@@ -134,8 +134,10 @@ supply_requests — requester_id, items, status, eta
 
 conflict_log  — event_id, patient_id, algo_value, human_value, reason, actor_id
 
-Repo Structure
-<img width="755" height="486" alt="image" src="https://github.com/user-attachments/assets/598813a0-25a7-48c2-aea4-c8e49d940ac8" />
+Repo Structure:
+
+<img width="752" height="482" alt="image" src="https://github.com/user-attachments/assets/781432f0-2c11-4690-b4d5-55177547f71e" />
+
 
 Status
 
