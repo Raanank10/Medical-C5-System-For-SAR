@@ -34,11 +34,17 @@ Core Features
 🏥 7-Step Treatment Pipeline (Mobile)
 
 Location — Building, floor, apartment, structural status, looks
+
 Access — Free / Partial / Trapped (arms Crush Syndrome watchdog)
+
 T-Kit — Tourniquet log with auto-applied time and elapsed counter
+
 Vitals — Tap-to-count heart rate (15s × 4) and respiratory rate (30s × 2); AVPU 4-button; BP palpation 3-button
+
 Triage — MSTART (adult) / JumpSTART (pediatric) with algorithmic suggestion, manual override with mandatory audit reason
+
 Status — Treating / Observing / Extricated
+
 Interventions — Morphine, IV Fluids, Actiq with auto-inventory decrement and TBI safety guard
 
 ⏱ Watchdog Stack (Local Clocks — No Connectivity Required)
