@@ -69,22 +69,38 @@ Time-to-clear per sector
 Supply burn rate vs. predicted stock
 
 
-Triage Algorithms
+Triage Algorithms:
 MSTART (Adult, age ≥ 8)
+
 RR = 0           → BLACK
+
 RR > 30 or < 8   → RED
+
 BP = None        → RED (MCI override possible — PC/CC only, logged)
+
 AVPU Unresponsive → RED
+
 AVPU Pain        → YELLOW
+
 else             → GREEN
+
 JumpSTART (Pediatric, age < 8)
+
 RR = 0 → check pulse
+
   No pulse        → BLACK
+  
 RR < 15 or > 45  → RED
+
 BP = None        → RED
+
 AVPU Unresponsive → RED
+
 AVPU Pain        → YELLOW
+
 else             → GREEN
+
+Black - Unsaveable, Red - Urgent to extraction, Yellow - Non-urgent to extraction but needs oversavtion, Green - Non-urgent to extraction
 
 Technical Architecture
 Mobile (React Native / Expo)
