@@ -103,47 +103,39 @@ else             → GREEN
 Black - Unsaveable, Red - Urgent to extraction, Yellow - Non-urgent to extraction but needs oversavtion, Green - Non-urgent to extraction
 
 Technical Architecture
-Mobile (React Native / Expo)
-      ↕ Offline-first / Append-only sync
-Web Dashboard (React + Tailwind)
-      ↕ Supabase Realtime subscriptions
+Mobile (React Native / Expo) - Offline-first / Append-only sync
+
+Web Dashboard (React + Tailwind) - Supabase Realtime subscriptions
+
 PostgreSQL (Event-Sourced schema)
+
 Design principle: Every action is an immutable, timestamped JSON event. Nothing is ever updated or deleted. The current state is computed by replaying the event log. This means:
 
 100% auditability
+
 Zero merge conflicts in offline-sync scenarios
+
 Complete after-action reconstruction from any device's partial log
 
 
-Database Schema (Simplified)
+Database Schema (Simplified):
+
 incidents     — id, t_zero, location, status
+
 users         — id, name, role, device_id, last_seen
+
 patients      — id, incident_id, visual_id, triage, location, status, handed_over
+
 events        — id, patient_id, actor_id, type, payload, local_timestamp, synced_at
+
 inventory     — owner_id, item_id, quantity, threshold
+
 supply_requests — requester_id, items, status, eta
+
 conflict_log  — event_id, patient_id, algo_value, human_value, reason, actor_id
 
 Repo Structure
-c5-sentinel-sar/
-├── README.md
-├── SPEC.md                          ← Full technical specification v1.0
-├── docs/
-│   └── linkedin-series.md           ← Project story & public communications (later on)
-├── mobile/                          ← React Native / Expo app (planned)
-│   ├── src/
-│   │   ├── screens/
-│   │   ├── components/
-│   │   └── logic/
-│   │       ├── mstart.js
-│   │       ├── watchdog.js
-│   │       └── eventStore.js
-├── web/                             ← React dashboard (planned)
-│   ├── src/
-│   │   ├── views/
-│   │   └── components/
-└── supabase/                        ← DB schema & migrations (planned)
-    └── schema.sql
+<img width="755" height="486" alt="image" src="https://github.com/user-attachments/assets/598813a0-25a7-48c2-aea4-c8e49d940ac8" />
 
 Status
 
