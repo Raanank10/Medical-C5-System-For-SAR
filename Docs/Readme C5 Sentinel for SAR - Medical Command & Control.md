@@ -33,7 +33,7 @@ Medic → Platoon Commander → Logistics Officer → Company Commander (CC) →
 Core Features
 🏥 7-Step Treatment Pipeline (Mobile)
 
-Location — Building, floor, apartment, structural status
+Location — Building, floor, apartment, structural status, looks
 Access — Free / Partial / Trapped (arms Crush Syndrome watchdog)
 T-Kit — Tourniquet log with auto-applied time and elapsed counter
 Vitals — Tap-to-count heart rate (15s × 4) and respiratory rate (30s × 2); AVPU 4-button; BP palpation 3-button
@@ -42,15 +42,6 @@ Status — Treating / Observing / Extricated
 Interventions — Morphine, IV Fluids, Actiq with auto-inventory decrement and TBI safety guard
 
 ⏱ Watchdog Stack (Local Clocks — No Connectivity Required)
- Alert 	 Trigger 
- Crush Syndrome 	 T+45 min from T₀ for any trapped patient 
- Golden Hour Amber 	 T+45 min from injury time 
- Golden Hour Red 	 T+60 min from injury time 
- T-Kit Warning: 60 min since tourniquet applied 
- T-Kit Critical 	 120 min since tourniquet applied 
- Re-assess RED 	 every 10 min 
- Re-assess YELLOW 	 Every 30 min 
- Dead Man's Switch 	 Medic device inactive >5m 
 <img width="470" height="217" alt="image" src="https://github.com/user-attachments/assets/574ec9ca-3ec8-44d8-8b93-28302d92d582" />
 
 🖥 Command Dashboard (Web)
