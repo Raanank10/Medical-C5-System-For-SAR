@@ -27,15 +27,15 @@ Interfaces
 **Frontend (Field)**: React Native / Expo (Optimized for one-handed, gloved operation).
 **Dashboard (Command)**: React + Tailwind (Real-time Heatmaps & Funnels).
 
-Roles
-Medic → Platoon Commander → Logistics Officer → Company Commander (CC) → Chamal
+Roles:
+Medic → Platoon Commander (PC) → Logistics Officer → Company Commander (CC) → Chamal
 
 Core Features
 🏥 7-Step Treatment Pipeline (Mobile)
 
 Location — Building, floor, apartment, structural status, looks
 
-Access — Free / Partial / Trapped (arms Crush Syndrome watchdog)
+Access — Free / Partial (arms Crush Syndrome watchdog) / Trapped (arms Crush Syndrome watchdog)
 
 T-Kit — Tourniquet log with auto-applied time and elapsed counter
 
