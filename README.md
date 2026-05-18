@@ -2,6 +2,8 @@
 
 Mission-critical Medical Command and Control for Search and Rescue mass-casualty operations.
 
+**[Live Demo ->](https://raanank10.github.io/Medical-C5-System-For-SAR/)**
+
 C5 Sentinel-SAR is an offline-first prototype for medical SAR teams operating in rubble, missile-impact, and mass-casualty scenarios. It turns field actions into structured operational data so medics, platoon commanders, logistics officers, company command, and Chamal can answer the questions that usually disappear into radio traffic:
 
 - How many casualties are active right now?
@@ -19,7 +21,9 @@ The project is intentionally built along two tracks:
 
 ## Current Demo
 
-Open [`index.html`](index.html) in a browser to run the standalone Hebrew prototype.
+Use the **[Live Demo](https://raanank10.github.io/Medical-C5-System-For-SAR/)** for the fastest walkthrough.
+
+You can also open [`index.html`](index.html) locally after cloning the repo.
 
 The same demo is also available at [`demo/rescue-app.html`](demo/rescue-app.html).
 
@@ -58,23 +62,40 @@ Core technical docs:
 
 ## Analytics And AAR
 
-The analytics package shows how the event log becomes command insight and after-action learning.
+The analytics package is a standalone Python layer showing how the event log becomes command insight and after-action learning.
 
 Location: [`analytics/c5_sentinel_sar_analytics_v1_1`](analytics/c5_sentinel_sar_analytics_v1_1)
 
-It includes:
+It includes a SQLite demo database, KPI computation engine, tactical charts, and a self-contained HTML AAR report generator.
 
-- KPI computation engine
-- SQLite demo database
-- command summary metrics
-- vitals reassessment compliance
-- Golden Hour compliance
-- high-risk clinical violation tracking
-- data freshness and sync health
-- stockout risk analysis
-- self-contained HTML AAR report generator
+| KPI | Source | Threshold / Interpretation |
+|---|---|---|
+| Command casualty picture | `patients`, `incident_command_state` | Current red/yellow/green/black counts for command decisions |
+| Time to first vitals | `events` where `type = 'VITALS_RECORDED'` | Target: first vitals within 5 minutes of patient registration |
+| Vitals reassessment compliance | `patients.last_vitals_at`, vitals events | Red target: 10 minutes; Yellow target: 30 minutes |
+| Golden Hour compliance | `patients.t_injury`, `patients.handed_over_at` | Tracks handover within 60 minutes from injury time |
+| Tourniquet reassessment due | `tourniquets.next_reassessment_due_at` | Due or overdue tourniquets require command/clinical attention |
+| High-risk clinical violations | `watchdog_alerts`, `conflict_log` | Preserved and escalated, not silently blocked |
+| Dead Man's Switch | `device_presence`, `watchdog_alerts` | Medic/device silent for more than 5 minutes |
+| Sync freshness | `device_sync_state.last_successful_pull_at` | Fresh under 60s; stale over 60s; critical over 300s |
+| Sync latency | local/server event timestamps | p95 latency indicates offline/sync degradation |
+| Stockout risk | `inventory_ledger` burn rate | Flags negative stock and items at risk of depletion |
 
-See [`docs/METRICS_DICTIONARY.md`](docs/METRICS_DICTIONARY.md) for the analyst-facing metric definitions.
+Example output:
+
+- [`analytics/c5_sentinel_sar_analytics_v1_1/aar_report_v1_1.html`](analytics/c5_sentinel_sar_analytics_v1_1/aar_report_v1_1.html)
+- [`analytics/c5_sentinel_sar_analytics_v1_1/analytics_demo.ipynb`](analytics/c5_sentinel_sar_analytics_v1_1/analytics_demo.ipynb)
+- [`docs/METRICS_DICTIONARY.md`](docs/METRICS_DICTIONARY.md)
+
+This is the portfolio-facing proof that the project is not only a UI mockup: it defines operational metrics, computes them from event data, and translates them into command decisions.
+
+## Version History
+
+The `versions/` folder preserves the product and architecture progression:
+
+- [`versions/v0.6`](versions/v0.6) - earlier MVP specification and schema baseline.
+- [`versions/v0.7`](versions/v0.7) - architecture hardening pass, including offline sync, event-sourcing, inventory ledger, realtime outbox, Quick Patient mode, and SQLite-first mobile storage.
+- [`versions/v1.1`](versions/v1.1) - current production-ready specification package with sync-log-first API, command/AAR endpoints, scoped RLS baseline, analytics alignment, and PC demo package.
 
 ## Repository Structure
 
@@ -97,8 +118,10 @@ See [`docs/METRICS_DICTIONARY.md`](docs/METRICS_DICTIONARY.md) for the analyst-f
 |   `-- c5_sentinel_sar_analytics_v1_1/
 |-- assets/
 |   `-- mockups/
-`-- Docs/
-    `-- Readme C5 Sentinel for SAR - Medical Command & Control.md
+`-- versions/
+    |-- v0.6/
+    |-- v0.7/
+    `-- v1.1/
 ```
 
 ## Interview Narrative

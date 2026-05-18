@@ -1,0 +1,1064 @@
+-- C5 Sentinel-SAR PostgreSQL / Supabase Schema v0.6
+-- Event-sourced, offline-first, realtime-outbox architecture
+
+create extension if not exists pgcrypto;
+
+-- =========================================================
+-- ENUMS
+-- =========================================================
+
+do $$ begin create type user_role as enum ('medic','pc','logistics_officer','cc','chamal','admin'); exception when duplicate_object then null; end $$;
+do $$ begin create type incident_status as enum ('draft','staging','active','closed'); exception when duplicate_object then null; end $$;
+do $$ begin create type triage_level as enum ('red','yellow','green','black','pending','unknown'); exception when duplicate_object then null; end $$;
+do $$ begin create type access_status as enum ('trapped','partial','free','unknown'); exception when duplicate_object then null; end $$;
+do $$ begin create type patient_status as enum ('identified','treating','observing','extricated','handed_over','closed','self_evacuated','deceased','unknown'); exception when duplicate_object then null; end $$;
+do $$ begin create type supply_request_status as enum ('requested','approved','dispatched','in_transit','delivered','cancelled'); exception when duplicate_object then null; end $$;
+do $$ begin create type external_source as enum ('mda','united_hatzalah','police','idf','civilian','other'); exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type event_type as enum (
+    'INCIDENT_DRAFT_CREATED','INCIDENT_OPENED','INCIDENT_CONFIRMED','INCIDENT_DRAFT_MERGED','INCIDENT_DRAFT_REJECTED','INCIDENT_CLOSED','INCIDENT_REOPENED',
+    'PATIENT_CREATED','QUICK_PATIENT_CREATED','PATIENT_T_INJURY_UPDATED','PATIENT_LOCATION_UPDATED','PATIENT_ACCESS_UPDATED','PATIENT_TRIAGE_UPDATED','PATIENT_STATUS_UPDATED','PATIENT_HANDED_OVER',
+    'VITALS_RECORDED','MINIMAL_TRIAGE_RECORDED','SABCDE_RECORDED','MSTART_SUGGESTED','JUMPSTART_SUGGESTED','MSTART_OVERRIDE','JUMPSTART_OVERRIDE',
+    'TOURNIQUET_APPLIED','TOURNIQUET_STATUS_RECORDED','INTERVENTION_RECORDED','MEDICATION_ADMINISTERED',
+    'EXTERNAL_REPORT_CREATED','EXTERNAL_REPORT_LINKED',
+    'SUPPLY_REQUEST_CREATED','SUPPLY_REQUEST_DISPATCHED','SUPPLY_REQUEST_IN_TRANSIT','SUPPLY_REQUEST_RECEIVED',
+    'INVENTORY_LEDGER_ENTRY','INVENTORY_INITIALIZED','INVENTORY_TRANSFER_OUT','INVENTORY_TRANSFER_IN','PLATOON_STOCK_INITIALIZED','PLATOON_STOCK_REFILLED','DIRECT_LOGO_TO_MEDIC_REFILL','WATCHDOG_ALERT','WATCHDOG_ACKNOWLEDGED','WATCHDOG_RESOLVED',
+    'BUILDING_STATUS_UPDATED','SITE_CLEAR_CONFIRMED','MEDIC_SITE_CLOSE_REQUESTED',
+    'SYNC_CONFLICT','CONFLICT_LOG_ENTRY','TREATMENT_SAFETY_WARNING','UX_METRIC_RECORDED','SYNC_ATTEMPT_RECORDED','NOTE_ADDED'
+  );
+exception when duplicate_object then null; end $$;
+
+-- =========================================================
+-- USERS / PROFILES
+-- =========================================================
+
+create table if not exists profiles (
+  id uuid primary key default gen_random_uuid(),
+  display_name text not null,
+  role user_role not null default 'medic',
+  unit_name text,
+  phone text,
+  device_id text,
+  last_seen_at timestamptz,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  version integer not null default 1
+);
+
+create index if not exists idx_profiles_role on profiles(role);
+create index if not exists idx_profiles_last_seen on profiles(last_seen_at);
+
+-- =========================================================
+-- INCIDENTS
+-- t_zero is official strike/incident time.
+-- t_injury_default defaults to t_zero and is used by clinical timers.
+-- =========================================================
+
+create table if not exists incidents (
+  id uuid primary key default gen_random_uuid(),
+  visual_id text unique,
+  t_zero timestamptz not null,
+  t_injury_default timestamptz not null,
+  location_name text not null,
+  address text,
+  incident_type text,
+  status incident_status not null default 'draft',
+  is_draft boolean not null default true,
+  draft_created_by uuid references profiles(id),
+  confirmed_by uuid references profiles(id),
+  opened_by uuid references profiles(id),
+  closed_by uuid references profiles(id),
+  opened_at timestamptz not null default now(),
+  confirmed_at timestamptz,
+  draft_acknowledged_by uuid references profiles(id),
+  draft_acknowledged_at timestamptz,
+  draft_resolved_at timestamptz,
+  closed_at timestamptz,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  version integer not null default 1,
+  constraint chk_incident_time_default check (t_injury_default = t_zero or t_injury_default is not null)
+);
+
+create index if not exists idx_incidents_status on incidents(status);
+create index if not exists idx_incidents_t_zero on incidents(t_zero);
+
+-- =========================================================
+-- SECTORS
+-- =========================================================
+
+create table if not exists sectors (
+  id uuid primary key default gen_random_uuid(),
+  incident_id uuid not null references incidents(id) on delete cascade,
+  building_no text not null,
+  floor text,
+  apartment text,
+  room text,
+  sector_label text,
+  building_status text not null default 'unknown' check (building_status in ('stable','unstable','unknown')),
+  is_site_clear boolean not null default false,
+  site_clear_confirmed_by uuid references profiles(id),
+  site_clear_confirmed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  version integer not null default 1,
+  unique (incident_id, building_no, floor, apartment, room)
+);
+
+create index if not exists idx_sectors_incident on sectors(incident_id);
+create index if not exists idx_sectors_location on sectors(incident_id, building_no, floor, apartment, room);
+
+-- =========================================================
+-- PATIENTS — projection/read model
+-- =========================================================
+
+create table if not exists patients (
+  id uuid primary key default gen_random_uuid(),
+  incident_id uuid not null references incidents(id) on delete cascade,
+  sector_id uuid references sectors(id),
+  visual_id text not null,
+  optional_name text,
+  t_injury timestamptz not null,
+  current_triage triage_level not null default 'pending',
+  algorithm_triage triage_level,
+  access_status access_status not null default 'unknown',
+  current_status patient_status not null default 'identified',
+  is_pediatric boolean not null default false,
+  pediatric_age_years integer,
+  needs_full_assessment boolean not null default false,
+  pending_incident_approval boolean not null default false,
+  pulse_present boolean,
+  breathing_present boolean,
+  tourniquet_used boolean,
+  is_trapped boolean generated always as (access_status in ('trapped','partial')) stored,
+  location_json jsonb not null default '{}'::jsonb,
+  last_vitals_at timestamptz,
+  last_seen_at timestamptz,
+  handed_over_at timestamptz,
+  handed_over_to text,
+  handover_token uuid not null default gen_random_uuid(),
+  handover_token_used_at timestamptz,
+  handover_token_expires_at timestamptz,
+  created_by uuid references profiles(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  version integer not null default 1,
+  unique (incident_id, visual_id),
+  constraint chk_pediatric_age check (pediatric_age_years is null or pediatric_age_years between 0 and 17)
+);
+
+create index if not exists idx_patients_incident on patients(incident_id);
+create index if not exists idx_patients_triage on patients(current_triage);
+create index if not exists idx_patients_status on patients(current_status);
+create index if not exists idx_patients_sector on patients(sector_id);
+create index if not exists idx_patients_last_vitals on patients(last_vitals_at);
+create unique index if not exists idx_patients_handover_token on patients(handover_token);
+create index if not exists idx_patients_needs_full_assessment on patients(needs_full_assessment) where needs_full_assessment = true;
+create index if not exists idx_patients_pending_incident_approval on patients(pending_incident_approval) where pending_incident_approval = true;
+
+-- =========================================================
+-- EVENTS — immutable append-only log
+-- =========================================================
+
+create table if not exists events (
+  id uuid primary key default gen_random_uuid(),
+  incident_id uuid not null references incidents(id) on delete cascade,
+  patient_id uuid references patients(id) on delete cascade,
+  actor_id uuid references profiles(id),
+  actor_role user_role,
+  type event_type not null,
+  payload_json jsonb not null default '{}'::jsonb,
+  device_id text,
+  local_event_id text not null,
+  local_timestamp timestamptz not null,
+  server_timestamp timestamptz not null default now(),
+  synced_at timestamptz,
+  sync_cursor bigserial,
+  event_version integer not null default 1,
+  unique (device_id, local_event_id)
+);
+
+create index if not exists idx_events_incident_time on events(incident_id, server_timestamp);
+create index if not exists idx_events_patient_time on events(patient_id, server_timestamp);
+create index if not exists idx_events_type on events(type);
+create index if not exists idx_events_sync_cursor on events(sync_cursor);
+create index if not exists idx_events_payload_gin on events using gin(payload_json);
+create index if not exists idx_events_vitals_bp on events ((payload_json->>'bp')) where type = 'VITALS_RECORDED' and payload_json ? 'bp';
+create index if not exists idx_events_vitals_avpu on events ((payload_json->>'avpu')) where type = 'VITALS_RECORDED' and payload_json ? 'avpu';
+create index if not exists idx_events_vitals_spo2 on events (((payload_json->>'spo2')::int)) where type = 'VITALS_RECORDED' and payload_json ? 'spo2';
+create index if not exists idx_events_triage on events ((payload_json->>'triage')) where payload_json ? 'triage';
+create index if not exists idx_events_status on events ((payload_json->>'status')) where payload_json ? 'status';
+
+create or replace function prevent_event_mutation()
+returns trigger as $$
+begin
+  raise exception 'events are immutable. append a new event instead.';
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_prevent_event_update on events;
+create trigger trg_prevent_event_update
+before update or delete on events
+for each row execute function prevent_event_mutation();
+
+-- =========================================================
+-- REALTIME OUTBOX
+-- =========================================================
+
+create table if not exists realtime_outbox (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid references events(id) on delete cascade,
+  incident_id uuid not null references incidents(id) on delete cascade,
+  patient_id uuid references patients(id) on delete cascade,
+  event_type event_type not null,
+  channel text not null default 'chamal',
+  payload_json jsonb not null default '{}'::jsonb,
+  origin_device_id text,
+  created_at timestamptz not null default now(),
+  processed_at timestamptz,
+  retry_count integer not null default 0,
+  last_error text
+);
+
+create index if not exists idx_realtime_outbox_unprocessed on realtime_outbox(created_at) where processed_at is null;
+create index if not exists idx_realtime_outbox_incident on realtime_outbox(incident_id, created_at);
+
+-- =========================================================
+-- EXTERNAL REPORTS / DEDUP
+-- =========================================================
+
+create table if not exists external_reports (
+  id uuid primary key default gen_random_uuid(),
+  incident_id uuid not null references incidents(id) on delete cascade,
+  source external_source not null,
+  external_reference text,
+  reported_red integer not null default 0 check (reported_red >= 0),
+  reported_yellow integer not null default 0 check (reported_yellow >= 0),
+  reported_green integer not null default 0 check (reported_green >= 0),
+  reported_black integer not null default 0 check (reported_black >= 0),
+  evacuation_destination text,
+  notes text,
+  created_by uuid references profiles(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  version integer not null default 1
+);
+
+create index if not exists idx_external_reports_incident on external_reports(incident_id);
+create index if not exists idx_external_reports_source on external_reports(source);
+
+create table if not exists external_patient_links (
+  id uuid primary key default gen_random_uuid(),
+  external_report_id uuid not null references external_reports(id) on delete cascade,
+  patient_id uuid not null references patients(id) on delete cascade,
+  match_score numeric(5,2) not null default 0,
+  match_reason jsonb not null default '{}'::jsonb,
+  linked_by uuid references profiles(id),
+  linked_at timestamptz not null default now(),
+  unique (external_report_id, patient_id)
+);
+
+-- =========================================================
+-- INVENTORY LEDGER / LOGISTICS
+-- =========================================================
+
+create table if not exists inventory_items (
+  id uuid primary key default gen_random_uuid(),
+  sku text unique not null,
+  name text not null,
+  category text,
+  unit text not null default 'unit',
+  is_life_saving boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  version integer not null default 1
+);
+
+-- Treatment catalog defines available treatment actions and their safety requirements.
+create table if not exists treatment_catalog (
+  id uuid primary key default gen_random_uuid(),
+  code text unique not null,
+  display_name text not null,
+  category text not null check (category in ('hemorrhage','airway','circulation','medication','cpr','other')),
+  event_type event_type not null,
+  requires_limb boolean not null default false,
+  requires_application_time boolean not null default false,
+  is_medication boolean not null default false,
+  requires_pediatric_weight boolean not null default false,
+  warns_on_reduced_avpu boolean not null default false,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Maps a treatment action to inventory consumption.
+-- Example: TOURNIQUET -> TQ x1; COMBAT_GAUZE -> COMBAT_GAUZE x1.
+create table if not exists treatment_inventory_items (
+  id uuid primary key default gen_random_uuid(),
+  treatment_code text not null references treatment_catalog(code),
+  item_id uuid not null references inventory_items(id),
+  quantity_per_treatment integer not null check (quantity_per_treatment > 0),
+  unique (treatment_code, item_id)
+);
+
+create index if not exists idx_treatment_catalog_active on treatment_catalog(is_active) where is_active = true;
+
+
+create table if not exists inventory_ledger (
+  id uuid primary key default gen_random_uuid(),
+  incident_id uuid references incidents(id) on delete cascade,
+
+  -- Current owner of this ledger row.
+  owner_id uuid references profiles(id),
+  owner_type text not null default 'medic_bag' check (owner_type in ('medic_bag','platoon_stock','truck_stock','logistics_stock','external')),
+  owner_label text,
+
+  -- Transfer metadata. Paired transfer rows share transfer_group_id.
+  source_owner_id uuid references profiles(id),
+  source_owner_type text check (source_owner_type in ('medic_bag','platoon_stock','truck_stock','logistics_stock','external')),
+  target_owner_id uuid references profiles(id),
+  target_owner_type text check (target_owner_type in ('medic_bag','platoon_stock','truck_stock','logistics_stock','external')),
+  transfer_group_id uuid,
+  transfer_kind text check (transfer_kind in ('INITIAL_FILL','MEDIC_REQUEST_FROM_PLATOON','PC_TO_MEDIC','LOGO_TO_PLATOON','DIRECT_LOGO_TO_MEDIC','TREATMENT_CONSUMPTION','MANUAL_ADJUSTMENT')),
+  authorized_by uuid references profiles(id),
+  direct_override_reason text,
+
+  item_id uuid not null references inventory_items(id),
+  quantity_change integer not null,
+  location_at_time jsonb not null default '{}'::jsonb,
+  reason text not null check (reason in ('INITIAL_STOCK','INTERVENTION_USED','MEDICATION_USED','TRANSFER_OUT','TRANSFER_IN','RESUPPLY_SENT','RESUPPLY_RECEIVED','MANUAL_ADJUSTMENT','LOSS_REPORTED')),
+  related_patient_id uuid references patients(id),
+  related_event_id uuid references events(id),
+  supply_request_id uuid,
+  device_id text,
+  local_ledger_id text not null,
+  local_timestamp timestamptz not null,
+  server_timestamp timestamptz not null default now(),
+  synced_at timestamptz,
+  notes text,
+  unique (device_id, local_ledger_id),
+  constraint chk_inventory_direct_logo_override check (
+    transfer_kind <> 'DIRECT_LOGO_TO_MEDIC'
+    or (direct_override_reason is not null and length(trim(direct_override_reason)) >= 10)
+  )
+);
+
+create index if not exists idx_inventory_ledger_incident on inventory_ledger(incident_id);
+create index if not exists idx_inventory_ledger_owner_item on inventory_ledger(owner_id, owner_label, item_id);
+create index if not exists idx_inventory_ledger_item on inventory_ledger(item_id);
+create index if not exists idx_inventory_ledger_time on inventory_ledger(server_timestamp);
+
+create index if not exists idx_inventory_ledger_owner_type_item on inventory_ledger(owner_type, owner_id, owner_label, item_id);
+create index if not exists idx_inventory_ledger_transfer_group on inventory_ledger(transfer_group_id) where transfer_group_id is not null;
+create index if not exists idx_inventory_ledger_transfer_kind on inventory_ledger(transfer_kind) where transfer_kind is not null;
+
+
+create table if not exists kit_templates (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  description text,
+  is_active boolean not null default true,
+  created_by uuid references profiles(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  version integer not null default 1
+);
+
+create table if not exists kit_template_items (
+  id uuid primary key default gen_random_uuid(),
+  kit_template_id uuid not null references kit_templates(id) on delete cascade,
+  item_id uuid not null references inventory_items(id),
+  quantity integer not null check (quantity > 0),
+  unique (kit_template_id, item_id)
+);
+
+create table if not exists supply_requests (
+  id uuid primary key default gen_random_uuid(),
+  incident_id uuid not null references incidents(id) on delete cascade,
+  requester_id uuid not null references profiles(id),
+  supervisor_id uuid references profiles(id),
+  logistics_officer_id uuid references profiles(id),
+  kit_template_id uuid references kit_templates(id),
+  status supply_request_status not null default 'requested',
+  request_level text not null default 'medic_to_pc' check (request_level in ('medic_to_pc','pc_to_logo','logo_direct_to_medic')),
+  parent_supply_request_id uuid,
+  approved_by_pc uuid references profiles(id),
+  direct_resupply_override_reason text,
+  delivery_location_json jsonb not null default '{}'::jsonb,
+  eta_minutes integer,
+  notes text,
+  requested_at timestamptz not null default now(),
+  dispatched_at timestamptz,
+  in_transit_at timestamptz,
+  delivered_at timestamptz,
+  updated_at timestamptz not null default now(),
+  version integer not null default 1
+);
+
+create index if not exists idx_supply_requests_incident on supply_requests(incident_id);
+create index if not exists idx_supply_requests_status on supply_requests(status);
+create index if not exists idx_supply_requests_request_level on supply_requests(request_level);
+
+alter table supply_requests drop constraint if exists fk_supply_requests_parent;
+alter table supply_requests add constraint fk_supply_requests_parent foreign key (parent_supply_request_id) references supply_requests(id);
+
+alter table supply_requests drop constraint if exists chk_supply_direct_override_reason;
+alter table supply_requests add constraint chk_supply_direct_override_reason check (
+  request_level <> 'logo_direct_to_medic'
+  or (direct_resupply_override_reason is not null and length(trim(direct_resupply_override_reason)) >= 10)
+);
+
+create table if not exists supply_request_items (
+  id uuid primary key default gen_random_uuid(),
+  supply_request_id uuid not null references supply_requests(id) on delete cascade,
+  item_id uuid not null references inventory_items(id),
+  quantity integer not null check (quantity > 0),
+  unique (supply_request_id, item_id)
+);
+
+alter table inventory_ledger drop constraint if exists fk_inventory_ledger_supply_request;
+alter table inventory_ledger add constraint fk_inventory_ledger_supply_request foreign key (supply_request_id) references supply_requests(id);
+
+-- =========================================================
+-- WATCHDOG / DEVICE / CONFLICT
+-- =========================================================
+
+create table if not exists watchdog_alerts (
+  id uuid primary key default gen_random_uuid(),
+  incident_id uuid not null references incidents(id) on delete cascade,
+  patient_id uuid references patients(id) on delete cascade,
+  actor_id uuid references profiles(id),
+  alert_type text not null,
+  severity text not null check (severity in ('info','warning','critical')),
+  message text not null,
+  triggered_at timestamptz not null default now(),
+  acknowledged_by uuid references profiles(id),
+  acknowledged_at timestamptz,
+  resolved_at timestamptz,
+  payload_json jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now(),
+  version integer not null default 1
+);
+
+create index if not exists idx_watchdog_incident on watchdog_alerts(incident_id);
+create index if not exists idx_watchdog_patient on watchdog_alerts(patient_id);
+create index if not exists idx_watchdog_unresolved on watchdog_alerts(resolved_at) where resolved_at is null;
+
+create table if not exists device_presence (
+  id uuid primary key default gen_random_uuid(),
+  incident_id uuid references incidents(id) on delete cascade,
+  actor_id uuid not null references profiles(id),
+  device_id text not null,
+  current_location_json jsonb not null default '{}'::jsonb,
+  current_patient_id uuid references patients(id),
+  last_heartbeat_at timestamptz not null default now(),
+  sync_status text not null default 'online' check (sync_status in ('online','offline','syncing','error')),
+  updated_at timestamptz not null default now(),
+  version integer not null default 1,
+  unique (incident_id, actor_id, device_id)
+);
+
+create index if not exists idx_device_presence_incident on device_presence(incident_id);
+create index if not exists idx_device_presence_heartbeat on device_presence(last_heartbeat_at);
+
+create table if not exists conflict_log (
+  id uuid primary key default gen_random_uuid(),
+  incident_id uuid not null references incidents(id) on delete cascade,
+  event_id uuid references events(id),
+  patient_id uuid references patients(id),
+  actor_id uuid references profiles(id),
+  conflict_type text not null,
+  severity text not null default 'medium' check (severity in ('low','medium','high','critical')),
+  algorithm_value text,
+  human_value text,
+  reason text,
+  description text not null,
+  payload_json jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  resolved_by uuid references profiles(id),
+  resolved_at timestamptz,
+  updated_at timestamptz not null default now(),
+  version integer not null default 1
+);
+
+create index if not exists idx_conflict_incident on conflict_log(incident_id);
+create index if not exists idx_conflict_patient on conflict_log(patient_id);
+create index if not exists idx_conflict_unresolved on conflict_log(resolved_at) where resolved_at is null;
+
+-- =========================================================
+-- TRIGGER: projections + outbox + conflict materialization
+-- =========================================================
+
+create or replace function apply_event_projection_and_outbox()
+returns trigger as $$
+begin
+  if new.patient_id is not null then
+    if new.type = 'VITALS_RECORDED' then
+      update patients
+      set last_vitals_at = new.local_timestamp,
+          last_seen_at = new.local_timestamp,
+          needs_full_assessment = false,
+          updated_at = now(),
+          version = version + 1
+      where id = new.patient_id;
+
+    elsif new.type = 'MINIMAL_TRIAGE_RECORDED' or new.type = 'QUICK_PATIENT_CREATED' then
+      update patients
+      set pulse_present = coalesce((new.payload_json->>'pulse_present')::boolean, pulse_present),
+          breathing_present = coalesce((new.payload_json->>'breathing_present')::boolean, breathing_present),
+          tourniquet_used = coalesce((new.payload_json->>'tourniquet_used')::boolean, tourniquet_used),
+          needs_full_assessment = true,
+          updated_at = now(),
+          version = version + 1
+      where id = new.patient_id;
+
+    elsif new.type = 'PATIENT_TRIAGE_UPDATED' then
+      update patients
+      set current_triage = coalesce((new.payload_json->>'triage')::triage_level, current_triage),
+          algorithm_triage = coalesce((new.payload_json->>'algorithm_triage')::triage_level, algorithm_triage),
+          updated_at = now(),
+          version = version + 1
+      where id = new.patient_id;
+
+    elsif new.type = 'PATIENT_ACCESS_UPDATED' then
+      update patients
+      set access_status = coalesce((new.payload_json->>'access_status')::access_status, access_status),
+          updated_at = now(),
+          version = version + 1
+      where id = new.patient_id;
+
+    elsif new.type = 'PATIENT_STATUS_UPDATED' then
+      update patients
+      set current_status = coalesce((new.payload_json->>'status')::patient_status, current_status),
+          updated_at = now(),
+          version = version + 1
+      where id = new.patient_id;
+
+    elsif new.type = 'PATIENT_LOCATION_UPDATED' then
+      update patients
+      set location_json = coalesce(new.payload_json->'location', location_json),
+          updated_at = now(),
+          version = version + 1
+      where id = new.patient_id;
+
+    elsif new.type = 'PATIENT_T_INJURY_UPDATED' then
+      update patients
+      set t_injury = coalesce((new.payload_json->>'t_injury')::timestamptz, t_injury),
+          updated_at = now(),
+          version = version + 1
+      where id = new.patient_id;
+
+    elsif new.type = 'PATIENT_HANDED_OVER' then
+      update patients
+      set current_status = 'handed_over',
+          handed_over_at = new.local_timestamp,
+          handed_over_to = coalesce(new.payload_json->>'handover_to', 'MDA / Evacuation'),
+          updated_at = now(),
+          version = version + 1
+      where id = new.patient_id;
+    end if;
+  end if;
+
+  if new.type in ('MSTART_OVERRIDE','JUMPSTART_OVERRIDE','SYNC_CONFLICT','CONFLICT_LOG_ENTRY','TREATMENT_SAFETY_WARNING') then
+    insert into conflict_log (incident_id, event_id, patient_id, actor_id, conflict_type, severity, algorithm_value, human_value, reason, description, payload_json)
+    values (
+      new.incident_id,
+      new.id,
+      new.patient_id,
+      new.actor_id,
+      new.type::text,
+      coalesce(new.payload_json->>'severity','medium'),
+      new.payload_json->>'algorithm_value',
+      new.payload_json->>'human_value',
+      new.payload_json->>'reason',
+      coalesce(new.payload_json->>'description', new.type::text),
+      new.payload_json
+    );
+  end if;
+
+  if new.type in (
+    'PATIENT_CREATED','QUICK_PATIENT_CREATED','VITALS_RECORDED','MINIMAL_TRIAGE_RECORDED',
+    'PATIENT_TRIAGE_UPDATED','PATIENT_STATUS_UPDATED','PATIENT_HANDED_OVER',
+    'INTERVENTION_RECORDED','MEDICATION_ADMINISTERED','TOURNIQUET_APPLIED','TREATMENT_SAFETY_WARNING',
+    'WATCHDOG_ALERT','SUPPLY_REQUEST_CREATED','SUPPLY_REQUEST_DISPATCHED','SUPPLY_REQUEST_IN_TRANSIT','SUPPLY_REQUEST_RECEIVED',
+    'BUILDING_STATUS_UPDATED','SITE_CLEAR_CONFIRMED','SYNC_CONFLICT','MSTART_OVERRIDE','JUMPSTART_OVERRIDE'
+  ) then
+    insert into realtime_outbox (event_id, incident_id, patient_id, event_type, channel, payload_json, origin_device_id)
+    values (new.id, new.incident_id, new.patient_id, new.type, 'chamal', new.payload_json, new.device_id);
+  end if;
+
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_events_projection_outbox on events;
+create trigger trg_events_projection_outbox
+after insert on events
+for each row execute function apply_event_projection_and_outbox();
+
+-- =========================================================
+-- VIEWS
+-- =========================================================
+
+create or replace view vw_patient_latest_vitals as
+select distinct on (e.patient_id)
+  e.patient_id,
+  e.local_timestamp as vitals_at,
+  coalesce((e.payload_json #>> '{heart_rate,calculated_bpm}')::int, (e.payload_json->>'hr')::int) as hr,
+  coalesce((e.payload_json #>> '{respiratory_rate,calculated_per_min}')::int, (e.payload_json->>'rr')::int) as rr,
+  e.payload_json->>'bp' as bp,
+  e.payload_json->>'avpu' as avpu,
+  (e.payload_json->>'spo2')::int as spo2
+from events e
+where e.type = 'VITALS_RECORDED'
+order by e.patient_id, e.local_timestamp desc;
+
+create or replace view vw_incident_tactical_funnel as
+select
+  i.id as incident_id,
+  count(p.id) filter (where p.current_status in ('identified')) as identified,
+  count(p.id) filter (where p.current_status in ('treating','observing')) as in_treatment,
+  count(p.id) filter (where p.current_status = 'extricated') as extricated,
+  count(p.id) filter (where p.current_status = 'handed_over') as handed_over,
+  count(p.id) as total
+from incidents i
+left join patients p on p.incident_id = i.id
+group by i.id;
+
+create or replace view vw_sector_clearance_status as
+select
+  s.id as sector_id,
+  s.incident_id,
+  s.building_no,
+  s.floor,
+  s.apartment,
+  s.room,
+  s.building_status,
+  s.is_site_clear,
+  count(p.id) as registered_patients,
+  count(p.id) filter (where p.current_status = 'handed_over') as handed_over_patients,
+  (
+    count(p.id) = count(p.id) filter (where p.current_status = 'handed_over')
+    and s.is_site_clear = true
+  ) as heatmap_green
+from sectors s
+left join patients p on p.sector_id = s.id
+group by s.id;
+
+create or replace view vw_current_inventory as
+select
+  il.incident_id,
+  il.owner_id,
+  il.owner_type,
+  il.owner_label,
+  il.item_id,
+  ii.sku,
+  ii.name as item_name,
+  ii.category,
+  ii.unit,
+  ii.is_life_saving,
+  sum(il.quantity_change) as current_quantity,
+  min(il.server_timestamp) as first_ledger_at,
+  max(il.server_timestamp) as last_ledger_at
+from inventory_ledger il
+join inventory_items ii on ii.id = il.item_id
+group by il.incident_id, il.owner_id, il.owner_type, il.owner_label, il.item_id, ii.sku, ii.name, ii.category, ii.unit, ii.is_life_saving;
+
+create or replace view vw_active_patient_priority as
+select
+  p.id as patient_id,
+  p.incident_id,
+  p.visual_id,
+  p.current_triage,
+  p.access_status,
+  p.current_status,
+  p.needs_full_assessment,
+  p.tourniquet_used,
+  p.pulse_present,
+  p.breathing_present,
+  p.location_json,
+  p.last_vitals_at,
+  v.hr,
+  v.rr,
+  v.bp,
+  v.avpu,
+  v.spo2,
+  case
+    when p.current_triage = 'red' then 100
+    when p.current_triage = 'yellow' then 60
+    when p.current_triage = 'green' then 20
+    when p.current_triage = 'black' then 5
+    when p.current_triage = 'pending' then 50
+    else 10
+  end
+  + case when p.needs_full_assessment then 40 else 0 end
+  + case when p.last_vitals_at is null then 30 else 0 end
+  + case when p.last_vitals_at < now() - interval '5 minutes' then 25 else 0 end
+  + case when v.spo2 is not null and v.spo2 < 92 then 25 else 0 end
+  + case when v.avpu is not null and v.avpu in ('Pain','Unresponsive') then 20 else 0 end
+  + case when p.tourniquet_used is true then 15 else 0 end
+  as priority_score
+from patients p
+left join vw_patient_latest_vitals v on v.patient_id = p.id
+where p.current_status not in ('handed_over','closed','self_evacuated','deceased');
+
+
+-- =========================================================
+-- v0.6 VITALS STEPPER SUPPORT INDEXES
+-- Stores raw count + measurement window in events.payload_json:
+-- {
+--   "heart_rate": {"raw_count": 31, "window_seconds": 15, "calculated_bpm": 124, "entry_method": "stepper"},
+--   "respiratory_rate": {"raw_count": 16, "window_seconds": 30, "calculated_per_min": 32, "entry_method": "stepper"}
+-- }
+-- =========================================================
+
+create index if not exists idx_events_vitals_hr_calculated
+on events (((payload_json #>> '{heart_rate,calculated_bpm}')::int))
+where type = 'VITALS_RECORDED'
+  and payload_json #>> '{heart_rate,calculated_bpm}' is not null;
+
+create index if not exists idx_events_vitals_hr_raw_count
+on events (((payload_json #>> '{heart_rate,raw_count}')::int))
+where type = 'VITALS_RECORDED'
+  and payload_json #>> '{heart_rate,raw_count}' is not null;
+
+create index if not exists idx_events_vitals_rr_calculated
+on events (((payload_json #>> '{respiratory_rate,calculated_per_min}')::int))
+where type = 'VITALS_RECORDED'
+  and payload_json #>> '{respiratory_rate,calculated_per_min}' is not null;
+
+create index if not exists idx_inventory_ledger_location_at_time
+on inventory_ledger using gin(location_at_time);
+
+
+-- =========================================================
+-- v0.6 PEDIATRIC MEDICATION SAFETY
+-- Blocks medication events for pediatric patients when weight_estimate_kg is missing.
+-- =========================================================
+
+create or replace function validate_pediatric_medication_event()
+returns trigger as $$
+declare
+  patient_is_pediatric boolean;
+begin
+  if new.patient_id is null or new.type not in ('MEDICATION_ADMINISTERED') then
+    return new;
+  end if;
+
+  select is_pediatric
+  into patient_is_pediatric
+  from patients
+  where id = new.patient_id;
+
+  if patient_is_pediatric = true
+     and (
+       new.payload_json->>'weight_estimate_kg' is null
+       or nullif(trim(new.payload_json->>'weight_estimate_kg'), '') is null
+     )
+  then
+    raise exception 'Pediatric medication events require weight_estimate_kg.';
+  end if;
+
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_validate_pediatric_medication_event on events;
+create trigger trg_validate_pediatric_medication_event
+before insert on events
+for each row execute function validate_pediatric_medication_event();
+
+
+-- =========================================================
+-- v0.6 TREATMENT UPDATE SUPPORT INDEXES
+-- =========================================================
+
+create index if not exists idx_events_treatment_type
+on events ((payload_json->>'treatment_type'))
+where type in ('INTERVENTION_RECORDED','MEDICATION_ADMINISTERED','TOURNIQUET_APPLIED')
+  and payload_json ? 'treatment_type';
+
+create index if not exists idx_events_treatment_location
+on events using gin ((payload_json->'location_at_time'))
+where type in ('INTERVENTION_RECORDED','MEDICATION_ADMINISTERED','TOURNIQUET_APPLIED')
+  and payload_json ? 'location_at_time';
+
+
+create or replace view vw_patient_treatment_history as
+select
+  e.id as event_id,
+  e.incident_id,
+  e.patient_id,
+  e.actor_id,
+  e.type,
+  e.local_timestamp,
+  e.payload_json->>'treatment_type' as treatment_type,
+  e.payload_json->>'limb' as limb,
+  e.payload_json->>'medication' as medication,
+  e.payload_json->'location_at_time' as location_at_time,
+  e.payload_json as payload_json
+from events e
+where e.type in ('INTERVENTION_RECORDED','MEDICATION_ADMINISTERED','TOURNIQUET_APPLIED')
+order by e.patient_id, e.local_timestamp;
+
+
+-- =========================================================
+-- v0.6 PLATOON STOCK LOGISTICS
+-- =========================================================
+
+create or replace view vw_platoon_stock as
+select
+  incident_id,
+  owner_id as platoon_commander_id,
+  owner_label,
+  item_id,
+  sku,
+  item_name,
+  category,
+  unit,
+  is_life_saving,
+  current_quantity,
+  first_ledger_at,
+  last_ledger_at
+from vw_current_inventory
+where owner_type = 'platoon_stock';
+
+create or replace view vw_inventory_transfer_audit as
+select
+  transfer_group_id,
+  incident_id,
+  min(server_timestamp) as transfer_started_at,
+  max(server_timestamp) as transfer_completed_at,
+  transfer_kind,
+  item_id,
+  sum(case when quantity_change < 0 then abs(quantity_change) else 0 end) as quantity_out,
+  sum(case when quantity_change > 0 then quantity_change else 0 end) as quantity_in,
+  jsonb_agg(
+    jsonb_build_object(
+      'ledger_id', id,
+      'owner_type', owner_type,
+      'owner_id', owner_id,
+      'owner_label', owner_label,
+      'quantity_change', quantity_change,
+      'reason', reason,
+      'location_at_time', location_at_time,
+      'authorized_by', authorized_by,
+      'direct_override_reason', direct_override_reason,
+      'server_timestamp', server_timestamp
+    ) order by server_timestamp
+  ) as ledger_rows
+from inventory_ledger
+where transfer_group_id is not null
+group by transfer_group_id, incident_id, transfer_kind, item_id;
+
+create or replace function validate_inventory_transfer_rules()
+returns trigger as $$
+begin
+  -- Medic consumption during treatment must be from medic bag.
+  if new.transfer_kind = 'TREATMENT_CONSUMPTION' and new.owner_type <> 'medic_bag' then
+    raise exception 'Treatment consumption must deduct from medic_bag inventory.';
+  end if;
+
+  -- Platoon stock manual initial fill is PC-owned.
+  if new.transfer_kind = 'INITIAL_FILL' and new.owner_type = 'platoon_stock' then
+    if new.authorized_by is null then
+      raise exception 'Platoon Stock initial fill requires authorized_by PC.';
+    end if;
+  end if;
+
+  -- Direct Log-O to Medic refill requires override reason.
+  if new.transfer_kind = 'DIRECT_LOGO_TO_MEDIC'
+     and (new.direct_override_reason is null or length(trim(new.direct_override_reason)) < 10) then
+    raise exception 'Direct Log-O to Medic refill requires override reason of at least 10 characters.';
+  end if;
+
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_validate_inventory_transfer_rules on inventory_ledger;
+create trigger trg_validate_inventory_transfer_rules
+before insert on inventory_ledger
+for each row execute function validate_inventory_transfer_rules();
+
+
+-- =========================================================
+-- v0.6 DRAFT INCIDENT APPROVAL QUEUE
+-- =========================================================
+
+create or replace view vw_draft_incident_approval_queue as
+select
+  i.id as incident_id,
+  i.visual_id,
+  i.location_name,
+  i.address,
+  i.draft_created_by,
+  creator.display_name as draft_created_by_name,
+  i.created_at,
+  i.draft_acknowledged_at,
+  count(p.id) as attached_patients,
+  count(p.id) filter (where p.current_triage = 'red') as red_patients,
+  count(p.id) filter (where p.needs_full_assessment = true) as patients_missing_full_assessment,
+  (i.status = 'draft' and i.is_draft = true and i.draft_resolved_at is null) as requires_approval,
+  case
+    when i.draft_acknowledged_at is null then true
+    else false
+  end as should_blink
+from incidents i
+left join profiles creator on creator.id = i.draft_created_by
+left join patients p on p.incident_id = i.id
+where i.status = 'draft' and i.is_draft = true and i.draft_resolved_at is null
+group by i.id, creator.display_name;
+
+create or replace function mark_patient_pending_when_incident_is_draft()
+returns trigger as $$
+begin
+  if exists (select 1 from incidents i where i.id = new.incident_id and i.is_draft = true and i.status = 'draft') then
+    new.pending_incident_approval := true;
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_mark_patient_pending_when_incident_is_draft on patients;
+create trigger trg_mark_patient_pending_when_incident_is_draft
+before insert on patients
+for each row execute function mark_patient_pending_when_incident_is_draft();
+
+create or replace function clear_patient_pending_on_incident_confirmation()
+returns trigger as $$
+begin
+  if old.is_draft = true and new.is_draft = false then
+    update patients
+    set pending_incident_approval = false,
+        updated_at = now(),
+        version = version + 1
+    where incident_id = new.id;
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_clear_patient_pending_on_incident_confirmation on incidents;
+create trigger trg_clear_patient_pending_on_incident_confirmation
+after update on incidents
+for each row execute function clear_patient_pending_on_incident_confirmation();
+
+create or replace function draft_incident_approval_outbox()
+returns trigger as $$
+begin
+  if new.type in ('INCIDENT_DRAFT_CREATED','INCIDENT_CONFIRMED','INCIDENT_DRAFT_MERGED','INCIDENT_DRAFT_REJECTED') then
+    insert into realtime_outbox (event_id, incident_id, patient_id, event_type, channel, payload_json, origin_device_id)
+    values (new.id, new.incident_id, new.patient_id, new.type, 'draft_incident_approval', new.payload_json, new.device_id);
+  end if;
+
+  if new.type in ('PATIENT_CREATED','QUICK_PATIENT_CREATED')
+     and exists (select 1 from incidents i where i.id = new.incident_id and i.is_draft = true and i.status = 'draft') then
+    insert into realtime_outbox (event_id, incident_id, patient_id, event_type, channel, payload_json, origin_device_id)
+    values (new.id, new.incident_id, new.patient_id, new.type, 'draft_incident_approval', jsonb_build_object('message','Patient created under draft incident','patient_id',new.patient_id,'payload',new.payload_json), new.device_id);
+  end if;
+
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_draft_incident_approval_outbox on events;
+create trigger trg_draft_incident_approval_outbox
+after insert on events
+for each row execute function draft_incident_approval_outbox();
+
+-- =========================================================
+-- v0.6 STEPPER VITALS SUPPORT
+-- Payload format:
+-- {
+--   "heart_rate": {"raw_count": 31, "window_seconds": 15, "calculated_bpm": 124, "entry_method": "stepper"},
+--   "respiratory_rate": {"raw_count": 16, "window_seconds": 30, "calculated_per_min": 32, "entry_method": "stepper"}
+-- }
+-- =========================================================
+
+create index if not exists idx_events_vitals_hr_entry_method
+on events ((payload_json #>> '{heart_rate,entry_method}'))
+where type = 'VITALS_RECORDED'
+  and payload_json #>> '{heart_rate,entry_method}' is not null;
+
+create index if not exists idx_events_vitals_rr_entry_method
+on events ((payload_json #>> '{respiratory_rate,entry_method}'))
+where type = 'VITALS_RECORDED'
+  and payload_json #>> '{respiratory_rate,entry_method}' is not null;
+
+-- =========================================================
+-- v0.6 KPI HELPER VIEWS
+-- =========================================================
+
+create or replace view vw_kpi_incident_command_summary as
+select
+  i.id as incident_id,
+  count(p.id) filter (where p.current_triage = 'red' and p.current_status not in ('handed_over','closed','self_evacuated','deceased')) as active_red_patients,
+  count(p.id) filter (where p.needs_full_assessment = true and p.current_status not in ('handed_over','closed','self_evacuated','deceased')) as patients_missing_full_vitals,
+  count(p.id) filter (where p.current_status = 'handed_over') as handed_over_patients,
+  count(p.id) as total_patients,
+  count(wa.id) filter (where wa.resolved_at is null) as active_watchdog_alerts,
+  count(dp.id) filter (where dp.last_heartbeat_at < now() - interval '5 minutes') as dead_man_switch_active,
+  count(p.id) filter (where p.current_triage = 'red' and p.current_status not in ('handed_over','closed','self_evacuated','deceased'))::numeric
+    / nullif(count(dp.id) filter (where dp.last_heartbeat_at >= now() - interval '5 minutes'), 0) as red_patients_per_active_medic
+from incidents i
+left join patients p on p.incident_id = i.id
+left join watchdog_alerts wa on wa.incident_id = i.id
+left join device_presence dp on dp.incident_id = i.id
+group by i.id;
+
+create or replace view vw_kpi_sync_latency as
+select
+  incident_id,
+  type as event_type,
+  count(*) as event_count,
+  avg(extract(epoch from (server_timestamp - local_timestamp))) as avg_latency_seconds,
+  percentile_cont(0.95) within group (order by extract(epoch from (server_timestamp - local_timestamp))) as p95_latency_seconds,
+  count(*) filter (where synced_at is null) as unsynced_or_unconfirmed_events
+from events
+group by incident_id, type;
+
+create or replace view vw_kpi_time_to_first_vitals as
+with patient_created as (
+  select patient_id, min(local_timestamp) as patient_created_at
+  from events
+  where type in ('PATIENT_CREATED','QUICK_PATIENT_CREATED')
+  group by patient_id
+), first_vitals as (
+  select patient_id, min(local_timestamp) as first_vitals_at
+  from events
+  where type = 'VITALS_RECORDED'
+  group by patient_id
+)
+select
+  p.incident_id,
+  p.id as patient_id,
+  p.visual_id,
+  pc.patient_created_at,
+  fv.first_vitals_at,
+  extract(epoch from (fv.first_vitals_at - pc.patient_created_at)) as seconds_to_first_vitals
+from patients p
+left join patient_created pc on pc.patient_id = p.id
+left join first_vitals fv on fv.patient_id = p.id;
+
+create or replace view vw_kpi_inventory_stockout_risk as
+select
+  ci.incident_id,
+  ci.owner_id,
+  ci.owner_type,
+  ci.owner_label,
+  ci.item_id,
+  ci.sku,
+  ci.item_name,
+  ci.current_quantity,
+  coalesce(abs(sum(il.quantity_change) filter (where il.quantity_change < 0 and il.server_timestamp >= now() - interval '30 minutes')),0) as consumed_last_30m,
+  case
+    when coalesce(abs(sum(il.quantity_change) filter (where il.quantity_change < 0 and il.server_timestamp >= now() - interval '30 minutes')),0) = 0 then null
+    else ci.current_quantity / (abs(sum(il.quantity_change) filter (where il.quantity_change < 0 and il.server_timestamp >= now() - interval '30 minutes')) / 30.0)
+  end as estimated_minutes_to_empty
+from vw_current_inventory ci
+left join inventory_ledger il on il.incident_id = ci.incident_id and il.owner_id = ci.owner_id and il.item_id = ci.item_id
+group by ci.incident_id, ci.owner_id, ci.owner_type, ci.owner_label, ci.item_id, ci.sku, ci.item_name, ci.current_quantity;
