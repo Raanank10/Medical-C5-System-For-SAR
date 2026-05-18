@@ -138,6 +138,44 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .limb-btn:active{transform:scale(0.97);}
 .limb-btn.selected{border-color:var(--red);background:rgba(230,57,70,0.12);color:var(--red);}
 
+/* ── BODY MAP ── */
+.body-map-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:16px;}
+.body-map-wrap{display:grid;grid-template-columns:128px 1fr;gap:12px;align-items:center;}
+.body-map{position:relative;height:270px;margin:auto;width:128px;}
+.body-core{position:absolute;left:44px;top:54px;width:40px;height:86px;background:linear-gradient(180deg,#d8e3ff,#8fa8ff);border-radius:22px 22px 16px 16px;opacity:.86;}
+.body-head{position:absolute;left:46px;top:10px;width:36px;height:36px;background:#d8e3ff;border-radius:50%;opacity:.9;}
+.body-arm{position:absolute;top:66px;width:22px;height:92px;background:#9eb3ff;border-radius:18px;opacity:.74;}
+.body-arm.left{left:18px;transform:rotate(14deg);}
+.body-arm.right{right:18px;transform:rotate(-14deg);}
+.body-leg{position:absolute;top:136px;width:24px;height:116px;background:#8fa8ff;border-radius:16px;opacity:.74;}
+.body-leg.left{left:39px;transform:rotate(5deg);}
+.body-leg.right{right:39px;transform:rotate(-5deg);}
+.body-hotspot{position:absolute;border:2px solid rgba(255,255,255,.34);background:rgba(10,10,15,.44);color:var(--text);border-radius:999px;font-size:10px;font-weight:800;cursor:pointer;min-width:34px;height:28px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px rgba(0,0,0,.25);}
+.body-hotspot.selected{background:rgba(230,57,70,.9);border-color:#fff;color:#fff;}
+.body-hotspot.head{left:47px;top:14px;}
+.body-hotspot.chest{left:41px;top:68px;width:46px;}
+.body-hotspot.abdomen{left:41px;top:108px;width:46px;}
+.body-hotspot.left-arm{left:6px;top:90px;}
+.body-hotspot.right-arm{right:6px;top:90px;}
+.body-hotspot.left-leg{left:28px;top:182px;}
+.body-hotspot.right-leg{right:28px;top:182px;}
+.body-zone-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px;min-height:31px;}
+.body-zone-chip{background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.45);border-radius:999px;padding:6px 9px;color:var(--red);font-size:12px;font-weight:700;}
+.body-zone-empty{color:var(--muted);font-size:12px;line-height:1.5;}
+
+/* ── AUTO ID + SAVE MODAL ── */
+.device-card{background:rgba(67,97,238,.08);border:1px solid rgba(67,97,238,.42);border-radius:12px;padding:11px 13px;margin-top:12px;font-size:12px;color:var(--muted);line-height:1.5;}
+.device-id{font-family:var(--mono);font-weight:800;color:var(--accent);letter-spacing:.5px;}
+.new-id-modal{align-items:center;justify-content:center;padding:20px;}
+.new-id-card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:24px 20px;width:min(340px,100%);text-align:center;box-shadow:0 22px 80px rgba(0,0,0,.48);}
+.new-id-label{color:var(--muted);font-size:13px;margin-bottom:8px;}
+.new-id-value{font-family:var(--mono);font-size:42px;font-weight:900;color:var(--green);letter-spacing:1px;}
+.new-id-sub{color:var(--muted);font-size:12px;line-height:1.5;margin-top:8px;}
+.new-id-close{margin-top:18px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;color:var(--text);padding:11px 18px;font-family:var(--sans);font-weight:700;cursor:pointer;}
+.tq-reminder{display:none;background:rgba(230,57,70,.1);border:1px solid rgba(230,57,70,.7);border-radius:14px;padding:13px 14px;margin-bottom:14px;}
+.tq-reminder-title{font-weight:800;color:var(--red);font-size:14px;margin-bottom:5px;}
+.tq-reminder-body{font-size:12px;color:var(--muted);line-height:1.55;}
+
 /* ── SABCDE ── */
 .sabcde-row{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px;margin-bottom:9px;}
 .sabcde-letter{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--accent);margin-bottom:3px;}
@@ -680,8 +718,8 @@ textarea{resize:vertical;min-height:70px;}
 
     <div class="spacer"></div>
     <!-- MANDATORY medic name -->
-    <div class="field-label"><span class="required-star">* </span>שם החובש הבודק</div>
-    <input type="text" id="vitals-medic-name" placeholder="שם מלא / מ.א. — חובה" oninput="checkStep4()">
+    <div class="field-label">זיהוי חובש</div>
+    <div class="device-card">נחתם אוטומטית על ידי מכשיר <span class="device-id" id="vitals-device-id">—</span></div>
   </div>
   <div class="bottom-bar"><button class="btn-primary" id="btn-step4" onclick="goTo('step5')" disabled>המשך</button></div>
 </div>
@@ -740,14 +778,31 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="progress-bar"><div class="progress-fill" style="width:75%"></div></div>
   <div class="flow-content">
-    <div class="field-label">פציעה עיקרית</div>
-    <div class="tap-grid tap-grid-2" id="injury-grid" style="margin-bottom:16px">
-      <button class="tap-btn" onclick="selectInjury(this,'ראש')"><span class="icon">🧠</span>ראש</button>
-      <button class="tap-btn" onclick="selectInjury(this,'חזה')"><span class="icon">🫁</span>חזה</button>
-      <button class="tap-btn" onclick="selectInjury(this,'בטן')"><span class="icon">🫃</span>בטן</button>
-      <button class="tap-btn" onclick="selectInjury(this,'גפיים')"><span class="icon">🦵</span>גפיים</button>
-      <button class="tap-btn" onclick="selectInjury(this,'מעיכה')"><span class="icon">⚠️</span>מעיכה</button>
-      <button class="tap-btn" onclick="selectInjury(this,'מרובה/אחר')"><span class="icon">➕</span>מרובה/אחר</button>
+    <div class="field-label">מפת גוף — סמן אזורי פגיעה</div>
+    <div class="body-map-card">
+      <div class="body-map-wrap">
+        <div class="body-map" id="body-map">
+          <div class="body-head"></div>
+          <div class="body-core"></div>
+          <div class="body-arm left"></div>
+          <div class="body-arm right"></div>
+          <div class="body-leg left"></div>
+          <div class="body-leg right"></div>
+          <button class="body-hotspot head" onclick="toggleBodyZone(this,'head')">ראש</button>
+          <button class="body-hotspot chest" onclick="toggleBodyZone(this,'chest')">חזה</button>
+          <button class="body-hotspot abdomen" onclick="toggleBodyZone(this,'abdomen')">בטן</button>
+          <button class="body-hotspot left-arm" onclick="toggleBodyZone(this,'left_arm')">י.ש</button>
+          <button class="body-hotspot right-arm" onclick="toggleBodyZone(this,'right_arm')">י.י</button>
+          <button class="body-hotspot left-leg" onclick="toggleBodyZone(this,'left_leg')">ר.ש</button>
+          <button class="body-hotspot right-leg" onclick="toggleBodyZone(this,'right_leg')">ר.י</button>
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.55">כל סימון נשמר כחלק מרשומת הפצוע ומחליף בחירה מילולית של פציעה עיקרית.</div>
+          <div class="body-zone-list" id="body-zone-list">
+            <span class="body-zone-empty">עדיין לא סומן אזור פגיעה</span>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="field-label">מצב הפצוע</div>
     <div class="tap-grid tap-grid-1" id="status-grid">
@@ -778,6 +833,10 @@ textarea{resize:vertical;min-height:70px;}
     <div id="tx-history-block" style="display:none;margin-bottom:16px">
       <div class="field-label">היסטוריית טיפולים קודמים</div>
       <div id="tx-history-list"></div>
+    </div>
+    <div id="quick-tq-reminder" class="tq-reminder">
+      <div class="tq-reminder-title">תזכורת: חסם עורקים כבר הונח</div>
+      <div class="tq-reminder-body" id="quick-tq-reminder-body"></div>
     </div>
     <div class="field-label">טיפולים שניתנו עכשיו (ניתן לבחור מספר)</div>
     <div class="chip-grid" style="margin-bottom:16px">
@@ -827,8 +886,8 @@ textarea{resize:vertical;min-height:70px;}
       <div class="field-label">תאר טיפול אחר</div>
       <input type="text" id="other-tx-text" placeholder="פרט...">
     </div>
-    <div class="field-label" style="margin-top:4px"><span class="required-star">* </span>שם החובש המטפל</div>
-    <input type="text" id="tx-medic-name" placeholder="שם מלא / מ.א. — חובה" oninput="checkStep7()">
+    <div class="field-label" style="margin-top:4px">זיהוי חובש מטפל</div>
+    <div class="device-card">הטיפול ייחתם אוטומטית על ידי מכשיר <span class="device-id" id="tx-device-id">—</span></div>
   </div>
   <div class="bottom-bar"><button class="btn-primary" id="btn-step7" onclick="goTo('step8')" disabled>המשך לסיכום</button></div>
 </div>
@@ -1018,11 +1077,19 @@ textarea{resize:vertical;min-height:70px;}
       <button class="avpu-btn" id="mavpu-U" onclick="selectModalAVPU('U')">U</button>
     </div>
 
-    <!-- MANDATORY medic name -->
-    <div class="field-label"><span class="required-star">* </span>שם החובש הבודק — חובה</div>
-    <input type="text" id="modal-medic-name" placeholder="שם מלא / מ.א." style="margin-bottom:14px" oninput="checkModalReady()">
+    <div class="field-label">זיהוי חובש</div>
+    <div class="device-card" style="margin:0 0 14px">עדכון המדדים ייחתם על ידי מכשיר <span class="device-id" id="modal-device-id">—</span></div>
 
-    <button class="btn-primary" id="btn-save-modal" onclick="saveModalVitals()" style="background:var(--green)" disabled>✓ שמור מדדים</button>
+    <button class="btn-primary" id="btn-save-modal" onclick="saveModalVitals()" style="background:var(--green)">✓ שמור מדדים</button>
+  </div>
+</div>
+
+<div class="modal-overlay hidden new-id-modal" id="new-patient-id-modal">
+  <div class="new-id-card">
+    <div class="new-id-label">פצוע חדש נפתח</div>
+    <div class="new-id-value" id="new-patient-id-value">P000</div>
+    <div class="new-id-sub">המזהה יוצג עכשיו לחובש, ואז המערכת תחזור אוטומטית לרשימת הפצועים.</div>
+    <button class="new-id-close" onclick="closeNewPatientIdModal()">סגור והמשך</button>
   </div>
 </div>
 
@@ -1034,6 +1101,7 @@ textarea{resize:vertical;min-height:70px;}
 const VITALS_INTERVAL_MS = 5 * 60 * 1000;
 const WARN_AT_MS = 4 * 60 * 1000;
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
+const DEVICE_ID_KEY = 'c5-sentinel-sar-device-id';
 const AVPU_RANK = {A:0,V:1,P:2,U:3};
 const COUNT_LIMITS = {
   pulse15:{min:5,max:55}, rr30:{min:2,max:30},
@@ -1050,9 +1118,33 @@ const STATUS_LABELS = {in_treatment:'בטיפול', monitoring:'בהשגחה ע�
 const TRIAGE_LABELS = {red:'קשה — אדום', yellow:'בינוני — צהוב', green:'קל — ירוק', black:'לא בר הצלה — שחור'};
 const INT_LABELS = {bandage:'חבישה', tourniquet:'חסם עורקים', iv:'פתיחת וריד', airway_mgmt:'פתיחת נ"א', cpr:'החייאה', atq:'אקטיק'};
 const LIMB_LABELS = {yl:'יד שמאל', yr:'יד ימין', rl:'רגל שמאל', rr:'רגל ימין'};
+const BODY_ZONE_LABELS = {
+  head:'ראש',
+  chest:'חזה',
+  abdomen:'בטן',
+  left_arm:'יד שמאל',
+  right_arm:'יד ימין',
+  left_leg:'רגל שמאל',
+  right_leg:'רגל ימין'
+};
 
 function nowT(){ const n=new Date(); return n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0'); }
 function uid(){ return Math.random().toString(36).slice(2,7); }
+function getDeviceId(){
+  let id=localStorage.getItem(DEVICE_ID_KEY);
+  if(!id){
+    id='PHONE-'+Math.random().toString(36).slice(2,6).toUpperCase();
+    localStorage.setItem(DEVICE_ID_KEY,id);
+  }
+  return id;
+}
+function setDeviceLabels(){
+  const id=getDeviceId();
+  ['vitals-device-id','tx-device-id','modal-device-id'].forEach(elId=>{
+    const el=document.getElementById(elId);
+    if(el) el.textContent=id;
+  });
+}
 
 // ═══════════════════════════════════════════════
 //  STATE
@@ -1068,7 +1160,7 @@ function freshState(){
   return {
     buildingType:null, locFloor:'', locApt:'', locRoom:'', locFree:'',
     accessibility:null, sabcde:{},
-    injury:null, patientStatus:null,
+    injury:null, injuryZones:new Set(), patientStatus:null,
     interventions:new Set(), triage:null,
     vitalsMedicName:'', txMedicName:''
   };
@@ -1117,14 +1209,14 @@ function demoPatient(id, triage, accessibility, location, injury, patientStatus,
     alert:deterioration.length>0 || !!extra.alert,
     deterioration,
     lastVitalsAt:minutesAgo(lastVitalsMin),
-    vitalsHistory:extra.vitalsHistory||[{t:minutesAgo(lastVitalsMin),pulse:vitals.pulse,spo2:vitals.spo2,avpu:vitals.avpu}],
+    vitalsHistory:extra.vitalsHistory||[{t:minutesAgo(lastVitalsMin),pulse:vitals.pulse,spo2:vitals.spo2,rr:vitals.rr,avpu:vitals.avpu}],
     tourniquet:extra.tourniquet||null,
     medic:extra.medic||'',
     siteId:extra.siteId||'SITE_A',
     events:extra.events||[
       {type:'PATIENT_CREATED',time:t,detail:'פצוע נפתח'},
       {type:'TRIAGE_SET',time:t,detail:TRIAGE_LABELS[triage]},
-      {type:'VITALS_RECORDED',time:timeAgoLabel(minutesAgo(lastVitalsMin)),detail:`דופק ${vitals.pulse} / SpO₂ ${vitals.spo2||'לא נמדד'} / AVPU ${vitals.avpu||'—'}`,warn:triage==='red'}
+      {type:'VITALS_RECORDED',time:timeAgoLabel(minutesAgo(lastVitalsMin)),detail:`דופק ${vitals.pulse} / נשימות ${vitals.rr} / SpO₂ ${vitals.spo2||'לא נמדד'} / AVPU ${vitals.avpu||'—'}`,warn:triage==='red'}
     ]
   };
 }
@@ -1184,6 +1276,11 @@ function loadStoredDemoState(){
     if(!saved || !Array.isArray(saved.patients)) return false;
     siteData=saved.siteData||siteData;
     patients=saved.patients;
+    patients.forEach(p=>{
+      if(Array.isArray(p.vitalsHistory)){
+        p.vitalsHistory.forEach(h=>{ if(h.rr===undefined) h.rr=p.vitals?.rr ?? null; });
+      }
+    });
     demoSyncMode=saved.demoSyncMode||'fresh';
     lastSyncAt=saved.lastSyncAt||Date.now();
     allSites.find(s=>s.id==='SITE_A').externalReports=siteData.externalReports||[];
@@ -1235,7 +1332,9 @@ function goTo(screen){
   document.getElementById('screen-'+screen).classList.add('active');
   window.scrollTo(0,0);
   if(screen==='dashboard'){ renderDashboard(); renderAlerts(); }
+  if(screen==='step4')     { setDeviceLabels(); checkStep4(); }
   if(screen==='step5')     showMstartSuggestion();
+  if(screen==='step7')     { renderTourniquetReminder(); setDeviceLabels(); checkStep7(); }
   if(screen==='step8')     renderSummary();
   if(screen==='commander') renderCommander();
   if(screen==='aar')       renderAar();
@@ -1398,6 +1497,7 @@ function openPatient(id){
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
         <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--accent)">${p.vitals.pulse}</div><div style="font-size:11px;color:var(--muted)">דופק bpm</div></div>
+        <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:#f4a261">${p.vitals.rr ?? '—'}</div><div style="font-size:11px;color:var(--muted)">נשימות / דקה</div></div>
         <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:${sCol(p.vitals.spo2)}">${p.vitals.spo2||'—'}${p.vitals.spo2?'%':''}</div><div style="font-size:11px;color:var(--muted)">SpO₂</div></div>
         <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:13px;font-weight:700">${BP_LABELS[p.vitals.bp_estimate]||'—'}</div><div style="font-size:11px;color:var(--muted)">לחץ דם</div></div>
         <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:${p.vitals.avpu==='A'?'var(--green)':p.vitals.avpu==='U'?'var(--red)':'var(--yellow)'}">${p.vitals.avpu||'—'}</div><div style="font-size:11px;color:var(--muted)">AVPU</div></div>
@@ -1474,15 +1574,13 @@ function buildTrendChart(history){
         Math.min(...spo2Vals.map(([,v])=>v)), 100, 94, '94%')
     : `<div style="color:var(--muted);font-size:11px;margin-bottom:12px;font-family:var(--mono)">SpO₂ — אין נתונים מספיקים</div>`;
 
-  // ── Graph 3: AVPU ──────────────────────────────────────
-  const AVPU_RANK = {A:3,V:2,P:1,U:0};
-  const AVPU_LABEL = {3:'A',2:'V',1:'P',0:'U'};
-  const avpuVals = history.filter(d=>d.avpu).map(d=>[d.t, AVPU_RANK[d.avpu]??2]);
-  const g3_color = avpuVals.length ? (avpuVals[avpuVals.length-1][1] < 2 ? '#e63946' : avpuVals[avpuVals.length-1][1] === 2 ? '#f4a261' : '#2a9d8f') : '#7070a0';
-  const g3 = avpuVals.length >= 2
-    ? miniChart('AVPU (הכרה)', g3_color, avpuVals, 0, 3, 2, 'V')
-      .replace('</svg>', `${avpuVals.map(([t,v])=>`<text x="${tx(t)}" y="${H-PT-IH/2+4}" fill="#e8e8f0" font-size="9" font-weight="700" text-anchor="middle">${AVPU_LABEL[v]||''}</text>`).join('')}</svg>`)
-    : `<div style="color:var(--muted);font-size:11px;margin-bottom:12px;font-family:var(--mono)">AVPU — אין נתונים מספיקים</div>`;
+  // ── Graph 3: Breathing rate ────────────────────────────
+  const rrVals = history.filter(d=>d.rr!==undefined && d.rr!==null).map(d=>[d.t, d.rr]);
+  const rrNumbers = rrVals.map(([,v])=>v);
+  const g3 = rrVals.length >= 2
+    ? miniChart('נשימות (/דקה)', '#f4a261', rrVals,
+        Math.min(...rrNumbers), Math.max(...rrNumbers), 30, '30')
+    : `<div style="color:var(--muted);font-size:11px;margin-bottom:12px;font-family:var(--mono)">נשימות — אין נתונים מספיקים</div>`;
 
   return g1 + g2 + g3 + buildVitalsTable(history);
 }
@@ -1495,14 +1593,16 @@ function buildVitalsTable(history){
     return `<tr>
       <td style="font-family:var(--mono);color:var(--muted);font-size:11px;padding:6px 6px;border-bottom:1px solid var(--border)">${fmt(d.t)}</td>
       <td style="font-family:var(--mono);font-weight:700;color:var(--accent);font-size:14px;text-align:center;padding:6px;border-bottom:1px solid var(--border)">${d.pulse}</td>
+      <td style="font-family:var(--mono);font-weight:700;color:#f4a261;font-size:14px;text-align:center;padding:6px;border-bottom:1px solid var(--border)">${d.rr ?? '—'}</td>
       <td style="font-family:var(--mono);font-weight:700;color:${sc};font-size:14px;text-align:center;padding:6px;border-bottom:1px solid var(--border)">${d.spo2?d.spo2+'%':'—'}</td>
       <td style="font-family:var(--mono);font-weight:700;color:${ac};font-size:14px;text-align:center;padding:6px;border-bottom:1px solid var(--border)">${d.avpu||'—'}</td>
     </tr>`;
   }).join('');
-  return `<table style="width:100%;border-collapse:collapse;margin-top:4px">
+  return `<div style="font-weight:700;font-size:12px;margin:4px 0 6px;color:var(--muted)">טבלת מדדים ו-AVPU</div><table style="width:100%;border-collapse:collapse;margin-top:4px">
     <thead><tr>
       <th style="font-family:var(--mono);font-size:9px;color:var(--muted);padding:3px 6px;text-align:right;letter-spacing:1px">שעה</th>
       <th style="font-family:var(--mono);font-size:9px;color:var(--accent);padding:3px 6px;text-align:center">דופק</th>
+      <th style="font-family:var(--mono);font-size:9px;color:#f4a261;padding:3px 6px;text-align:center">נשימות</th>
       <th style="font-family:var(--mono);font-size:9px;color:var(--green);padding:3px 6px;text-align:center">SpO₂</th>
       <th style="font-family:var(--mono);font-size:9px;color:var(--muted);padding:3px 6px;text-align:center">AVPU</th>
     </tr></thead>
@@ -1523,8 +1623,8 @@ function startNewPatient(){
   quickTqData = {applied:false, time:null, limbs:new Set()};
 
   // Reset all UI
-  document.querySelectorAll('.tap-btn,.sabcde-opt,.avpu-btn,.chip,.bp-btn,.limb-btn').forEach(b=>b.classList.remove('selected','ok','issue','managed'));
-  ['location-free','vitals-medic-name','tx-medic-name','other-tx-text','tourniquet-time-input'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.querySelectorAll('.tap-btn,.sabcde-opt,.avpu-btn,.chip,.bp-btn,.limb-btn,.body-hotspot').forEach(b=>b.classList.remove('selected','ok','issue','managed'));
+  ['location-free','other-tx-text','tourniquet-time-input'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('building-fields').style.display='none';
   document.getElementById('house-fields').style.display='none';
   document.getElementById('common-loc-fields').style.display='none';
@@ -1550,6 +1650,8 @@ function startNewPatient(){
   document.querySelectorAll('#quick-limb-grid .limb-btn').forEach(b=>b.classList.remove('selected'));
   document.getElementById('quick-tq-yes-btn').classList.remove('selected');
   document.getElementById('quick-tq-no-btn').classList.remove('selected');
+  updateBodyZoneList();
+  setDeviceLabels();
 
   // Reset loc fields
   ['loc-floor','loc-apt'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -1593,8 +1695,7 @@ function setSabcde(btn, letter, val, cls){
 
 // Step 4 — Vitals
 function checkStep4(){
-  const name = document.getElementById('vitals-medic-name').value.trim();
-  document.getElementById('btn-step4').disabled = !name;
+  document.getElementById('btn-step4').disabled = false;
 }
 function toggleSpo2(){
   spo2Active = !spo2Active;
@@ -1615,6 +1716,22 @@ function selectAVPU(btn, val){
 }
 
 // Step 5 — Injury + Status
+function toggleBodyZone(btn, key){
+  btn.classList.toggle('selected');
+  if(state.injuryZones.has(key)) state.injuryZones.delete(key);
+  else state.injuryZones.add(key);
+  updateBodyZoneList();
+  checkStep6();
+}
+function updateBodyZoneList(){
+  const el=document.getElementById('body-zone-list');
+  if(!el) return;
+  const labels=[...state.injuryZones].map(k=>BODY_ZONE_LABELS[k]||k);
+  state.injury = labels.join(', ') || null;
+  el.innerHTML = labels.length
+    ? labels.map(label=>`<span class="body-zone-chip">${label}</span>`).join('')
+    : '<span class="body-zone-empty">עדיין לא סומן אזור פגיעה</span>';
+}
 function selectInjury(btn, val){
   document.querySelectorAll('#injury-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
@@ -1783,8 +1900,7 @@ function renderSummary(){
   const newId='P'+String(patients.length+1).padStart(3,'0');
   const intStr=buildIntStr();
   const locStr=buildLocStr();
-  const vMedic=document.getElementById('vitals-medic-name').value;
-  const txMedic=document.getElementById('tx-medic-name').value;
+  const deviceId=getDeviceId();
   const sab=Object.entries(state.sabcde).map(([k,v])=>`${k}:${v}`).join(' · ')||'—';
   document.getElementById('summary-content').innerHTML=`
     <div class="summary-row"><span class="summary-key">מזהה</span><span class="summary-val" style="font-family:var(--mono);font-weight:700">${newId}</span></div>
@@ -1797,11 +1913,11 @@ function renderSummary(){
     <div class="summary-row"><span class="summary-key">לחץ דם</span><span class="summary-val">${BP_LABELS[flowVitals.bp_estimate]||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">נשימות</span><span class="summary-val" style="font-family:var(--mono)">${flowVitals.rr} / דקה</span></div>
     <div class="summary-row"><span class="summary-key">AVPU</span><span class="summary-val" style="font-family:var(--mono)">${flowVitals.avpu||'—'}</span></div>
-    <div class="summary-row"><span class="summary-key">חובש בדיקה</span><span class="summary-val">${vMedic}</span></div>
+    <div class="summary-row"><span class="summary-key">זיהוי מכשיר</span><span class="summary-val device-id">${deviceId}</span></div>
     <div class="summary-row"><span class="summary-key">פציעה</span><span class="summary-val">${state.injury||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">מצב</span><span class="summary-val">${STATUS_LABELS[state.patientStatus]||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">טיפולים</span><span class="summary-val">${intStr||'ללא'}</span></div>
-    ${txMedic?`<div class="summary-row"><span class="summary-key">חובש טיפול</span><span class="summary-val">${txMedic}</span></div>`:''}
+    <div class="summary-row"><span class="summary-key">חתימת טיפול</span><span class="summary-val device-id">${deviceId}</span></div>
     <div class="summary-row"><span class="summary-key">זמן פתיחה</span><span class="summary-val" style="font-family:var(--mono)">${nowT()}</span></div>`;
 }
 
@@ -1809,10 +1925,9 @@ function savePatient(){
   const newId='P'+String(patients.length+1).padStart(3,'0');
   const intStr=buildIntStr();
   const locStr=buildLocStr();
-  const vMedic=document.getElementById('vitals-medic-name').value;
-  const txMedic=document.getElementById('tx-medic-name').value;
+  const deviceId=getDeviceId();
   const t=nowT();
-  const txHistoryEntry = intStr ? [{time:t, text:intStr, medic:txMedic}] : [];
+  const txHistoryEntry = intStr ? [{time:t, text:intStr, medic:deviceId}] : [];
   patients.push({
     id:newId, triage:state.triage, accessibility:state.accessibility,
     location:locStr, locDetail:'',
@@ -1820,17 +1935,36 @@ function savePatient(){
     time:t, vitals:{...flowVitals},
     txHistory:txHistoryEntry,
     alert:false, deterioration:[], lastVitalsAt:Date.now(),
-    vitalsHistory:[{t:Date.now(),pulse:flowVitals.pulse,spo2:flowVitals.spo2,avpu:flowVitals.avpu}],
+    vitalsHistory:[{t:Date.now(),pulse:flowVitals.pulse,spo2:flowVitals.spo2,rr:flowVitals.rr,avpu:flowVitals.avpu}],
+    tourniquet:quickTqData.applied?{limb:[...quickTqData.limbs].map(l=>LIMB_LABELS[l]||l).join(', ')||'לא צוין',appliedAt:Date.now()}:null,
+    medic:deviceId,
     events:[
       {type:'CREATED',time:t,detail:'פצוע נפתח'},
       {type:'TRIAGE_SET',time:t,detail:TRIAGE_LABELS[state.triage]},
-      {type:'VITALS_UPDATED',time:t,detail:`דופק ${flowVitals.pulse} / SpO₂ ${flowVitals.spo2||'לא נמדד'} / AVPU: ${flowVitals.avpu||'—'} — חובש: ${vMedic}`},
-      ...(intStr?[{type:'INTERVENTION_LOGGED',time:t,detail:`${intStr}${txMedic?' — חובש: '+txMedic:''}`}]:[]),
+      {type:'VITALS_UPDATED',time:t,detail:`דופק ${flowVitals.pulse} / נשימות ${flowVitals.rr} / SpO₂ ${flowVitals.spo2||'לא נמדד'} / AVPU: ${flowVitals.avpu||'—'} — מכשיר: ${deviceId}`},
+      ...(intStr?[{type:'INTERVENTION_LOGGED',time:t,detail:`${intStr} — מכשיר: ${deviceId}`}]:[]),
     ]
   });
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   document.getElementById('success-pid').textContent=newId;
-  goTo('success');
+  goTo('dashboard');
+  showNewPatientIdModal(newId);
+}
+
+let newPatientModalTimer=null;
+function showNewPatientIdModal(pid){
+  const modal=document.getElementById('new-patient-id-modal');
+  const value=document.getElementById('new-patient-id-value');
+  if(!modal || !value) return;
+  value.textContent=pid;
+  modal.classList.remove('hidden');
+  clearTimeout(newPatientModalTimer);
+  newPatientModalTimer=setTimeout(closeNewPatientIdModal,3000);
+}
+function closeNewPatientIdModal(){
+  const modal=document.getElementById('new-patient-id-modal');
+  if(modal) modal.classList.add('hidden');
+  clearTimeout(newPatientModalTimer);
 }
 
 // ═══════════════════════════════════════════════
@@ -1843,10 +1977,10 @@ function openQuickVitals(pid){
   counts.mpulse15=Math.round(p.vitals.pulse/4);
   counts.mrr30=Math.round(p.vitals.rr/2);
   document.getElementById('modal-pid-title').textContent=`עדכון מדדים — ${p.id}`;
-  document.getElementById('modal-last-vitals').textContent=`אחרון: דופק ${p.vitals.pulse} · SpO₂ ${p.vitals.spo2||'—'} · AVPU ${p.vitals.avpu||'—'}`;
+  document.getElementById('modal-last-vitals').textContent=`אחרון: דופק ${p.vitals.pulse} · נשימות ${p.vitals.rr ?? '—'} · SpO₂ ${p.vitals.spo2||'—'} · AVPU ${p.vitals.avpu||'—'}`;
   document.getElementById('mv-spo2').textContent=p.vitals.spo2||98;
-  document.getElementById('modal-medic-name').value='';
-  document.getElementById('btn-save-modal').disabled=true;
+  setDeviceLabels();
+  document.getElementById('btn-save-modal').disabled=false;
   updateCountDisplay('mpulse15');
   updateCountDisplay('mrr30');
   document.querySelectorAll('#modal-avpu-grid .avpu-btn').forEach(b=>b.classList.remove('selected'));
@@ -1856,7 +1990,7 @@ function openQuickVitals(pid){
   document.getElementById('vitals-modal').classList.remove('hidden');
 }
 function closeVitalsModal(e){ if(e.target.id==='vitals-modal') document.getElementById('vitals-modal').classList.add('hidden'); }
-function checkModalReady(){ document.getElementById('btn-save-modal').disabled=!document.getElementById('modal-medic-name').value.trim(); }
+function checkModalReady(){ document.getElementById('btn-save-modal').disabled=false; }
 function selectModalBP(btn,val){
   document.querySelectorAll('#modal-bp-grid .bp-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected'); modalVitals.bp_estimate=val;
@@ -1867,7 +2001,7 @@ function selectModalAVPU(val){
 }
 function saveModalVitals(){
   const p=patients.find(x=>x.id===modalPid); if(!p) return;
-  const medicName=document.getElementById('modal-medic-name').value.trim();
+  const medicName=getDeviceId();
   const prev={...p.vitals};
   const next={...modalVitals};
 
@@ -1923,9 +2057,9 @@ function saveModalVitals(){
   p.lastVitalsAt = Date.now();
   p.alert = flags.length > 0 || !!criticalEvent || triageChanged;
   if(!p.vitalsHistory) p.vitalsHistory = [];
-  p.vitalsHistory.push({t:Date.now(), pulse:next.pulse, spo2:next.spo2, avpu:next.avpu});
+  p.vitalsHistory.push({t:Date.now(), pulse:next.pulse, spo2:next.spo2, rr:next.rr, avpu:next.avpu});
 
-  const detail = `דופק ${next.pulse} / SpO₂ ${next.spo2||'לא נמדד'} / ${BP_LABELS[next.bp_estimate]||'—'} / AVPU: ${next.avpu||'—'} — חובש: ${medicName}`;
+  const detail = `דופק ${next.pulse} / נשימות ${next.rr} / SpO₂ ${next.spo2||'לא נמדד'} / ${BP_LABELS[next.bp_estimate]||'—'} / AVPU: ${next.avpu||'—'} — מכשיר: ${medicName}`;
   p.events.unshift({type:'VITALS_UPDATED', time:nowT(), detail, warn:flags.length>0});
   if(flags.length) p.events.unshift({type:'DETERIORATION_FLAGGED', time:nowT(), detail:flags.join(' · '), warn:true});
   if(criticalEvent) p.events.unshift({type:'CRITICAL_DETERIORATION', time:nowT(), detail:criticalEvent, warn:true});
@@ -2128,10 +2262,24 @@ function toggleQuickLimb(btn, key) {
   else quickTqData.limbs.add(key);
 }
 
-// ── Step 7 check (interventions medic name) ───────────────
+function renderTourniquetReminder(){
+  const wrap=document.getElementById('quick-tq-reminder');
+  const body=document.getElementById('quick-tq-reminder-body');
+  if(!wrap || !body) return;
+  if(!quickTqData.applied){
+    wrap.style.display='none';
+    body.textContent='';
+    return;
+  }
+  const t=quickTqData.time ? quickTqData.time.slice(0,2)+':'+quickTqData.time.slice(2) : 'שעה לא צוינה';
+  const limbs=[...quickTqData.limbs].map(l=>LIMB_LABELS[l]||l).join(', ') || 'גפה לא צוינה';
+  body.innerHTML=`חסם עורקים מיידי כבר תועד בשלב 3: <strong style="color:var(--text)">${limbs}</strong> · ${t}. אם הונח חסם נוסף, בחר גם את טיפול "חסם עורקים".`;
+  wrap.style.display='block';
+}
+
+// ── Step 7 check (automatic device signature) ─────────────
 function checkStep7() {
-  const name = document.getElementById('tx-medic-name').value.trim();
-  document.getElementById('btn-step7').disabled = !name;
+  document.getElementById('btn-step7').disabled = false;
 }
 
 // ── Skip to summary for black triage ─────────────────────
