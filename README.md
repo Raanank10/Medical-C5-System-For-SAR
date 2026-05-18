@@ -33,7 +33,7 @@ The prototype includes:
 - rapid patient intake
 - location and access status
 - tourniquet capture
-- tap-first vitals with stepper correction
+- stepper-based vitals matching the mockups
 - MSTART-style triage support
 - treatment and patient status capture
 - reassessment alerts

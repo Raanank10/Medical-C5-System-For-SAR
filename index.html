@@ -104,7 +104,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .flow-title{font-size:18px;font-weight:700;}
 .progress-bar{height:3px;background:var(--border);margin:0 16px;}
 .progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.3s;}
-.flow-content{padding:18px 16px;}
+.flow-content{padding:18px 16px 110px;}
 .field-label{font-size:13px;color:var(--muted);margin-bottom:8px;font-weight:500;}
 .spacer{height:14px;}
 
@@ -215,11 +215,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .count-label{font-size:12px;color:var(--muted);min-width:50px;}
 .count-mult{font-size:11px;color:var(--muted);min-width:32px;text-align:left;}
 .calc-confirm{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 9px;line-height:1.35;}
-.count-tap-btn{width:100%;min-height:58px;border-radius:12px;border:1.5px solid rgba(67,97,238,0.55);background:rgba(67,97,238,0.12);color:var(--text);font-family:var(--sans);font-size:15px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:3px;touch-action:manipulation;user-select:none;}
-.count-tap-btn span{font-size:11px;color:var(--muted);font-weight:600;}
-.count-tap-btn:active{transform:scale(0.98);background:rgba(67,97,238,0.22);border-color:var(--accent);}
-.count-row + .count-tap-btn{margin-top:8px;}
-.count-tap-btn + .calc-confirm{margin-top:8px;}
+.count-stepper{direction:ltr;gap:0;}
+.count-stepper .vital-btn{flex:1;min-width:42px;font-size:16px;font-weight:700;}
+.count-stepper .vital-val{min-width:56px;flex:none;}
+.count-row + .calc-confirm{margin-top:8px;}
 .avpu-row{display:flex;gap:8px;}
 .avpu-btn{flex:1;padding:14px 4px;background:var(--surface2);border:2px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:18px;font-weight:700;cursor:pointer;text-align:center;transition:all 0.12s;}
 .avpu-btn.selected{border-color:var(--accent);background:rgba(67,97,238,0.15);color:var(--accent);}
@@ -678,15 +677,37 @@ textarea{resize:vertical;min-height:70px;}
       </div>
       <div class="count-row">
         <div class="count-label">ספירה:</div>
-        <div class="vital-ctrl" style="flex:1">
-          <button class="vital-btn" style="border-radius:10px 0 0 10px;flex:1" onmousedown="startHold('pulse15',-1,true)" onmouseup="stopHold()" ontouchstart="startHold('pulse15',-1,true)" ontouchend="stopHold()" onclick="changeCount('pulse15',-1)">−</button>
-          <div class="vital-val" id="v-pulse15" style="min-width:52px;flex:none">20</div>
-          <button class="vital-btn" style="border-radius:0 10px 10px 0;flex:1" onmousedown="startHold('pulse15',1,true)" onmouseup="stopHold()" ontouchstart="startHold('pulse15',1,true)" ontouchend="stopHold()" onclick="changeCount('pulse15',1)">+</button>
+        <div class="vital-ctrl count-stepper" style="flex:1">
+          <button class="vital-btn" style="border-radius:10px 0 0 10px" onmousedown="startHold('pulse15',-5,true)" onmouseup="stopHold()" ontouchstart="startHold('pulse15',-5,true)" ontouchend="stopHold()" onclick="changeCount('pulse15',-5)">−5</button>
+          <button class="vital-btn" style="border-radius:0" onmousedown="startHold('pulse15',-1,true)" onmouseup="stopHold()" ontouchstart="startHold('pulse15',-1,true)" ontouchend="stopHold()" onclick="changeCount('pulse15',-1)">−1</button>
+          <div class="vital-val" id="v-pulse15">20</div>
+          <button class="vital-btn" style="border-radius:0" onmousedown="startHold('pulse15',1,true)" onmouseup="stopHold()" ontouchstart="startHold('pulse15',1,true)" ontouchend="stopHold()" onclick="changeCount('pulse15',1)">+1</button>
+          <button class="vital-btn" style="border-radius:0 10px 10px 0" onmousedown="startHold('pulse15',5,true)" onmouseup="stopHold()" ontouchstart="startHold('pulse15',5,true)" ontouchend="stopHold()" onclick="changeCount('pulse15',5)">+5</button>
         </div>
         <div class="count-mult">× 4</div>
       </div>
-      <button class="count-tap-btn" onclick="tapCount('pulse15')">טפח כל פעימת דופק <span>לחיצה אחת = פעימה אחת בספירת 15 שניות</span></button>
       <div class="calc-confirm" id="v-pulse-calc">20 פעימות ב-15 שניות = 80 BPM</div>
+    </div>
+
+    <!-- RR 30s -->
+    <div class="vital-row column">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><div class="vital-label">נשימות</div><div class="vital-unit">ספור 30 שניות × 2</div></div>
+        <div class="count-result"><div class="count-rate" id="v-rr-rate">16</div><div class="count-unit" style="text-align:left">/ דקה</div></div>
+      </div>
+      <div class="count-row">
+        <div class="count-label">ספירה:</div>
+        <div class="vital-ctrl count-stepper" style="flex:1">
+          <button class="vital-btn" style="border-radius:10px 0 0 10px" onmousedown="startHold('rr30',-2,true)" onmouseup="stopHold()" ontouchstart="startHold('rr30',-2,true)" ontouchend="stopHold()" onclick="changeCount('rr30',-2)">−2</button>
+          <button class="vital-btn" style="border-radius:0" onmousedown="startHold('rr30',-1,true)" onmouseup="stopHold()" ontouchstart="startHold('rr30',-1,true)" ontouchend="stopHold()" onclick="changeCount('rr30',-1)">−1</button>
+          <div class="vital-val" id="v-rr30">8</div>
+          <button class="vital-btn" style="border-radius:0" onmousedown="startHold('rr30',1,true)" onmouseup="stopHold()" ontouchstart="startHold('rr30',1,true)" ontouchend="stopHold()" onclick="changeCount('rr30',1)">+1</button>
+          <button class="vital-btn" style="border-radius:0 10px 10px 0" onmousedown="startHold('rr30',2,true)" onmouseup="stopHold()" ontouchstart="startHold('rr30',2,true)" ontouchend="stopHold()" onclick="changeCount('rr30',2)">+2</button>
+        </div>
+        <div class="count-mult">× 2</div>
+      </div>
+      <div class="calc-confirm" id="v-rr-calc">8 נשימות ב-30 שניות = 16 / דקה</div>
+      <button id="no-breathing-btn" onclick="setNoBreathing()" style="background:rgba(230,57,70,0.1);border:1.5px solid var(--red);border-radius:10px;padding:10px;color:var(--red);font-size:14px;font-weight:700;cursor:pointer;width:100%">🚫 לא נושם</button>
     </div>
 
     <!-- SpO2 optional -->
@@ -719,26 +740,6 @@ textarea{resize:vertical;min-height:70px;}
         <div class="bp-btn-value" style="color:var(--red)">מתחת 70</div>
         <div class="bp-btn-desc">ללא טיפול<br>מציל</div>
       </button>
-    </div>
-
-    <!-- RR 30s -->
-    <div class="vital-row column">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div><div class="vital-label">נשימות</div><div class="vital-unit">ספור 30 שניות × 2</div></div>
-        <div class="count-result"><div class="count-rate" id="v-rr-rate">16</div><div class="count-unit" style="text-align:left">/ דקה</div></div>
-      </div>
-      <div class="count-row">
-        <div class="count-label">ספירה:</div>
-        <div class="vital-ctrl" style="flex:1">
-          <button class="vital-btn" style="border-radius:10px 0 0 10px;flex:1" onmousedown="startHold('rr30',-1,true)" onmouseup="stopHold()" ontouchstart="startHold('rr30',-1,true)" ontouchend="stopHold()" onclick="changeCount('rr30',-1)">−</button>
-          <div class="vital-val" id="v-rr30" style="min-width:52px;flex:none">8</div>
-          <button class="vital-btn" style="border-radius:0 10px 10px 0;flex:1" onmousedown="startHold('rr30',1,true)" onmouseup="stopHold()" ontouchstart="startHold('rr30',1,true)" ontouchend="stopHold()" onclick="changeCount('rr30',1)">+</button>
-        </div>
-        <div class="count-mult">× 2</div>
-      </div>
-      <button class="count-tap-btn" onclick="tapCount('rr30')">טפח כל נשימה <span>לחיצה אחת = נשימה אחת בספירת 30 שניות</span></button>
-      <div class="calc-confirm" id="v-rr-calc">8 נשימות ב-30 שניות = 16 / דקה</div>
-      <button id="no-breathing-btn" onclick="setNoBreathing()" style="background:rgba(230,57,70,0.1);border:1.5px solid var(--red);border-radius:10px;padding:10px;color:var(--red);font-size:14px;font-weight:700;cursor:pointer;width:100%">🚫 לא נושם</button>
     </div>
 
     <div class="spacer"></div>
@@ -1039,14 +1040,15 @@ textarea{resize:vertical;min-height:70px;}
       </div>
       <div class="count-row">
         <div class="count-label">ספירה:</div>
-        <div class="vital-ctrl" style="flex:1">
-          <button class="vital-btn" style="border-radius:10px 0 0 10px;flex:1" onmousedown="startHold('mpulse15',-1,true)" onmouseup="stopHold()" ontouchstart="startHold('mpulse15',-1,true)" ontouchend="stopHold()" onclick="changeCount('mpulse15',-1)">−</button>
-          <div class="vital-val" id="mv-pulse15" style="min-width:52px;flex:none">20</div>
-          <button class="vital-btn" style="border-radius:0 10px 10px 0;flex:1" onmousedown="startHold('mpulse15',1,true)" onmouseup="stopHold()" ontouchstart="startHold('mpulse15',1,true)" ontouchend="stopHold()" onclick="changeCount('mpulse15',1)">+</button>
+        <div class="vital-ctrl count-stepper" style="flex:1">
+          <button class="vital-btn" style="border-radius:10px 0 0 10px" onmousedown="startHold('mpulse15',-5,true)" onmouseup="stopHold()" ontouchstart="startHold('mpulse15',-5,true)" ontouchend="stopHold()" onclick="changeCount('mpulse15',-5)">−5</button>
+          <button class="vital-btn" style="border-radius:0" onmousedown="startHold('mpulse15',-1,true)" onmouseup="stopHold()" ontouchstart="startHold('mpulse15',-1,true)" ontouchend="stopHold()" onclick="changeCount('mpulse15',-1)">−1</button>
+          <div class="vital-val" id="mv-pulse15">20</div>
+          <button class="vital-btn" style="border-radius:0" onmousedown="startHold('mpulse15',1,true)" onmouseup="stopHold()" ontouchstart="startHold('mpulse15',1,true)" ontouchend="stopHold()" onclick="changeCount('mpulse15',1)">+1</button>
+          <button class="vital-btn" style="border-radius:0 10px 10px 0" onmousedown="startHold('mpulse15',5,true)" onmouseup="stopHold()" ontouchstart="startHold('mpulse15',5,true)" ontouchend="stopHold()" onclick="changeCount('mpulse15',5)">+5</button>
         </div>
         <div class="count-mult">× 4</div>
       </div>
-      <button class="count-tap-btn" onclick="tapCount('mpulse15')">טפח כל פעימת דופק <span>לחיצה אחת = פעימה אחת בספירת 15 שניות</span></button>
       <div class="calc-confirm" id="mv-pulse-calc">20 פעימות ב-15 שניות = 80 BPM</div>
     </div>
 
@@ -1085,14 +1087,15 @@ textarea{resize:vertical;min-height:70px;}
       </div>
       <div class="count-row">
         <div class="count-label">ספירה:</div>
-        <div class="vital-ctrl" style="flex:1">
-          <button class="vital-btn" style="border-radius:10px 0 0 10px;flex:1" onmousedown="startHold('mrr30',-1,true)" onmouseup="stopHold()" ontouchstart="startHold('mrr30',-1,true)" ontouchend="stopHold()" onclick="changeCount('mrr30',-1)">−</button>
-          <div class="vital-val" id="mv-rr30" style="min-width:52px;flex:none">8</div>
-          <button class="vital-btn" style="border-radius:0 10px 10px 0;flex:1" onmousedown="startHold('mrr30',1,true)" onmouseup="stopHold()" ontouchstart="startHold('mrr30',1,true)" ontouchend="stopHold()" onclick="changeCount('mrr30',1)">+</button>
+        <div class="vital-ctrl count-stepper" style="flex:1">
+          <button class="vital-btn" style="border-radius:10px 0 0 10px" onmousedown="startHold('mrr30',-2,true)" onmouseup="stopHold()" ontouchstart="startHold('mrr30',-2,true)" ontouchend="stopHold()" onclick="changeCount('mrr30',-2)">−2</button>
+          <button class="vital-btn" style="border-radius:0" onmousedown="startHold('mrr30',-1,true)" onmouseup="stopHold()" ontouchstart="startHold('mrr30',-1,true)" ontouchend="stopHold()" onclick="changeCount('mrr30',-1)">−1</button>
+          <div class="vital-val" id="mv-rr30">8</div>
+          <button class="vital-btn" style="border-radius:0" onmousedown="startHold('mrr30',1,true)" onmouseup="stopHold()" ontouchstart="startHold('mrr30',1,true)" ontouchend="stopHold()" onclick="changeCount('mrr30',1)">+1</button>
+          <button class="vital-btn" style="border-radius:0 10px 10px 0" onmousedown="startHold('mrr30',2,true)" onmouseup="stopHold()" ontouchstart="startHold('mrr30',2,true)" ontouchend="stopHold()" onclick="changeCount('mrr30',2)">+2</button>
         </div>
         <div class="count-mult">× 2</div>
       </div>
-      <button class="count-tap-btn" onclick="tapCount('mrr30')">טפח כל נשימה <span>לחיצה אחת = נשימה אחת בספירת 30 שניות</span></button>
       <div class="calc-confirm" id="mv-rr-calc">8 נשימות ב-30 שניות = 16 / דקה</div>
       <button onclick="setModalNoBreathing()" style="background:rgba(230,57,70,0.1);border:1.5px solid var(--red);border-radius:10px;padding:10px;color:var(--red);font-size:14px;font-weight:700;cursor:pointer;width:100%">🚫 לא נושם</button>
     </div>
@@ -1184,7 +1187,6 @@ let reportState = {source:null, red:0, yellow:0, green:0};
 // BASELINES — used to reset, not carry over
 const VITALS_BASELINE = {pulse:80, spo2:null, bp_estimate:null, rr:16, avpu:null};
 const COUNT_BASELINE = {pulse15:20, rr30:8, mpulse15:20, mrr30:8};
-const ENTRY_METHOD_BASELINE = {pulse15:'stepper', rr30:'stepper', mpulse15:'stepper', mrr30:'stepper'};
 
 function freshState(){
   return {
@@ -1198,7 +1200,6 @@ function freshState(){
 let state = freshState();
 let flowVitals = {...VITALS_BASELINE};
 let counts = {...COUNT_BASELINE};
-let countEntryMethods = {...ENTRY_METHOD_BASELINE};
 let spo2Active = false;
 let doses = {morphine:5, fluids:500};
 let tqData = {time:null, limbs:new Set()};
@@ -1513,7 +1514,6 @@ function guardedNewPatient(){
 function setNoBreathing(){
   // Set RR to 0
   counts.rr30=0; flowVitals.rr=0;
-  countEntryMethods.rr30='clinical_override';
   document.getElementById('v-rr30').textContent='0';
   document.getElementById('v-rr-rate').textContent='0';
   const calc=document.getElementById('v-rr-calc');
@@ -1523,7 +1523,7 @@ function setNoBreathing(){
   if(btn){ btn.style.background='rgba(230,57,70,0.25)'; btn.style.fontWeight='900'; }
 }
 function setModalNoBreathing(){
-  counts.mrr30=0; modalVitals.rr=0; countEntryMethods.mrr30='clinical_override';
+  counts.mrr30=0; modalVitals.rr=0;
   document.getElementById('mv-rr30').textContent='0';
   document.getElementById('mv-rr-rate').textContent='0';
   const calc=document.getElementById('mv-rr-calc');
@@ -1705,7 +1705,6 @@ function startNewPatient(){
   state = freshState();
   flowVitals = {...VITALS_BASELINE};
   counts = {...COUNT_BASELINE};
-  countEntryMethods = {...ENTRY_METHOD_BASELINE};
   spo2Active = false;
   doses = {morphine:5, fluids:500};
   tqData = {time:null, limbs:new Set()};
@@ -1728,7 +1727,6 @@ function startNewPatient(){
   document.getElementById('triage-suggestion').style.display='none';
   // Reset counts to baselines
   counts.pulse15=20; counts.rr30=8;
-  countEntryMethods = {...ENTRY_METHOD_BASELINE};
   updateCountDisplay('pulse15'); updateCountDisplay('rr30');
   updateCountDisplay('mpulse15'); updateCountDisplay('mrr30');
   document.getElementById('dose-morphine').textContent='5';
@@ -1917,13 +1915,11 @@ function showMstartSuggestion(){
 // ═══════════════════════════════════════════════
 //  COUNT-BASED VITALS
 // ═══════════════════════════════════════════════
-function changeCount(key, delta, method='stepper'){
+function changeCount(key, delta){
   const lim=COUNT_LIMITS[key]; if(!lim) return;
   counts[key]=Math.min(lim.max,Math.max(lim.min,(counts[key]||lim.min)+delta));
-  countEntryMethods[key]=method;
   updateCountDisplay(key);
 }
-function tapCount(key){ changeCount(key,1,'tap'); }
 function updateCountDisplay(key){
   const isM=key.startsWith('m');
   const pfx=isM?'mv':'v';
@@ -1965,9 +1961,10 @@ function stopHold(){ clearTimeout(holdTimer); clearInterval(holdInterval); }
 function vitalsCapturePayload(scope='flow'){
   const pulseKey=scope==='modal'?'mpulse15':'pulse15';
   const rrKey=scope==='modal'?'mrr30':'rr30';
+  const rrMethod=counts[rrKey]===0 ? 'clinical_override' : 'stepper';
   return {
-    heart_rate:{raw_count:counts[pulseKey], window_seconds:15, calculated_bpm:counts[pulseKey]*4, entry_method:countEntryMethods[pulseKey]},
-    respiratory_rate:{raw_count:counts[rrKey], window_seconds:30, calculated_per_min:counts[rrKey]*2, entry_method:countEntryMethods[rrKey]}
+    heart_rate:{raw_count:counts[pulseKey], window_seconds:15, calculated_bpm:counts[pulseKey]*4, entry_method:'stepper'},
+    respiratory_rate:{raw_count:counts[rrKey], window_seconds:30, calculated_per_min:counts[rrKey]*2, entry_method:rrMethod}
   };
 }
 function vitalsCaptureLabel(scope='flow'){
@@ -2091,8 +2088,6 @@ function openQuickVitals(pid){
   modalVitals={...p.vitals};
   counts.mpulse15=Math.round(p.vitals.pulse/4);
   counts.mrr30=Math.round(p.vitals.rr/2);
-  countEntryMethods.mpulse15='stepper';
-  countEntryMethods.mrr30='stepper';
   document.getElementById('modal-pid-title').textContent=`עדכון מדדים — ${p.id}`;
   document.getElementById('modal-last-vitals').textContent=`אחרון: דופק ${p.vitals.pulse} · נשימות ${p.vitals.rr ?? '—'} · SpO₂ ${p.vitals.spo2||'—'} · AVPU ${p.vitals.avpu||'—'}`;
   document.getElementById('mv-spo2').textContent=p.vitals.spo2||98;

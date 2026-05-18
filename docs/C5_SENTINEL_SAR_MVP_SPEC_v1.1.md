@@ -686,15 +686,15 @@ Optional:
 
 Personnel ID is auto-populated from login and is non-editable.
 
-### Tap + Stepper Vitals Entry
+### Stepper-Based Vitals Entry
 
-The MVP supports the original **large tap-every-beat / tap-every-breath control** and keeps steppers as the correction path. This preserves the gloved-hands field UX while still allowing a medic to fix an over-count or under-count quickly.
+The MVP uses **stepper-based manual count entry**, matching the mockups and avoiding a tap-every-beat control.
 
 Heart Rate uses a 15-second count:
 
 ```text
 Pulse Count — 15 sec
-[Tap Beat]   [-1]   25   [+1]
+[-5] [-1]   25   [+1] [+5]
 Calculated HR: 100 bpm
 ```
 
@@ -702,7 +702,7 @@ Respiratory Rate uses a 30-second count:
 
 ```text
 Resp Count — 30 sec
-[Tap Breath]   [-1]   10   [+1]
+[-2] [-1]   10   [+1] [+2]
 Calculated RR: 20/min
 ```
 
@@ -713,9 +713,9 @@ HR raw count default = 25  → 25 × 4 = 100 bpm
 RR raw count default = 10  → 10 × 2 = 20/min
 ```
 
-The medic can use the large tap control as the primary path, then use the stepper buttons to correct the raw count if needed.
+The medic adjusts the raw count with large stepper buttons only.
 
-Stored payload includes raw count, window seconds, calculated value, and `entry_method`. Allowed MVP values are `tap`, `stepper`, and `clinical_override` for explicit no-breathing decisions.
+Stored payload includes raw count, window seconds, calculated value, and `entry_method = stepper`. Explicit no-breathing decisions may use `entry_method = clinical_override` for respiratory rate.
 
 ## Step 5 — Triage
 
@@ -1495,27 +1495,27 @@ The heatmap never turns green until every known patient is handed over and the s
 
 # v1.1 Corrections and Safety Updates
 
-## Vitals UX — Tap Primary, Stepper Correction
+## Vitals UX — Stepper-Based Manual Count
 
-The large tap model is preserved for field use, with steppers retained for correction.
+The tap-every-beat / tap-every-breath model is removed. Vitals use a stepper-based manual count model.
 
 For Heart Rate:
 - Default raw count is 25 beats in 15 seconds.
-- Medic taps once per beat or adjusts using `-1 / +1`.
+- Medic adjusts using `-5 / -1 / +1 / +5`.
 - System calculates `heart_rate = raw_count × 4`.
 
 For Respiratory Rate:
 - Default raw count is 10 breaths in 30 seconds.
-- Medic taps once per breath or adjusts using `-1 / +1`.
+- Medic adjusts using `-2 / -1 / +1 / +2`.
 - System calculates `respiratory_rate = raw_count × 2`.
 
 The system stores:
 - raw count
 - measurement window seconds
 - calculated per-minute value
-- entry method: `tap`, `stepper`, or `clinical_override`
+- entry method: `stepper`, or `clinical_override` for no-breathing
 
-This keeps the fastest field interaction while preserving a clear audit trail.
+This keeps the interaction close to the mockups while preserving a clear audit trail.
 
 ## Sync Deduplication and Projection Conflict Resolution
 
@@ -1704,16 +1704,16 @@ This keeps inventory auditable, offline-safe, and compatible with after-action l
 
 Critical events trigger immediate sync attempts, including New Patient, Quick Patient, Vitals, Treatment, Triage, Handover, Supply Request, Building Unstable, Dead Man’s Switch, and Site Clear. Background sync is fallback only and runs every 60–90 seconds. Failed sync uses exponential backoff: 5s → 15s → 30s → 60s → 90s max.
 
-## Tap + Stepper Vitals Entry
+## Stepper Vitals Entry
 
-Vitals entry now uses a large tap control plus stepper correction:
+Vitals entry uses stepper-based manual count input:
 
 ```text
 HR: default 25 beats / 15s → ×4
 RR: default 10 breaths / 30s → ×2
 ```
 
-The payload stores `entry_method = tap | stepper | clinical_override`.
+The payload stores `entry_method = stepper | clinical_override`.
 
 ## KPIs
 
