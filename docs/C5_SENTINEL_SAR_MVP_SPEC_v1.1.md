@@ -432,14 +432,15 @@ If full vitals are not available, the app uses **minimal triage support**, not a
 Rules:
 
 ```text
-No breathing + no pulse → BLACK suggestion
-No breathing + pulse present → RED suggestion / airway-breathing prompt
+No breathing in MCI mode → BLACK suggestion
 Breathing present + major bleeding/tourniquet used → RED suggestion
 Breathing present + pulse present + ambulatory/minor injury → GREEN or YELLOW manual assignment
 Unknown pulse/breathing → PENDING / requires assessment
 ```
 
 A full algorithmic triage label is calculated only after required vitals are entered.
+
+The UI must visually distinguish `pending` from `green`: pending means "not enough data / not triaged yet", while green means minor/non-urgent.
 
 ---
 
@@ -649,7 +650,26 @@ If YES:
 
 This information is captured even in Quick Patient mode.
 
+Once a tourniquet is recorded, the patient card, patient detail view, and command row must show a persistent elapsed timer. The timer is a clinical clock, not a passive history item.
+
 ## Step 4 — Vitals
+
+Stepper-based vitals entry must show the calculation behind the value, for example:
+
+```text
+15 beats in 15 seconds = 60 BPM
+8 breaths in 30 seconds = 16/min
+```
+
+## Step 5 — Injury Map
+
+The MVP supports a body-map injury capture model. Selected anatomical zones are stored as `patients.injury_zones` and mirrored in event payloads as `injury_zones`.
+
+Example zones:
+
+```text
+head, chest, abdomen, left_arm, right_arm, left_leg, right_leg
+```
 
 Required for full MSTART/JumpSTART:
 
@@ -1138,6 +1158,7 @@ vw_incident_tactical_funnel
 vw_sector_clearance_status
 vw_current_inventory
 vw_active_patient_priority
+vw_active_watchdog_alerts_by_severity
 ```
 
 ## Schema Principles

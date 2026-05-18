@@ -59,6 +59,7 @@ Core technical docs:
 - [`docs/API_SURFACE_v1.1.md`](docs/API_SURFACE_v1.1.md)
 - [`database/001_postgresql_schema_v1.1.sql`](database/001_postgresql_schema_v1.1.sql)
 - [`database/002_seed_demo_data_v1.1.sql`](database/002_seed_demo_data_v1.1.sql)
+- [`database/003_mci_ui_alignment.sql`](database/003_mci_ui_alignment.sql)
 
 ## Analytics And AAR
 
@@ -114,7 +115,8 @@ The current v1.1 specification lives in the root `docs/`, `database/`, and `anal
 |   `-- ROADMAP.md
 |-- database/
 |   |-- 001_postgresql_schema_v1.1.sql
-|   `-- 002_seed_demo_data_v1.1.sql
+|   |-- 002_seed_demo_data_v1.1.sql
+|   `-- 003_mci_ui_alignment.sql
 |-- analytics/
 |   `-- c5_sentinel_sar_analytics_v1_1/
 |-- assets/

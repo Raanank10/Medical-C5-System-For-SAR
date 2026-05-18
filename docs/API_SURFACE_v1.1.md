@@ -59,6 +59,10 @@ Purpose:
           "calculated_per_min": 32,
           "entry_method": "stepper"
         },
+        "calculation_display": {
+          "heart_rate": "31 beats in 15 seconds = 124 BPM",
+          "respiratory_rate": "16 breaths in 30 seconds = 32/min"
+        },
         "bp": "Carotid",
         "avpu": "Pain",
         "spo2": 91
@@ -171,6 +175,7 @@ The app attempts immediate `/sync/log` after:
 
 - draft incident created
 - new patient / quick patient created
+- body-map injury zones updated
 - vitals recorded
 - treatment recorded
 - tourniquet applied / reassessed / released
@@ -199,11 +204,14 @@ GET /command/incidents/:incidentId/dashboard-state
 GET /command/incidents/:incidentId/heatmap
 GET /command/incidents/:incidentId/inventory
 GET /command/incidents/:incidentId/watchdog-alerts
+GET /command/incidents/:incidentId/watchdog-alerts?severity=critical
 GET /command/incidents/:incidentId/conflict-log
 GET /command/incidents/:incidentId/aar/live-timeline
 ```
 
 Dashboard aggregation should use precomputed current-state tables/materialized views, not repeated heavy joins over raw events.
+
+Command alert slicers should read severity-aware alert views. `critical` alerts are shown separately from routine reminders so medics and PCs are not overwhelmed by low-priority operational debt.
 
 ---
 

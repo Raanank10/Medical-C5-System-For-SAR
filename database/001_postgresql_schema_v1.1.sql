@@ -14,7 +14,8 @@ do $$ begin
   alter type event_type add value if not exists 'TOURNIQUET_CONTEXT_UPDATED';
   alter type event_type add value if not exists 'AAR_CONTEXT_NOTE_ADDED';
   alter type event_type add value if not exists 'HIGH_RISK_OVERRIDE_CONFIRMED';
-exception when duplicate_object then null; end $$;
+  alter type event_type add value if not exists 'PATIENT_INJURY_UPDATED';
+exception when duplicate_object or undefined_object then null; end $$;
 
 do $$ begin create type incident_status as enum ('draft','staging','active','closed'); exception when duplicate_object then null; end $$;
 do $$ begin create type triage_level as enum ('red','yellow','green','black','pending','unknown'); exception when duplicate_object then null; end $$;
@@ -26,14 +27,15 @@ do $$ begin create type external_source as enum ('mda','united_hatzalah','police
 do $$ begin
   create type event_type as enum (
     'INCIDENT_DRAFT_CREATED','INCIDENT_OPENED','INCIDENT_CONFIRMED','INCIDENT_DRAFT_MERGED','INCIDENT_DRAFT_REJECTED','INCIDENT_CLOSED','INCIDENT_REOPENED',
-    'PATIENT_CREATED','QUICK_PATIENT_CREATED','PATIENT_T_INJURY_UPDATED','PATIENT_LOCATION_UPDATED','PATIENT_ACCESS_UPDATED','PATIENT_TRIAGE_UPDATED','PATIENT_STATUS_UPDATED','PATIENT_HANDED_OVER',
+    'PATIENT_CREATED','QUICK_PATIENT_CREATED','PATIENT_T_INJURY_UPDATED','PATIENT_LOCATION_UPDATED','PATIENT_INJURY_UPDATED','PATIENT_ACCESS_UPDATED','PATIENT_TRIAGE_UPDATED','PATIENT_STATUS_UPDATED','PATIENT_HANDED_OVER',
     'VITALS_RECORDED','MINIMAL_TRIAGE_RECORDED','SABCDE_RECORDED','MSTART_SUGGESTED','JUMPSTART_SUGGESTED','MSTART_OVERRIDE','JUMPSTART_OVERRIDE',
     'TOURNIQUET_APPLIED','TOURNIQUET_REASSESSMENT','TOURNIQUET_RELEASED','INTERVENTION_RECORDED','MEDICATION_ADMINISTERED',
     'EXTERNAL_REPORT_CREATED','EXTERNAL_REPORT_LINKED',
     'SUPPLY_REQUEST_CREATED','SUPPLY_REQUEST_DISPATCHED','SUPPLY_REQUEST_IN_TRANSIT','SUPPLY_REQUEST_RECEIVED',
     'INVENTORY_LEDGER_ENTRY','INVENTORY_INITIALIZED','INVENTORY_TRANSFER_OUT','INVENTORY_TRANSFER_IN','PLATOON_STOCK_INITIALIZED','PLATOON_STOCK_REFILLED','DIRECT_LOGO_TO_MEDIC_REFILL','WATCHDOG_ALERT','WATCHDOG_ACKNOWLEDGED','WATCHDOG_RESOLVED',
     'BUILDING_STATUS_UPDATED','SITE_CLEAR_CONFIRMED','MEDIC_SITE_CLOSE_REQUESTED',
-    'SYNC_CONFLICT','CONFLICT_LOG_ENTRY','TREATMENT_SAFETY_WARNING','COMMAND_CONTEXT_NOTE_ADDED','VOICE_MEMO_ADDED','HIGH_RISK_CLINICAL_VIOLATION','DEAD_MAN_SWITCH_ESCALATED','NOTE_ADDED'
+    'SYNC_CONFLICT','CONFLICT_LOG_ENTRY','TREATMENT_SAFETY_WARNING','COMMAND_CONTEXT_NOTE_ADDED','VOICE_MEMO_ADDED','HIGH_RISK_CLINICAL_VIOLATION','DEAD_MAN_SWITCH_ESCALATED','NOTE_ADDED',
+    'TOURNIQUET_CONTEXT_UPDATED','AAR_CONTEXT_NOTE_ADDED','HIGH_RISK_OVERRIDE_CONFIRMED'
   );
 exception when duplicate_object then null; end $$;
 
@@ -181,6 +183,7 @@ create table if not exists patients (
   pulse_present boolean,
   breathing_present boolean,
   tourniquet_used boolean,
+  injury_zones jsonb not null default '[]'::jsonb,
   is_trapped boolean generated always as (access_status in ('trapped','partial')) stored,
   location_json jsonb not null default '{}'::jsonb,
   location_recorded_at timestamptz,
@@ -207,6 +210,11 @@ create index if not exists idx_patients_last_vitals on patients(last_vitals_at);
 create unique index if not exists idx_patients_handover_token on patients(handover_token);
 create index if not exists idx_patients_needs_full_assessment on patients(needs_full_assessment) where needs_full_assessment = true;
 create index if not exists idx_patients_pending_incident_approval on patients(pending_incident_approval) where pending_incident_approval = true;
+
+alter table patients
+  add column if not exists injury_zones jsonb not null default '[]'::jsonb;
+
+create index if not exists idx_patients_injury_zones_gin on patients using gin(injury_zones);
 
 -- =========================================================
 -- EVENTS — immutable append-only log
@@ -526,6 +534,7 @@ create table if not exists watchdog_alerts (
 create index if not exists idx_watchdog_incident on watchdog_alerts(incident_id);
 create index if not exists idx_watchdog_patient on watchdog_alerts(patient_id);
 create index if not exists idx_watchdog_unresolved on watchdog_alerts(resolved_at) where resolved_at is null;
+create index if not exists idx_watchdog_unresolved_severity on watchdog_alerts(incident_id, severity, triggered_at desc) where resolved_at is null;
 
 create table if not exists device_presence (
   id uuid primary key default gen_random_uuid(),
@@ -590,6 +599,7 @@ begin
       set pulse_present = coalesce((new.payload_json->>'pulse_present')::boolean, pulse_present),
           breathing_present = coalesce((new.payload_json->>'breathing_present')::boolean, breathing_present),
           tourniquet_used = coalesce((new.payload_json->>'tourniquet_used')::boolean, tourniquet_used),
+          injury_zones = coalesce(new.payload_json->'injury_zones', injury_zones),
           needs_full_assessment = true,
           updated_at = now(),
           version = version + 1
@@ -631,6 +641,14 @@ begin
           version = version + 1
       where id = new.patient_id
         and (location_recorded_at is null or new.local_timestamp >= location_recorded_at);
+
+    elsif new.type in ('PATIENT_CREATED','QUICK_PATIENT_CREATED','PATIENT_INJURY_UPDATED') then
+      update patients
+      set injury_zones = coalesce(new.payload_json->'injury_zones', injury_zones),
+          updated_at = now(),
+          version = version + 1
+      where id = new.patient_id
+        and new.payload_json ? 'injury_zones';
 
     elsif new.type = 'PATIENT_T_INJURY_UPDATED' then
       update patients
@@ -1361,6 +1379,18 @@ from incidents i
 left join patient_counts pc on pc.incident_id = i.id
 left join alert_counts ac on ac.incident_id = i.id
 left join medic_counts mc on mc.incident_id = i.id;
+
+create or replace view vw_active_watchdog_alerts_by_severity as
+select
+  incident_id,
+  severity,
+  count(*) as active_alerts,
+  count(*) filter (where patient_id is not null) as patient_linked_alerts,
+  min(triggered_at) as oldest_triggered_at,
+  max(triggered_at) as newest_triggered_at
+from watchdog_alerts
+where resolved_at is null
+group by incident_id, severity;
 
 create or replace view vw_kpi_sync_latency as
 select

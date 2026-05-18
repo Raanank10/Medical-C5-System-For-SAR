@@ -64,6 +64,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .patient-card.yellow::before{background:var(--yellow);}
 .patient-card.green::before{background:var(--green);}
 .patient-card.black::before{background:var(--black);}
+.patient-card.pending::before{background:var(--muted);}
 .patient-id{font-family:var(--mono);font-weight:700;font-size:16px;min-width:46px;}
 .patient-info{flex:1;}
 .patient-badges{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;align-items:center;}
@@ -79,6 +80,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .vitals-timer.ok{color:var(--green);border-color:var(--green);}
 .vitals-timer.warn{color:var(--yellow);border-color:var(--yellow);}
 .vitals-timer.overdue{color:var(--orange);border-color:var(--orange);animation:blink 1.5s infinite;}
+.tq-timer{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:20px;border:1px solid var(--red);color:var(--red);background:rgba(230,57,70,0.08);}
+.tq-timer.warn{border-color:var(--orange);color:var(--orange);background:rgba(255,107,53,0.08);}
+.tq-timer.critical{border-color:var(--red);color:var(--red);background:rgba(230,57,70,0.16);animation:blink 1.5s infinite;}
 .deteri-flag{font-size:10px;font-weight:700;color:var(--red);background:rgba(230,57,70,0.1);border:1px solid var(--red);border-radius:20px;padding:2px 7px;}
 
 /* ── ALERT BANNERS ── */
@@ -210,6 +214,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .count-row{display:flex;align-items:center;gap:10px;}
 .count-label{font-size:12px;color:var(--muted);min-width:50px;}
 .count-mult{font-size:11px;color:var(--muted);min-width:32px;text-align:left;}
+.calc-confirm{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 9px;line-height:1.35;}
 .avpu-row{display:flex;gap:8px;}
 .avpu-btn{flex:1;padding:14px 4px;background:var(--surface2);border:2px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:18px;font-weight:700;cursor:pointer;text-align:center;transition:all 0.12s;}
 .avpu-btn.selected{border-color:var(--accent);background:rgba(67,97,238,0.15);color:var(--accent);}
@@ -235,6 +240,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .triage-pill.yellow{background:rgba(244,162,97,0.2);color:var(--yellow);}
 .triage-pill.green{background:rgba(42,157,143,0.2);color:var(--green);}
 .triage-pill.black{background:rgba(74,74,74,0.15);color:#aaa;}
+.triage-pill.pending{background:rgba(112,112,160,0.14);color:var(--muted);border:1px solid var(--border);}
 
 /* ── TIMELINE ── */
 .timeline-entry{display:flex;gap:12px;padding:0 16px 14px;}
@@ -674,6 +680,7 @@ textarea{resize:vertical;min-height:70px;}
         </div>
         <div class="count-mult">× 4</div>
       </div>
+      <div class="calc-confirm" id="v-pulse-calc">20 פעימות ב-15 שניות = 80 BPM</div>
     </div>
 
     <!-- SpO2 optional -->
@@ -723,6 +730,7 @@ textarea{resize:vertical;min-height:70px;}
         </div>
         <div class="count-mult">× 2</div>
       </div>
+      <div class="calc-confirm" id="v-rr-calc">8 נשימות ב-30 שניות = 16 / דקה</div>
       <button id="no-breathing-btn" onclick="setNoBreathing()" style="background:rgba(230,57,70,0.1);border:1.5px solid var(--red);border-radius:10px;padding:10px;color:var(--red);font-size:14px;font-weight:700;cursor:pointer;width:100%">🚫 לא נושם</button>
     </div>
 
@@ -1031,6 +1039,7 @@ textarea{resize:vertical;min-height:70px;}
         </div>
         <div class="count-mult">× 4</div>
       </div>
+      <div class="calc-confirm" id="mv-pulse-calc">20 פעימות ב-15 שניות = 80 BPM</div>
     </div>
 
     <!-- SpO2 -->
@@ -1075,6 +1084,7 @@ textarea{resize:vertical;min-height:70px;}
         </div>
         <div class="count-mult">× 2</div>
       </div>
+      <div class="calc-confirm" id="mv-rr-calc">8 נשימות ב-30 שניות = 16 / דקה</div>
       <button onclick="setModalNoBreathing()" style="background:rgba(230,57,70,0.1);border:1.5px solid var(--red);border-radius:10px;padding:10px;color:var(--red);font-size:14px;font-weight:700;cursor:pointer;width:100%">🚫 לא נושם</button>
     </div>
 
@@ -1125,7 +1135,7 @@ const BP_LABELS = {
 };
 const ACCESS_LABELS = {partial:'לכוד עם גישה חלקית', full:'לכוד עם גישה מלאה', none:'לכוד ללא גישה'};
 const STATUS_LABELS = {in_treatment:'בטיפול', monitoring:'בהשגחה עד חילוץ', evacuated:'מחולץ'};
-const TRIAGE_LABELS = {red:'קשה — אדום', yellow:'בינוני — צהוב', green:'קל — ירוק', black:'לא בר הצלה — שחור'};
+const TRIAGE_LABELS = {red:'קשה — אדום', yellow:'בינוני — צהוב', green:'קל — ירוק', black:'לא בר הצלה — שחור', pending:'ממתין למיון', unknown:'לא ידוע'};
 const INT_LABELS = {bandage:'חבישה', tourniquet:'חסם עורקים', iv:'פתיחת וריד', airway_mgmt:'פתיחת נ"א', cpr:'החייאה', atq:'אקטיק'};
 const LIMB_LABELS = {yl:'יד שמאל', yr:'יד ימין', rl:'רגל שמאל', rr:'רגל ימין'};
 const BODY_ZONE_LABELS = {
@@ -1365,6 +1375,7 @@ function renderDashboard(){
 
   document.getElementById('patient-list').innerHTML=patients.map(p=>{
     const timer=vitalsTimerLabel(p);
+    const tq=tourniquetTimerLabel(p);
     const det=p.deterioration&&p.deterioration.length;
     return `<div class="patient-card ${p.triage}" onclick="openPatient('${p.id}')">
       <div class="patient-id">${p.id}</div>
@@ -1375,6 +1386,7 @@ function renderDashboard(){
           <span class="badge ${p.patientStatus==='in_treatment'?'badge-green':p.patientStatus==='evacuated'?'badge-accent':'badge-muted'}">${STATUS_LABELS[p.patientStatus]||''}</span>
           <span class="badge badge-muted">${ACCESS_LABELS[p.accessibility]||''}</span>
           ${timer?`<span class="vitals-timer ${timer.cls}" onclick="event.stopPropagation();openQuickVitals('${p.id}')">${timer.label}</span>`:''}
+          ${tq?`<span class="tq-timer ${tq.cls}">${tq.label}</span>`:''}
           ${det?`<span class="deteri-flag">⚠ הידרדרות</span>`:''}
           <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${p.time}</span>
         </div>
@@ -1401,6 +1413,38 @@ function vitalsTimerLabel(p){
   if(age>=VITALS_INTERVAL_MS) return {cls:'overdue',label:`⏱ +${Math.floor(age/60000)}m`};
   if(age>=WARN_AT_MS) return {cls:'warn',label:`⏱ ${Math.ceil((VITALS_INTERVAL_MS-age)/60000)}m`};
   return {cls:'ok',label:`⏱ ${Math.ceil((VITALS_INTERVAL_MS-age)/60000)}m`};
+}
+function elapsedMinutes(ts){
+  const t=typeof ts==='string'?Date.parse(ts):ts;
+  return Number.isFinite(t) ? Math.max(0, Math.floor((Date.now()-t)/60000)) : 0;
+}
+function tourniquetTimerLabel(p){
+  if(!p.tourniquet || !p.tourniquet.appliedAt) return null;
+  const min=elapsedMinutes(p.tourniquet.appliedAt);
+  const cls=min>=60?'critical':min>=40?'warn':'';
+  return {cls,label:`חסם: ${p.tourniquet.limb||'לא צוין'} · +${min} דק׳`};
+}
+function timeCodeToTodayMs(code){
+  if(!code || !/^\d{4}$/.test(code)) return Date.now();
+  const d=new Date();
+  d.setHours(Number(code.slice(0,2)), Number(code.slice(2)), 0, 0);
+  if(d.getTime()>Date.now()+60000) d.setDate(d.getDate()-1);
+  return d.getTime();
+}
+function tourniquetRecordFromState(){
+  if(quickTqData.applied){
+    return {
+      limb:[...quickTqData.limbs].map(l=>LIMB_LABELS[l]||l).join(', ')||'לא צוין',
+      appliedAt:timeCodeToTodayMs(quickTqData.time)
+    };
+  }
+  if(state.interventions.has('tourniquet')){
+    return {
+      limb:[...tqData.limbs].map(l=>LIMB_LABELS[l]||l).join(', ')||'לא צוין',
+      appliedAt:timeCodeToTodayMs(tqData.time)
+    };
+  }
+  return null;
 }
 function detectDeterioration(prev,next){
   const f=[];
@@ -1460,6 +1504,8 @@ function setNoBreathing(){
   counts.rr30=0; flowVitals.rr=0;
   document.getElementById('v-rr30').textContent='0';
   document.getElementById('v-rr-rate').textContent='0';
+  const calc=document.getElementById('v-rr-calc');
+  if(calc) calc.textContent='0 נשימות ב-30 שניות = 0 / דקה';
   // Style the button as active
   const btn=document.getElementById('no-breathing-btn');
   if(btn){ btn.style.background='rgba(230,57,70,0.25)'; btn.style.fontWeight='900'; }
@@ -1468,6 +1514,8 @@ function setModalNoBreathing(){
   counts.mrr30=0; modalVitals.rr=0;
   document.getElementById('mv-rr30').textContent='0';
   document.getElementById('mv-rr-rate').textContent='0';
+  const calc=document.getElementById('mv-rr-calc');
+  if(calc) calc.textContent='0 נשימות ב-30 שניות = 0 / דקה';
 }
 
 // ── Fix 5: black skip toggle ──────────────────────────────
@@ -1508,13 +1556,15 @@ function openPatient(id){
   const p=patients.find(x=>x.id===id); if(!p) return;
   document.getElementById('detail-pid').textContent=p.id;
   const sCol=s=>!s?'var(--muted)':s<94?'var(--red)':s<97?'var(--yellow)':'var(--green)';
+  const tq=tourniquetTimerLabel(p);
   document.getElementById('detail-body').innerHTML=`
     <div class="summary-card">
-      <div class="summary-row"><span class="summary-key">מיון</span><span class="summary-val"><span class="triage-pill ${p.triage}">${TRIAGE_LABELS[p.triage]}</span></span></div>
+      <div class="summary-row"><span class="summary-key">מיון</span><span class="summary-val"><span class="triage-pill ${p.triage}">${TRIAGE_LABELS[p.triage]||TRIAGE_LABELS.unknown}</span></span></div>
       <div class="summary-row"><span class="summary-key">מיקום</span><span class="summary-val">${p.location}${p.locDetail?' · '+p.locDetail:''}</span></div>
       <div class="summary-row"><span class="summary-key">נגישות</span><span class="summary-val">${ACCESS_LABELS[p.accessibility]||''}</span></div>
       <div class="summary-row"><span class="summary-key">פציעה</span><span class="summary-val">${p.injury}</span></div>
       <div class="summary-row"><span class="summary-key">מצב</span><span class="summary-val">${STATUS_LABELS[p.patientStatus]||''}</span></div>
+      ${tq?`<div class="summary-row"><span class="summary-key">חסם עורקים</span><span class="summary-val"><span class="tq-timer ${tq.cls}">${tq.label}</span></span></div>`:''}
     </div>
     <div class="summary-card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -1666,6 +1716,7 @@ function startNewPatient(){
   // Reset counts to baselines
   counts.pulse15=20; counts.rr30=8;
   updateCountDisplay('pulse15'); updateCountDisplay('rr30');
+  updateCountDisplay('mpulse15'); updateCountDisplay('mrr30');
   document.getElementById('dose-morphine').textContent='5';
   document.getElementById('dose-fluids').textContent='500';
   ['btn-step1','btn-step2','btn-step3','btn-step4','btn-step5','btn-step6','btn-step7'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=true;});
@@ -1864,16 +1915,20 @@ function updateCountDisplay(key){
     const rate=counts[key]*4;
     const el15=document.getElementById(pfx+'-pulse15');
     const elR=document.getElementById(pfx+'-pulse-rate');
+    const elC=document.getElementById(pfx+'-pulse-calc');
     if(el15) el15.textContent=counts[key];
     if(elR)  elR.textContent=rate;
+    if(elC)  elC.textContent=`${counts[key]} פעימות ב-15 שניות = ${rate} BPM`;
     if(isM) modalVitals.pulse=rate; else flowVitals.pulse=rate;
   }
   if(key==='rr30'||key==='mrr30'){
     const rate=counts[key]*2;
     const el30=document.getElementById(pfx+'-rr30');
     const elR=document.getElementById(pfx+'-rr-rate');
+    const elC=document.getElementById(pfx+'-rr-calc');
     if(el30) el30.textContent=counts[key];
     if(elR)  elR.textContent=rate;
+    if(elC)  elC.textContent=`${counts[key]} נשימות ב-30 שניות = ${rate} / דקה`;
     if(isM) modalVitals.rr=rate; else flowVitals.rr=rate;
   }
 }
@@ -1955,17 +2010,18 @@ function savePatient(){
   const intStr=buildIntStr();
   const locStr=buildLocStr();
   const deviceId=getDeviceId();
+  const tqRecord=tourniquetRecordFromState();
   const t=nowT();
   const txHistoryEntry = intStr ? [{time:t, text:intStr, medic:deviceId}] : [];
   patients.push({
     id:newId, triage:state.triage, accessibility:state.accessibility,
     location:locStr, locDetail:'',
-    injury:state.injury, patientStatus:state.patientStatus,
+    injury:state.injury, injuryZones:[...state.injuryZones], patientStatus:state.patientStatus,
     time:t, vitals:{...flowVitals},
     txHistory:txHistoryEntry,
     alert:false, deterioration:[], lastVitalsAt:Date.now(),
     vitalsHistory:[{t:Date.now(),pulse:flowVitals.pulse,spo2:flowVitals.spo2,rr:flowVitals.rr,avpu:flowVitals.avpu}],
-    tourniquet:quickTqData.applied?{limb:[...quickTqData.limbs].map(l=>LIMB_LABELS[l]||l).join(', ')||'לא צוין',appliedAt:Date.now()}:null,
+    tourniquet:tqRecord,
     medic:deviceId,
     events:[
       {type:'CREATED',time:t,detail:'פצוע נפתח'},
@@ -2234,6 +2290,7 @@ function renderCmdPatients(){
       <div>
         <div style="font-weight:600;font-size:13px">${p.location}</div>
         <div style="font-size:12px;color:var(--muted)">${p.injury} · ${STATUS_LABELS[p.patientStatus]||''}</div>
+        ${tourniquetTimerLabel(p)?`<div style="margin-top:4px"><span class="tq-timer ${tourniquetTimerLabel(p).cls}">${tourniquetTimerLabel(p).label}</span></div>`:''}
         ${p.deterioration&&p.deterioration.length?`<div style="font-size:11px;color:var(--red);font-weight:700;margin-top:2px">⚠ ${p.deterioration.join(' · ')}</div>`:''}
         ${!(p.deterioration&&p.deterioration.length)&&needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS?`<div style="font-size:11px;color:var(--orange);margin-top:2px">⏱ מדדים נדרשים</div>`:''}
       </div>
