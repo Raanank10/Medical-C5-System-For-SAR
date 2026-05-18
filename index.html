@@ -262,6 +262,38 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .cmd-progress{height:5px;background:var(--border);border-radius:3px;margin-top:7px;overflow:hidden;}
 .cmd-progress-fill{height:100%;border-radius:3px;background:var(--green);}
 
+/* ── PC DEMO MVP ── */
+.demo-hero{min-height:100dvh;padding:28px 16px 120px;display:flex;flex-direction:column;gap:18px;background:radial-gradient(circle at 50% 0%, rgba(67,97,238,0.18), transparent 34%), var(--bg);}
+.demo-kicker{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;}
+.demo-title{font-size:30px;line-height:1.08;font-weight:800;max-width:720px;}
+.demo-sub{color:var(--muted);font-size:14px;line-height:1.65;max-width:760px;}
+.demo-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;}
+.demo-grid{display:grid;grid-template-columns:1fr;gap:10px;}
+.demo-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:right;color:var(--text);font-family:var(--sans);cursor:pointer;display:flex;align-items:center;gap:12px;}
+.demo-card strong{display:block;font-size:15px;margin-bottom:3px;}
+.demo-card span{display:block;font-size:12px;color:var(--muted);line-height:1.4;}
+.demo-icon{width:42px;height:42px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.demo-strip{margin:0 16px 12px;background:rgba(67,97,238,0.08);border:1px solid rgba(67,97,238,0.45);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px;justify-content:space-between;}
+.demo-strip-title{font-weight:700;font-size:13px;color:var(--accent);}
+.demo-strip-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.sync-pill{font-family:var(--mono);font-size:10px;border:1px solid var(--green);color:var(--green);border-radius:999px;padding:4px 8px;white-space:nowrap;}
+.sync-pill.stale{border-color:var(--orange);color:var(--orange);}
+.sync-pill.offline{border-color:var(--red);color:var(--red);}
+.demo-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 16px 12px;}
+.demo-mini-btn{background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--sans);font-weight:700;font-size:13px;padding:11px 8px;cursor:pointer;}
+.aar-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:0 16px 12px;}
+.aar-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 10px;text-align:center;}
+.aar-num{font-family:var(--mono);font-size:26px;font-weight:800;}
+.aar-label{font-size:10px;color:var(--muted);margin-top:3px;}
+.aar-note{margin:6px 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;}
+.aar-note-title{font-weight:700;font-size:13px;margin-bottom:4px;}
+.aar-note-body{font-size:12px;color:var(--muted);line-height:1.55;}
+@media (min-width:720px){
+  .demo-hero{align-items:center;justify-content:center;padding-inline:32px;}
+  .demo-grid{grid-template-columns:repeat(3,1fr);max-width:920px;width:100%;}
+  .demo-panel{max-width:920px;width:100%;}
+}
+
 /* ── INPUTS ── */
 input[type=text],input[type=number],textarea{width:100%;padding:13px;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--text);font-family:var(--sans);font-size:15px;outline:none;direction:rtl;}
 input[type=text]:focus,textarea:focus{border-color:var(--accent);}
@@ -270,14 +302,57 @@ textarea{resize:vertical;min-height:70px;}
 </head>
 <body>
 
+<!-- ══════════════════════ PC DEMO LAUNCHER ══ -->
+<div id="screen-demo" class="screen active">
+  <div class="demo-hero">
+    <div>
+      <div class="demo-kicker">PC DEMO MVP v1</div>
+      <div class="demo-title">C5 Sentinel-SAR</div>
+      <div class="demo-sub">
+        תרחיש הדגמה מבצעי למפקד מחלקה: פצועים, מדדים, חסמי עורקים, התראות, תמונת מצב ואירוע מסכם.
+      </div>
+    </div>
+    <div class="demo-grid">
+      <button class="demo-card" onclick="startPcDemo('dashboard')">
+        <div class="demo-icon">🚑</div>
+        <div><strong>תצוגת חובש</strong><span>פתיחת פצוע, מדדים, מיון וטיפול מהיר.</span></div>
+      </button>
+      <button class="demo-card" onclick="startPcDemo('commander')">
+        <div class="demo-icon">🎖</div>
+        <div><strong>תצוגת מפקד / חפ״ק</strong><span>ספירת פצועים, התראות, מוקדים ופינויים.</span></div>
+      </button>
+      <button class="demo-card" onclick="startPcDemo('aar')">
+        <div class="demo-icon">📋</div>
+        <div><strong>AAR חי</strong><span>סיכום אירוע, KPI ותובנות אחרי פעולה.</span></div>
+      </button>
+    </div>
+    <div class="demo-panel">
+      <div class="demo-strip-title">תרחיש נטען</div>
+      <div class="demo-strip-sub">מוקד A — הרצל 12, פגיעה במבנה, 5 פצועים, התראת חובש שקט, פצוע אדום עם חסם עורקים ומדדים באיחור.</div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="demo-mini-btn" onclick="loadDemoScenario(true);toast('תרחיש ההדגמה אופס')">אפס תרחיש</button>
+        <button class="demo-mini-btn" onclick="continueDemo()">המשך מהשמירה</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════════ DASHBOARD ══ -->
-<div id="screen-dashboard" class="screen active">
+<div id="screen-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
       <div class="header-subtitle">RESCUE // ACTIVE</div>
       <div class="header-title" id="site-name-header">אין מוקד פעיל</div>
     </div>
     <div class="header-time" id="clock">--:--</div>
+  </div>
+
+  <div class="demo-strip">
+    <div>
+      <div class="demo-strip-title">Demo MVP v1</div>
+      <div class="demo-strip-sub" id="demo-status-line">תרחיש PC פעיל</div>
+    </div>
+    <div class="sync-pill" id="sync-pill-dashboard">SYNC</div>
   </div>
 
   <!-- Big action buttons -->
@@ -305,6 +380,10 @@ textarea{resize:vertical;min-height:70px;}
     <button onclick="goTo('commander')" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;color:var(--text);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;">
       <span style="font-size:22px">🎖</span> תצוגת מפקד / חמ"ל
     </button>
+  </div>
+  <div class="demo-actions">
+    <button class="demo-mini-btn" onclick="goTo('aar')">AAR חי</button>
+    <button class="demo-mini-btn" onclick="loadDemoScenario(true);goTo('dashboard')">אפס דמו</button>
   </div>
 
   <div id="alerts-banner"></div>
@@ -802,9 +881,20 @@ textarea{resize:vertical;min-height:70px;}
       <button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goTo('dashboard')">✕</button>
     </div>
   </div>
+  <div class="demo-strip">
+    <div>
+      <div class="demo-strip-title">תמונת מצב PC</div>
+      <div class="demo-strip-sub" id="cmd-demo-line">נתוני דמו מסונכרנים מקומית</div>
+    </div>
+    <div class="sync-pill" id="sync-pill-command">SYNC</div>
+  </div>
   <div style="display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto" id="cmd-site-tabs"></div>
   <div style="padding:12px 16px 0"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px" id="cmd-totals"></div></div>
   <div id="cmd-alerts" style="padding:6px 16px 0"></div>
+  <div class="demo-actions">
+    <button class="demo-mini-btn" onclick="goTo('aar')">פתח AAR</button>
+    <button class="demo-mini-btn" onclick="setDemoSyncMode()">החלף Sync</button>
+  </div>
   <div style="display:flex;gap:6px;padding:10px 16px 4px;overflow-x:auto">
     <button class="cmd-filter active" onclick="setCmdFilter('all',this)">הכל</button>
     <button class="cmd-filter" onclick="setCmdFilter('red',this)" style="border-color:var(--red);color:var(--red)">קשה</button>
@@ -820,6 +910,34 @@ textarea{resize:vertical;min-height:70px;}
     <div id="cmd-ext-reports"></div>
   </div>
   <div style="height:60px"></div>
+</div>
+
+<!-- ══════════════════════ AAR ══ -->
+<div id="screen-aar" class="screen">
+  <div class="header">
+    <div class="header-left">
+      <div class="header-subtitle">AAR // LIVE</div>
+      <div class="header-title">סיכום אירוע חי</div>
+    </div>
+    <button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goTo('commander')">✕</button>
+  </div>
+  <div class="demo-strip">
+    <div>
+      <div class="demo-strip-title">AAR Preview</div>
+      <div class="demo-strip-sub">נבנה מתוך האירועים שנקלטו בדמו המקומי.</div>
+    </div>
+    <div class="sync-pill" id="sync-pill-aar">SYNC</div>
+  </div>
+  <div class="aar-grid" id="aar-kpis"></div>
+  <div class="section-label">ציר זמן מבצעי</div>
+  <div id="aar-timeline"></div>
+  <div class="section-label">תובנות למפקד</div>
+  <div id="aar-insights"></div>
+  <div class="demo-actions">
+    <button class="demo-mini-btn" onclick="goTo('commander')">חזרה לחפ״ק</button>
+    <button class="demo-mini-btn" onclick="loadDemoScenario(true);goTo('aar')">אפס AAR</button>
+  </div>
+  <div style="height:70px"></div>
 </div>
 
 <!-- ══════════════════════ QUICK VITALS MODAL ══ -->
@@ -915,6 +1033,7 @@ textarea{resize:vertical;min-height:70px;}
 // ═══════════════════════════════════════════════
 const VITALS_INTERVAL_MS = 5 * 60 * 1000;
 const WARN_AT_MS = 4 * 60 * 1000;
+const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const AVPU_RANK = {A:0,V:1,P:2,U:3};
 const COUNT_LIMITS = {
   pulse15:{min:5,max:55}, rr30:{min:2,max:30},
@@ -972,6 +1091,131 @@ let holdTimer=null, holdInterval=null;
 //  DEMO DATA
 // ═══════════════════════════════════════════════
 let patients = [];
+let demoSyncMode = 'fresh';
+let lastSyncAt = Date.now();
+
+function minutesAgo(min){ return Date.now() - min * 60 * 1000; }
+function timeAgoLabel(ms){
+  const min=Math.max(0,Math.round((Date.now()-ms)/60000));
+  if(min<1) return 'עכשיו';
+  return `לפני ${min} דק׳`;
+}
+function toast(text){
+  const msg=document.createElement('div');
+  msg.style.cssText='position:fixed;top:80px;left:50%;transform:translateX(-50%);background:var(--accent);color:white;padding:12px 18px;border-radius:12px;font-size:14px;font-weight:800;z-index:500;white-space:nowrap;box-shadow:0 10px 30px rgba(0,0,0,0.35)';
+  msg.textContent=text;
+  document.body.appendChild(msg);
+  setTimeout(()=>msg.remove(),2200);
+}
+function demoPatient(id, triage, accessibility, location, injury, patientStatus, vitals, lastVitalsMin, extra={}){
+  const t=timeAgoLabel(minutesAgo(extra.createdMin||35));
+  const deterioration=extra.deterioration||[];
+  return {
+    id, triage, accessibility, location, locDetail:extra.locDetail||'',
+    injury, patientStatus, time:t, vitals,
+    txHistory:extra.txHistory||[],
+    alert:deterioration.length>0 || !!extra.alert,
+    deterioration,
+    lastVitalsAt:minutesAgo(lastVitalsMin),
+    vitalsHistory:extra.vitalsHistory||[{t:minutesAgo(lastVitalsMin),pulse:vitals.pulse,spo2:vitals.spo2,avpu:vitals.avpu}],
+    tourniquet:extra.tourniquet||null,
+    medic:extra.medic||'',
+    siteId:extra.siteId||'SITE_A',
+    events:extra.events||[
+      {type:'PATIENT_CREATED',time:t,detail:'פצוע נפתח'},
+      {type:'TRIAGE_SET',time:t,detail:TRIAGE_LABELS[triage]},
+      {type:'VITALS_RECORDED',time:timeAgoLabel(minutesAgo(lastVitalsMin)),detail:`דופק ${vitals.pulse} / SpO₂ ${vitals.spo2||'לא נמדד'} / AVPU ${vitals.avpu||'—'}`,warn:triage==='red'}
+    ]
+  };
+}
+function loadDemoScenario(persist=false){
+  siteData={
+    name:'מוקד A — הרצל 12',
+    address:'הרצל 12, תל אביב',
+    eventType:'house_hit',
+    description:'פגיעה במבנה מגורים. מדרגות חסומות חלקית, עבודה בשני מוקדים.',
+    externalReports:[
+      {sourceLabel:'מד"א',source:'MDA',red:1,yellow:1,green:0,evacDest:'איכילוב',notes:'ניידת בדרך',time:timeAgoLabel(minutesAgo(18)),id:'RPT001',status:'new'}
+    ]
+  };
+  allSites.find(s=>s.id==='SITE_A').externalReports=siteData.externalReports;
+  allSites.find(s=>s.id==='SITE_B').externalReports=[
+    {sourceLabel:'משטרה',source:'police',red:0,yellow:1,green:1,evacDest:'',notes:'דיווח אזרחים על לכוד בקומה 1',time:timeAgoLabel(minutesAgo(11)),id:'RPT002',status:'new'}
+  ];
+  patients=[
+    demoPatient('P-001','red','partial','בניין 15A, קומה 3, דירה 7','מעיכה + דימום גפה','in_treatment',
+      {pulse:124,spo2:91,bp_estimate:'carotid',rr:32,avpu:'P'},7,{
+        siteId:'SITE_A', medic:'חובש כהן',
+        deterioration:['SpO₂ 96→91%','AVPU A→P'],
+        tourniquet:{limb:'רגל ימין',appliedAt:minutesAgo(42)},
+        txHistory:[{time:timeAgoLabel(minutesAgo(27)),text:'חסם עורקים — רגל ימין',medic:'חובש כהן'}],
+        events:[
+          {type:'TOURNIQUET_APPLIED',time:timeAgoLabel(minutesAgo(42)),detail:'חסם עורקים רגל ימין',warn:true},
+          {type:'VITALS_RECORDED',time:timeAgoLabel(minutesAgo(7)),detail:'דופק 124 / SpO₂ 91 / AVPU P',warn:true},
+          {type:'WATCHDOG_ALERT',time:timeAgoLabel(minutesAgo(5)),detail:'מדדים נדרשים + הידרדרות',warn:true}
+        ]
+      }),
+    demoPatient('P-002','yellow','full','בניין 15A, קומה 2','חתכים + חשד שאיפת עשן','monitoring',
+      {pulse:96,spo2:97,bp_estimate:'radial',rr:22,avpu:'A'},3,{siteId:'SITE_A', medic:'חובש לוי'}),
+    demoPatient('P-003','green','full','בניין 15B, קומה 1','ילד, שפשופים וחרדה','evacuated',
+      {pulse:110,spo2:99,bp_estimate:'radial',rr:28,avpu:'A'},1,{siteId:'SITE_B', medic:'חובש כהן', createdMin:28,
+        events:[{type:'PATIENT_HANDED_OVER',time:timeAgoLabel(minutesAgo(4)),detail:'הועבר למד"א — QR handover'}]}),
+    demoPatient('P-004','red','none','בניין 15B, קומה 2, חדר מדרגות','לכוד ללא גישה מלאה','monitoring',
+      {pulse:118,spo2:null,bp_estimate:'carotid',rr:30,avpu:'V'},12,{siteId:'SITE_B', medic:'חובש לוי', alert:true,
+        events:[{type:'ACCESS_UPDATED',time:timeAgoLabel(minutesAgo(20)),detail:'לכוד ללא גישה — נדרש חילוץ',warn:true}]}),
+    demoPatient('P-005','yellow','partial','חצר אחורית, סמוך לכניסה','פגיעת ראש קלה','in_treatment',
+      {pulse:88,spo2:95,bp_estimate:'radial',rr:18,avpu:'A'},6,{siteId:'SITE_A', medic:'חובש כהן'})
+  ];
+  demoSyncMode='fresh';
+  lastSyncAt=Date.now();
+  if(persist) saveDemoState();
+  renderDashboard(); renderAlerts();
+}
+function saveDemoState(){
+  try{
+    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify({siteData,patients,demoSyncMode,lastSyncAt}));
+  }catch(e){}
+}
+function loadStoredDemoState(){
+  try{
+    const raw=localStorage.getItem(DEMO_STORAGE_KEY);
+    if(!raw) return false;
+    const saved=JSON.parse(raw);
+    if(!saved || !Array.isArray(saved.patients)) return false;
+    siteData=saved.siteData||siteData;
+    patients=saved.patients;
+    demoSyncMode=saved.demoSyncMode||'fresh';
+    lastSyncAt=saved.lastSyncAt||Date.now();
+    allSites.find(s=>s.id==='SITE_A').externalReports=siteData.externalReports||[];
+    return true;
+  }catch(e){ return false; }
+}
+function startPcDemo(screen){
+  if(!patients.length) loadDemoScenario(true);
+  goTo(screen);
+}
+function continueDemo(){
+  if(!loadStoredDemoState()) loadDemoScenario(true);
+  goTo('commander');
+}
+function setDemoSyncMode(){
+  demoSyncMode = demoSyncMode==='fresh' ? 'stale' : demoSyncMode==='stale' ? 'offline' : 'fresh';
+  lastSyncAt = demoSyncMode==='fresh' ? Date.now() : demoSyncMode==='stale' ? minutesAgo(4) : minutesAgo(13);
+  saveDemoState();
+  updateDemoStatus();
+}
+function updateDemoStatus(){
+  const label = demoSyncMode==='fresh' ? `Fresh · ${timeAgoLabel(lastSyncAt)}` : demoSyncMode==='stale' ? `Stale · ${timeAgoLabel(lastSyncAt)}` : `Offline · ${timeAgoLabel(lastSyncAt)}`;
+  ['sync-pill-dashboard','sync-pill-command','sync-pill-aar'].forEach(id=>{
+    const el=document.getElementById(id); if(!el) return;
+    el.textContent=label;
+    el.className='sync-pill '+(demoSyncMode==='fresh'?'':demoSyncMode);
+  });
+  const openAlerts=patients.filter(p=>p.alert || (needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS)).length;
+  const handed=patients.filter(p=>p.patientStatus==='evacuated').length;
+  const line=`${patients.length} פצועים · ${openAlerts} התראות · ${handed} הועברו`;
+  ['demo-status-line','cmd-demo-line'].forEach(id=>{const el=document.getElementById(id); if(el) el.textContent=line;});
+}
 
 // ═══════════════════════════════════════════════
 //  CLOCK
@@ -979,6 +1223,7 @@ let patients = [];
 function updateClock(){
   const t=nowT();
   ['clock','cmd-clock'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=t;});
+  updateDemoStatus();
 }
 setInterval(updateClock,1000); updateClock();
 
@@ -993,6 +1238,8 @@ function goTo(screen){
   if(screen==='step5')     showMstartSuggestion();
   if(screen==='step8')     renderSummary();
   if(screen==='commander') renderCommander();
+  if(screen==='aar')       renderAar();
+  updateDemoStatus();
 }
 
 // ═══════════════════════════════════════════════
@@ -1026,6 +1273,7 @@ function renderDashboard(){
       ${p.alert?'<div class="alert-dot"></div>':''}
     </div>`;
   }).join('');
+  updateDemoStatus();
 }
 
 // ═══════════════════════════════════════════════
@@ -1108,6 +1356,7 @@ function selectEventType(btn,val){
 function saveSite(){
   siteData.name=document.getElementById('site-name-input').value||siteData.name;
   siteData.address=document.getElementById('site-address').value;
+  lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   goTo('dashboard');
 }
 function selectReportSource(btn,val){
@@ -1119,7 +1368,7 @@ function changeRC(color,delta){ reportState[color]=Math.max(0,(reportState[color
 function saveReport(){
   const labels={MDA:'מד"א',police:'משטרה',UH:'ידידים',other:'אחר'};
   const r={sourceLabel:labels[reportState.source]||'',source:reportState.source,red:reportState.red,yellow:reportState.yellow,green:reportState.green,evacDest:document.getElementById('report-evac-dest').value,notes:document.getElementById('report-notes').value,time:nowT(),id:'RPT'+uid(),status:'new'};
-  siteData.externalReports.push(r); renderExtReports(); goTo('site');
+  siteData.externalReports.push(r); lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState(); renderExtReports(); goTo('site');
 }
 function renderExtReports(){
   const el=document.getElementById('ext-reports-list');
@@ -1580,6 +1829,7 @@ function savePatient(){
       ...(intStr?[{type:'INTERVENTION_LOGGED',time:t,detail:`${intStr}${txMedic?' — חובש: '+txMedic:''}`}]:[]),
     ]
   });
+  lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   document.getElementById('success-pid').textContent=newId;
   goTo('success');
 }
@@ -1681,6 +1931,7 @@ function saveModalVitals(){
   if(flags.length) p.events.unshift({type:'DETERIORATION_FLAGGED', time:nowT(), detail:flags.join(' · '), warn:true});
   if(criticalEvent) p.events.unshift({type:'CRITICAL_DETERIORATION', time:nowT(), detail:criticalEvent, warn:true});
 
+  lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   document.getElementById('vitals-modal').classList.add('hidden');
   renderDashboard(); renderAlerts();
   if(document.getElementById('screen-patient').classList.contains('active')) openPatient(modalPid);
@@ -1696,8 +1947,8 @@ const allSites=[
 ];
 function getSitePatients(siteId){
   if(siteId==='ALL') return patients;
-  if(siteId==='SITE_A') return patients.slice(0,2);
-  if(siteId==='SITE_B') return patients.slice(2);
+  if(siteId==='SITE_A') return patients.filter(p=>(p.siteId||'SITE_A')==='SITE_A');
+  if(siteId==='SITE_B') return patients.filter(p=>(p.siteId||'SITE_A')==='SITE_B');
   return [];
 }
 let cmdActiveSite='ALL', cmdFilter='all';
@@ -1802,6 +2053,47 @@ function renderCmdPatients(){
 setInterval(()=>{ if(document.getElementById('screen-commander').classList.contains('active')) renderCommander(); },30000);
 
 // ═══════════════════════════════════════════════
+//  AAR PREVIEW
+// ═══════════════════════════════════════════════
+function renderAar(){
+  const total=patients.length;
+  const red=patients.filter(p=>p.triage==='red').length;
+  const handed=patients.filter(p=>p.patientStatus==='evacuated').length;
+  const openAlerts=patients.filter(p=>p.alert || (needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS)).length;
+  const tqDue=patients.filter(p=>p.tourniquet && Date.now()-p.tourniquet.appliedAt>=40*60*1000).length;
+  document.getElementById('aar-kpis').innerHTML=`
+    <div class="aar-card"><div class="aar-num">${total}</div><div class="aar-label">סה״כ פצועים</div></div>
+    <div class="aar-card"><div class="aar-num" style="color:var(--red)">${red}</div><div class="aar-label">אדומים פעילים</div></div>
+    <div class="aar-card"><div class="aar-num" style="color:var(--green)">${handed}</div><div class="aar-label">הועברו</div></div>
+    <div class="aar-card"><div class="aar-num" style="color:var(--orange)">${openAlerts}</div><div class="aar-label">התראות פתוחות</div></div>
+  `;
+  const events=patients.flatMap(p=>(p.events||[]).map(e=>({...e,pid:p.id,triage:p.triage,loc:p.location})));
+  const timeline=events.slice(0,10).map(e=>`
+    <div class="timeline-entry">
+      <div class="tl-line"><div class="tl-dot${e.warn?' warn':''}"></div></div>
+      <div class="tl-body">
+        <div class="tl-type">${e.pid} · ${e.type}</div>
+        <div class="tl-detail${e.warn?' warn':''}">${e.detail}</div>
+        <div class="tl-time">${e.time} · ${e.loc||''}</div>
+      </div>
+    </div>`).join('');
+  document.getElementById('aar-timeline').innerHTML=timeline || '<div class="aar-note"><div class="aar-note-body">אין אירועים להצגה.</div></div>';
+  const overdue=patients.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS);
+  const insights=[
+    `${openAlerts} התראות פתוחות דורשות החלטת PC או חובש.`,
+    overdue.length ? `${overdue.length} פצועים עברו את יעד עדכון המדדים.` : 'כל הפצועים הפעילים בתוך חלון המדדים.',
+    tqDue ? `${tqDue} חסמי עורקים דורשים הערכת המשך.` : 'אין חסם עורקים שעבר את סף הדמו.',
+    `${handed}/${total} פצועים הועברו או נסגרו בתרחיש.`
+  ];
+  document.getElementById('aar-insights').innerHTML=insights.map((txt,i)=>`
+    <div class="aar-note">
+      <div class="aar-note-title">${i===0?'נקודת פיקוד':i===1?'רעננות קלינית':i===2?'חסמי עורקים':'פינוי'}</div>
+      <div class="aar-note-body">${txt}</div>
+    </div>`).join('');
+  updateDemoStatus();
+}
+
+// ═══════════════════════════════════════════════
 //  QUICK TOURNIQUET (step 3)
 // ═══════════════════════════════════════════════
 let quickTqData = { applied: false, time: null, limbs: new Set() };
@@ -1867,10 +2159,12 @@ function computeMstartTriage(v) {
 // ═══════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════
+if(!loadStoredDemoState()) loadDemoScenario(false);
 updateCountDisplay('pulse15');
 updateCountDisplay('rr30');
 renderDashboard();
 renderAlerts();
+updateDemoStatus();
 </script>
 </body>
 </html>
