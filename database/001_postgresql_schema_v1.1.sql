@@ -813,11 +813,12 @@ where p.current_status not in ('handed_over','closed','self_evacuated','deceased
 
 
 -- =========================================================
--- v1.1 VITALS STEPPER SUPPORT INDEXES
+-- v1.1 VITALS TAP / STEPPER SUPPORT INDEXES
 -- Stores raw count + measurement window in events.payload_json:
 -- {
---   "heart_rate": {"raw_count": 31, "window_seconds": 15, "calculated_bpm": 124, "entry_method": "stepper"},
+--   "heart_rate": {"raw_count": 31, "window_seconds": 15, "calculated_bpm": 124, "entry_method": "tap"},
 --   "respiratory_rate": {"raw_count": 16, "window_seconds": 30, "calculated_per_min": 32, "entry_method": "stepper"}
+-- entry_method may be "tap", "stepper", or "clinical_override" for explicit no-breathing decisions.
 -- }
 -- =========================================================
 
@@ -1320,11 +1321,12 @@ after insert on events
 for each row execute function draft_incident_approval_outbox();
 
 -- =========================================================
--- v1.1 STEPPER VITALS SUPPORT
+-- v1.1 TAP / STEPPER VITALS SUPPORT
 -- Payload format:
 -- {
---   "heart_rate": {"raw_count": 31, "window_seconds": 15, "calculated_bpm": 124, "entry_method": "stepper"},
+--   "heart_rate": {"raw_count": 31, "window_seconds": 15, "calculated_bpm": 124, "entry_method": "tap"},
 --   "respiratory_rate": {"raw_count": 16, "window_seconds": 30, "calculated_per_min": 32, "entry_method": "stepper"}
+-- entry_method may be "tap", "stepper", or "clinical_override" for explicit no-breathing decisions.
 -- }
 -- =========================================================
 

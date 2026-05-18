@@ -58,10 +58,10 @@ Changes applied from the reviewed draft spec:
 # v1.1 Changes
 
 ## Vitals UX
-Replaced tap-counting with a selectable timer model:
-- 15s HR timer → medic enters counted beats → system calculates `count × 4`.
-- 30s RR timer → medic enters counted breaths → system calculates `count × 2`.
-- Payload stores raw count, window seconds, and calculated value.
+Restored tap-first counting with stepper correction:
+- 15s HR window → medic taps each beat or corrects with steppers → system calculates `count × 4`.
+- 30s RR window → medic taps each breath or corrects with steppers → system calculates `count × 2`.
+- Payload stores raw count, window seconds, calculated value, and `entry_method`.
 
 ## Sync Protection
 
@@ -142,3 +142,5 @@ Historical note corrected: pediatric medication events must not be blocked; miss
 3. Removed stale non-command AAR endpoint references.
 4. Replaced the last out-of-stock blocking sentence with save-and-alert behavior.
 5. Rechecked stale terms across spec, API, schema, seed, changelog, and README.
+6. Clarified `pc` as the Platoon Commander / field Supervisor role.
+7. Reintroduced large tap controls for pulse and respiratory-rate entry in the demo while preserving stepper correction.

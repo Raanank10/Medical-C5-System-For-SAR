@@ -123,6 +123,8 @@ Company Commander (CC)
 Chamal
 ```
 
+`PC` is the schema/auth role name for Platoon Commander. In the product language this is the field Supervisor role, so `pc` in the auth matrix should be read as "Platoon Commander / Supervisor".
+
 ## Incident Opening and T₀ Authority
 
 Official incidents and official `T₀` can be created/set only by:
@@ -133,7 +135,7 @@ Chamal
 Platoon Commander, if authorized
 ```
 
-A Medic may create a **local draft incident** only when no official incident is available. A draft incident allows field data capture but must later be confirmed by PC / CC / Chamal. The confirmation event is auditable.
+A Medic may create a **local draft incident** only when no official incident is available. A draft incident allows field data capture but must later be confirmed by PC / CC / Chamal. The confirmation event is auditable. Draft state has a single source of truth: `incidents.status = 'draft'`; there is no separate `is_draft` flag.
 
 ## Authorization Matrix
 
@@ -684,15 +686,15 @@ Optional:
 
 Personnel ID is auto-populated from login and is non-editable.
 
-### Stepper-Based Vitals Entry
+### Tap + Stepper Vitals Entry
 
-The MVP uses **stepper-based manual count entry**, not tap-every-beat input.
+The MVP supports the original **large tap-every-beat / tap-every-breath control** and keeps steppers as the correction path. This preserves the gloved-hands field UX while still allowing a medic to fix an over-count or under-count quickly.
 
 Heart Rate uses a 15-second count:
 
 ```text
 Pulse Count — 15 sec
-[-5] [-1]   25   [+1] [+5]
+[Tap Beat]   [-1]   25   [+1]
 Calculated HR: 100 bpm
 ```
 
@@ -700,7 +702,7 @@ Respiratory Rate uses a 30-second count:
 
 ```text
 Resp Count — 30 sec
-[-2] [-1]   10   [+1] [+2]
+[Tap Breath]   [-1]   10   [+1]
 Calculated RR: 20/min
 ```
 
@@ -711,9 +713,9 @@ HR raw count default = 25  → 25 × 4 = 100 bpm
 RR raw count default = 10  → 10 × 2 = 20/min
 ```
 
-The medic may also tap the number field and type a direct raw count if needed.
+The medic can use the large tap control as the primary path, then use the stepper buttons to correct the raw count if needed.
 
-Stored payload includes raw count, window seconds, calculated value, and `entry_method = stepper`.
+Stored payload includes raw count, window seconds, calculated value, and `entry_method`. Allowed MVP values are `tap`, `stepper`, and `clinical_override` for explicit no-breathing decisions.
 
 ## Step 5 — Triage
 
@@ -1493,27 +1495,27 @@ The heatmap never turns green until every known patient is handed over and the s
 
 # v1.1 Corrections and Safety Updates
 
-## Vitals UX — Stepper-Based Manual Count
+## Vitals UX — Tap Primary, Stepper Correction
 
-The timer/tap model is replaced with a stepper-based manual count model.
+The large tap model is preserved for field use, with steppers retained for correction.
 
 For Heart Rate:
 - Default raw count is 25 beats in 15 seconds.
-- Medic adjusts using `-5 / -1 / +1 / +5`.
+- Medic taps once per beat or adjusts using `-1 / +1`.
 - System calculates `heart_rate = raw_count × 4`.
 
 For Respiratory Rate:
 - Default raw count is 10 breaths in 30 seconds.
-- Medic adjusts using `-2 / -1 / +1 / +2`.
+- Medic taps once per breath or adjusts using `-1 / +1`.
 - System calculates `respiratory_rate = raw_count × 2`.
 
 The system stores:
 - raw count
 - measurement window seconds
 - calculated per-minute value
-- entry method: `stepper`
+- entry method: `tap`, `stepper`, or `clinical_override`
 
-This avoids tap-every-beat interaction while still preserving a clear audit trail.
+This keeps the fastest field interaction while preserving a clear audit trail.
 
 ## Sync Deduplication and Projection Conflict Resolution
 
@@ -1702,16 +1704,16 @@ This keeps inventory auditable, offline-safe, and compatible with after-action l
 
 Critical events trigger immediate sync attempts, including New Patient, Quick Patient, Vitals, Treatment, Triage, Handover, Supply Request, Building Unstable, Dead Man’s Switch, and Site Clear. Background sync is fallback only and runs every 60–90 seconds. Failed sync uses exponential backoff: 5s → 15s → 30s → 60s → 90s max.
 
-## Stepper Vitals Entry
+## Tap + Stepper Vitals Entry
 
-Vitals entry now uses stepper-based manual count input:
+Vitals entry now uses a large tap control plus stepper correction:
 
 ```text
 HR: default 25 beats / 15s → ×4
 RR: default 10 breaths / 30s → ×2
 ```
 
-The payload stores `entry_method = stepper`.
+The payload stores `entry_method = tap | stepper | clinical_override`.
 
 ## KPIs
 

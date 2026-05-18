@@ -33,7 +33,7 @@ The prototype includes:
 - rapid patient intake
 - location and access status
 - tourniquet capture
-- stepper-based vitals
+- tap-first vitals with stepper correction
 - MSTART-style triage support
 - treatment and patient status capture
 - reassessment alerts
@@ -52,6 +52,8 @@ The v1.1 design is local-first and event-sourced.
 - Poison events are quarantined in `sync_ingestion_errors`.
 - Clinical history is preserved; risky documentation is flagged and escalated rather than silently blocked.
 - Command dashboards read precomputed command state rather than repeatedly joining raw clinical events.
+- `pc` is the schema/auth role for Platoon Commander, which is the field Supervisor role in the product language.
+- Draft incidents use `incidents.status = 'draft'` as the only source of truth; there is no separate `is_draft` flag.
 
 Core technical docs:
 

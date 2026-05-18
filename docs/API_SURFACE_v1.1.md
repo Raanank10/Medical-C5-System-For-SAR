@@ -51,7 +51,7 @@ Purpose:
           "raw_count": 31,
           "window_seconds": 15,
           "calculated_bpm": 124,
-          "entry_method": "stepper"
+          "entry_method": "tap"
         },
         "respiratory_rate": {
           "raw_count": 16,
@@ -71,6 +71,8 @@ Purpose:
   ]
 }
 ```
+
+`entry_method` is one of `tap`, `stepper`, or `clinical_override`. The mobile UI should prefer the large tap control for pulse/RR counting and use steppers as a correction path.
 
 ## Processing semantics
 
@@ -333,7 +335,7 @@ The sync endpoint processes events individually, but not blindly. Events may dec
       "type": "VITALS_RECORDED",
       "incident_id": "10000000-0000-0000-0000-000000000001",
       "local_timestamp": "2026-05-13T10:01:00Z",
-      "payload_json": { "heart_rate": { "raw_count": 25, "window_seconds": 15, "calculated_bpm": 100 } },
+      "payload_json": { "heart_rate": { "raw_count": 25, "window_seconds": 15, "calculated_bpm": 100, "entry_method": "tap" } },
       "depends_on": [
         { "device_id": "demo-device-cohen", "local_event_id": "evt-001" }
       ]
