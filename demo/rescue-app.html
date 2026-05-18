@@ -1619,22 +1619,21 @@ function selectInjury(btn, val){
   document.querySelectorAll('#injury-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
   state.injury = val;
-  checkStep5();
+  checkStep6();
 }
 function selectStatus(btn, val){
   document.querySelectorAll('#status-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
   state.patientStatus = val;
-  checkStep5();
+  checkStep6();
 }
 function checkStep5(){
-  document.getElementById('btn-step5').disabled = !(state.injury && state.patientStatus);
+  document.getElementById('btn-step5').disabled = !state.triage;
 }
 
 // Step 6 — Interventions
 function checkStep6(){
-  const name = document.getElementById('tx-medic-name').value.trim();
-  document.getElementById('btn-step6').disabled = !name;
+  document.getElementById('btn-step6').disabled = !(state.injury && state.patientStatus);
 }
 function toggleChip(btn, key){
   btn.classList.toggle('selected');
@@ -1673,7 +1672,7 @@ function selectTriage(btn, val){
   document.querySelectorAll('#triage-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
   state.triage = val;
-  document.getElementById('btn-step7').disabled = false;
+  document.getElementById('btn-step5').disabled = false;
 }
 function showMstartSuggestion(){
   const v=flowVitals, s=state.sabcde;
