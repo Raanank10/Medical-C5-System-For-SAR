@@ -84,9 +84,14 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 /* ── ALERT BANNERS ── */
 .alert-banner{margin:5px 16px;background:rgba(230,57,70,0.08);border:1px solid var(--red);border-radius:12px;padding:11px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;}
 .alert-banner.warn{background:rgba(255,107,53,0.08);border-color:var(--orange);}
+.alert-banner.muted{background:var(--surface);border-color:var(--border);}
 .alert-banner-title{font-weight:700;font-size:13px;color:var(--red);}
 .alert-banner.warn .alert-banner-title{color:var(--orange);}
 .alert-banner-sub{font-size:11px;color:var(--muted);margin-top:1px;}
+.alert-slicer{display:flex;gap:6px;padding:4px 16px 8px;overflow-x:auto;}
+.alert-slice{background:var(--surface);border:1px solid var(--border);border-radius:999px;color:var(--muted);font-size:12px;font-weight:700;padding:7px 11px;white-space:nowrap;cursor:pointer;}
+.alert-slice.active{background:rgba(230,57,70,0.12);border-color:var(--red);color:var(--red);}
+.alert-slice.other.active{background:rgba(255,107,53,0.12);border-color:var(--orange);color:var(--orange);}
 
 /* ── FLOW ── */
 .flow-header{padding:14px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);}
@@ -424,6 +429,11 @@ textarea{resize:vertical;min-height:70px;}
     <button class="demo-mini-btn" onclick="loadDemoScenario(true);goTo('dashboard')">אפס דמו</button>
   </div>
 
+  <div class="alert-slicer" id="alert-slicer">
+    <button class="alert-slice active" onclick="setAlertFilter('critical',this)">קריטי <span id="alert-critical-count">0</span></button>
+    <button class="alert-slice other" onclick="setAlertFilter('routine',this)">אחר <span id="alert-routine-count">0</span></button>
+    <button class="alert-slice" onclick="setAlertFilter('all',this)">הכל <span id="alert-all-count">0</span></button>
+  </div>
   <div id="alerts-banner"></div>
   <div class="section-label">פצועים פעילים</div>
   <div id="patient-list"></div>
@@ -1400,11 +1410,27 @@ function detectDeterioration(prev,next){
   return f;
 }
 function renderAlerts(){
-  const det=patients.filter(p=>p.deterioration&&p.deterioration.length);
-  const over=patients.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS);
+  const critical=patients.filter(isCriticalAlert);
+  const routine=patients.filter(p=>hasRoutineAlert(p)&&!isCriticalAlert(p));
+  const criticalCount=document.getElementById('alert-critical-count');
+  const routineCount=document.getElementById('alert-routine-count');
+  const allCount=document.getElementById('alert-all-count');
+  if(criticalCount) criticalCount.textContent=critical.length;
+  if(routineCount) routineCount.textContent=routine.length;
+  if(allCount) allCount.textContent=critical.length+routine.length;
+  let list = alertFilter==='critical' ? critical : alertFilter==='routine' ? routine : [...critical,...routine];
   let h='';
-  det.forEach(p=>{h+=`<div class="alert-banner" onclick="openQuickVitals('${p.id}')"><span style="font-size:20px">🚨</span><div style="flex:1"><div class="alert-banner-title">${p.id} — הידרדרות!</div><div class="alert-banner-sub">${p.deterioration.join(' · ')}</div></div></div>`;});
-  over.filter(p=>!p.deterioration||!p.deterioration.length).forEach(p=>{h+=`<div class="alert-banner warn" onclick="openQuickVitals('${p.id}')"><span style="font-size:20px">⏱</span><div><div class="alert-banner-title">${p.id} — מדדים נדרשים</div><div class="alert-banner-sub">${p.location}</div></div></div>`;});
+  if(!list.length){
+    h=`<div class="alert-banner muted"><span style="font-size:18px">✓</span><div><div class="alert-banner-title" style="color:var(--muted)">אין התראות ${alertFilter==='critical'?'קריטיות':alertFilter==='routine'?'אחרות':''}</div><div class="alert-banner-sub">אפשר לעבור בין הסינונים בלי להציף את החובש.</div></div></div>`;
+  }
+  list.forEach(p=>{
+    if(isCriticalAlert(p)){
+      const reason=(p.deterioration&&p.deterioration.length)?p.deterioration.join(' · '):TRIAGE_LABELS[p.triage];
+      h+=`<div class="alert-banner" onclick="openQuickVitals('${p.id}')"><span style="font-size:20px">🚨</span><div style="flex:1"><div class="alert-banner-title">${p.id} — קריטי</div><div class="alert-banner-sub">${reason}</div></div></div>`;
+    } else {
+      h+=`<div class="alert-banner warn" onclick="openQuickVitals('${p.id}')"><span style="font-size:20px">⏱</span><div><div class="alert-banner-title">${p.id} — מדדים נדרשים</div><div class="alert-banner-sub">${p.location}</div></div></div>`;
+    }
+  });
   document.getElementById('alerts-banner').innerHTML=h;
 }
 setInterval(()=>{ renderAlerts(); renderDashboard(); },30000);
@@ -1794,7 +1820,9 @@ function selectTriage(btn, val){
 function showMstartSuggestion(){
   const v=flowVitals, s=state.sabcde;
   let triage='yellow', reason='לא ניתן לקבוע — בחר ידנית';
-  if(s.B==='abnormal'&&s.A!=='managed'){
+  if(v.rr===0){
+    triage='black'; reason='MCI: לא נושם — מסווג שחור';
+  } else if(s.B==='abnormal'&&s.A!=='managed'){
     triage='black'; reason='ללא נשימה לאחר פתיחת נתיב אוויר';
   } else {
     const highRR=v.rr>30||v.rr<10;
@@ -1818,6 +1846,7 @@ function showMstartSuggestion(){
     const btn=document.querySelector(`#triage-grid .tap-btn.triage-${triage}`);
     if(btn) selectTriage(btn,triage);
   }
+  if(triage==='black') showBlackSkip(); else hideBlackSkip();
 }
 
 // ═══════════════════════════════════════════════
@@ -2084,7 +2113,25 @@ function getSitePatients(siteId){
   if(siteId==='SITE_B') return patients.filter(p=>(p.siteId||'SITE_A')==='SITE_B');
   return [];
 }
-let cmdActiveSite='ALL', cmdFilter='all';
+let cmdActiveSite='ALL', cmdFilter='all', alertFilter='critical', cmdAlertFilter='critical';
+function isCriticalAlert(p){ return !!(p.alert || (p.deterioration&&p.deterioration.length)); }
+function hasRoutineAlert(p){ return needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS; }
+function openPatientFromAlert(id){
+  openPatient(id);
+  goTo('patient');
+}
+function setAlertFilter(f,btn){
+  alertFilter=f;
+  document.querySelectorAll('#alert-slicer .alert-slice').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderAlerts();
+}
+function setCmdAlertFilter(f,btn){
+  cmdAlertFilter=f;
+  document.querySelectorAll('#cmd-alert-slicer .alert-slice').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderCmdContent();
+}
 function setCmdFilter(f,btn){
   cmdFilter=f;
   document.querySelectorAll('.cmd-filter').forEach(b=>b.classList.remove('active'));
@@ -2118,11 +2165,25 @@ function renderCmdContent(){
     <div class="cmd-stat-card yellow"><div class="cmd-stat-num">${c.yellow}</div><div class="cmd-stat-label">בינוני</div></div>
     <div class="cmd-stat-card green"><div class="cmd-stat-num">${c.green}</div><div class="cmd-stat-label">קל</div></div>
     <div class="cmd-stat-card black"><div class="cmd-stat-num">${c.black}</div><div class="cmd-stat-label">לא בר הצלה</div></div>`;
-  const det=pts.filter(p=>p.deterioration&&p.deterioration.length);
-  const over=pts.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS);
-  let ah='';
-  if(det.length) ah+=`<div class="alert-banner" style="margin:6px 16px 0"><span style="font-size:18px">🚨</span><div style="flex:1"><div class="alert-banner-title">${det.length} פצועים בהידרדרות</div><div class="alert-banner-sub">${det.map(p=>p.id).join(', ')}</div></div></div>`;
-  if(over.length) ah+=`<div class="alert-banner warn" style="margin:6px 16px 0"><span style="font-size:18px">⏱</span><div><div class="alert-banner-title">${over.length} ממתינים לבדיקת מדדים</div><div class="alert-banner-sub">${over.map(p=>p.id).join(', ')}</div></div></div>`;
+  const critical=pts.filter(isCriticalAlert);
+  const routine=pts.filter(p=>hasRoutineAlert(p)&&!isCriticalAlert(p));
+  const cmdAlertList=cmdAlertFilter==='critical'?critical:cmdAlertFilter==='routine'?routine:[...critical,...routine];
+  let ah=`<div class="alert-slicer" id="cmd-alert-slicer" style="padding-top:0">
+    <button class="alert-slice ${cmdAlertFilter==='critical'?'active':''}" onclick="setCmdAlertFilter('critical',this)">קריטי ${critical.length}</button>
+    <button class="alert-slice other ${cmdAlertFilter==='routine'?'active':''}" onclick="setCmdAlertFilter('routine',this)">אחר ${routine.length}</button>
+    <button class="alert-slice ${cmdAlertFilter==='all'?'active':''}" onclick="setCmdAlertFilter('all',this)">הכל ${critical.length+routine.length}</button>
+  </div>`;
+  if(!cmdAlertList.length){
+    ah+=`<div class="alert-banner muted" style="margin:6px 16px 0"><span style="font-size:18px">✓</span><div><div class="alert-banner-title" style="color:var(--muted)">אין התראות ${cmdAlertFilter==='critical'?'קריטיות':cmdAlertFilter==='routine'?'אחרות':''}</div><div class="alert-banner-sub">תמונת המצב נקייה בסינון הנוכחי.</div></div></div>`;
+  }
+  cmdAlertList.forEach(p=>{
+    if(isCriticalAlert(p)){
+      const reason=(p.deterioration&&p.deterioration.length)?p.deterioration.join(' · '):TRIAGE_LABELS[p.triage];
+      ah+=`<div class="alert-banner" style="margin:6px 16px 0" onclick="openPatientFromAlert('${p.id}')"><span style="font-size:18px">🚨</span><div style="flex:1"><div class="alert-banner-title">${p.id} — קריטי</div><div class="alert-banner-sub">${reason} · ${p.location}</div></div></div>`;
+    } else {
+      ah+=`<div class="alert-banner warn" style="margin:6px 16px 0" onclick="openPatientFromAlert('${p.id}')"><span style="font-size:18px">⏱</span><div><div class="alert-banner-title">${p.id} — מדדים נדרשים</div><div class="alert-banner-sub">${p.location}</div></div></div>`;
+    }
+  });
   if(cmdActiveSite==='ALL'){
     ah+=`<div style="margin:8px 16px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px">${allSites.filter(s=>s.id!=='ALL').map(s=>{
       const sp=getSitePatients(s.id); const sc={red:0,yellow:0,green:0};

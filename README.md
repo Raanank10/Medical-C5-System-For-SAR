@@ -91,11 +91,12 @@ This is the portfolio-facing proof that the project is not only a UI mockup: it 
 
 ## Version History
 
-The `versions/` folder preserves the product and architecture progression:
+The `Previous versions/` folder preserves the product and architecture progression before the current v1.1 package:
 
-- [`versions/v0.6`](versions/v0.6) - earlier MVP specification and schema baseline.
-- [`versions/v0.7`](versions/v0.7) - architecture hardening pass, including offline sync, event-sourcing, inventory ledger, realtime outbox, Quick Patient mode, and SQLite-first mobile storage.
-- [`versions/v1.1`](versions/v1.1) - current production-ready specification package with sync-log-first API, command/AAR endpoints, scoped RLS baseline, analytics alignment, and PC demo package.
+- [`Previous versions/v0.6`](<Previous versions/v0.6>) - earlier MVP specification and schema baseline.
+- [`Previous versions/v0.7`](<Previous versions/v0.7>) - architecture hardening pass, including offline sync, event-sourcing, inventory ledger, realtime outbox, Quick Patient mode, and SQLite-first mobile storage.
+
+The current v1.1 specification lives in the root `docs/`, `database/`, and `analytics/` folders.
 
 ## Repository Structure
 
@@ -118,10 +119,9 @@ The `versions/` folder preserves the product and architecture progression:
 |   `-- c5_sentinel_sar_analytics_v1_1/
 |-- assets/
 |   `-- mockups/
-`-- versions/
+`-- Previous versions/
     |-- v0.6/
-    |-- v0.7/
-    `-- v1.1/
+    `-- v0.7/
 ```
 
 ## Interview Narrative
