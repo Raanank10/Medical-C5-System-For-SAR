@@ -114,8 +114,10 @@ Historical note corrected: pediatric medication events must not be blocked; miss
 10. Fixed duplicate demo tourniquet seed.
     - P-001 now has only one tourniquet event.
 
-11. Clarified Actiq/Fentanyl warning.
-    - Reduced AVPU/TBI-context warning applies to Actiq/Fentanyl in MVP.
+11. Clarified medication catalog and reduced-AVPU warnings.
+    - Morphine and Actiq/Fentanyl are separate medication catalog entries.
+    - Both require pediatric weight when used for pediatric patients.
+    - Reduced AVPU/TBI-context warning applies to both medication paths.
 
 12. Removed redundant `is_draft`.
     - `incidents.status = 'draft'` is now the single draft source of truth.

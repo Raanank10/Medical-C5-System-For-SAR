@@ -745,6 +745,7 @@ Closed / Read-only
 Rows / counters:
 
 - IV Fluids
+- Morphine, if authorized
 - Actiq / Fentanyl, if authorized
 - Combat Gauze
 - Tourniquet
@@ -865,12 +866,13 @@ Combat Gauze
 Airway Intervention
 IV Access
 IV Fluids
+Morphine
 Actiq / Fentanyl
 CPR
 Other
 ```
 
-Morphine is intentionally excluded from the MVP treatment list.
+Morphine and Actiq / Fentanyl are separate medication catalog entries with separate inventory deductions. Both require pediatric weight when used for a pediatric patient and both trigger the reduced-AVPU / possible-TBI confirmation guard.
 
 ## Auto Signature
 
@@ -977,13 +979,13 @@ Medication event example:
 
 ```json
 {
-  "treatment_type": "ACTIQ",
-  "medication": "ACTIQ",
-  "quantity": 1,
+  "treatment_type": "MORPHINE",
+  "medication": "MORPHINE",
+  "dose_mg": 5,
   "weight_estimate_kg": 22,
   "confirmed_per_protocol": true,
   "inventory_deductions": [
-    { "sku": "ACTIQ", "quantity_change": -1 }
+    { "sku": "MORPHINE", "quantity_change": -5 }
   ],
   "location_at_time": {
     "building": "15B",

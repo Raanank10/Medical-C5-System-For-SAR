@@ -64,6 +64,7 @@ values
   ('BANDAGE','First-aid Bandage','hemorrhage','unit',true),
   ('COMBAT_GAUZE','Combat Gauze','hemorrhage','unit',true),
   ('FLUID_500','IV Fluids 500ml','circulation','bag',true),
+  ('MORPHINE','Morphine','medication','mg',true),
   ('ACTIQ','Actiq / Fentanyl','medication','unit',true),
   ('AIRWAY','Airway Adjunct','airway','unit',true),
   ('THERMAL_BLANKET','Thermal Blanket','exposure','unit',false)
@@ -101,6 +102,7 @@ values
   ('AIRWAY_INTERVENTION', 'Airway Intervention', 'airway', 'INTERVENTION_RECORDED', false, false, false, false, true),
   ('IV_ACCESS', 'IV Access', 'circulation', 'INTERVENTION_RECORDED', false, false, false, false, false),
   ('IV_FLUIDS', 'IV Fluids', 'circulation', 'INTERVENTION_RECORDED', false, false, false, false, false),
+  ('MORPHINE', 'Morphine', 'medication', 'MEDICATION_ADMINISTERED', false, false, true, true, true),
   ('ACTIQ', 'Actiq / Fentanyl', 'medication', 'MEDICATION_ADMINISTERED', false, false, true, true, true),
   ('CPR', 'CPR', 'cpr', 'INTERVENTION_RECORDED', false, false, false, false, false),
   ('OTHER', 'Other', 'other', 'INTERVENTION_RECORDED', false, false, false, false, false)
@@ -120,6 +122,10 @@ on conflict (treatment_code, item_id) do nothing;
 
 insert into treatment_inventory_items (treatment_code, item_id, quantity_per_treatment)
 select 'IV_FLUIDS', id, 1 from inventory_items where sku = 'FLUID_500'
+on conflict (treatment_code, item_id) do nothing;
+
+insert into treatment_inventory_items (treatment_code, item_id, quantity_per_treatment)
+select 'MORPHINE', id, 5 from inventory_items where sku = 'MORPHINE'
 on conflict (treatment_code, item_id) do nothing;
 
 insert into treatment_inventory_items (treatment_code, item_id, quantity_per_treatment)
@@ -160,6 +166,7 @@ select
     when ii.sku = 'COMBAT_GAUZE' then 10
     when ii.sku = 'BANDAGE' then 12
     when ii.sku = 'FLUID_500' then 6
+    when ii.sku = 'MORPHINE' then 40
     when ii.sku = 'ACTIQ' then 4
     else 0
   end,
@@ -174,7 +181,7 @@ select
   now(),
   'Initial manual fill of Platoon Stock by PC'
 from inventory_items ii
-where ii.sku in ('TQ','COMBAT_GAUZE','BANDAGE','FLUID_500','ACTIQ')
+where ii.sku in ('TQ','COMBAT_GAUZE','BANDAGE','FLUID_500','MORPHINE','ACTIQ')
 on conflict (device_id, local_ledger_id) do nothing;
 
 -- Demo medic personal bag stock.
