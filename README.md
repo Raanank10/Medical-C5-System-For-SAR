@@ -1,8 +1,10 @@
+**[Live Interactive Demo ->](https://raanank10.github.io/Medical-C5-System-For-SAR/)**
+
+![C5 Sentinel-SAR Command Dashboard](./assets/mockups/command_dashboard.png)
+
 # C5 Sentinel-SAR
 
 Mission-critical Medical Command and Control for Search and Rescue mass-casualty operations.
-
-**[Live Demo ->](https://raanank10.github.io/Medical-C5-System-For-SAR/)**
 
 C5 Sentinel-SAR is an offline-first prototype for medical SAR teams operating in rubble, missile-impact, and mass-casualty scenarios. It turns field actions into structured operational data so medics, platoon commanders, logistics officers, company command, and Chamal can answer the questions that usually disappear into radio traffic:
 
@@ -18,6 +20,18 @@ The project is intentionally built along two tracks:
 
 1. **Portfolio / analyst case study** - demonstrates product thinking, event modeling, KPI design, analytics, operational dashboards, and decision support.
 2. **MVP field demo** - a practical Hebrew RTL prototype that can be shown to a Platoon Commander as a realistic command-and-control workflow.
+
+## Skills & Technologies Demonstrated
+
+| Layer | Technology / Concept |
+|---|---|
+| Data Modeling | Event-sourced PostgreSQL schema, append-only inventory ledger |
+| Analytics | Python KPI engine, Golden Hour compliance, burn rate forecasting |
+| API Design | Sync-log-first REST, offline-first conflict resolution |
+| Database | PostgreSQL, PLpgSQL triggers, materialized views, RLS policies |
+| Product | Role-based access design, MSTART/JumpSTART triage algorithm |
+| Frontend | Hebrew RTL interface, offline-capable PWA prototype |
+| Domain | IDF SAR operations, mass-casualty triage, field medical logistics |
 
 ## Current Demo
 
@@ -71,18 +85,15 @@ Location: [`analytics/c5_sentinel_sar_analytics_v1_1`](analytics/c5_sentinel_sar
 
 It includes a SQLite demo database, KPI computation engine, tactical charts, and a self-contained HTML AAR report generator.
 
-| KPI | Source | Threshold / Interpretation |
+| KPI | Definition | Alert Threshold / Target |
 |---|---|---|
-| Command casualty picture | `patients`, `incident_command_state` | Current red/yellow/green/black counts for command decisions |
-| Time to first vitals | `events` where `type = 'VITALS_RECORDED'` | Target: first vitals within 5 minutes of patient registration |
-| Vitals reassessment compliance | `patients.last_vitals_at`, vitals events | Red target: 10 minutes; Yellow target: 30 minutes |
-| Golden Hour compliance | `patients.t_injury`, `patients.handed_over_at` | Tracks handover within 60 minutes from injury time |
-| Tourniquet reassessment due | `tourniquets.next_reassessment_due_at` | Due or overdue tourniquets require command/clinical attention |
-| High-risk clinical violations | `watchdog_alerts`, `conflict_log` | Preserved and escalated, not silently blocked |
-| Dead Man's Switch | `device_presence`, `watchdog_alerts` | Medic/device silent for more than 5 minutes |
-| Sync freshness | `device_sync_state.last_successful_pull_at` | Fresh under 60s; stale over 60s; critical over 300s |
-| Sync latency | local/server event timestamps | p95 latency indicates offline/sync degradation |
-| Stockout risk | `inventory_ledger` burn rate | Flags negative stock and items at risk of depletion |
+| Golden Hour compliance % | Patients handed over within 60 minutes of injury | Target >= 70% |
+| Triage accuracy % | MSTART/JumpSTART algorithm match rate vs. override log | Track override rate |
+| Tourniquet violation | Active tourniquet age from `tourniquets` and event timestamps | > 120 minutes = immediate alert |
+| Stockout risk | Minutes to empty at current `inventory_ledger` burn rate | < 30 minutes = critical |
+| Sync latency p95 | 95th percentile local-to-server event delay | > 300 seconds = stale |
+| Vitals reassessment compliance | `patients.last_vitals_at` compared with triage interval | Red: 10 minutes; Yellow: 30 minutes |
+| Dead Man's Switch | Device heartbeat silence from `device_presence` | > 5 minutes = supervisor alert |
 
 Example output:
 
