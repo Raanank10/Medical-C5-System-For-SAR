@@ -1,61 +1,68 @@
 # Roadmap
 
-The project should proceed in two parallel tracks while sharing one event model and one demo story.
+The project should advance as a development repo while preserving one reliable demo story. The immediate goal is not production scale; it is a cleaner prototype with testable product rules and a path toward real implementation.
 
-## Track 1: Portfolio / Analyst Case Study
+## Phase 1: Stabilize the Development Surface
 
-Goal: make the repository immediately legible to interviewers for data analyst, product analyst, and analytics engineer roles.
+Goal: make the repository easy to clone, inspect, validate, and change.
 
-### Next Milestones
+- Keep `index.html` as the stable demo entry point.
+- Keep `demo/rescue-app.html` only if it serves a distinct demo purpose.
+- Add browser smoke tests for loading the prototype.
+- Add analytics KPI tests with pytest.
+- Add SQL validation notes for the schema and seed files.
+- Keep `python scripts/check_repo.py` passing in CI.
+- Replace outdated portfolio language with development status and build priorities.
 
-- Polish root README with screenshots from the prototype.
-- Add a short case-study PDF or Markdown narrative.
-- Add a metric lineage diagram from event log to KPI to command decision.
-- Add sample SQL queries for each KPI.
-- Add screenshots of the generated AAR report.
-- Add a small demo video or GIF walkthrough.
+## Phase 2: Extract Product Rules
 
-### Interview Proof Points
+Goal: move critical logic out of one large prototype file into documented, testable rules.
 
-- Product discovery from a real operational gap.
-- Workflow design under field constraints.
-- Event-sourced data model.
-- KPI design and metric definitions.
-- Offline-first sync tradeoffs.
-- Dashboard and AAR analytics.
+- Define triage state transitions.
+- Define vitals reassessment intervals by triage color.
+- Define tourniquet review thresholds.
+- Define patient status and handover transitions.
+- Define inventory burn-rate and stockout-risk rules.
+- Define stale-data and device-silence thresholds.
+- Add synthetic fixtures for repeatable incident scenarios.
 
-## Track 2: PC MVP Demonstration
+## Phase 3: Local-First Prototype Hardening
 
-Goal: show a realistic enough workflow that a Platoon Commander can evaluate operational value.
+Goal: prove the core offline-first architecture before introducing production services.
 
-### Next Milestones
+- Add local persistence for patients, vitals, treatments, inventory, and handovers.
+- Add a local event log and replay path.
+- Add simulated sync push/pull behavior.
+- Show sync freshness and device presence in the command view.
+- Preserve poison-event and high-risk-violation concepts in the prototype.
+- Generate AAR output from the same event stream used by the demo.
 
-- Freeze one scripted demo scenario.
-- Add seeded patients matching that script.
-- Make command view easier to access during the demo.
-- Add a clear "PC Demo Mode" entry point.
-- Add fake/simulated sync status and freshness indicators.
-- Add a simple AAR screen or export link from the demo.
+## Phase 4: Split Into Implementation Packages
 
-### MVP Proof Points
+Goal: introduce real app boundaries after the workflow stabilizes.
 
-- Medic can create a patient quickly.
-- PC can see patient counts and locations.
-- Alerts surface overdue vitals, deterioration, and tourniquet concerns.
-- Handover and site-clear status are visible.
-- AAR story is understandable after the event.
+- `apps/field-mobile`: Expo or native mobile field workflow.
+- `apps/command-web`: command dashboard.
+- `packages/domain`: triage, vitals, inventory, sync, and alert rules.
+- `packages/fixtures`: synthetic incidents and demo scenarios.
+- `services/sync-api`: event ingestion and pull API.
+- `services/projectors`: command-state projection workers.
+- `database/migrations`: executable database migrations.
+- `analytics/`: KPI and AAR package.
 
-## Later Build Options
+## Phase 5: Operational Readiness Research
 
-- Split the prototype into a React/Expo app and React command dashboard.
-- Add local SQLite persistence.
-- Add Supabase/Postgres backend.
-- Implement `/sync/log` push/pull API.
-- Add role-based authentication and RLS.
-- Add command-state worker and realtime outbox.
-- Add QR handover tokens.
-- Add automated test data generation.
+Goal: identify what would be required before any real-world pilot discussion.
+
+- Threat model.
+- Privacy and data minimization review.
+- Authentication and role model.
+- Encrypted local storage design.
+- Audit and retention policy.
+- Failure-mode review for stale data and sync conflicts.
+- Clinical governance review.
+- Field usability testing with synthetic scenarios only.
 
 ## Guiding Constraint
 
-Do not let production architecture slow down demo learning too early. The next useful version should be judged by whether an interviewer or PC understands the problem, trusts the workflow, and can ask sharper questions after seeing it.
+Do not let production architecture slow down learning too early. The next useful version should be judged by whether developers can change it safely, the workflow can be validated repeatedly, and field reviewers can ask sharper questions after seeing the demo.

@@ -1,6 +1,6 @@
 # Metrics Dictionary
 
-This document defines the analytics layer for C5 Sentinel-SAR as a product/data analyst case study.
+This document defines the analytics layer for C5 Sentinel-SAR as a development artifact: metric definitions, source tables, alert thresholds, and AAR-ready outputs.
 
 ## North Star
 
@@ -82,6 +82,29 @@ Decision use: shows bottlenecks in the rescue/evacuation chain.
 Elapsed minutes from patient creation to handover.
 
 Decision use: evacuation throughput and AAR analysis.
+
+Source: `vw_command_incident_throughput_funnel.total_evacuation_time_seconds`.
+
+### Command Throughput Funnel
+
+Tracks patient lifecycle milestones from identification to handover:
+
+- identified
+- first vitals
+- first intervention
+- handed over
+
+Source: `vw_command_incident_throughput_funnel`.
+
+Primary fields:
+
+- `seconds_to_first_vitals`
+- `total_evacuation_time_seconds`
+- `milestone_assessed`
+- `milestone_evacuated`
+- `is_triage_breach_overdue`
+
+Decision use: high-throughput Chamal/AAR analysis without forcing routine dashboard refreshes to scan raw events.
 
 ### Medic To Critical Ratio
 

@@ -130,6 +130,109 @@ for event in events:
 Clinical events should almost never be rejected. Bad-but-important clinical data is accepted and flagged.
 Only malformed/unparseable envelopes are rejected and quarantined.
 
+## MIST Handover Event
+
+When a medic completes MIST handover, the client writes a local `PATIENT_HANDED_OVER` event before attempting network delivery. The receiving unit may scan a secure QR link, but the QR must contain a temporary encrypted token/signature, not embedded clinical files.
+
+Example payload:
+
+```json
+{
+  "device_id": "device-cohen",
+  "actor_id": "00000000-0000-0000-0000-000000000001",
+  "incident_id": "10000000-0000-0000-0000-000000000001",
+  "events": [
+    {
+      "local_event_id": "evt-mstart-mist-8812",
+      "type": "PATIENT_HANDED_OVER",
+      "patient_id": "30000000-0000-0000-0000-000000000099",
+      "actor_role": "medic",
+      "local_timestamp": "2026-05-19T21:30:15.123Z",
+      "payload_json": {
+        "handover_method": "secure_qr_token",
+        "destination_facility": "Tel Hashomer (Sheba)",
+        "receiving_unit_transport": "HELO_CHOPPER_12",
+        "token_hash": "sha256:server-side-token-hash",
+        "token_signature": "ed25519-or-hmac-signature",
+        "encrypted_link": "https://handover.example/t/opaque-token",
+        "token_expires_at": "2026-05-19T21:45:15.123Z",
+        "mist_summary": {
+          "mechanism": "Blast injury, structure collapse",
+          "injuries": "Amputation right lower limb, blast lung",
+          "signs": "HR 128, RR 26, AVPU=V",
+          "treatment": "TQ x1 right thigh at 21:02, Morphine 10mg IV at 21:10"
+        },
+        "active_tourniquets_at_handover": 1,
+        "device_telemetry": {
+          "battery_percent": 34,
+          "power_mode": "normal"
+        }
+      }
+    }
+  ]
+}
+```
+
+Server projection rules:
+
+- update `patients.current_status = 'evacuating'`
+- set `patients.needs_full_assessment = false`
+- set `patients.handed_over_at` and `patients.handed_over_to`
+- resolve active vitals, reassessment, tourniquet, and missing-full-assessment watchdog alerts for that patient
+- tag resolved alerts with `resolved_by_event_id`
+- store token metadata in `patient_handover_tokens` when `token_hash` and `token_signature` are supplied
+
+Idempotency remains `device_id + local_event_id`. If a weak network resends the handover packet, the duplicate must not re-run treatment/status side effects.
+
+## Black / Expectant Fast Exit Event
+
+When a medic confirms Black triage, the client should skip remaining assessment, treatment, and MIST forms and write a lightweight terminal event.
+
+Canonical event type: `PATIENT_TRIAGED_EXPECTANT`.
+
+```json
+{
+  "local_event_id": "evt-black-bypass-9912",
+  "type": "PATIENT_TRIAGED_EXPECTANT",
+  "patient_id": "30000000-0000-0000-0000-000000000099",
+  "local_timestamp": "2026-05-19T21:44:00Z",
+  "payload_json": {
+    "current_triage": "black",
+    "current_status": "deceased",
+    "needs_full_assessment": false,
+    "reason": "No spontaneous breathing after airway opening",
+    "bypass_flow": true
+  }
+}
+```
+
+Server projection rules:
+
+- set `patients.current_triage = 'black'`
+- set `patients.current_status = 'deceased'`
+- set `patients.needs_full_assessment = false`
+- bypass normal vitals/intervention/MIST completion requirements
+
+## Patient Lifecycle Status Pipeline
+
+`patients.current_status` is a projected operational custody state, not a manual form field.
+
+| Status | Production meaning / trigger |
+| --- | --- |
+| `identified` | Point of impact. Quick Patient created or tag assigned, but no care started yet. |
+| `stabilizing` | Care is ongoing at the treatment site, such as tourniquet, medication, or airway management. |
+| `observing` | Care milestone completed; patient waits for extraction or reassessment. |
+| `extricating` | Casualty is being physically moved through the structure or ruins. |
+| `evacuating` | Loaded into vehicle/chopper or handed over through MIST/secure QR. |
+| `deceased` | Black triage fast-path or casualty expired during care. |
+
+The projection is event-driven:
+
+- `PATIENT_TRIAGED_EXPECTANT` or payload `current_triage = black` -> `deceased`
+- `TOURNIQUET_APPLIED`, `MEDICATION_ADMINISTERED`, `AIRWAY_MANAGED` -> `stabilizing`
+- `VITALS_RECORDED` from stabilizing -> `observing`
+- `PATIENT_HANDED_OVER` -> `evacuating`
+
 ---
 
 # 3. GET /sync/log
@@ -399,6 +502,12 @@ GET /command/incidents/:incidentId/state
 ```
 
 This endpoint uses one API-level permission check. It must not perform RLS-heavy joins over `events` for routine dashboard refreshes.
+
+Recommended dashboard behavior:
+
+- poll `GET /command/incidents/:incidentId/state` on a fixed interval such as 5 seconds
+- do not recalculate command aggregates on arbitrary button clicks
+- use `vw_command_incident_throughput_funnel` for backend analytics and AAR throughput analysis, not as the hot dashboard endpoint
 
 ## High-Risk Override Payload
 

@@ -15,21 +15,29 @@ do $$ begin
   alter type event_type add value if not exists 'AAR_CONTEXT_NOTE_ADDED';
   alter type event_type add value if not exists 'HIGH_RISK_OVERRIDE_CONFIRMED';
   alter type event_type add value if not exists 'PATIENT_INJURY_UPDATED';
+  alter type event_type add value if not exists 'PATIENT_IDENTIFIED';
+  alter type event_type add value if not exists 'PATIENT_TRIAGED_EXPECTANT';
+  alter type event_type add value if not exists 'AIRWAY_MANAGED';
 exception when duplicate_object or undefined_object then null; end $$;
 
 do $$ begin create type incident_status as enum ('draft','staging','active','closed'); exception when duplicate_object then null; end $$;
 do $$ begin create type triage_level as enum ('red','yellow','green','black','pending','unknown'); exception when duplicate_object then null; end $$;
 do $$ begin create type access_status as enum ('trapped','partial','free','unknown'); exception when duplicate_object then null; end $$;
-do $$ begin create type patient_status as enum ('identified','treating','observing','extricated','handed_over','closed','self_evacuated','deceased','unknown'); exception when duplicate_object then null; end $$;
+do $$ begin create type patient_status as enum ('identified','stabilizing','observing','extricating','evacuating','treating','extricated','handed_over','closed','self_evacuated','deceased','unknown'); exception when duplicate_object then null; end $$;
+do $$ begin
+  alter type patient_status add value if not exists 'stabilizing';
+  alter type patient_status add value if not exists 'extricating';
+  alter type patient_status add value if not exists 'evacuating';
+exception when duplicate_object or undefined_object then null; end $$;
 do $$ begin create type supply_request_status as enum ('requested','approved','dispatched','in_transit','delivered','cancelled'); exception when duplicate_object then null; end $$;
 do $$ begin create type external_source as enum ('mda','united_hatzalah','police','idf','civilian','other'); exception when duplicate_object then null; end $$;
 
 do $$ begin
   create type event_type as enum (
     'INCIDENT_DRAFT_CREATED','INCIDENT_OPENED','INCIDENT_CONFIRMED','INCIDENT_DRAFT_MERGED','INCIDENT_DRAFT_REJECTED','INCIDENT_CLOSED','INCIDENT_REOPENED',
-    'PATIENT_CREATED','QUICK_PATIENT_CREATED','PATIENT_T_INJURY_UPDATED','PATIENT_LOCATION_UPDATED','PATIENT_INJURY_UPDATED','PATIENT_ACCESS_UPDATED','PATIENT_TRIAGE_UPDATED','PATIENT_STATUS_UPDATED','PATIENT_HANDED_OVER',
+    'PATIENT_CREATED','QUICK_PATIENT_CREATED','PATIENT_IDENTIFIED','PATIENT_TRIAGED_EXPECTANT','PATIENT_T_INJURY_UPDATED','PATIENT_LOCATION_UPDATED','PATIENT_INJURY_UPDATED','PATIENT_ACCESS_UPDATED','PATIENT_TRIAGE_UPDATED','PATIENT_STATUS_UPDATED','PATIENT_HANDED_OVER',
     'VITALS_RECORDED','MINIMAL_TRIAGE_RECORDED','SABCDE_RECORDED','MSTART_SUGGESTED','JUMPSTART_SUGGESTED','MSTART_OVERRIDE','JUMPSTART_OVERRIDE',
-    'TOURNIQUET_APPLIED','TOURNIQUET_REASSESSMENT','TOURNIQUET_RELEASED','INTERVENTION_RECORDED','MEDICATION_ADMINISTERED',
+    'TOURNIQUET_APPLIED','TOURNIQUET_REASSESSMENT','TOURNIQUET_RELEASED','INTERVENTION_RECORDED','MEDICATION_ADMINISTERED','AIRWAY_MANAGED',
     'EXTERNAL_REPORT_CREATED','EXTERNAL_REPORT_LINKED',
     'SUPPLY_REQUEST_CREATED','SUPPLY_REQUEST_DISPATCHED','SUPPLY_REQUEST_IN_TRANSIT','SUPPLY_REQUEST_RECEIVED',
     'INVENTORY_LEDGER_ENTRY','INVENTORY_INITIALIZED','INVENTORY_TRANSFER_OUT','INVENTORY_TRANSFER_IN','PLATOON_STOCK_INITIALIZED','PLATOON_STOCK_REFILLED','DIRECT_LOGO_TO_MEDIC_REFILL','WATCHDOG_ALERT','WATCHDOG_ACKNOWLEDGED','WATCHDOG_RESOLVED',
@@ -38,6 +46,10 @@ do $$ begin
     'TOURNIQUET_CONTEXT_UPDATED','AAR_CONTEXT_NOTE_ADDED','HIGH_RISK_OVERRIDE_CONFIRMED'
   );
 exception when duplicate_object then null; end $$;
+
+do $$ begin
+  alter type event_type add value if not exists 'PATIENT_IDENTIFIED';
+exception when duplicate_object or undefined_object then null; end $$;
 
 -- =========================================================
 -- USERS / PROFILES
@@ -228,7 +240,7 @@ create table if not exists events (
   actor_role user_role,
   type event_type not null,
   payload_json jsonb not null default '{}'::jsonb,
-  device_id text,
+  device_id text not null,
   local_event_id text not null,
   local_timestamp timestamptz not null,
   server_timestamp timestamptz not null default now(),
@@ -248,6 +260,19 @@ create index if not exists idx_events_vitals_avpu on events ((payload_json->>'av
 create index if not exists idx_events_vitals_spo2 on events (((payload_json->>'spo2')::int)) where type = 'VITALS_RECORDED' and payload_json ? 'spo2';
 create index if not exists idx_events_triage on events ((payload_json->>'triage')) where payload_json ? 'triage';
 create index if not exists idx_events_status on events ((payload_json->>'status')) where payload_json ? 'status';
+create index if not exists idx_events_lifecycle_milestones
+on events(incident_id, patient_id, type, local_timestamp)
+where type in ('QUICK_PATIENT_CREATED','PATIENT_CREATED','PATIENT_IDENTIFIED','VITALS_RECORDED','TOURNIQUET_APPLIED','PATIENT_HANDED_OVER');
+create index if not exists idx_events_patient_lifecycle_status
+on events(patient_id, local_timestamp)
+where type in ('PATIENT_TRIAGED_EXPECTANT','TOURNIQUET_APPLIED','MEDICATION_ADMINISTERED','AIRWAY_MANAGED','VITALS_RECORDED','PATIENT_HANDED_OVER');
+
+update events
+set device_id = 'legacy-unknown-device'
+where device_id is null;
+
+alter table events
+  alter column device_id set not null;
 
 create or replace function prevent_event_mutation()
 returns trigger as $$
@@ -260,6 +285,32 @@ drop trigger if exists trg_prevent_event_update on events;
 create trigger trg_prevent_event_update
 before update or delete on events
 for each row execute function prevent_event_mutation();
+
+-- Temporary signed handover tokens used by MIST QR handoff.
+-- The QR code carries an encrypted URL/token, not static clinical files.
+create table if not exists patient_handover_tokens (
+  id uuid primary key default gen_random_uuid(),
+  incident_id uuid not null references incidents(id) on delete cascade,
+  patient_id uuid not null references patients(id) on delete cascade,
+  source_event_id uuid references events(id) on delete set null,
+  handover_method text not null default 'secure_qr_token',
+  destination_facility text,
+  receiving_unit_transport text,
+  token_hash text not null,
+  token_signature text not null,
+  encrypted_link text,
+  expires_at timestamptz not null,
+  consumed_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (token_hash)
+);
+
+create index if not exists idx_handover_tokens_patient
+on patient_handover_tokens(patient_id, created_at desc);
+
+create index if not exists idx_handover_tokens_unconsumed
+on patient_handover_tokens(expires_at)
+where consumed_at is null;
 
 
 -- =========================================================
@@ -536,6 +587,12 @@ create index if not exists idx_watchdog_patient on watchdog_alerts(patient_id);
 create index if not exists idx_watchdog_unresolved on watchdog_alerts(resolved_at) where resolved_at is null;
 create index if not exists idx_watchdog_unresolved_severity on watchdog_alerts(incident_id, severity, triggered_at desc) where resolved_at is null;
 
+alter table watchdog_alerts
+  add column if not exists dedupe_key text,
+  add column if not exists source_event_id uuid references events(id),
+  add column if not exists resolved_by_event_id uuid references events(id),
+  add column if not exists suppressed_before_dashboard boolean not null default false;
+
 create table if not exists device_presence (
   id uuid primary key default gen_random_uuid(),
   incident_id uuid references incidents(id) on delete cascade,
@@ -590,6 +647,17 @@ begin
       set last_vitals_at = new.local_timestamp,
           last_seen_at = new.local_timestamp,
           needs_full_assessment = false,
+          updated_at = now(),
+          version = version + 1
+      where id = new.patient_id;
+
+    elsif new.type = 'PATIENT_TRIAGED_EXPECTANT' then
+      update patients
+      set current_status = 'deceased',
+          current_triage = 'black',
+          needs_full_assessment = false,
+          triage_recorded_at = new.local_timestamp,
+          status_recorded_at = new.local_timestamp,
           updated_at = now(),
           version = version + 1
       where id = new.patient_id;
@@ -659,12 +727,70 @@ begin
 
     elsif new.type = 'PATIENT_HANDED_OVER' then
       update patients
-      set current_status = 'handed_over',
+      set current_status = 'evacuating',
           handed_over_at = new.local_timestamp,
-          handed_over_to = coalesce(new.payload_json->>'handover_to', 'MDA / Evacuation'),
+          handed_over_to = coalesce(
+            new.payload_json->>'destination_facility',
+            new.payload_json->>'receiving_unit_transport',
+            new.payload_json->>'handover_to',
+            'MDA / Evacuation'
+          ),
+          needs_full_assessment = false,
+          last_seen_at = new.local_timestamp,
+          handover_token_used_at = case
+            when new.payload_json->>'handover_method' = 'secure_qr_token' then coalesce(handover_token_used_at, new.local_timestamp)
+            else handover_token_used_at
+          end,
           updated_at = now(),
           version = version + 1
       where id = new.patient_id;
+
+      update watchdog_alerts
+      set resolved_at = coalesce(resolved_at, new.server_timestamp),
+          resolved_by_event_id = new.id,
+          suppressed_before_dashboard = true,
+          updated_at = now(),
+          version = version + 1
+      where incident_id = new.incident_id
+        and patient_id = new.patient_id
+        and resolved_at is null
+        and alert_type in (
+          'VITALS_OVERDUE',
+          'REASSESSMENT_OVERDUE',
+          'TOURNIQUET_REASSESSMENT_OVERDUE',
+          'TOURNIQUET_CRITICAL',
+          'MISSING_FULL_ASSESSMENT'
+        );
+
+      if new.payload_json->>'handover_method' = 'secure_qr_token'
+         and new.payload_json ? 'token_hash'
+         and new.payload_json ? 'token_signature' then
+        insert into patient_handover_tokens (
+          incident_id,
+          patient_id,
+          source_event_id,
+          handover_method,
+          destination_facility,
+          receiving_unit_transport,
+          token_hash,
+          token_signature,
+          encrypted_link,
+          expires_at
+        )
+        values (
+          new.incident_id,
+          new.patient_id,
+          new.id,
+          new.payload_json->>'handover_method',
+          new.payload_json->>'destination_facility',
+          new.payload_json->>'receiving_unit_transport',
+          new.payload_json->>'token_hash',
+          new.payload_json->>'token_signature',
+          new.payload_json->>'encrypted_link',
+          coalesce((new.payload_json->>'token_expires_at')::timestamptz, new.server_timestamp + interval '15 minutes')
+        )
+        on conflict (token_hash) do nothing;
+      end if;
     end if;
   end if;
 
@@ -687,8 +813,8 @@ begin
 
   if new.type in (
     'PATIENT_CREATED','QUICK_PATIENT_CREATED','VITALS_RECORDED','MINIMAL_TRIAGE_RECORDED',
-    'PATIENT_TRIAGE_UPDATED','PATIENT_STATUS_UPDATED','PATIENT_HANDED_OVER',
-    'INTERVENTION_RECORDED','MEDICATION_ADMINISTERED','TOURNIQUET_APPLIED','TOURNIQUET_RELEASED','TREATMENT_SAFETY_WARNING','HIGH_RISK_CLINICAL_VIOLATION',
+    'PATIENT_TRIAGE_UPDATED','PATIENT_STATUS_UPDATED','PATIENT_HANDED_OVER','PATIENT_TRIAGED_EXPECTANT',
+    'INTERVENTION_RECORDED','MEDICATION_ADMINISTERED','AIRWAY_MANAGED','TOURNIQUET_APPLIED','TOURNIQUET_RELEASED','TREATMENT_SAFETY_WARNING','HIGH_RISK_CLINICAL_VIOLATION',
     'WATCHDOG_ALERT','SUPPLY_REQUEST_CREATED','SUPPLY_REQUEST_DISPATCHED','SUPPLY_REQUEST_IN_TRANSIT','SUPPLY_REQUEST_RECEIVED',
     'BUILDING_STATUS_UPDATED','SITE_CLEAR_CONFIRMED','SYNC_CONFLICT','MSTART_OVERRIDE','JUMPSTART_OVERRIDE'
   ) then
@@ -704,6 +830,72 @@ drop trigger if exists trg_events_projection_outbox on events;
 create trigger trg_events_projection_outbox
 after insert on events
 for each row execute function apply_event_projection_and_outbox();
+
+create or replace function trg_project_patient_lifecycle_status()
+returns trigger as $$
+declare
+  v_payload jsonb;
+begin
+  v_payload := new.payload_json;
+
+  if new.patient_id is null then
+    return new;
+  end if;
+
+  -- Fast-path Black/expectant handling: no further assessment debt.
+  if new.type = 'PATIENT_TRIAGED_EXPECTANT'
+     or v_payload->>'current_triage' = 'black' then
+    update patients
+    set current_status = 'deceased',
+        current_triage = 'black',
+        needs_full_assessment = false,
+        triage_recorded_at = coalesce(triage_recorded_at, new.local_timestamp),
+        status_recorded_at = new.local_timestamp,
+        updated_at = now(),
+        version = version + 1
+    where id = new.patient_id;
+
+  -- Treatment actions imply active stabilization at the point of care.
+  elsif new.type in ('TOURNIQUET_APPLIED','MEDICATION_ADMINISTERED','AIRWAY_MANAGED') then
+    update patients
+    set current_status = 'stabilizing',
+        status_recorded_at = new.local_timestamp,
+        updated_at = now(),
+        version = version + 1
+    where id = new.patient_id
+      and current_status in ('identified','unknown','treating');
+
+  -- First/secondary vitals after stabilization means care is complete enough for observation.
+  elsif new.type = 'VITALS_RECORDED' then
+    update patients
+    set current_status = 'observing',
+        needs_full_assessment = false,
+        status_recorded_at = new.local_timestamp,
+        updated_at = now(),
+        version = version + 1
+    where id = new.patient_id
+      and current_status = 'stabilizing';
+
+  -- MIST/secure QR handover means the patient is in evacuation/handoff custody.
+  elsif new.type = 'PATIENT_HANDED_OVER' then
+    update patients
+    set current_status = 'evacuating',
+        handover_token_used_at = coalesce(handover_token_used_at, now()),
+        status_recorded_at = new.local_timestamp,
+        updated_at = now(),
+        version = version + 1
+    where id = new.patient_id
+      and current_status <> 'deceased';
+  end if;
+
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists audit_project_lifecycle_status on events;
+create trigger audit_project_lifecycle_status
+after insert on events
+for each row execute function trg_project_patient_lifecycle_status();
 
 -- =========================================================
 -- VIEWS
@@ -726,9 +918,11 @@ create or replace view vw_incident_tactical_funnel as
 select
   i.id as incident_id,
   count(p.id) filter (where p.current_status in ('identified')) as identified,
-  count(p.id) filter (where p.current_status in ('treating','observing')) as in_treatment,
-  count(p.id) filter (where p.current_status = 'extricated') as extricated,
-  count(p.id) filter (where p.current_status = 'handed_over') as handed_over,
+  count(p.id) filter (where p.current_status in ('stabilizing','treating')) as stabilizing,
+  count(p.id) filter (where p.current_status = 'observing') as observing,
+  count(p.id) filter (where p.current_status in ('extricating','extricated')) as extricating,
+  count(p.id) filter (where p.current_status in ('evacuating','handed_over')) as evacuating,
+  count(p.id) filter (where p.current_status = 'deceased') as deceased,
   count(p.id) as total
 from incidents i
 left join patients p on p.incident_id = i.id
@@ -745,9 +939,9 @@ select
   s.building_status,
   s.is_site_clear,
   count(p.id) as registered_patients,
-  count(p.id) filter (where p.current_status = 'handed_over') as handed_over_patients,
+  count(p.id) filter (where p.current_status in ('evacuating','handed_over')) as handed_over_patients,
   (
-    count(p.id) = count(p.id) filter (where p.current_status = 'handed_over')
+    count(p.id) = count(p.id) filter (where p.current_status in ('evacuating','handed_over','deceased','closed','self_evacuated'))
     and s.is_site_clear = true
   ) as heatmap_green
 from sectors s
@@ -809,7 +1003,7 @@ select
   as priority_score
 from patients p
 left join vw_patient_latest_vitals v on v.patient_id = p.id
-where p.current_status not in ('handed_over','closed','self_evacuated','deceased');
+where p.current_status not in ('evacuating','handed_over','closed','self_evacuated','deceased');
 
 
 -- =========================================================
@@ -1348,9 +1542,9 @@ create or replace view vw_kpi_incident_command_summary as
 with patient_counts as (
   select
     incident_id,
-    count(*) filter (where current_triage = 'red' and current_status not in ('handed_over','closed','self_evacuated','deceased')) as active_red_patients,
-    count(*) filter (where needs_full_assessment = true and current_status not in ('handed_over','closed','self_evacuated','deceased')) as patients_missing_full_vitals,
-    count(*) filter (where current_status = 'handed_over') as handed_over_patients,
+    count(*) filter (where current_triage = 'red' and current_status not in ('evacuating','handed_over','closed','self_evacuated','deceased')) as active_red_patients,
+    count(*) filter (where needs_full_assessment = true and current_status not in ('evacuating','handed_over','closed','self_evacuated','deceased')) as patients_missing_full_vitals,
+    count(*) filter (where current_status in ('evacuating','handed_over')) as handed_over_patients,
     count(*) as total_patients
   from patients
   group by incident_id
@@ -1510,6 +1704,83 @@ $$ language plpgsql;
 
 create index if not exists idx_incident_command_state_refreshed
 on incident_command_state(last_refreshed_at);
+
+create or replace function refresh_command_state_after_event()
+returns trigger as $$
+begin
+  if new.incident_id is not null then
+    perform refresh_incident_command_state(new.incident_id);
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_refresh_command_state_after_event on events;
+create trigger trg_refresh_command_state_after_event
+after insert on events
+for each row
+when (new.type in (
+  'QUICK_PATIENT_CREATED',
+  'PATIENT_CREATED',
+  'PATIENT_IDENTIFIED',
+  'VITALS_RECORDED',
+  'MINIMAL_TRIAGE_RECORDED',
+  'PATIENT_TRIAGE_UPDATED',
+  'PATIENT_STATUS_UPDATED',
+  'PATIENT_HANDED_OVER',
+  'PATIENT_TRIAGED_EXPECTANT',
+  'TOURNIQUET_APPLIED',
+  'AIRWAY_MANAGED',
+  'MEDICATION_ADMINISTERED',
+  'TOURNIQUET_REASSESSMENT',
+  'TOURNIQUET_RELEASED',
+  'WATCHDOG_ALERT',
+  'WATCHDOG_RESOLVED',
+  'DEAD_MAN_SWITCH_ESCALATED'
+))
+execute function refresh_command_state_after_event();
+
+create or replace view vw_command_incident_throughput_funnel as
+with patient_lifecycle_milestones as (
+  select
+    patient_id,
+    incident_id,
+    min(local_timestamp) filter (where type in ('QUICK_PATIENT_CREATED','PATIENT_CREATED','PATIENT_IDENTIFIED')) as t_identified,
+    min(local_timestamp) filter (where type = 'VITALS_RECORDED') as t_first_vitals,
+    min(local_timestamp) filter (where type = 'TOURNIQUET_APPLIED') as t_first_intervention,
+    min(local_timestamp) filter (where type = 'PATIENT_HANDED_OVER') as t_evacuated
+  from events
+  where patient_id is not null
+    and type in ('QUICK_PATIENT_CREATED','PATIENT_CREATED','PATIENT_IDENTIFIED','VITALS_RECORDED','TOURNIQUET_APPLIED','PATIENT_HANDED_OVER')
+  group by patient_id, incident_id
+)
+select
+  p.incident_id,
+  p.id as patient_id,
+  p.visual_id,
+  p.current_triage,
+  p.current_status,
+  p.needs_full_assessment as is_quick_patient_only,
+  plm.t_identified,
+  plm.t_first_vitals,
+  plm.t_first_intervention,
+  plm.t_evacuated,
+  extract(epoch from (plm.t_first_vitals - plm.t_identified)) as seconds_to_first_vitals,
+  extract(epoch from (plm.t_evacuated - plm.t_identified)) as total_evacuation_time_seconds,
+  case when plm.t_first_vitals is not null then 1 else 0 end as milestone_assessed,
+  case when plm.t_evacuated is not null then 1 else 0 end as milestone_evacuated,
+  case
+    when p.current_triage = 'red'
+      and plm.t_first_vitals is null
+      and plm.t_identified is not null
+      and (now() - plm.t_identified) > interval '10 minutes'
+    then true
+    else false
+  end as is_triage_breach_overdue
+from patients p
+left join patient_lifecycle_milestones plm
+  on p.id = plm.patient_id
+ and p.incident_id = plm.incident_id;
 
 
 -- AAR generated reports
@@ -1990,6 +2261,23 @@ begin
       and patient_id = e.patient_id
       and resolved_at is null
       and alert_type in ('TOURNIQUET_REASSESSMENT_OVERDUE','TOURNIQUET_CRITICAL');
+  end if;
+
+  if e.type = 'PATIENT_HANDED_OVER' then
+    update watchdog_alerts
+    set resolved_at = coalesce(resolved_at, e.server_timestamp),
+        resolved_by_event_id = e.id,
+        suppressed_before_dashboard = true
+    where incident_id = e.incident_id
+      and patient_id = e.patient_id
+      and resolved_at is null
+      and alert_type in (
+        'VITALS_OVERDUE',
+        'REASSESSMENT_OVERDUE',
+        'TOURNIQUET_REASSESSMENT_OVERDUE',
+        'TOURNIQUET_CRITICAL',
+        'MISSING_FULL_ASSESSMENT'
+      );
   end if;
 end;
 $$ language plpgsql;

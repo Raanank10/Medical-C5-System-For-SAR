@@ -1,5 +1,22 @@
 # C5 Sentinel-SAR v1.1 Changelog
 
+## Production Handover / Command Snapshot Hardening
+
+1. Strengthened `PATIENT_HANDED_OVER` projection:
+   - sets `current_status = evacuating`
+   - clears `needs_full_assessment`
+   - records destination facility / transport target
+   - resolves patient-specific vitals, reassessment, tourniquet, and missing-assessment watchdog alerts
+   - tags resolved alerts with `resolved_by_event_id`
+2. Added `patient_handover_tokens` for secure MIST QR handover metadata.
+   - QR links represent temporary signed tokens, not embedded clinical files.
+3. Made `events.device_id` non-null so `(device_id, local_event_id)` idempotency is enforceable.
+4. Added lifecycle milestone indexing for command throughput analysis.
+5. Added `vw_command_incident_throughput_funnel`.
+6. Added event-triggered refresh of `incident_command_state` for high-value lifecycle events.
+7. Added `PATIENT_TRIAGED_EXPECTANT` fast-exit path for Black triage.
+8. Added projected lifecycle statuses: `stabilizing`, `extricating`, and `evacuating`.
+
 Changes applied from the reviewed draft spec:
 
 1. Renamed the document from `FINAL SPECIFICATION v2.0` to `MVP Product & Technical Specification v1.1`.
