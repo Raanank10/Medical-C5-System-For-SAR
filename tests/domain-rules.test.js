@@ -16,6 +16,9 @@ function patient(overrides = {}) {
 assert.equal(rules.needsVitals(patient()), true);
 assert.equal(rules.needsVitals(patient({ accessibility: "none" })), false);
 assert.equal(rules.needsVitals(patient({ patientStatus: "evacuated" })), false);
+assert.equal(rules.needsVitals(patient({ patientStatus: "evacuating" })), false);
+assert.equal(rules.needsVitals(patient({ patientStatus: "deceased" })), false);
+assert.equal(rules.needsVitals(patient({ patientStatus: "handed_over" })), false);
 assert.equal(rules.needsVitals(patient({ triage: "black" })), false);
 
 assert.deepEqual(rules.vitalsTimer(patient(), baseTime + 2 * 60 * 1000), {

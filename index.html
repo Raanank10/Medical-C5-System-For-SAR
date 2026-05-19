@@ -100,7 +100,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 
 /* ── FLOW ── */
 .flow-header{padding:14px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);}
-.btn-back{background:var(--surface2);border:1px solid var(--border);color:var(--text);width:40px;height:40px;border-radius:10px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.btn-back{background:var(--surface2);border:1px solid var(--border);color:var(--text);width:56px;height:56px;border-radius:10px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation;}
 .flow-step{font-family:var(--mono);font-size:10px;color:var(--muted);}
 .flow-title{font-size:18px;font-weight:700;}
 .progress-bar{height:3px;background:var(--border);margin:0 16px;}
@@ -113,7 +113,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .tap-grid{display:grid;gap:10px;}
 .tap-grid-2{grid-template-columns:1fr 1fr;}
 .tap-grid-1{grid-template-columns:1fr;}
-.tap-btn{background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:16px 12px;color:var(--text);font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;text-align:center;transition:all 0.12s;display:flex;flex-direction:column;align-items:center;gap:7px;line-height:1.3;}
+.tap-btn{background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:16px 12px;color:var(--text);font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;text-align:center;transition:all 0.12s;display:flex;flex-direction:column;align-items:center;gap:7px;line-height:1.3;min-height:56px;touch-action:manipulation;}
 .tap-btn .icon{font-size:26px;}
 .tap-btn:active{transform:scale(0.97);}
 .tap-btn.selected{border-color:var(--accent);background:rgba(67,97,238,0.12);}
@@ -128,7 +128,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 
 /* ── BP BUTTONS ── */
 .bp-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:4px;}
-.bp-btn{background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:14px 8px;cursor:pointer;text-align:center;transition:all 0.12s;display:flex;flex-direction:column;align-items:center;gap:4px;}
+.bp-btn{background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:14px 8px;cursor:pointer;text-align:center;transition:all 0.12s;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:56px;touch-action:manipulation;}
 .bp-btn:active{transform:scale(0.97);}
 .bp-btn-value{font-family:var(--mono);font-size:13px;font-weight:700;}
 .bp-btn-desc{font-size:10px;color:var(--muted);line-height:1.4;}
@@ -138,13 +138,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 
 /* ── CHIPS ── */
 .chip-grid{display:flex;flex-wrap:wrap;gap:10px;}
-.chip{background:var(--surface);border:2px solid var(--border);border-radius:50px;padding:11px 16px;color:var(--text);font-size:14px;font-weight:600;cursor:pointer;transition:all 0.12s;display:flex;align-items:center;gap:7px;}
+.chip{background:var(--surface);border:2px solid var(--border);border-radius:50px;padding:11px 16px;color:var(--text);font-size:14px;font-weight:600;cursor:pointer;transition:all 0.12s;display:flex;align-items:center;gap:7px;min-height:56px;touch-action:manipulation;}
 .chip:active{transform:scale(0.97);}
 .chip.selected{border-color:var(--accent);background:rgba(67,97,238,0.15);color:var(--accent);}
 .chip-icon{font-size:18px;}
 
 /* ── LIMB BUTTONS ── */
-.limb-btn{background:var(--surface);border:2px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-size:14px;font-weight:600;cursor:pointer;text-align:center;transition:all 0.12s;}
+.limb-btn{background:var(--surface);border:2px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-size:14px;font-weight:600;cursor:pointer;text-align:center;transition:all 0.12s;min-height:56px;touch-action:manipulation;}
 .limb-btn:active{transform:scale(0.97);}
 .limb-btn.selected{border-color:var(--red);background:rgba(230,57,70,0.12);color:var(--red);}
 
@@ -172,6 +172,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .body-zone-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px;min-height:31px;}
 .body-zone-chip{background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.45);border-radius:999px;padding:6px 9px;color:var(--red);font-size:12px;font-weight:700;}
 .body-zone-empty{color:var(--muted);font-size:12px;line-height:1.5;}
+.computed-status-card{background:rgba(67,97,238,.08);border:1px solid rgba(67,97,238,.42);border-radius:12px;padding:13px 14px;margin-top:16px;}
+.computed-status-title{font-size:12px;color:var(--muted);margin-bottom:4px;}
+.computed-status-value{font-size:18px;font-weight:800;color:var(--accent);}
+.computed-status-note{font-size:11px;color:var(--muted);line-height:1.5;margin-top:4px;}
 
 /* ── AUTO ID + SAVE MODAL ── */
 .device-card{background:rgba(67,97,238,.08);border:1px solid rgba(67,97,238,.42);border-radius:12px;padding:11px 13px;margin-top:12px;font-size:12px;color:var(--muted);line-height:1.5;}
@@ -204,7 +208,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .vital-label{font-size:14px;font-weight:600;}
 .vital-unit{font-size:11px;color:var(--muted);margin-top:2px;}
 .vital-ctrl{display:flex;align-items:center;}
-.vital-btn{width:48px;height:48px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:300;user-select:none;transition:background 0.1s;}
+.vital-btn{width:56px;height:56px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:300;user-select:none;transition:background 0.1s;touch-action:manipulation;}
 .vital-btn:first-child{border-radius:10px 0 0 10px;}
 .vital-btn:last-child{border-radius:0 10px 10px 0;}
 .vital-btn:active{background:var(--accent);}
@@ -221,8 +225,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .count-stepper .vital-val{min-width:56px;flex:none;}
 .count-row + .calc-confirm{margin-top:8px;}
 .avpu-row{display:flex;gap:8px;}
-.avpu-btn{flex:1;padding:14px 4px;background:var(--surface2);border:2px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:18px;font-weight:700;cursor:pointer;text-align:center;transition:all 0.12s;}
+.avpu-btn{flex:1;padding:14px 4px;background:var(--surface2);border:2px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:18px;font-weight:700;cursor:pointer;text-align:center;transition:all 0.12s;min-height:56px;touch-action:manipulation;}
 .avpu-btn.selected{border-color:var(--accent);background:rgba(67,97,238,0.15);color:var(--accent);}
+#no-breathing-btn{min-height:56px;touch-action:manipulation;}
 
 /* ── REQUIRED FIELD ── */
 .required-star{color:var(--red);}
@@ -261,10 +266,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 
 /* ── BOTTOM BAR ── */
 .bottom-bar{position:fixed;bottom:0;left:0;right:0;padding:14px 16px;background:rgba(10,10,15,0.97);border-top:1px solid var(--border);backdrop-filter:blur(8px);}
-.btn-primary{width:100%;padding:17px;background:var(--accent);border:none;border-radius:14px;color:white;font-family:var(--sans);font-size:17px;font-weight:700;cursor:pointer;transition:opacity 0.1s;}
+.btn-primary{width:100%;padding:17px;background:var(--accent);border:none;border-radius:14px;color:white;font-family:var(--sans);font-size:17px;font-weight:700;cursor:pointer;transition:opacity 0.1s;min-height:56px;touch-action:manipulation;}
 .btn-primary:active{opacity:0.85;}
 .btn-primary:disabled{background:var(--surface2);color:var(--muted);}
-.btn-secondary{width:100%;padding:15px;background:var(--surface);border:1px solid var(--border);border-radius:14px;color:var(--text);font-family:var(--sans);font-size:16px;font-weight:600;cursor:pointer;}
+.btn-secondary{width:100%;padding:15px;background:var(--surface);border:1px solid var(--border);border-radius:14px;color:var(--text);font-family:var(--sans);font-size:16px;font-weight:600;cursor:pointer;min-height:56px;touch-action:manipulation;}
 
 /* ── SUCCESS ── */
 .success-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80dvh;padding:32px;text-align:center;}
@@ -573,7 +578,7 @@ textarea{resize:vertical;min-height:70px;}
       <input type="text" id="location-free" placeholder="לדוגמה: ליד הדלת האדומה, מתחת לשרידים..." oninput="state.locFree=this.value">
     </div>
   </div>
-  <div class="bottom-bar"><button class="btn-primary" id="btn-step1" onclick="goTo('step2')" disabled>המשך</button></div>
+  <div class="bottom-bar"><button class="btn-primary" id="btn-step1" onclick="goTo('step2')">המשך</button></div>
 </div>
 
 <!-- ══════════════════════ STEP 2 — ACCESSIBILITY ══ -->
@@ -602,7 +607,7 @@ textarea{resize:vertical;min-height:70px;}
       </button>
     </div>
   </div>
-  <div class="bottom-bar"><button class="btn-primary" id="btn-step2" onclick="goTo('step3')" disabled>המשך</button></div>
+  <div class="bottom-bar"><button class="btn-primary" id="btn-step2" onclick="goTo('step3')">המשך</button></div>
 </div>
 
 <!-- ══════════════════════ STEP 3 — QUICK TOURNIQUET ══ -->
@@ -651,7 +656,7 @@ textarea{resize:vertical;min-height:70px;}
       </button>
     </div>
   </div>
-  <div class="bottom-bar"><button class="btn-primary" id="btn-step3" onclick="goTo('step4')" disabled>המשך לבדיקת מדדים</button></div>
+  <div class="bottom-bar"><button class="btn-primary" id="btn-step3" onclick="goTo('step4')">המשך לבדיקת מדדים</button></div>
 </div>
 
 <!-- ══════════════════════ STEP 4 — VITALS ══ -->
@@ -750,7 +755,7 @@ textarea{resize:vertical;min-height:70px;}
     <div class="field-label">זיהוי חובש</div>
     <div class="device-card">נחתם אוטומטית על ידי מכשיר <span class="device-id" id="vitals-device-id">—</span></div>
   </div>
-  <div class="bottom-bar"><button class="btn-primary" id="btn-step4" onclick="goTo('step5')" disabled>המשך</button></div>
+  <div class="bottom-bar"><button class="btn-primary" id="btn-step4" onclick="goTo('step5')">המשך</button></div>
 </div>
 
 <!-- ══════════════════════ STEP 5 — INJURY + STATUS ══ -->
@@ -797,7 +802,7 @@ textarea{resize:vertical;min-height:70px;}
       </button>
     </div>
   </div>
-  <div class="bottom-bar"><button class="btn-primary" id="btn-step5" onclick="goTo('step6')" disabled>המשך</button></div>
+  <div class="bottom-bar"><button class="btn-primary" id="btn-step5" onclick="goTo('step6')">המשך</button></div>
 </div>
 
 <div id="screen-step6" class="screen">
@@ -833,27 +838,13 @@ textarea{resize:vertical;min-height:70px;}
         </div>
       </div>
     </div>
-    <div class="field-label">מצב הפצוע</div>
-    <div class="tap-grid tap-grid-1" id="status-grid">
-      <button class="tap-btn" onclick="selectStatus(this,'stabilizing')">
-        <div style="font-weight:700">ייצוב בטיפול</div>
-        <div style="font-size:11px;color:var(--muted)">טיפול מציל חיים פעיל באתר</div>
-      </button>
-      <button class="tap-btn" onclick="selectStatus(this,'observing')">
-        <div style="font-weight:700">בהשגחה</div>
-        <div style="font-size:11px;color:var(--muted)">טיפול הושלם זמנית — ממתין לחילוץ</div>
-      </button>
-      <button class="tap-btn" onclick="selectStatus(this,'extricating')">
-        <div style="font-weight:700">בחילוץ</div>
-        <div style="font-size:11px;color:var(--muted)">מועבר פיזית לנקודת איסוף</div>
-      </button>
-      <button class="tap-btn" onclick="selectStatus(this,'evacuating')">
-        <div style="font-weight:700">בפינוי / מסירה</div>
-        <div style="font-size:11px;color:var(--muted)">נמסר או נטען לאמצעי פינוי</div>
-      </button>
+    <div class="computed-status-card">
+      <div class="computed-status-title">מצב מחושב מאירועים</div>
+      <div class="computed-status-value" id="computed-status-label">זוהה</div>
+      <div class="computed-status-note">המערכת מעדכנת סטטוס לפי פעולות: פתיחת פצוע, חסם עורקים, מדדים, חילוץ או מסירה. החובש לא נדרש לבחור סטטוס ידנית.</div>
     </div>
   </div>
-  <div class="bottom-bar"><button class="btn-primary" id="btn-step6" onclick="goTo('step7')" disabled>המשך</button></div>
+  <div class="bottom-bar"><button class="btn-primary" id="btn-step6" onclick="goTo('step7')">המשך</button></div>
 </div>
 
 <div id="screen-step7" class="screen">
@@ -922,7 +913,7 @@ textarea{resize:vertical;min-height:70px;}
     <div class="field-label" style="margin-top:4px">זיהוי חובש מטפל</div>
     <div class="device-card">הטיפול ייחתם אוטומטית על ידי מכשיר <span class="device-id" id="tx-device-id">—</span></div>
   </div>
-  <div class="bottom-bar"><button class="btn-primary" id="btn-step7" onclick="goTo('step8')" disabled>המשך לסיכום</button></div>
+  <div class="bottom-bar"><button class="btn-primary" id="btn-step7" onclick="goTo('step8')">המשך לסיכום</button></div>
 </div>
 
 <!-- ══════════════════════ STEP 8 — SUMMARY ══ -->
@@ -1217,7 +1208,7 @@ function freshState(){
   return {
     buildingType:null, locFloor:'', locApt:'', locRoom:'', locFree:'',
     accessibility:null, sabcde:{},
-    injury:null, injuryZones:new Set(), patientStatus:null,
+    injury:null, injuryZones:new Set(), patientStatus:'identified',
     interventions:new Set(), triage:null,
     needsFullAssessment:true, localEvents:[],
     vitalsMedicName:'', txMedicName:''
@@ -1385,7 +1376,43 @@ setInterval(updateClock,1000); updateClock();
 // ═══════════════════════════════════════════════
 //  NAVIGATION
 // ═══════════════════════════════════════════════
+const TERMINAL_STATUSES = new Set(['deceased','evacuating','evacuated','handed_over','closed','self_evacuated']);
+
+function queueEventOnce(type, event){
+  if((state.localEvents||[]).some(e=>e.type===type)) return;
+  saveLocalEvent({type, ...event});
+}
+
+function projectPatientStatus(nextStatus, eventType, payload={}){
+  if(!nextStatus) return;
+  const current = state.patientStatus || 'identified';
+  if(current === 'deceased' && nextStatus !== 'deceased') return;
+  if(TERMINAL_STATUSES.has(current) && current !== 'deceased') return;
+
+  if(eventType === 'VITALS_RECORDED'){
+    state.needsFullAssessment = false;
+    if(['identified','stabilizing'].includes(current)) state.patientStatus = 'observing';
+    queueEventOnce('VITALS_RECORDED', {
+      detail:'מדדים תועדו — סטטוס מחושב להשגחה',
+      warn:false,
+      payload_json:{current_status:state.patientStatus, needs_full_assessment:false}
+    });
+  } else {
+    state.patientStatus = nextStatus;
+    if(eventType){
+      queueEventOnce(eventType, {
+        detail:`סטטוס מחושב: ${STATUS_LABELS[nextStatus]||nextStatus}`,
+        warn:false,
+        payload_json:{current_status:nextStatus, ...payload}
+      });
+    }
+  }
+  syncComputedStatusDisplay();
+}
+
 function goTo(screen){
+  if(screen==='step5') projectPatientStatus('observing','VITALS_RECORDED');
+  if(screen==='step6') syncComputedStatusDisplay();
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+screen).classList.add('active');
   window.scrollTo(0,0);
@@ -1747,7 +1774,7 @@ function startNewPatient(){
   updateCountDisplay('mpulse15'); updateCountDisplay('mrr30');
   document.getElementById('dose-morphine').textContent='5';
   document.getElementById('dose-fluids').textContent='500';
-  ['btn-step1','btn-step2','btn-step3','btn-step4','btn-step5','btn-step6','btn-step7'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=true;});
+  ['btn-step1','btn-step2','btn-step3','btn-step4','btn-step5','btn-step6','btn-step7'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=false;});
   // Reset quick TQ UI
   document.getElementById('quick-tq-panel').style.display='none';
   document.getElementById('quick-tq-time').value='';
@@ -1837,6 +1864,10 @@ function updateBodyZoneList(){
     ? labels.map(label=>`<span class="body-zone-chip">${label}</span>`).join('')
     : '<span class="body-zone-empty">עדיין לא סומן אזור פגיעה</span>';
 }
+function syncComputedStatusDisplay(){
+  const el=document.getElementById('computed-status-label');
+  if(el) el.textContent = STATUS_LABELS[state.patientStatus] || 'זוהה';
+}
 function selectInjury(btn, val){
   document.querySelectorAll('#injury-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
@@ -1844,18 +1875,16 @@ function selectInjury(btn, val){
   checkStep6();
 }
 function selectStatus(btn, val){
-  document.querySelectorAll('#status-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
-  btn.classList.add('selected');
-  state.patientStatus = val;
+  projectPatientStatus(val,'MANUAL_STATUS_OVERRIDE');
   checkStep6();
 }
 function checkStep5(){
-  document.getElementById('btn-step5').disabled = !state.triage;
+  document.getElementById('btn-step5').disabled = false;
 }
 
 // Step 6 — Interventions
 function checkStep6(){
-  document.getElementById('btn-step6').disabled = !(state.injury && state.patientStatus);
+  document.getElementById('btn-step6').disabled = false;
 }
 function toggleChip(btn, key){
   btn.classList.toggle('selected');
@@ -1865,6 +1894,9 @@ function toggleChip(btn, key){
   document.getElementById('morphine-wrap').style.display=state.interventions.has('morphine')?'block':'none';
   document.getElementById('fluids-wrap').style.display=state.interventions.has('fluids')?'block':'none';
   document.getElementById('other-tx-wrap').style.display=state.interventions.has('other_tx')?'block':'none';
+  if(state.interventions.has(key) && ['tourniquet','morphine','iv','fluids','airway_mgmt','cpr','atq'].includes(key)){
+    projectPatientStatus('stabilizing', key==='tourniquet'?'TOURNIQUET_APPLIED':'INTERVENTION_LOGGED');
+  }
   if(key==='tourniquet'&&state.interventions.has('tourniquet')&&!tqData.time) setTQTimeNow();
 }
 function changeDose(key, delta){
@@ -2038,6 +2070,20 @@ function savePatient(){
   const tqRecord=tourniquetRecordFromState();
   const t=nowT();
   const vitalsCapture=vitalsCapturePayload('flow');
+  const effectiveStatus=state.patientStatus || 'identified';
+  const effectiveInjury=state.injury || 'לא תועד';
+  const missingFields=[];
+  if(!state.triage) missingFields.push('triage');
+  if(!state.accessibility) missingFields.push('accessibility');
+  if(!state.injury) missingFields.push('injury');
+  if(missingFields.length && state.triage !== 'black'){
+    saveLocalEvent({
+      type:'INCOMPLETE_FIELD_CAPTURED',
+      detail:`רשומה נשמרה עם מידע חסר: ${missingFields.join(', ')}`,
+      warn:true,
+      payload_json:{missing_fields:missingFields}
+    });
+  }
   const txHistoryEntry = intStr ? [{time:t, text:intStr, medic:deviceId}] : [];
   const queuedEvents=(state.localEvents||[]).map(e=>({
     type:e.type,
@@ -2048,7 +2094,7 @@ function savePatient(){
   patients.push({
     id:newId, triage:state.triage, accessibility:state.accessibility,
     location:locStr, locDetail:'',
-    injury:state.injury, injuryZones:[...state.injuryZones], patientStatus:state.patientStatus,
+    injury:effectiveInjury, injuryZones:[...state.injuryZones], patientStatus:effectiveStatus,
     needsFullAssessment:state.needsFullAssessment,
     time:t, vitals:{...flowVitals},
     vitalsCapture,
@@ -2059,7 +2105,7 @@ function savePatient(){
     medic:deviceId,
     events:[
       {type:'CREATED',time:t,detail:'פצוע נפתח'},
-      {type:'TRIAGE_SET',time:t,detail:TRIAGE_LABELS[state.triage]},
+      {type:'TRIAGE_SET',time:t,detail:TRIAGE_LABELS[state.triage]||'מיון לא תועד'},
       ...queuedEvents,
       {type:'VITALS_UPDATED',time:t,detail:`דופק ${flowVitals.pulse} / נשימות ${flowVitals.rr} / SpO₂ ${flowVitals.spo2||'לא נמדד'} / AVPU: ${flowVitals.avpu||'—'} — ${vitalsCaptureLabel('flow')} — מכשיר: ${deviceId}`},
       ...(intStr?[{type:'INTERVENTION_LOGGED',time:t,detail:`${intStr} — מכשיר: ${deviceId}`}]:[]),
@@ -2392,7 +2438,10 @@ function toggleQuickTQ(btn, applied) {
   document.getElementById('quick-tq-no-btn').classList.remove('selected');
   btn.classList.add('selected');
   document.getElementById('quick-tq-panel').style.display = applied ? 'block' : 'none';
-  if (applied && !quickTqData.time) setQuickTQTimeNow();
+  if (applied) {
+    projectPatientStatus('stabilizing','TOURNIQUET_APPLIED',{source:'quick_patient_flow'});
+    if (!quickTqData.time) setQuickTQTimeNow();
+  }
   document.getElementById('btn-step3').disabled = false;
 }
 
@@ -2439,11 +2488,18 @@ function checkStep7() {
 
 function saveLocalEvent(event){
   if(!state.localEvents) state.localEvents=[];
-  state.localEvents.push({
+  const entry={
     local_event_id:`local-${Date.now()}-${uid()}`,
     local_timestamp:new Date().toISOString(),
     ...event
-  });
+  };
+  state.localEvents.push(entry);
+  try{
+    const key='c5_local_sqlite_outbox';
+    const outbox=JSON.parse(localStorage.getItem(key)||'[]');
+    outbox.push(entry);
+    localStorage.setItem(key, JSON.stringify(outbox.slice(-500)));
+  }catch(e){}
 }
 
 // ── Skip to summary for black triage ─────────────────────
@@ -2456,6 +2512,7 @@ function skipToSummaryBlack() {
     saveLocalEvent({
       type:'PATIENT_TRIAGED_EXPECTANT',
       detail:'מיון שחור — יציאה מהירה',
+      warn:false,
       payload_json:{
         current_triage:'black',
         current_status:'deceased',

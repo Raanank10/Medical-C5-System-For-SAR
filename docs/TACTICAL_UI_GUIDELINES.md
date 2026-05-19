@@ -7,9 +7,11 @@ These guidelines capture the design intent for C5 Sentinel-SAR as a development 
 - Use high contrast for every operationally important state.
 - Keep touch targets large enough for stress, movement, rain, dust, and gloves.
 - Prefer steppers, toggles, and large tap choices over free typing.
+- Keep critical controls at least 56px by 56px.
 - Show the current clinical clock when time changes the risk.
 - Never communicate triage by color alone; pair color with text.
 - Treat stale data, missing data, and pending triage as first-class states.
+- Do not block forward movement for optional or incomplete fields; save the record and surface missing data as a background alert.
 
 ## New Patient Flow
 
@@ -27,6 +29,15 @@ Required early capture:
 - initial triage
 
 The flow should feel like tactical documentation, not a form. Each screen should answer one operational question.
+
+Lifecycle status must be projected from events, not manually selected by the medic:
+
+- quick patient created: `identified`
+- tourniquet, medication, or airway action: `stabilizing`
+- vitals recorded after immediate care: `observing`
+- extraction movement: `extricating`
+- MIST handover / evacuation asset scan: `evacuating`
+- black triage fast exit: `deceased`
 
 ## Vitals Entry
 

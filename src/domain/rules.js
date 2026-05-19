@@ -12,11 +12,19 @@
   const TOURNIQUET_WARN_MS = 40 * 60 * 1000;
   const TOURNIQUET_CRITICAL_MS = 60 * 60 * 1000;
   const AVPU_RANK = { A: 0, V: 1, P: 2, U: 3 };
+  const VITALS_CLOSED_STATUSES = new Set([
+    "closed",
+    "deceased",
+    "evacuated",
+    "evacuating",
+    "handed_over",
+    "self_evacuated",
+  ]);
 
   function needsVitals(patient) {
     if (!patient) return false;
     if (patient.accessibility === "none") return false;
-    if (patient.patientStatus === "evacuated") return false;
+    if (VITALS_CLOSED_STATUSES.has(patient.patientStatus)) return false;
     if (patient.triage === "black") return false;
     return true;
   }
