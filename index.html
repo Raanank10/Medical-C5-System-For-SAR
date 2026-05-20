@@ -367,6 +367,28 @@ input[type=range]{width:100%;accent-color:var(--orange);}
 .cmd-logistics span{border:1px solid var(--border);border-radius:999px;padding:3px 7px;background:rgba(255,255,255,.02);}
 .cmd-logistics .low{border-color:var(--orange);color:var(--orange);}
 .cmd-logistics .empty{border-color:var(--red);color:var(--red);}
+.role-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:10px 16px 0;}
+.role-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:11px 12px;min-height:92px;}
+.role-card.command{border-color:rgba(67,97,238,.55);background:rgba(67,97,238,.08);}
+.role-code{font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:900;letter-spacing:.6px;}
+.role-title{font-size:14px;font-weight:900;margin-top:4px;}
+.role-desc{font-size:11px;color:var(--muted);line-height:1.45;margin-top:4px;}
+.auth-table-wrap{margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:auto;max-height:48vh;}
+.auth-table{width:100%;border-collapse:collapse;min-width:720px;font-size:12px;}
+.auth-table th,.auth-table td{border-bottom:1px solid var(--border);padding:9px 8px;text-align:center;white-space:nowrap;}
+.auth-table th:first-child,.auth-table td:first-child{text-align:right;position:sticky;right:0;background:var(--surface);z-index:1;}
+.auth-table th{font-size:10px;color:var(--muted);font-family:var(--mono);letter-spacing:.6px;text-transform:uppercase;background:var(--surface2);}
+.auth-yes{color:var(--green);font-weight:900;}
+.auth-no{color:var(--muted);}
+.auth-limited{color:var(--yellow);font-weight:900;}
+.watchdog-row.red{border-color:var(--red);background:rgba(230,57,70,.08);}
+.watchdog-row.amber{border-color:var(--orange);background:rgba(255,107,53,.08);}
+.watchdog-row.prompt{border-color:var(--yellow);background:rgba(244,162,97,.08);}
+.watchdog-tag{font-family:var(--mono);font-size:11px;font-weight:900;border:1px solid var(--border);border-radius:999px;padding:4px 8px;}
+.watchdog-tag.red{color:var(--red);border-color:var(--red);}
+.watchdog-tag.amber{color:var(--orange);border-color:var(--orange);}
+.watchdog-tag.prompt{color:var(--yellow);border-color:var(--yellow);}
+.watchdog-tag.ok{color:var(--green);border-color:var(--green);}
 .device-panel{padding:8px 16px 0;display:grid;gap:7px;}
 .device-row{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 11px;display:flex;justify-content:space-between;gap:10px;align-items:center;}
 .device-row.offline{border-color:var(--red);background:rgba(230,57,70,.08);}
@@ -439,6 +461,10 @@ textarea{resize:vertical;min-height:70px;}
       <button class="demo-card" onclick="startPcDemo('logistics')">
         <div class="demo-icon">📦</div>
         <div><strong>קצין לוגיסטיקה</strong><span>מלאי ציוד רפואי לפי פלוגה, שריפה ודחיפות אספקה.</span></div>
+      </button>
+      <button class="demo-card" onclick="startPcDemo('roles')">
+        <div class="demo-icon">🛡</div>
+        <div><strong>תפקידים והרשאות</strong><span>Medic, PC, Log-O, CC וחמ״ל מול פעולות מותרות.</span></div>
       </button>
       <button class="demo-card" onclick="startPcDemo('aar')">
         <div class="demo-icon">📋</div>
@@ -1180,12 +1206,16 @@ textarea{resize:vertical;min-height:70px;}
   <div id="cmd-panel-heatmap" class="cmd-panel-body collapsed"><div id="cmd-heatmap" class="cmd-status-matrix"></div></div>
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('devices')"><span>מכשירים / Sync</span><span class="cmd-panel-sub" id="cmd-panel-devices-meta">COLLAPSED</span></button>
   <div id="cmd-panel-devices" class="cmd-panel-body collapsed"><div id="cmd-device-panel" class="device-panel"></div></div>
+  <button class="cmd-panel-toggle" onclick="toggleCmdPanel('watchdogs')"><span>Watchdog Stack</span><span class="cmd-panel-sub" id="cmd-panel-watchdogs-meta">COLLAPSED</span></button>
+  <div id="cmd-panel-watchdogs" class="cmd-panel-body collapsed"><div id="cmd-watchdogs" class="cmd-status-matrix"></div></div>
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('duplicates')"><span>חשד לכפילויות</span><span class="cmd-panel-sub" id="cmd-panel-duplicates-meta">COLLAPSED</span></button>
   <div id="cmd-panel-duplicates" class="cmd-panel-body collapsed"><div id="cmd-duplicates" class="cmd-status-matrix"></div></div>
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('alerts')"><span>התראות</span><span class="cmd-panel-sub" id="cmd-panel-alerts-meta">OPEN</span></button>
   <div id="cmd-panel-alerts" class="cmd-panel-body"><div id="cmd-alerts" style="padding:6px 16px 0"></div></div>
   <div class="demo-actions">
     <button class="demo-mini-btn" onclick="goTo('aar')">פתח AAR</button>
+    <button class="demo-mini-btn" onclick="goTo('roles')">תפקידים והרשאות</button>
+    <button class="demo-mini-btn" onclick="goTo('logistics')">Log-O</button>
     <button class="demo-mini-btn" onclick="exportExperimentLog()">ייצוא ניסוי</button>
     <button class="demo-mini-btn" onclick="setDemoSyncMode()">החלף Sync</button>
   </div>
@@ -1227,6 +1257,36 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div id="logistics-summary" class="cmd-priority-grid"></div>
   <div id="logistics-companies" class="cmd-status-matrix" style="padding-bottom:90px"></div>
+</div>
+
+<!-- ══════════════════════ ROLES / AUTHORIZATION ══ -->
+<div id="screen-roles" class="screen">
+  <div class="header">
+    <div class="header-left">
+      <div class="header-subtitle">AUTH // OPERATING ROLES</div>
+      <div class="header-title">תפקידים והרשאות</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="header-time" id="role-clock">--:--</div>
+      <button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goTo('dashboard')">✕</button>
+    </div>
+  </div>
+  <div class="demo-strip">
+    <div>
+      <div class="demo-strip-title">Local draft incident rule</div>
+      <div class="demo-strip-sub">חובש רשאי לפתוח טיוטת אירוע רק כשאין אירוע רשמי. PC / CC / חמ״ל מאשרים טיוטה באירוע audit בלתי מחיק.</div>
+    </div>
+    <div class="sync-pill" id="sync-pill-roles">AUTH</div>
+  </div>
+  <div id="role-cards" class="role-grid"></div>
+  <div class="section-label">Authorization Matrix</div>
+  <div id="auth-matrix" class="auth-table-wrap"></div>
+  <div class="demo-actions">
+    <button class="demo-mini-btn" onclick="goTo('commander')">חזרה לחפ״ק</button>
+    <button class="demo-mini-btn" onclick="goTo('logistics')">Log-O</button>
+    <button class="demo-mini-btn" onclick="goTo('aar')">AAR</button>
+  </div>
+  <div style="height:70px"></div>
 </div>
 
 <!-- ══════════════════════ AAR ══ -->
@@ -1547,6 +1607,32 @@ const INT_LABELS = {bandage:'חבישה', tourniquet:'חסם עורקים', iv:'
 const MEDICATION_LABELS = {morphine:'Morphine', atq:'Actiq/Fentanyl'};
 const MEDICATION_ROUTES = {morphine:'IV', atq:'PO/BUCCAL'};
 const LIMB_LABELS = {yl:'יד שמאל', yr:'יד ימין', rl:'רגל שמאל', rr:'רגל ימין'};
+const ROLE_DEFS = [
+  {key:'medic', label:'Medic', he:'חובש', desc:'פותח פצועים, מדדים, התערבויות, MIST וטיוטת אירוע מקומית כשאין אירוע רשמי.'},
+  {key:'pc', label:'PC', he:'מפקד מחלקה / Supervisor', desc:'פותח ומאשר אירוע רשמי, מנהל תמונת מצב, התראות, אספקה ו-AAR.'},
+  {key:'log_o', label:'Log-O', he:'קצין לוגיסטיקה', desc:'מנהל ערכות ורצי אספקה, רואה מלאי לפי פלוגה, לא מבצע רישום קליני.'},
+  {key:'cc', label:'CC', he:'מפקד פלוגה', desc:'סמכות פיקודית לפתיחת/אישור אירוע, סגירה, אתר נקי, דשבורד וייצוא.'},
+  {key:'chamal', label:'Chamal', he:'חמ״ל', desc:'תמונת מצב מלאה, אישור טיוטות, ניהול אירוע ברמת חטיבה/AAR, ללא רישום פצועים.'}
+];
+const AUTH_MATRIX = [
+  {action:'Create local draft incident', medic:'yes', pc:'yes', log_o:'no', cc:'yes', chamal:'yes'},
+  {action:'Open official incident and set T0', medic:'no', pc:'yes', log_o:'no', cc:'yes', chamal:'yes'},
+  {action:'Confirm draft incident', medic:'no', pc:'yes', log_o:'no', cc:'yes', chamal:'yes'},
+  {action:'Close / reopen official incident', medic:'limited', pc:'yes', log_o:'no', cc:'yes', chamal:'yes'},
+  {action:'Register new patient', medic:'yes', pc:'yes', log_o:'no', cc:'no', chamal:'no'},
+  {action:'Record vitals and interventions', medic:'yes', pc:'yes', log_o:'no', cc:'no', chamal:'no'},
+  {action:'Override MSTART / JumpSTART triage', medic:'yes', pc:'yes', log_o:'no', cc:'no', chamal:'no'},
+  {action:'Mark patient handed over', medic:'yes', pc:'yes', log_o:'no', cc:'no', chamal:'no'},
+  {action:'Request resupply', medic:'yes', pc:'no', log_o:'no', cc:'no', chamal:'no'},
+  {action:'Dispatch supply to Log-O', medic:'no', pc:'yes', log_o:'no', cc:'no', chamal:'no'},
+  {action:'Manage kit templates', medic:'no', pc:'yes', log_o:'yes', cc:'yes', chamal:'no'},
+  {action:'Dispatch resupply runner', medic:'no', pc:'no', log_o:'yes', cc:'no', chamal:'no'},
+  {action:'Update building status', medic:'yes', pc:'yes', log_o:'no', cc:'yes', chamal:'yes'},
+  {action:'Confirm Site Clear', medic:'no', pc:'yes', log_o:'no', cc:'yes', chamal:'yes'},
+  {action:'View full command dashboard', medic:'no', pc:'yes', log_o:'yes', cc:'yes', chamal:'yes'},
+  {action:'View conflict log', medic:'no', pc:'yes', log_o:'no', cc:'yes', chamal:'yes'},
+  {action:'Unlock and export AAR', medic:'no', pc:'yes', log_o:'no', cc:'yes', chamal:'yes'}
+];
 const BODY_ZONE_LABELS = {
   head:'ראש',
   chest:'חזה',
@@ -1832,7 +1918,7 @@ function setDemoSyncMode(){
 }
 function updateDemoStatus(){
   const label = demoSyncMode==='fresh' ? `Fresh · ${timeAgoLabel(lastSyncAt)}` : demoSyncMode==='stale' ? `Stale · ${timeAgoLabel(lastSyncAt)}` : `Offline · ${timeAgoLabel(lastSyncAt)}`;
-  ['sync-pill-dashboard','sync-pill-command','sync-pill-aar','sync-pill-logistics'].forEach(id=>{
+  ['sync-pill-dashboard','sync-pill-command','sync-pill-aar','sync-pill-logistics','sync-pill-roles'].forEach(id=>{
     const el=document.getElementById(id); if(!el) return;
     el.textContent=label;
     el.className='sync-pill '+(demoSyncMode==='fresh'?'':demoSyncMode);
@@ -1858,7 +1944,7 @@ function updateExperimentLine(){
   const mins=Math.max(0, Math.round((Date.now()-started.getTime())/60000));
   const notes=observerNotes().length;
   const conflicts=conflictLog().length;
-  const line=`תרחיש: ${siteData.name||'ללא מוקד'} · תפקיד: חובש/PC · מכשיר: ${getDeviceId()} · התחלה: ${started.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})} · שלב: ${experimentPhase} · ${notes} הערות · ${conflicts} התנגשויות · ${mins} דק׳`;
+  const line=`תרחיש: ${siteData.name||'ללא מוקד'} · תפקידים: Medic/PC/Log-O/CC/Chamal · מכשיר: ${getDeviceId()} · התחלה: ${started.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})} · שלב: ${experimentPhase} · ${notes} הערות · ${conflicts} התנגשויות · ${mins} דק׳`;
   ['experiment-line-dashboard','experiment-line-command'].forEach(id=>{const el=document.getElementById(id); if(el) el.textContent=line;});
 }
 function addObserverNote(){
@@ -1953,7 +2039,7 @@ function exportExperimentLog(){
 // ═══════════════════════════════════════════════
 function updateClock(){
   const t=nowT();
-  ['clock','cmd-clock','log-clock'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=t;});
+  ['clock','cmd-clock','log-clock','role-clock'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=t;});
   updateDemoStatus();
 }
 setInterval(updateClock,1000); updateClock();
@@ -2013,6 +2099,7 @@ function goTo(screen){
   if(screen==='step8')     renderSummary();
   if(screen==='commander') renderCommander();
   if(screen==='logistics') renderLogisticsOfficer();
+  if(screen==='roles')     renderRolesAuthorization();
   if(screen==='aar')       renderAar();
   updateDemoStatus();
 }
@@ -3341,7 +3428,7 @@ function getSitePatients(siteId){
   return [];
 }
 let cmdActiveSite='ALL', cmdFilter='all', alertFilter='critical', cmdAlertFilter='critical';
-let cmdPanelOpen={priority:true,heatmap:false,devices:false,duplicates:false,alerts:true};
+let cmdPanelOpen={priority:true,heatmap:false,devices:false,watchdogs:false,duplicates:false,alerts:true};
 function isCriticalAlert(p){ return !p?.alertAcknowledgedAt && C5Rules.isCriticalAlert(p); }
 function hasRoutineAlert(p){ return !p?.alertAcknowledgedAt && C5Rules.isRoutineAlert(p); }
 function openPatientFromAlert(id){
@@ -3486,6 +3573,33 @@ function renderLogisticsOfficer(){
   }).join('');
   updateDemoStatus();
 }
+function authCell(value){
+  if(value==='yes') return '<span class="auth-yes">✓</span>';
+  if(value==='limited') return '<span class="auth-limited">Limited</span>';
+  return '<span class="auth-no">✕</span>';
+}
+function renderRolesAuthorization(){
+  updateClock();
+  const cards=document.getElementById('role-cards');
+  if(cards) cards.innerHTML=ROLE_DEFS.map(r=>`<div class="role-card ${['pc','cc','chamal'].includes(r.key)?'command':''}">
+    <div class="role-code">${r.label}</div>
+    <div class="role-title">${r.he}</div>
+    <div class="role-desc">${r.desc}</div>
+  </div>`).join('');
+  const table=document.getElementById('auth-matrix');
+  if(table) table.innerHTML=`<table class="auth-table">
+    <thead><tr><th>Action</th>${ROLE_DEFS.map(r=>`<th>${r.label}</th>`).join('')}</tr></thead>
+    <tbody>${AUTH_MATRIX.map(row=>`<tr>
+      <td>${row.action}</td>
+      <td>${authCell(row.medic)}</td>
+      <td>${authCell(row.pc)}</td>
+      <td>${authCell(row.log_o)}</td>
+      <td>${authCell(row.cc)}</td>
+      <td>${authCell(row.chamal)}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+  updateDemoStatus();
+}
 function buildIncidentCommandStateSnapshot(pts, site){
   const inventory=inventoryReadModel(pts);
   const sectors=new Map();
@@ -3499,9 +3613,70 @@ function buildIncidentCommandStateSnapshot(pts, site){
   });
   return {incident_id:site?.id||cmdActiveSite, sectors:[...sectors.values()], inventory};
 }
+function patientClockStart(p){
+  return Date.parse(p.createdAt||p.lastModifiedAt||'') || p.lastVitalsAt || Date.now();
+}
+function watchdogState(minutes, amberAt, redAt){
+  if(minutes>=redAt) return 'red';
+  if(minutes>=amberAt) return 'amber';
+  return 'ok';
+}
+function computeWatchdogRows(pts){
+  const now=Date.now();
+  const rows=[];
+  pts.forEach(p=>{
+    const ageMin=Math.floor((now-patientClockStart(p))/60000);
+    const golden=watchdogState(ageMin,45,60);
+    rows.push({patient:p.id, name:'Golden Hour', trigger:'Any registered patient', threshold:'T_injury +45m / +60m', state:golden, detail:`${ageMin} דק׳ מאז פתיחה מקומית`});
+    if(normalizeTrapStatus(p)==='trapped'){
+      const crush=watchdogState(ageMin,45,60);
+      rows.push({patient:p.id, name:'Crush Syndrome', trigger:'Access = Trapped', threshold:'T_injury +45m', state:crush, detail:`לכוד · ${ageMin} דק׳`});
+    }
+    if(p.tourniquet?.appliedAt){
+      const tqMin=Math.floor((now-p.tourniquet.appliedAt)/60000);
+      rows.push({patient:p.id, name:'Tourniquet Warning', trigger:'Tourniquet per limb', threshold:'+60m', state:tqMin>=60?'amber':'ok', detail:`${p.tourniquet.limb||'גפה לא צוינה'} · ${tqMin} דק׳`});
+      rows.push({patient:p.id, name:'Tourniquet Critical', trigger:'Tourniquet per limb', threshold:'+120m', state:tqMin>=120?'red':'ok', detail:`${p.tourniquet.limb||'גפה לא צוינה'} · ${tqMin} דק׳`});
+    }
+    const vitalsMin=Math.floor((now-(p.lastVitalsAt||patientClockStart(p)))/60000);
+    if(p.triage==='red') rows.push({patient:p.id, name:'Reassessment RED', trigger:'Triage = RED', threshold:'Every 10m', state:vitalsMin>=10?'prompt':'ok', detail:`מדדים אחרונים ${vitalsMin} דק׳`});
+    if(p.triage==='yellow') rows.push({patient:p.id, name:'Reassessment YELLOW', trigger:'Triage = YELLOW', threshold:'Every 30m', state:vitalsMin>=30?'prompt':'ok', detail:`מדדים אחרונים ${vitalsMin} דק׳`});
+  });
+  const devices=new Map();
+  pts.forEach(p=>{
+    const id=p.lastTouchedBy||p.medic||'UNKNOWN';
+    const last=Math.max(p.lastVitalsAt||0, Date.parse(p.lastModifiedAt||'')||0);
+    devices.set(id, Math.max(devices.get(id)||0, last));
+  });
+  devices.forEach((last,id)=>{
+    const silentMin=Math.floor((now-last)/60000);
+    rows.push({patient:id, name:"Dead Man's Switch", trigger:'Medic inactivity', threshold:'>5m no heartbeat', state:silentMin>5?'red':'ok', detail:`פעילות אחרונה ${silentMin} דק׳`});
+  });
+  return rows;
+}
+function renderWatchdogPanel(pts){
+  const rows=computeWatchdogRows(pts);
+  const active=rows.filter(r=>r.state!=='ok');
+  const red=active.filter(r=>r.state==='red').length;
+  const amber=active.filter(r=>r.state==='amber').length;
+  const prompt=active.filter(r=>r.state==='prompt').length;
+  setCmdPanelMeta('watchdogs', `${red} RED · ${amber} AMBER · ${prompt} PROMPT`);
+  const body=document.getElementById('cmd-watchdogs');
+  if(!body) return;
+  const visible=(active.length?active:rows.slice(0,6)).slice(0,12);
+  body.innerHTML=visible.map(r=>{
+    const tag=r.state==='ok'?'ok':r.state;
+    return `<div class="cmd-matrix-row watchdog-row ${tag}">
+      <div>
+        <div class="cmd-matrix-title">${r.name} · ${r.patient}</div>
+        <div class="cmd-matrix-sub">${r.trigger} · ${r.threshold} · ${r.detail}</div>
+      </div>
+      <div class="watchdog-tag ${tag}">${r.state.toUpperCase()}</div>
+    </div>`;
+  }).join('') || '<div class="cmd-matrix-row"><div class="cmd-matrix-sub">אין Watchdogs פעילים.</div></div>';
+}
 function renderCommandOperationalPanels(pts, site){
   const stale=pts.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS);
-  const tqOverdue=pts.filter(p=>p.tourniquet && Date.now()-p.tourniquet.appliedAt>=40*60*1000);
+  const tqOverdue=pts.filter(p=>p.tourniquet && Date.now()-p.tourniquet.appliedAt>=60*60*1000);
   const trappedSilent=pts.filter(p=>normalizeTrapStatus(p)==='trapped' && vitalsAgeMs(p)>=10*60*1000);
   const evacBlocked=pts.filter(p=>p.triage==='red' && !['evacuating','evacuated','handed_over'].includes(p.patientStatus));
   const unsynced=pts.reduce((sum,p)=>sum+(p.unsyncedEvents||0),0)+localOutboxCount();
@@ -3542,10 +3717,11 @@ function renderCommandOperationalPanels(pts, site){
   });
   if(!deviceMap.has(getDeviceId())) deviceMap.set(getDeviceId(),{id:getDeviceId(),last:Date.now(),patients:0,unsynced:localOutboxCount()});
   document.getElementById('cmd-device-panel').innerHTML=[...deviceMap.values()].map(d=>{
-    const silent=Date.now()-d.last>10*60*1000;
+    const silent=Date.now()-d.last>5*60*1000;
     return `<div class="device-row ${silent?'offline':''}"><div><div class="device-name">${d.id}</div><div class="device-meta">${d.patients} פצועים · ${d.unsynced} unsynced</div></div><div class="sync-pill ${silent?'offline':''}">${silent?'SILENT':timeAgoLabel(d.last)}</div></div>`;
   }).join('');
-  setCmdPanelMeta('devices', `${[...deviceMap.values()].filter(d=>Date.now()-d.last>10*60*1000).length} SILENT · ${deviceMap.size} DEVICES`);
+  setCmdPanelMeta('devices', `${[...deviceMap.values()].filter(d=>Date.now()-d.last>5*60*1000).length} SILENT · ${deviceMap.size} DEVICES`);
+  renderWatchdogPanel(pts);
 
   const dupes=duplicateCandidates(pts);
   document.getElementById('cmd-duplicates').innerHTML=dupes.length?dupes.map(([a,b])=>`<div class="cmd-matrix-row critical">

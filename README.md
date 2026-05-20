@@ -82,6 +82,7 @@ python -c "from db import DB; from kpis import KPIEngine; from report import Rep
 |   |-- TACTICAL_UI_GUIDELINES.md      # field UI principles and New Patient guardrails
 |   |-- PRODUCTION_READINESS.md        # path from prototype to pilot/production readiness
 |   |-- OPERATIONS_SAFETY.md           # safety/privacy boundaries
+|   |-- ROLE_AUTHORIZATION_AND_WATCHDOGS_v1.2.md
 |   |-- C5_SENTINEL_SAR_MVP_SPEC_v1.2.md
 |   |-- API_SURFACE_v1.2.md
 |   |-- METRICS_DICTIONARY.md
@@ -136,6 +137,7 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the active build plan.
 - [Production readiness path](docs/PRODUCTION_READINESS.md)
 - [Field experiment gap register](docs/FIELD_EXPERIMENT_GAPS.md)
 - [Operations and safety notes](docs/OPERATIONS_SAFETY.md)
+- [Role authorization and watchdog stack](docs/ROLE_AUTHORIZATION_AND_WATCHDOGS_v1.2.md)
 - [Metrics dictionary](docs/METRICS_DICTIONARY.md)
 - [Demo script](docs/PC_DEMO_SCRIPT.md)
 - [v1.2 changelog](docs/CHANGELOG_v1.2.md)
