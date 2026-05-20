@@ -306,6 +306,18 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .risk-panel{background:rgba(255,107,53,.09);border:1px solid rgba(255,107,53,.58);border-radius:12px;padding:12px 13px;margin:12px 0;color:var(--orange);}
 .risk-panel-title{font-weight:800;font-size:13px;margin-bottom:4px;}
 .risk-panel-body{font-size:12px;color:var(--muted);line-height:1.55;}
+.stock-panel{background:rgba(67,97,238,.08);border:1px solid rgba(67,97,238,.4);border-radius:12px;padding:11px 12px;margin:0 0 14px;}
+.stock-panel-title{font-size:12px;font-weight:900;color:var(--accent);margin-bottom:8px;}
+.stock-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;}
+.stock-chip{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 9px;display:flex;justify-content:space-between;gap:6px;font-size:11px;color:var(--muted);}
+.stock-chip strong{font-family:var(--mono);font-size:13px;color:var(--text);}
+.stock-chip.low{border-color:var(--orange);background:rgba(255,107,53,.08);}
+.stock-chip.empty{border-color:var(--red);background:rgba(230,57,70,.1);}
+.peds-estimate{display:none;background:rgba(255,107,53,.08);border:1px solid rgba(255,107,53,.48);border-radius:12px;padding:12px;margin-top:12px;}
+.peds-estimate.active{display:block;}
+.peds-estimate-grid{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;}
+.peds-estimate-value{font-family:var(--mono);font-size:13px;color:var(--orange);font-weight:900;white-space:nowrap;}
+input[type=range]{width:100%;accent-color:var(--orange);}
 
 /* ── COMMANDER ── */
 .cmd-site-tab{flex-shrink:0;padding:10px 16px;font-size:13px;font-weight:600;color:var(--muted);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;}
@@ -351,6 +363,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .cmd-matrix-title{font-size:13px;font-weight:800;}
 .cmd-matrix-sub{font-size:11px;color:var(--muted);margin-top:2px;}
 .cmd-matrix-counts{font-family:var(--mono);font-size:12px;display:flex;gap:8px;white-space:nowrap;}
+.cmd-logistics{font-size:11px;color:var(--muted);line-height:1.45;margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;}
+.cmd-logistics span{border:1px solid var(--border);border-radius:999px;padding:3px 7px;background:rgba(255,255,255,.02);}
+.cmd-logistics .low{border-color:var(--orange);color:var(--orange);}
+.cmd-logistics .empty{border-color:var(--red);color:var(--red);}
 .device-panel{padding:8px 16px 0;display:grid;gap:7px;}
 .device-row{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 11px;display:flex;justify-content:space-between;gap:10px;align-items:center;}
 .device-row.offline{border-color:var(--red);background:rgba(230,57,70,.08);}
@@ -615,6 +631,14 @@ textarea{resize:vertical;min-height:70px;}
         <div style="font-weight:700">ילד מתחת 8</div>
         <div style="font-size:11px;color:var(--muted)">מפעיל הגנות מינון ילדים</div>
       </button>
+    </div>
+    <div class="peds-estimate" id="peds-estimate-panel">
+      <div class="risk-panel-title">אומדן פדיאטרי מקומי</div>
+      <div class="peds-estimate-grid">
+        <input type="range" id="peds-age-slider" min="0" max="7" step="1" value="7" oninput="setPediatricAge(Number(this.value))">
+        <div class="peds-estimate-value" id="peds-estimate-value">גיל 7 · 22kg</div>
+      </div>
+      <div class="risk-panel-body" id="peds-dose-guidance">מורפיום מוצע: 2.2mg · פנטניל מוצע: 22mcg. מינון מבוגר יחייב אישור כפול.</div>
     </div>
   </div>
   <div class="bottom-bar"><button class="btn-primary" id="btn-step1" onclick="continueAfterIntake()">המשך</button></div>
@@ -974,6 +998,10 @@ textarea{resize:vertical;min-height:70px;}
       <div class="tq-reminder-title">תזכורת: חסם עורקים כבר הונח</div>
       <div class="tq-reminder-body" id="quick-tq-reminder-body"></div>
     </div>
+    <div class="stock-panel">
+      <div class="stock-panel-title">מלאי מקומי נגזר מאירועי ledger</div>
+      <div class="stock-grid" id="tx-stock-grid"></div>
+    </div>
     <div class="field-label">טיפולים שניתנו עכשיו (ניתן לבחור מספר)</div>
     <div class="chip-grid" style="margin-bottom:16px">
       <button class="chip" onclick="toggleChip(this,'bandage')"><span class="chip-icon">🩹</span>חבישה</button>
@@ -1317,7 +1345,17 @@ const APP_VERSION = '1.2.0';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
 const CONFLICT_LOG_KEY = 'c5-sentinel-sar-conflict-log-v1';
+const ACTIVE_RECOVERY_KEY = 'c5_active_recovery_state';
 const DEVICE_ID_KEY = 'c5-sentinel-sar-device-id';
+const SUPPLY_BASELINE = Object.freeze({CAT_TOURNIQUET:2,MORPHINE_10MG:4,FENTANYL_ACTIQ:2,IV_FLUID_500ML:3,BANDAGE_6INCH:8});
+const SUPPLY_LABELS = {CAT_TOURNIQUET:'CAT חסם',MORPHINE_10MG:'Morphine',FENTANYL_ACTIQ:'Actiq/Fentanyl',IV_FLUID_500ML:'נוזלים 500',BANDAGE_6INCH:'חבישה'};
+const INTERVENTION_SUPPLY = {
+  tourniquet:{item:'CAT_TOURNIQUET', qty:1},
+  bandage:{item:'BANDAGE_6INCH', qty:1},
+  morphine:{item:'MORPHINE_10MG', qty:1},
+  atq:{item:'FENTANYL_ACTIQ', qty:1},
+  fluids:{item:'IV_FLUID_500ML', qty:()=>Math.max(1, Math.ceil((doses.fluids||500)/500))}
+};
 const AVPU_RANK = C5Rules.AVPU_RANK;
 const COUNT_LIMITS = {
   pulse15:{min:5,max:55}, rr30:{min:2,max:30},
@@ -1392,13 +1430,14 @@ const COUNT_BASELINE = {pulse15:20, rr30:8, mpulse15:20, mrr30:8};
 
 function freshState(){
   return {
+    patientDraftId:`draft-${Date.now()}-${uid()}`,
     buildingType:null, locFloor:'', locApt:'', locRoom:'', locFree:'',
     accessibility:null, trapStatus:null, sabcde:{},
     flowMode:'extended', patientAgeGroup:'adult', patientAge:null,
     injury:null, injuryZones:new Set(), patientStatus:'identified',
     rapidWalking:null, rapidMajorBleeding:null,
     interventions:new Set(), triage:null,
-    needsFullAssessment:true, localEvents:[], localStockCache:{CAT_TOURNIQUET:2,MORPHINE_10MG:4,FENTANYL_ACTIQ:2,IV_FLUID_500ML:3,BANDAGE_6INCH:8}, pediatricOverrides:{}, pendingMedicationOverride:null,
+    needsFullAssessment:true, localEvents:[], localStockCache:{...SUPPLY_BASELINE}, supplyMovements:{}, pediatricOverrides:{}, pendingMedicationOverride:null,
     vitalsMedicName:'', txMedicName:''
   };
 }
@@ -1433,6 +1472,57 @@ let experimentPhase = 'intake-drill';
 let demoRevision = 0;
 let modalOpenedLastModified = null;
 let vitalCountdowns = {};
+
+function serializeActiveDraft(screen=null){
+  return {
+    savedAt:new Date().toISOString(),
+    screen,
+    state:{
+      ...state,
+      interventions:[...(state.interventions||[])],
+      injuryZones:[...(state.injuryZones||[])],
+      pendingMedicationOverride:null
+    },
+    flowVitals:{...flowVitals},
+    counts:{...counts},
+    spo2Active,
+    doses:{...doses},
+    tqData:{...tqData, limbs:[...(tqData.limbs||[])]},
+    quickTqData:{...quickTqData, limbs:[...(quickTqData.limbs||[])]}
+  };
+}
+function saveActiveRecoveryState(screen=null){
+  try{ localStorage.setItem(ACTIVE_RECOVERY_KEY, JSON.stringify(serializeActiveDraft(screen))); }catch(e){}
+}
+function clearActiveRecoveryState(){
+  try{ localStorage.removeItem(ACTIVE_RECOVERY_KEY); }catch(e){}
+}
+function hydrateActiveDraft(snapshot){
+  if(!snapshot?.state) return false;
+  state={...freshState(), ...snapshot.state};
+  state.interventions=new Set(snapshot.state.interventions||[]);
+  state.injuryZones=new Set(snapshot.state.injuryZones||[]);
+  state.localStockCache={...SUPPLY_BASELINE, ...(snapshot.state.localStockCache||{})};
+  state.supplyMovements=snapshot.state.supplyMovements||{};
+  flowVitals={...VITALS_BASELINE, ...(snapshot.flowVitals||{})};
+  counts={...COUNT_BASELINE, ...(snapshot.counts||{})};
+  spo2Active=!!snapshot.spo2Active;
+  doses={morphine:5, fluids:500, ...(snapshot.doses||{})};
+  tqData={time:snapshot.tqData?.time||null, limbs:new Set(snapshot.tqData?.limbs||[])};
+  quickTqData={applied:!!snapshot.quickTqData?.applied, time:snapshot.quickTqData?.time||null, limbs:new Set(snapshot.quickTqData?.limbs||[])};
+  setTimeout(()=>{ updatePediatricEstimatePanel(); updatePediatricTreatmentUi(); renderLocalStockPanel(); },0);
+  return true;
+}
+function restoreActiveRecoveryState(){
+  try{
+    const snapshot=JSON.parse(localStorage.getItem(ACTIVE_RECOVERY_KEY)||'null');
+    if(!snapshot || Date.now()-Date.parse(snapshot.savedAt||0)>6*60*60*1000) return false;
+    if(!hydrateActiveDraft(snapshot)) return false;
+    toast('טיוטת פצוע פעילה שוחזרה מהמכשיר');
+    if(snapshot.screen && /^step[1-8]$/.test(snapshot.screen)) goTo(snapshot.screen);
+    return true;
+  }catch(e){ return false; }
+}
 
 function minutesAgo(min){ return Date.now() - min * 60 * 1000; }
 function timeAgoLabel(ms){
@@ -1478,6 +1568,7 @@ function demoPatient(id, triage, accessibility, location, injury, patientStatus,
   };
 }
 function loadDemoScenario(persist=false){
+  if(persist) clearActiveRecoveryState();
   siteData={
     name:'מוקד A — הרצל 12',
     address:'הרצל 12, תל אביב',
@@ -1559,7 +1650,7 @@ function loadStoredDemoState(){
     return true;
   }catch(e){ return false; }
 }
-window.addEventListener('beforeunload', saveDemoState);
+window.addEventListener('beforeunload', ()=>{ saveActiveRecoveryState(activeScreenId()); saveDemoState(); });
 function startPcDemo(screen){
   if(!patients.length) loadDemoScenario(true);
   goTo(screen);
@@ -1718,6 +1809,7 @@ function projectPatientStatus(nextStatus, eventType, payload={}){
 function goTo(screen){
   if(screen==='step5') projectPatientStatus('observing','VITALS_RECORDED');
   if(screen==='step6') syncComputedStatusDisplay();
+  if(/^step[1-8]$/.test(screen)) saveActiveRecoveryState(screen);
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+screen).classList.add('active');
   window.scrollTo(0,0);
@@ -1726,7 +1818,7 @@ function goTo(screen){
   if(screen==='step3')     { const b=document.querySelector('#screen-step3 .btn-back'); if(b) b.setAttribute('onclick', "goTo('step2')"); }
   if(screen==='step4')     { setVitalsModeView(); setDeviceLabels(); checkStep4(); }
   if(screen==='step5')     showMstartSuggestion();
-  if(screen==='step7')     { renderTourniquetReminder(); setDeviceLabels(); checkStep7(); }
+  if(screen==='step7')     { renderTourniquetReminder(); renderLocalStockPanel(); updatePediatricTreatmentUi(); setDeviceLabels(); checkStep7(); }
   if(screen==='step8')     renderSummary();
   if(screen==='commander') renderCommander();
   if(screen==='aar')       renderAar();
@@ -2142,6 +2234,8 @@ function startNewPatient(mode='extended'){
   document.getElementById('morphine-wrap').style.display='none';
   const riskNote=document.getElementById('pediatric-risk-note');
   if(riskNote) riskNote.style.display='none';
+  updatePediatricEstimatePanel();
+  renderLocalStockPanel();
   document.getElementById('fluids-wrap').style.display='none';
   document.getElementById('other-tx-wrap').style.display='none';
   document.getElementById('tq-time-display').textContent='';
@@ -2177,6 +2271,11 @@ function selectAgeGroup(btn, val){
   btn.classList.add('selected');
   state.patientAgeGroup = val;
   state.patientAge = val === 'pediatric' ? 7 : null;
+  if(val==='pediatric') applyPediatricSafeDefaults();
+  else { doses.morphine=5; const el=document.getElementById('dose-morphine'); if(el) el.textContent='5'; }
+  updatePediatricEstimatePanel();
+  updatePediatricTreatmentUi();
+  saveActiveRecoveryState('step1');
 }
 
 function selectFlowMode(btn, val){
@@ -2390,6 +2489,55 @@ function checkStep6(){
 function patientSafetyProfile(){
   return {patientAgeGroup:state.patientAgeGroup, patientAge:state.patientAge};
 }
+function estimatedPediatricWeight(){
+  const age=Number.isFinite(Number(state.patientAge)) ? Number(state.patientAge) : 7;
+  return Math.max(4, Math.round(age * 2 + 8));
+}
+function pediatricDoseGuidance(){
+  const kg=estimatedPediatricWeight();
+  return {
+    kg,
+    morphine:Number(Math.min(4, Math.max(0.5, kg * 0.1)).toFixed(1)),
+    fentanyl:Math.min(50, kg)
+  };
+}
+function updatePediatricEstimatePanel(){
+  const panel=document.getElementById('peds-estimate-panel');
+  if(!panel) return;
+  const isPeds=state.patientAgeGroup==='pediatric';
+  panel.classList.toggle('active', isPeds);
+  if(!isPeds) return;
+  const g=pediatricDoseGuidance();
+  const slider=document.getElementById('peds-age-slider');
+  if(slider) slider.value=String(state.patientAge ?? 7);
+  document.getElementById('peds-estimate-value').textContent=`גיל ${state.patientAge ?? 7} · ${g.kg}kg`;
+  document.getElementById('peds-dose-guidance').textContent=`מורפיום מוצע: ${g.morphine}mg · פנטניל מוצע: ${g.fentanyl}mcg. מינון מבוגר יחייב אישור כפול.`;
+}
+function setPediatricAge(age){
+  state.patientAge=Math.max(0,Math.min(7,Number(age)||0));
+  applyPediatricSafeDefaults();
+  updatePediatricEstimatePanel();
+  updatePediatricTreatmentUi();
+  saveActiveRecoveryState('step1');
+}
+function applyPediatricSafeDefaults(){
+  if(state.patientAgeGroup!=='pediatric') return;
+  doses.morphine=pediatricDoseGuidance().morphine;
+  const el=document.getElementById('dose-morphine');
+  if(el) el.textContent=doses.morphine;
+}
+function updatePediatricTreatmentUi(){
+  const note=document.getElementById('pediatric-risk-note');
+  if(!note) return;
+  const isPeds=state.patientAgeGroup==='pediatric';
+  if(isPeds){
+    const g=pediatricDoseGuidance();
+    note.style.display='block';
+    note.querySelector('.risk-panel-body').textContent=`גיל ${state.patientAge ?? 7}, אומדן ${g.kg}kg. מורפיום מוצע ${g.morphine}mg; פנטניל מוצע ${g.fentanyl}mcg. חריגה נשמרת כאישור high-risk.`;
+  } else if(!Object.keys(state.pediatricOverrides||{}).length){
+    note.style.display='none';
+  }
+}
 function medicationDose(key){
   if(key==='morphine') return {medication:'morphine', label:'Morphine', dose:doses.morphine, dosage:`${doses.morphine} mg`, unit:'mg', route:'IV'};
   if(key==='atq') return {medication:'fentanyl', label:'Fentanyl', dose:100, dosage:'100 mcg', unit:'mcg', route:'BUCCAL'};
@@ -2409,8 +2557,14 @@ function maybeWarnHighRiskMedication(key){
 }
 function toggleChip(btn, key){
   btn.classList.toggle('selected');
-  if(state.interventions.has(key)) state.interventions.delete(key);
-  else state.interventions.add(key);
+  const isSelected=btn.classList.contains('selected');
+  if(!isSelected) {
+    state.interventions.delete(key);
+    reconcileSupplyForIntervention(key, 0);
+  } else {
+    state.interventions.add(key);
+    reconcileSupplyForIntervention(key);
+  }
   if(key==='tourniquet' && state.interventions.has(key)) haptic([120,60,120]);
   document.getElementById('tourniquet-wrap').style.display=state.interventions.has('tourniquet')?'block':'none';
   document.getElementById('morphine-wrap').style.display=state.interventions.has('morphine')?'block':'none';
@@ -2421,12 +2575,18 @@ function toggleChip(btn, key){
   }
   if(key==='tourniquet'&&state.interventions.has('tourniquet')&&!tqData.time) setTQTimeNow();
   if(['morphine','atq'].includes(key)) maybeWarnHighRiskMedication(key);
+  updatePediatricTreatmentUi();
+  renderLocalStockPanel();
+  saveActiveRecoveryState('step7');
 }
 function changeDose(key, delta){
   const lim={morphine:{min:1,max:30},fluids:{min:50,max:2000}}[key];
-  doses[key]=Math.min(lim.max,Math.max(lim.min,doses[key]+delta));
+  const adjustedDelta=key==='morphine' && state.patientAgeGroup==='pediatric' && Math.abs(delta)===1 ? delta*0.5 : delta;
+  doses[key]=Number(Math.min(lim.max,Math.max(key==='morphine'&&state.patientAgeGroup==='pediatric'?0.5:lim.min,doses[key]+adjustedDelta)).toFixed(1));
   document.getElementById('dose-'+key).textContent=doses[key];
+  if(key==='fluids' && state.interventions.has('fluids')) reconcileSupplyForIntervention('fluids');
   if(key==='morphine') maybeWarnHighRiskMedication(key);
+  saveActiveRecoveryState('step7');
 }
 function setTQTimeNow(){
   const n=new Date();
@@ -2494,6 +2654,7 @@ function changeCount(key, delta){
   const lim=COUNT_LIMITS[key]; if(!lim) return;
   counts[key]=Math.min(lim.max,Math.max(lim.min,(counts[key]||lim.min)+delta));
   updateCountDisplay(key);
+  saveActiveRecoveryState(activeScreenId());
 }
 function updateCountDisplay(key){
   const isM=key.startsWith('m');
@@ -2521,8 +2682,9 @@ function updateCountDisplay(key){
 }
 function changeVital(key, delta){
   const b=VITALS_BOUNDS[key]; if(!b) return;
-  if(key==='spo2'){ flowVitals.spo2=Math.min(b.max,Math.max(b.min,flowVitals.spo2+delta)); document.getElementById('v-spo2').textContent=flowVitals.spo2; }
+  if(key==='spo2'){ flowVitals.spo2=Math.min(b.max,Math.max(b.min,(flowVitals.spo2??98)+delta)); document.getElementById('v-spo2').textContent=flowVitals.spo2; }
   if(key==='mspo2'){ modalVitals.spo2=Math.min(b.max,Math.max(b.min,(modalVitals.spo2||98)+delta)); document.getElementById('mv-spo2').textContent=modalVitals.spo2; }
+  saveActiveRecoveryState(activeScreenId());
 }
 function startHold(key, delta, isCount=false){
   stopHold();
@@ -2588,6 +2750,7 @@ function queueMedicationEventsBeforeSave(){
         medication:med.label,
         dosage:med.dosage,
         route:med.route,
+        estimated_weight_kg:state.patientAgeGroup==='pediatric'?estimatedPediatricWeight():null,
         is_pediatric_override:!!override,
         ...(override?{high_risk_override:{required:true, confirmed_twice:true, reason:override.reason}}:{})
       }
@@ -2596,12 +2759,8 @@ function queueMedicationEventsBeforeSave(){
 }
 
 function queueInventoryBeforeSave(patientId){
-  if(quickTqData.applied) trackSupplyConsumption('CAT_TOURNIQUET', 1, patientId);
-  if(state.interventions.has('tourniquet')) trackSupplyConsumption('CAT_TOURNIQUET', 1, patientId);
-  if(state.interventions.has('bandage')) trackSupplyConsumption('BANDAGE_6INCH', 1, patientId);
-  if(state.interventions.has('morphine')) trackSupplyConsumption('MORPHINE_10MG', 1, patientId);
-  if(state.interventions.has('atq')) trackSupplyConsumption('FENTANYL_ACTIQ', 1, patientId);
-  if(state.interventions.has('fluids')) trackSupplyConsumption('IV_FLUID_500ML', Math.max(1, Math.ceil((doses.fluids||500)/500)), patientId);
+  reconcileSupplySource('quick:tq', 'CAT_TOURNIQUET', quickTqData.applied ? 1 : 0, patientId);
+  ['tourniquet','bandage','morphine','atq','fluids'].forEach(key=>reconcileSupplyForIntervention(key, state.interventions.has(key)?null:0, patientId));
 }
 
 function buildLocStr(){
@@ -2623,6 +2782,7 @@ function renderSummary(){
   const locStr=buildLocStr();
   const deviceId=getDeviceId();
   const sab=Object.entries(state.sabcde).map(([k,v])=>`${k}:${v}`).join(' · ')||'—';
+  const stockLine=Object.entries(state.localStockCache||{}).map(([k,v])=>`${SUPPLY_LABELS[k]||k}: ${v}`).join(' · ');
   document.getElementById('summary-content').innerHTML=`
     <div class="summary-row"><span class="summary-key">מזהה</span><span class="summary-val" style="font-family:var(--mono);font-weight:700">${newId}</span></div>
     <div class="summary-row"><span class="summary-key">מיון</span><span class="summary-val">${triagePill(state.triage)}</span></div>
@@ -2642,12 +2802,14 @@ function renderSummary(){
     <div class="summary-row"><span class="summary-key">פציעה</span><span class="summary-val">${state.injury||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">מצב</span><span class="summary-val">${STATUS_LABELS[state.patientStatus]||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">טיפולים</span><span class="summary-val">${intStr||'ללא'}</span></div>
+    <div class="summary-row"><span class="summary-key">מלאי מקומי</span><span class="summary-val" style="font-size:11px">${stockLine||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">חתימת טיפול</span><span class="summary-val device-id">${deviceId}</span></div>
     <div class="summary-row"><span class="summary-key">זמן פתיחה</span><span class="summary-val" style="font-family:var(--mono)">${nowT()}</span></div>`;
 }
 
 function savePatient(){
   const newId='P'+String(patients.length+1).padStart(3,'0');
+  const draftId=state.patientDraftId;
   const intStr=buildIntStr();
   const locStr=buildLocStr();
   const deviceId=getDeviceId();
@@ -2691,6 +2853,8 @@ function savePatient(){
     needsFullAssessment:state.needsFullAssessment,
     patientAgeGroup:state.patientAgeGroup,
     patientAge:state.patientAge,
+    tempPatientId:draftId,
+    stockSnapshot:{...(state.localStockCache||{})},
     lastTouchedBy:deviceId,
     lastModifiedAt:new Date().toISOString(),
     confirmedClinical:true,
@@ -2712,6 +2876,7 @@ function savePatient(){
       ...(intStr?[{type:'INTERVENTION_LOGGED',time:t,detail:`${intStr} — מכשיר: ${deviceId}`}]:[]),
     ]
   });
+  clearActiveRecoveryState();
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   document.getElementById('success-pid').textContent=newId;
   goTo('dashboard');
@@ -2965,6 +3130,23 @@ function duplicateCandidates(pts){
   }
   return pairs.slice(0,4);
 }
+function inventoryReadModel(pts){
+  const latestStock=[...pts].reverse().find(p=>p.stockSnapshot)?.stockSnapshot || state.localStockCache || SUPPLY_BASELINE;
+  return {...SUPPLY_BASELINE, ...latestStock};
+}
+function buildIncidentCommandStateSnapshot(pts, site){
+  const inventory=inventoryReadModel(pts);
+  const sectors=new Map();
+  pts.filter(p=>!['handed_over','closed','evacuated'].includes(p.patientStatus)).forEach(p=>{
+    const s=sectorFromLocation(p.location); const key=`${s.building}|${s.floor}`;
+    if(!sectors.has(key)) sectors.set(key,{...s,total:0,red:0,yellow:0,green:0,black:0,critical:false,inventory:{...inventory}});
+    const row=sectors.get(key);
+    row.total++;
+    if(row[p.triage]!==undefined) row[p.triage]++;
+    row.critical=row.critical||isCriticalAlert(p);
+  });
+  return {incident_id:site?.id||cmdActiveSite, sectors:[...sectors.values()], inventory};
+}
 function renderCommandOperationalPanels(pts, site){
   const stale=pts.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS);
   const tqOverdue=pts.filter(p=>p.tourniquet && Date.now()-p.tourniquet.appliedAt>=40*60*1000);
@@ -2983,17 +3165,22 @@ function renderCommandOperationalPanels(pts, site){
     {n:unsynced,l:'אירועים מקומיים שלא סונכרנו',c:unsynced?'':''}
   ].map(x=>`<div class="cmd-priority-card ${x.c}"><div class="cmd-priority-num">${x.n}</div><div class="cmd-priority-label">${x.l}</div></div>`).join('');
 
-  const sectorMap=new Map();
-  pts.filter(p=>!['handed_over','closed','evacuated'].includes(p.patientStatus)).forEach(p=>{
-    const s=sectorFromLocation(p.location); const key=`${s.building}|${s.floor}`;
-    if(!sectorMap.has(key)) sectorMap.set(key,{...s,total:0,red:0,yellow:0,green:0,black:0,critical:false});
-    const row=sectorMap.get(key); row.total++; if(row[p.triage]!==undefined) row[p.triage]++; row.critical=row.critical||isCriticalAlert(p);
-  });
-  document.getElementById('cmd-heatmap').innerHTML=[...sectorMap.values()].map(s=>`<div class="cmd-matrix-row ${s.critical?'critical':''}">
-    <div><div class="cmd-matrix-title">בניין ${s.building} · קומה ${s.floor}</div><div class="cmd-matrix-sub">${s.total} פצועים · ${s.critical?'CRITICAL':'STABLE'}</div></div>
-    <div class="cmd-matrix-counts"><span style="color:var(--red)">${s.red}R</span><span style="color:var(--yellow)">${s.yellow}Y</span><span style="color:var(--green)">${s.green}G</span><span style="color:var(--muted)">${s.black}B</span></div>
-  </div>`).join('') || '<div class="cmd-matrix-row"><div class="cmd-matrix-sub">אין פצועים פעילים למיפוי.</div></div>';
-  setCmdPanelMeta('heatmap', `${sectorMap.size} SECTORS`);
+  const commandState=buildIncidentCommandStateSnapshot(pts, site);
+  document.getElementById('cmd-heatmap').innerHTML=commandState.sectors.map(s=>{
+    const logistics=Object.entries(s.inventory).map(([item,count])=>{
+      const cls=count<=0?'empty':count<=1?'low':'';
+      return `<span class="${cls}">${SUPPLY_LABELS[item]||item}: ${count}</span>`;
+    }).join('');
+    return `<div class="cmd-matrix-row ${s.critical?'critical':''}">
+      <div>
+        <div class="cmd-matrix-title">SECTOR: בניין ${s.building} · קומה ${s.floor}</div>
+        <div class="cmd-matrix-sub">${s.total} פצועים · ${s.critical?'CRITICAL':'STABLE'} · incident_command_state cache</div>
+        <div class="cmd-logistics">${logistics}</div>
+      </div>
+      <div class="cmd-matrix-counts"><span style="color:var(--red)">${s.red}R</span><span style="color:var(--yellow)">${s.yellow}Y</span><span style="color:var(--green)">${s.green}G</span><span style="color:var(--muted)">${s.black}B</span></div>
+    </div>`;
+  }).join('') || '<div class="cmd-matrix-row"><div class="cmd-matrix-sub">אין פצועים פעילים למיפוי.</div></div>';
+  setCmdPanelMeta('heatmap', `${commandState.sectors.length} SECTORS · CACHE`);
 
   const deviceMap=new Map();
   pts.forEach(p=>{
@@ -3181,10 +3368,14 @@ function toggleQuickTQ(btn, applied) {
   btn.classList.add('selected');
   document.getElementById('quick-tq-panel').style.display = applied ? 'block' : 'none';
   if (applied) {
+    reconcileSupplySource('quick:tq', 'CAT_TOURNIQUET', 1);
     projectPatientStatus('stabilizing','TOURNIQUET_APPLIED',{source:'quick_patient_flow'});
     if (!quickTqData.time) setQuickTQTimeNow();
+  } else {
+    reconcileSupplySource('quick:tq', 'CAT_TOURNIQUET', 0);
   }
   document.getElementById('btn-step3').disabled = false;
+  saveActiveRecoveryState('step3');
 }
 
 function setQuickTQTimeNow() {
@@ -3252,6 +3443,7 @@ function saveLocalEvent(event){
     ...event
   };
   state.localEvents.push(entry);
+  saveActiveRecoveryState(activeScreenId());
   try{
     const key='c5_local_sqlite_outbox';
     const outbox=JSON.parse(localStorage.getItem(key)||'[]');
@@ -3260,22 +3452,69 @@ function saveLocalEvent(event){
   }catch(e){}
 }
 
-function trackSupplyConsumption(itemType, qtyUsed, associatedPatientId=null){
+function activeScreenId(){
+  const el=document.querySelector('.screen.active');
+  return el?.id?.replace('screen-','')||null;
+}
+function localStock(itemType){
+  state.localStockCache={...SUPPLY_BASELINE, ...(state.localStockCache||{})};
+  return state.localStockCache[itemType] ?? 0;
+}
+function renderLocalStockPanel(){
+  const el=document.getElementById('tx-stock-grid');
+  if(!el) return;
+  state.localStockCache={...SUPPLY_BASELINE, ...(state.localStockCache||{})};
+  el.innerHTML=Object.entries(SUPPLY_LABELS).map(([key,label])=>{
+    const value=localStock(key);
+    const cls=value<=0?'empty':value<=1?'low':'';
+    return `<div class="stock-chip ${cls}"><span>${label}</span><strong>${value}</strong></div>`;
+  }).join('');
+}
+function consumeFieldSupply(itemType, quantityDelta, patientId=null, movementType='treatment_consumed'){
   if(!state.localStockCache) state.localStockCache={};
-  state.localStockCache[itemType]=(state.localStockCache[itemType]||0)-Math.abs(qtyUsed);
+  const delta=Number(quantityDelta)||0;
+  state.localStockCache[itemType]=(state.localStockCache[itemType] ?? SUPPLY_BASELINE[itemType] ?? 0)+delta;
   saveLocalEvent({
     type:'INVENTORY_LEDGER_MOVEMENT',
-    detail:`Inventory consumed: ${itemType} x${qtyUsed}`,
-    warn:state.localStockCache[itemType] < 0,
+    detail:`Inventory ledger: ${itemType} ${delta}`,
+    warn:state.localStockCache[itemType] <= 0,
     payload_json:{
       item_type:itemType,
-      movement_type:'treatment_consumed',
-      quantity_delta:-Math.abs(qtyUsed),
-      patient_context:associatedPatientId,
+      movement_type:movementType,
+      quantity_delta:delta,
+      patient_id:state.patientDraftId||patientId,
+      patient_context:patientId||state.patientDraftId,
       local_stock_after:state.localStockCache[itemType],
       battery_at_log:null
     }
   });
+  renderLocalStockPanel();
+  if(state.localStockCache[itemType] <= 0){
+    toast(`מלאי ${SUPPLY_LABELS[itemType]||itemType} אזל מקומית — נרשמת התרעת דחף לחמ"ל`);
+    saveLocalEvent({
+      type:'LOCAL_STOCKOUT_WARNING',
+      detail:`Local stock depleted: ${itemType}`,
+      warn:true,
+      payload_json:{item_type:itemType, local_stock_after:state.localStockCache[itemType], patient_id:patientId||state.patientDraftId}
+    });
+  }
+}
+function reconcileSupplyForIntervention(key, forcedQty=null, patientId=null){
+  const spec=INTERVENTION_SUPPLY[key];
+  if(!spec) return;
+  const desired=forcedQty===null ? (typeof spec.qty==='function'?spec.qty():spec.qty) : forcedQty;
+  reconcileSupplySource(`tx:${key}`, spec.item, desired, patientId);
+}
+function reconcileSupplySource(movementKey, itemType, desiredQty, patientId=null){
+  if(!state.supplyMovements) state.supplyMovements={};
+  const prev=state.supplyMovements[movementKey]?.qty||0;
+  const delta=desiredQty-prev;
+  if(delta===0) return;
+  state.supplyMovements[movementKey]={itemType, qty:desiredQty};
+  consumeFieldSupply(itemType, -delta, patientId, delta>0?'treatment_consumed':'correction_reversed');
+}
+function trackSupplyConsumption(itemType, qtyUsed, associatedPatientId=null){
+  consumeFieldSupply(itemType, -Math.abs(qtyUsed), associatedPatientId);
 }
 
 function confirmPediatricOverride(){
@@ -3296,6 +3535,20 @@ function confirmPediatricOverride(){
     confirmedTwice:true,
     reason:'Emergency administration due to severe trauma; weight estimated via age group.'
   };
+  saveLocalEvent({
+    type:'HIGH_RISK_OVERRIDE_CONFIRMED',
+    detail:`אישור חריגת מינון פדיאטרי — ${pending.label} ${pending.dosage}`,
+    warn:true,
+    payload_json:{
+      patient_id:state.patientDraftId,
+      medication:pending.label,
+      dosage:pending.dosage,
+      route:pending.route,
+      estimated_weight_kg:estimatedPediatricWeight(),
+      confirmed_twice:true,
+      reason:'Emergency administration due to severe trauma; weight estimated via age group.'
+    }
+  });
   saveLocalEvent({
     type:'MEDICATION_ADMINISTERED',
     detail:`${pending.label} ${pending.dosage} — אישור פדיאטרי כפול`,
@@ -3320,9 +3573,11 @@ function cancelPediatricOverride(){
   const pending=state.pendingMedicationOverride;
   if(pending){
     state.interventions.delete(pending.key);
+    reconcileSupplyForIntervention(pending.key, 0);
     const chip=document.querySelector(`.chip[onclick*="'${pending.key}'"]`);
     if(chip) chip.classList.remove('selected');
     if(pending.key==='morphine') document.getElementById('morphine-wrap').style.display='none';
+    renderLocalStockPanel();
   }
   closePediatricRisk();
 }
@@ -3437,6 +3692,7 @@ function computeMstartTriage(v) {
 //  INIT
 // ═══════════════════════════════════════════════
 if(!loadStoredDemoState()) loadDemoScenario(false);
+restoreActiveRecoveryState();
 updateCountDisplay('pulse15');
 updateCountDisplay('rr30');
 renderDashboard();
