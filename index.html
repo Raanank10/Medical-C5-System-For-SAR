@@ -31,7 +31,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 @keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 
 /* ── DASHBOARD ACTION BAR ── */
-.action-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:16px;}
+.action-bar{display:grid;grid-template-columns:1.15fr .85fr;gap:10px;padding:16px;}
 .action-btn{background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:18px 12px;cursor:pointer;text-align:center;transition:all 0.12s;display:flex;flex-direction:column;align-items:center;gap:8px;}
 .action-btn:active{transform:scale(0.97);}
 .action-btn .action-icon{font-size:32px;}
@@ -337,6 +337,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .cmd-priority-card.critical{border-color:rgba(230,57,70,.7);background:rgba(230,57,70,.08);}
 .cmd-priority-num{font-family:var(--mono);font-size:24px;font-weight:900;line-height:1;}
 .cmd-priority-label{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.35;}
+.cmd-panel-toggle{width:calc(100% - 32px);margin:10px 16px 0;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px 12px;color:var(--text);font-size:13px;font-weight:800;cursor:pointer;display:flex;justify-content:space-between;align-items:center;text-align:right;}
+.cmd-panel-toggle .cmd-panel-sub{font-family:var(--mono);font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.8px;}
+.cmd-panel-body.collapsed{display:none;}
 .cmd-status-matrix{display:grid;gap:7px;padding:8px 16px 0;}
 .cmd-matrix-row{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 11px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;}
 .cmd-matrix-row.critical{border-color:var(--red);background:rgba(230,57,70,.08);}
@@ -348,6 +351,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .device-row.offline{border-color:var(--red);background:rgba(230,57,70,.08);}
 .device-name{font-family:var(--mono);font-size:12px;font-weight:800;}
 .device-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+#cmd-patient-table{max-height:44vh;overflow-y:auto;scrollbar-width:thin;}
 
 /* ── PC DEMO MVP ── */
 .demo-hero{min-height:100dvh;padding:28px 16px 120px;display:flex;flex-direction:column;gap:18px;background:radial-gradient(circle at 50% 0%, rgba(67,97,238,0.18), transparent 34%), var(--bg);}
@@ -444,13 +448,9 @@ textarea{resize:vertical;min-height:70px;}
 
   <!-- Big action buttons -->
   <div class="action-bar">
-    <button class="action-btn primary" onclick="startPatientFlow('quick')">
-      <div class="action-icon">🚑</div>
-      <div class="action-label">פצוע מהיר</div>
-    </button>
-    <button class="action-btn" onclick="startPatientFlow('extended')">
+    <button class="action-btn primary" onclick="guardedNewPatient()">
       <div class="action-icon">🩺</div>
-      <div class="action-label">פצוע מורחב</div>
+      <div class="action-label">פצוע חדש</div>
     </button>
     <button class="action-btn site-btn" onclick="goTo('site')">
       <div class="action-icon">🏢</div>
@@ -567,13 +567,52 @@ textarea{resize:vertical;min-height:70px;}
   <div class="bottom-bar"><button class="btn-primary" id="btn-save-report" onclick="saveReport()" disabled>שמור דיווח</button></div>
 </div>
 
-<!-- ══════════════════════ STEP 1 — LOCATION ══ -->
+<!-- ══════════════════════ STEP 1 — INTAKE MODE ══ -->
 <div id="screen-step1" class="screen">
   <div class="flow-header">
     <button class="btn-back" onclick="goTo('dashboard')">←</button>
-    <div><div class="flow-step">שלב 1 / 8</div><div class="flow-title">מיקום</div></div>
+    <div><div class="flow-step">שלב 1 / 8</div><div class="flow-title">פתיחת פצוע</div></div>
   </div>
   <div class="progress-bar"><div class="progress-fill" style="width:12.5%"></div></div>
+  <div class="flow-content">
+    <div class="field-label">מסלול רישום</div>
+    <div class="tap-grid tap-grid-2" id="flow-mode-grid" style="margin-bottom:16px">
+      <button class="tap-btn" onclick="selectFlowMode(this,'quick')">
+        <span class="icon">⚡</span>
+        <div style="font-weight:700">מהיר</div>
+        <div style="font-size:11px;color:var(--muted)">מדדים בינאריים, כל השאר חוב הערכה</div>
+      </button>
+      <button class="tap-btn selected" onclick="selectFlowMode(this,'extended')">
+        <span class="icon">🩺</span>
+        <div style="font-weight:700">רגיל</div>
+        <div style="font-size:11px;color:var(--muted)">חסם, מדדים מלאים, טיפול</div>
+      </button>
+    </div>
+
+    <div class="field-label">קבוצת גיל</div>
+    <div class="tap-grid tap-grid-2" id="age-grid">
+      <button class="tap-btn selected" onclick="selectAgeGroup(this,'adult')">
+        <span class="icon">🧑</span>
+        <div style="font-weight:700">מבוגר / 8+</div>
+        <div style="font-size:11px;color:var(--muted)">ברירת מחדל למינונים רגילים</div>
+      </button>
+      <button class="tap-btn" onclick="selectAgeGroup(this,'pediatric')">
+        <span class="icon">🧒</span>
+        <div style="font-weight:700">ילד מתחת 8</div>
+        <div style="font-size:11px;color:var(--muted)">מפעיל הגנות מינון ילדים</div>
+      </button>
+    </div>
+  </div>
+  <div class="bottom-bar"><button class="btn-primary" id="btn-step1" onclick="continueAfterIntake()">המשך</button></div>
+</div>
+
+<!-- ══════════════════════ STEP 2 — LOCATION ══ -->
+<div id="screen-step2" class="screen">
+  <div class="flow-header">
+    <button class="btn-back" onclick="goTo('step5')">←</button>
+    <div><div class="flow-step">שלב 6 / 8</div><div class="flow-title">מיקום</div></div>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" style="width:70%"></div></div>
   <div class="flow-content">
     <div class="field-label">סוג המבנה</div>
     <div class="tap-grid tap-grid-2" id="building-type-grid" style="margin-bottom:16px">
@@ -607,38 +646,8 @@ textarea{resize:vertical;min-height:70px;}
       <div class="field-label">אזור / תיאור מדויק</div>
       <input type="text" id="location-free" placeholder="לדוגמה: ליד הדלת האדומה, מתחת לשרידים..." oninput="state.locFree=this.value">
     </div>
-    <div class="field-label" style="margin-top:14px">קבוצת גיל</div>
-    <div class="tap-grid tap-grid-2" id="age-grid">
-      <button class="tap-btn" onclick="selectAgeGroup(this,'adult')">
-        <span class="icon">🧑</span>
-        <div style="font-weight:700">מבוגר / 8+</div>
-        <div style="font-size:11px;color:var(--muted)">ברירת מחדל למינונים רגילים</div>
-      </button>
-      <button class="tap-btn" onclick="selectAgeGroup(this,'pediatric')">
-        <span class="icon">🧒</span>
-        <div style="font-weight:700">ילד מתחת 8</div>
-        <div style="font-size:11px;color:var(--muted)">מפעיל הגנות מינון ילדים</div>
-      </button>
-    </div>
   </div>
-  <div class="bottom-bar"><button class="btn-primary" id="btn-step1" onclick="continueAfterLocation()">המשך</button></div>
-</div>
-
-<!-- ══════════════════════ STEP 2 — RESERVED CHECKPOINT ══ -->
-<div id="screen-step2" class="screen">
-  <div class="flow-header">
-    <button class="btn-back" onclick="goTo('step1')">←</button>
-    <div><div class="flow-step">שלב ביניים</div><div class="flow-title">המשך הערכה</div></div>
-  </div>
-  <div class="progress-bar"><div class="progress-fill" style="width:25%"></div></div>
-  <div class="flow-content">
-    <div class="computed-status-card">
-      <div class="computed-status-title">סטטוס חילוץ עבר לשלב מאוחר</div>
-      <div class="computed-status-value">לכוד / לא לכוד</div>
-      <div class="computed-status-note">הבחירה הבינארית נשאלת לאחר מדדים ומיון, כדי לא לעכב רישום ראשוני.</div>
-    </div>
-  </div>
-  <div class="bottom-bar"><button class="btn-primary" id="btn-step2" onclick="continueAfterAccess()">המשך</button></div>
+  <div class="bottom-bar"><button class="btn-primary" id="btn-step2" onclick="continueAfterLocation()">המשך</button></div>
 </div>
 
 <!-- ══════════════════════ STEP 3 — QUICK TOURNIQUET ══ -->
@@ -698,7 +707,30 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="progress-bar"><div class="progress-fill" style="width:57.1%"></div></div>
   <div class="flow-content">
+    <div id="rapid-vitals-panel" style="display:none">
+      <div style="background:rgba(67,97,238,0.08);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.55">
+        <strong style="color:var(--accent)">מסלול מהיר:</strong>
+        מדדים בינאריים בלבד. המערכת שומרת חוב הערכה להשלמה בהמשך.
+      </div>
+      <div class="field-label">נשימה</div>
+      <div class="tap-grid tap-grid-2" id="rapid-breathing-grid" style="margin-bottom:14px">
+        <button class="tap-btn" onclick="selectRapidBreathing(this,true)"><span class="icon">✅</span>נושם</button>
+        <button class="tap-btn" onclick="selectRapidBreathing(this,false)"><span class="icon">🚫</span>לא נושם</button>
+      </div>
+      <div class="field-label">הכרה — AVPU בינארי</div>
+      <div class="tap-grid tap-grid-2" id="rapid-avpu-grid" style="margin-bottom:14px">
+        <button class="tap-btn" onclick="selectRapidAvpu(this,'A')"><span class="icon">👀</span>AVPU = A</button>
+        <button class="tap-btn" onclick="selectRapidAvpu(this,'V')"><span class="icon">⚠</span>AVPU אינו A</button>
+      </div>
+      <div class="field-label">לחץ דם / דופק רדיאלי</div>
+      <div class="tap-grid tap-grid-2" id="rapid-bp-grid" style="margin-bottom:14px">
+        <button class="tap-btn" onclick="selectRapidBp(this,'radial')"><span class="icon">✅</span>מעל 100</button>
+        <button class="tap-btn" onclick="selectRapidBp(this,'carotid')"><span class="icon">⚠</span>מתחת 100</button>
+      </div>
+      <div class="calc-confirm" id="rapid-vitals-summary">נשימה: — · AVPU: — · לחץ דם: —</div>
+    </div>
 
+    <div id="regular-vitals-panel">
     <!-- AVPU FIRST — most critical, fastest -->
     <div class="field-label">הכרה — AVPU</div>
     <div class="avpu-row" id="avpu-grid" style="margin-bottom:16px">
@@ -785,6 +817,7 @@ textarea{resize:vertical;min-height:70px;}
     <!-- MANDATORY medic name -->
     <div class="field-label">זיהוי חובש</div>
     <div class="device-card">נחתם אוטומטית על ידי מכשיר <span class="device-id" id="vitals-device-id">—</span></div>
+    </div>
   </div>
   <div class="bottom-bar"><button class="btn-primary" id="btn-step4" onclick="goTo('step5')">המשך</button></div>
 </div>
@@ -888,7 +921,7 @@ textarea{resize:vertical;min-height:70px;}
       </button>
     </div>
   </div>
-  <div class="bottom-bar"><button class="btn-primary" id="btn-step6" onclick="goTo('step7')">המשך</button></div>
+  <div class="bottom-bar"><button class="btn-primary" id="btn-step6" onclick="continueAfterInjuryTrap()">המשך</button></div>
 </div>
 
 <div id="screen-step7" class="screen">
@@ -1054,14 +1087,16 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div style="display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto" id="cmd-site-tabs"></div>
   <div style="padding:12px 16px 0"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px" id="cmd-totals"></div></div>
-  <div id="cmd-priority-board" class="cmd-priority-grid"></div>
-  <div class="section-label">מפת חום מרחבית</div>
-  <div id="cmd-heatmap" class="cmd-status-matrix"></div>
-  <div class="section-label">סטטוס מכשירים / Sync</div>
-  <div id="cmd-device-panel" class="device-panel"></div>
-  <div class="section-label">חשד לכפילויות</div>
-  <div id="cmd-duplicates" class="cmd-status-matrix"></div>
-  <div id="cmd-alerts" style="padding:6px 16px 0"></div>
+  <button class="cmd-panel-toggle" onclick="toggleCmdPanel('priority')"><span>תעדוף מפקד</span><span class="cmd-panel-sub" id="cmd-panel-priority-meta">OPEN</span></button>
+  <div id="cmd-panel-priority" class="cmd-panel-body"><div id="cmd-priority-board" class="cmd-priority-grid"></div></div>
+  <button class="cmd-panel-toggle" onclick="toggleCmdPanel('heatmap')"><span>מפת חום מרחבית</span><span class="cmd-panel-sub" id="cmd-panel-heatmap-meta">COLLAPSED</span></button>
+  <div id="cmd-panel-heatmap" class="cmd-panel-body collapsed"><div id="cmd-heatmap" class="cmd-status-matrix"></div></div>
+  <button class="cmd-panel-toggle" onclick="toggleCmdPanel('devices')"><span>מכשירים / Sync</span><span class="cmd-panel-sub" id="cmd-panel-devices-meta">COLLAPSED</span></button>
+  <div id="cmd-panel-devices" class="cmd-panel-body collapsed"><div id="cmd-device-panel" class="device-panel"></div></div>
+  <button class="cmd-panel-toggle" onclick="toggleCmdPanel('duplicates')"><span>חשד לכפילויות</span><span class="cmd-panel-sub" id="cmd-panel-duplicates-meta">COLLAPSED</span></button>
+  <div id="cmd-panel-duplicates" class="cmd-panel-body collapsed"><div id="cmd-duplicates" class="cmd-status-matrix"></div></div>
+  <button class="cmd-panel-toggle" onclick="toggleCmdPanel('alerts')"><span>התראות</span><span class="cmd-panel-sub" id="cmd-panel-alerts-meta">OPEN</span></button>
+  <div id="cmd-panel-alerts" class="cmd-panel-body"><div id="cmd-alerts" style="padding:6px 16px 0"></div></div>
   <div class="demo-actions">
     <button class="demo-mini-btn" onclick="goTo('aar')">פתח AAR</button>
     <button class="demo-mini-btn" onclick="setDemoSyncMode()">החלף Sync</button>
@@ -1497,12 +1532,12 @@ function projectPatientStatus(nextStatus, eventType, payload={}){
   if(TERMINAL_STATUSES.has(current) && current !== 'deceased') return;
 
   if(eventType === 'VITALS_RECORDED'){
-    state.needsFullAssessment = false;
+    state.needsFullAssessment = state.flowMode === 'quick';
     if(['identified','stabilizing'].includes(current)) state.patientStatus = 'observing';
     queueEventOnce('VITALS_RECORDED', {
       detail:'מדדים תועדו — סטטוס מחושב להשגחה',
       warn:false,
-      payload_json:{current_status:state.patientStatus, needs_full_assessment:false}
+      payload_json:{current_status:state.patientStatus, needs_full_assessment:state.needsFullAssessment, capture_mode:state.flowMode}
     });
   } else {
     state.patientStatus = nextStatus;
@@ -1518,13 +1553,13 @@ function projectPatientStatus(nextStatus, eventType, payload={}){
 }
 
 function goTo(screen){
-  if(screen==='step5' && state.flowMode !== 'quick') projectPatientStatus('observing','VITALS_RECORDED');
+  if(screen==='step5') projectPatientStatus('observing','VITALS_RECORDED');
   if(screen==='step6') syncComputedStatusDisplay();
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+screen).classList.add('active');
   window.scrollTo(0,0);
   if(screen==='dashboard'){ renderDashboard(); renderAlerts(); }
-  if(screen==='step4')     { setDeviceLabels(); checkStep4(); }
+  if(screen==='step4')     { setVitalsModeView(); setDeviceLabels(); checkStep4(); }
   if(screen==='step5')     showMstartSuggestion();
   if(screen==='step7')     { renderTourniquetReminder(); setDeviceLabels(); checkStep7(); }
   if(screen==='step8')     renderSummary();
@@ -1899,6 +1934,8 @@ function startNewPatient(mode='extended'){
 
   // Reset all UI
   document.querySelectorAll('.tap-btn,.sabcde-opt,.avpu-btn,.chip,.bp-btn,.limb-btn,.body-hotspot').forEach(b=>b.classList.remove('selected','ok','issue','managed'));
+  const modeBtn=document.querySelector(`#flow-mode-grid .tap-btn[onclick*="'${mode}'"]`) || document.querySelector('#flow-mode-grid .tap-btn:nth-child(2)');
+  if(modeBtn) modeBtn.classList.add('selected');
   const adultBtn=document.querySelector('#age-grid .tap-btn');
   if(adultBtn) adultBtn.classList.add('selected');
   ['location-free','other-tx-text','tourniquet-time-input'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -1949,22 +1986,38 @@ function selectAgeGroup(btn, val){
   state.patientAge = val === 'pediatric' ? 7 : null;
 }
 
-function continueAfterLocation(){
+function selectFlowMode(btn, val){
+  document.querySelectorAll('#flow-mode-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  state.flowMode = val;
+  state.needsFullAssessment = val === 'quick';
+  if(val === 'quick'){
+    flowVitals = {pulse:null, spo2:null, bp_estimate:null, rr:null, avpu:null};
+    counts = {...counts, pulse15:0, rr30:0};
+  } else {
+    flowVitals = {...VITALS_BASELINE};
+    counts = {...counts, pulse15:20, rr30:8};
+    updateCountDisplay('pulse15');
+    updateCountDisplay('rr30');
+  }
+  updateRapidVitalsSummary();
+}
+
+function continueAfterIntake(){
   if(state.flowMode === 'quick'){
     state.needsFullAssessment = true;
-    goTo('step5');
+    goTo('step4');
     return;
   }
   goTo('step3');
 }
 
+function continueAfterLocation(){
+  goTo('step6');
+}
+
 function continueAfterAccess(){
-  if(state.flowMode === 'quick'){
-    state.needsFullAssessment = true;
-    goTo('step5');
-    return;
-  }
-  goTo('step3');
+  continueAfterLocation();
 }
 
 function continueAfterTriage(){
@@ -1977,13 +2030,13 @@ function continueAfterTriage(){
       warn:true,
       payload_json:{needs_full_assessment:true, triage:state.triage, capture_mode:'quick_dirty'}
     });
-    goTo('step8');
+    goTo('step2');
     return;
   }
-  goTo('step6');
+  goTo('step2');
 }
 
-// Step 1 — Location
+// Step 2 — Location
 function selectBuildingType(btn, val){
   document.querySelectorAll('#building-type-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
@@ -2029,6 +2082,43 @@ function setSabcde(btn, letter, val, cls){
 // Step 4 — Vitals
 function checkStep4(){
   document.getElementById('btn-step4').disabled = false;
+}
+function setVitalsModeView(){
+  const rapid=document.getElementById('rapid-vitals-panel');
+  const regular=document.getElementById('regular-vitals-panel');
+  const back=document.querySelector('#screen-step4 .btn-back');
+  if(rapid) rapid.style.display = state.flowMode === 'quick' ? 'block' : 'none';
+  if(regular) regular.style.display = state.flowMode === 'quick' ? 'none' : 'block';
+  if(back) back.setAttribute('onclick', `goTo('${state.flowMode === 'quick' ? 'step1' : 'step3'}')`);
+  updateRapidVitalsSummary();
+}
+function updateRapidVitalsSummary(){
+  const el=document.getElementById('rapid-vitals-summary');
+  if(!el) return;
+  const breathing=flowVitals.rr===0?'לא נושם':flowVitals.rr?'נושם':'—';
+  const avpu=flowVitals.avpu?flowVitals.avpu==='A'?'A':'לא A':'—';
+  const bp=flowVitals.bp_estimate==='radial'?'מעל 100':flowVitals.bp_estimate?'מתחת 100':'—';
+  el.textContent=`נשימה: ${breathing} · AVPU: ${avpu} · לחץ דם: ${bp}`;
+}
+function selectRapidBreathing(btn, isBreathing){
+  document.querySelectorAll('#rapid-breathing-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  counts.rr30 = isBreathing ? 8 : 0;
+  flowVitals.rr = isBreathing ? 16 : 0;
+  updateRapidVitalsSummary();
+}
+function selectRapidAvpu(btn, val){
+  document.querySelectorAll('#rapid-avpu-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  flowVitals.avpu = val === 'A' ? 'A' : 'V';
+  updateRapidVitalsSummary();
+}
+function selectRapidBp(btn, val){
+  document.querySelectorAll('#rapid-bp-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  flowVitals.bp_estimate = val;
+  flowVitals.pulse = val === 'radial' ? 88 : 128;
+  updateRapidVitalsSummary();
 }
 function toggleSpo2(){
   spo2Active = !spo2Active;
@@ -2156,16 +2246,12 @@ function selectTriage(btn, val){
   state.triage = val;
 }
 function showMstartSuggestion(){
-  if(state.flowMode === 'quick'){
-    document.getElementById('triage-suggestion-text').innerHTML=`<span style="color:var(--muted)">הערכה מהירה — חסרים מדדים</span> <span style="font-size:12px;color:var(--muted);font-weight:400">— ניתן לשמור כחוב הערכה ולהשלים אחר כך</span>`;
-    document.getElementById('triage-suggestion').style.display='block';
-    return;
-  }
   const suggestion=C5Rules.suggestMstartTriage({vitals:flowVitals,sabcde:state.sabcde,accessibility:state.accessibility});
   const {triage, reason}=suggestion;
   const colors={red:'var(--red)',yellow:'var(--yellow)',green:'var(--green)',black:'#888'};
   const short={red:'אדום — דחוף',yellow:'צהוב — דחוף',green:'ירוק — לא דחוף',black:'שחור — לא בר הצלה'};
-  document.getElementById('triage-suggestion-text').innerHTML=`<span style="color:${colors[triage]}">${short[triage]}</span> <span style="font-size:12px;color:var(--muted);font-weight:400">— ${reason}</span>`;
+  const modeNote=state.flowMode === 'quick' ? 'מדדים בינאריים — נשמר כחוב הערכה' : reason;
+  document.getElementById('triage-suggestion-text').innerHTML=`<span style="color:${colors[triage]}">${short[triage]}</span> <span style="font-size:12px;color:var(--muted);font-weight:400">— ${modeNote}</span>`;
   document.getElementById('triage-suggestion').style.display='block';
   if(!state.triage){
     const btn=document.querySelector(`#triage-grid .tap-btn.triage-${triage}`);
@@ -2307,10 +2393,10 @@ function renderSummary(){
     <div class="summary-row"><span class="summary-key">מסלול</span><span class="summary-val">${state.flowMode==='quick'?'מהיר — חוב הערכה':'מורחב'}</span></div>
     <div class="summary-row"><span class="summary-key">גיל</span><span class="summary-val">${state.patientAgeGroup==='pediatric'?'ילד מתחת 8':'מבוגר / 8+'}</span></div>
     <div class="summary-row"><span class="summary-key">SABCDE</span><span class="summary-val" style="font-size:11px">${sab}</span></div>
-    <div class="summary-row"><span class="summary-key">דופק</span><span class="summary-val" style="font-family:var(--mono)">${flowVitals.pulse} bpm</span></div>
+    <div class="summary-row"><span class="summary-key">דופק</span><span class="summary-val" style="font-family:var(--mono)">${flowVitals.pulse ?? '—'}${flowVitals.pulse?' bpm':''}</span></div>
     <div class="summary-row"><span class="summary-key">SpO₂</span><span class="summary-val" style="font-family:var(--mono)">${flowVitals.spo2||'לא נמדד'}</span></div>
     <div class="summary-row"><span class="summary-key">לחץ דם</span><span class="summary-val">${BP_LABELS[flowVitals.bp_estimate]||'—'}</span></div>
-    <div class="summary-row"><span class="summary-key">נשימות</span><span class="summary-val" style="font-family:var(--mono)">${flowVitals.rr} / דקה</span></div>
+    <div class="summary-row"><span class="summary-key">נשימות</span><span class="summary-val" style="font-family:var(--mono)">${flowVitals.rr ?? '—'}${flowVitals.rr !== null && flowVitals.rr !== undefined?' / דקה':''}</span></div>
     <div class="summary-row"><span class="summary-key">AVPU</span><span class="summary-val" style="font-family:var(--mono)">${flowVitals.avpu||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">זיהוי מכשיר</span><span class="summary-val device-id">${deviceId}</span></div>
     ${state.triage==='black'?'<div class="summary-row" style="border:1px solid #666;background:rgba(74,74,74,0.18);border-radius:10px;padding:10px"><span class="summary-key">מסלול מהיר</span><span class="summary-val">מיון שחור — דילוג על מדדים / טיפולים / MIST</span></div>':''}
@@ -2527,6 +2613,7 @@ function getSitePatients(siteId){
   return [];
 }
 let cmdActiveSite='ALL', cmdFilter='all', alertFilter='critical', cmdAlertFilter='critical';
+let cmdPanelOpen={priority:true,heatmap:false,devices:false,duplicates:false,alerts:true};
 function isCriticalAlert(p){ return C5Rules.isCriticalAlert(p); }
 function hasRoutineAlert(p){ return C5Rules.isRoutineAlert(p); }
 function openPatientFromAlert(id){
@@ -2552,6 +2639,24 @@ function setCmdFilter(f,btn){
   renderCmdPatients();
 }
 function renderCommander(){ updateClock(); renderCmdTabs(); renderCmdContent(); }
+function toggleCmdPanel(name){
+  cmdPanelOpen[name]=!cmdPanelOpen[name];
+  applyCmdPanelState();
+}
+function applyCmdPanelState(){
+  Object.keys(cmdPanelOpen).forEach(name=>{
+    const body=document.getElementById(`cmd-panel-${name}`);
+    const meta=document.getElementById(`cmd-panel-${name}-meta`);
+    if(body) body.classList.toggle('collapsed', !cmdPanelOpen[name]);
+    if(meta && !meta.dataset.summary) meta.textContent=cmdPanelOpen[name]?'OPEN':'COLLAPSED';
+  });
+}
+function setCmdPanelMeta(name, summary){
+  const meta=document.getElementById(`cmd-panel-${name}-meta`);
+  if(!meta) return;
+  meta.dataset.summary='1';
+  meta.textContent=summary;
+}
 function renderCmdTabs(){
   const el=document.getElementById('cmd-site-tabs'); if(!el) return;
   el.innerHTML=allSites.map(s=>{
@@ -2600,6 +2705,7 @@ function renderCommandOperationalPanels(pts, site){
   const unsynced=pts.reduce((sum,p)=>sum+(p.unsyncedEvents||0),0)+localOutboxCount();
   const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>s.externalReports||[]):site.externalReports||siteData.externalReports||[];
   const conflicts=externalConflictCount(pts,reports);
+  setCmdPanelMeta('priority', `${pts.filter(p=>p.triage==='red').length} RED · ${stale.length} STALE · ${unsynced} UNSYNCED`);
   document.getElementById('cmd-priority-board').innerHTML=[
     {n:pts.filter(p=>p.triage==='red').length,l:'איפה האדומים?',c:'critical'},
     {n:tqOverdue.length,l:'חסמי עורקים שעברו סף',c:tqOverdue.length?'critical':''},
@@ -2619,6 +2725,7 @@ function renderCommandOperationalPanels(pts, site){
     <div><div class="cmd-matrix-title">בניין ${s.building} · קומה ${s.floor}</div><div class="cmd-matrix-sub">${s.total} פצועים · ${s.critical?'CRITICAL':'STABLE'}</div></div>
     <div class="cmd-matrix-counts"><span style="color:var(--red)">${s.red}R</span><span style="color:var(--yellow)">${s.yellow}Y</span><span style="color:var(--green)">${s.green}G</span><span style="color:var(--muted)">${s.black}B</span></div>
   </div>`).join('') || '<div class="cmd-matrix-row"><div class="cmd-matrix-sub">אין פצועים פעילים למיפוי.</div></div>';
+  setCmdPanelMeta('heatmap', `${sectorMap.size} SECTORS`);
 
   const deviceMap=new Map();
   pts.forEach(p=>{
@@ -2631,12 +2738,15 @@ function renderCommandOperationalPanels(pts, site){
     const silent=Date.now()-d.last>10*60*1000;
     return `<div class="device-row ${silent?'offline':''}"><div><div class="device-name">${d.id}</div><div class="device-meta">${d.patients} פצועים · ${d.unsynced} unsynced</div></div><div class="sync-pill ${silent?'offline':''}">${silent?'SILENT':timeAgoLabel(d.last)}</div></div>`;
   }).join('');
+  setCmdPanelMeta('devices', `${[...deviceMap.values()].filter(d=>Date.now()-d.last>10*60*1000).length} SILENT · ${deviceMap.size} DEVICES`);
 
   const dupes=duplicateCandidates(pts);
   document.getElementById('cmd-duplicates').innerHTML=dupes.length?dupes.map(([a,b])=>`<div class="cmd-matrix-row critical">
     <div><div class="cmd-matrix-title">${a.id} ↔ ${b.id}</div><div class="cmd-matrix-sub">${sectorFromLocation(a.location).building} קומה ${sectorFromLocation(a.location).floor} · מיזוג לא הורס אירועים</div></div>
     <div class="cmd-matrix-counts"><span style="color:var(--orange)">possible duplicate</span></div>
   </div>`).join(''):`<div class="cmd-matrix-row"><div class="cmd-matrix-sub">${conflicts?`${conflicts} פערי דיווח חיצוני מול שדה`:'אין כפילויות חשודות כרגע'}</div></div>`;
+  setCmdPanelMeta('duplicates', `${dupes.length} CANDIDATES`);
+  setCmdPanelMeta('alerts', `${stale.length + tqOverdue.length + conflicts} OPEN`);
 }
 function renderCmdContent(){
   const pts=getSitePatients(cmdActiveSite);
@@ -2697,6 +2807,7 @@ function renderCmdContent(){
     <div style="font-size:11px;color:var(--muted);margin-top:4px;text-align:left">${pct}% מחולצו</div></div>`;
   const rpts=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>(s.externalReports||[]).map(r=>({...r,_site:s.name.split('—')[0].trim()}))):siteData.externalReports;
   document.getElementById('cmd-ext-reports').innerHTML=rpts.length?rpts.map(r=>`<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px;margin-bottom:7px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700">${r.sourceLabel}</span><div style="display:flex;gap:6px">${r._site?`<span style="font-size:10px;color:var(--muted)">${r._site}</span>`:''}<span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${r.time}</span></div></div><div style="font-size:13px">${r.red?`<span style="color:var(--red);font-weight:700">${r.red} קשה </span>`:''}${r.yellow?`<span style="color:var(--yellow);font-weight:700">${r.yellow} בינוני </span>`:''}${r.green?`<span style="color:var(--green);font-weight:700">${r.green} קל</span>`:''}</div></div>`).join(''):'<div style="color:var(--muted);font-size:13px;padding:8px 0">אין דיווחים</div>';
+  applyCmdPanelState();
 }
 function renderCmdPatients(){
   const pts=getSitePatients(cmdActiveSite);
@@ -2974,6 +3085,14 @@ function cancelPanicAction(){
   document.querySelectorAll('#triage-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
 }
 function closePanicModal(e){ if(e.target.id==='panic-confirm-modal') cancelPanicAction(); }
+
+function continueAfterInjuryTrap(){
+  if(state.flowMode === 'quick'){
+    goTo('step8');
+    return;
+  }
+  goTo('step7');
+}
 
 // ── Skip to summary for black triage ─────────────────────
 function skipToSummaryBlack() {
