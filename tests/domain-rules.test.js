@@ -20,6 +20,13 @@ assert.equal(rules.needsVitals(patient({ patientStatus: "evacuating" })), false)
 assert.equal(rules.needsVitals(patient({ patientStatus: "deceased" })), false);
 assert.equal(rules.needsVitals(patient({ patientStatus: "handed_over" })), false);
 assert.equal(rules.needsVitals(patient({ triage: "black" })), false);
+assert.equal(rules.isPediatricPatient({ patientAge: 7 }), true);
+assert.equal(rules.isPediatricPatient({ patientAgeGroup: "pediatric" }), true);
+assert.equal(rules.isPediatricPatient({ patientAge: 8 }), false);
+assert.equal(rules.isPediatricPatient({ patientAge: null, patientAgeGroup: "adult" }), false);
+assert.equal(rules.isHighRiskDose("morphine", 5, { patientAge: 6 }), true);
+assert.equal(rules.isHighRiskDose("morphine", 4, { patientAge: 6 }), false);
+assert.equal(rules.isHighRiskDose("morphine", 10, { patientAge: 12 }), false);
 
 assert.deepEqual(rules.vitalsTimer(patient(), baseTime + 2 * 60 * 1000), {
   cls: "ok",

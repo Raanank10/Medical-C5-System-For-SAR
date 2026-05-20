@@ -1740,6 +1740,127 @@ when (new.type in (
 ))
 execute function refresh_command_state_after_event();
 
+create or replace function trg_verify_pediatric_safety()
+returns trigger as $$
+declare
+  v_override jsonb;
+  v_confirmed boolean;
+begin
+  if new.type <> 'MEDICATION_ADMINISTERED' then
+    return new;
+  end if;
+
+  v_override := coalesce(new.payload_json->'high_risk_override', '{}'::jsonb);
+  v_confirmed := coalesce((v_override->>'confirmed_twice')::boolean, false);
+
+  if coalesce((new.payload_json->>'is_pediatric_override')::boolean, false) = true
+     and v_confirmed = false then
+    insert into watchdog_alerts (
+      incident_id,
+      patient_id,
+      actor_id,
+      alert_type,
+      severity,
+      message,
+      payload_json,
+      dedupe_key
+    )
+    select
+      new.incident_id,
+      new.patient_id,
+      new.actor_id,
+      'HIGH_RISK_CLINICAL_VIOLATION',
+      'critical',
+      'Pediatric medication administered with high-risk dosage override missing double confirmation.',
+      jsonb_build_object(
+        'event_id', new.id,
+        'medication', new.payload_json->>'medication',
+        'dosage', new.payload_json->>'dosage',
+        'route', new.payload_json->>'route',
+        'high_risk_override', v_override
+      ),
+      'pediatric-medication-' || new.id::text
+    where not exists (
+      select 1
+      from watchdog_alerts wa
+      where wa.incident_id = new.incident_id
+        and wa.alert_type = 'HIGH_RISK_CLINICAL_VIOLATION'
+        and wa.dedupe_key = 'pediatric-medication-' || new.id::text
+    );
+  elsif coalesce((new.payload_json->>'is_pediatric_override')::boolean, false) = true then
+    insert into watchdog_alerts (
+      incident_id,
+      patient_id,
+      actor_id,
+      alert_type,
+      severity,
+      message,
+      payload_json,
+      dedupe_key
+    )
+    select
+      new.incident_id,
+      new.patient_id,
+      new.actor_id,
+      'HIGH_RISK_PEDIATRIC_MEDICATION_OVERRIDE',
+      'warning',
+      'Pediatric medication administered with double-confirmed high-risk override.',
+      jsonb_build_object(
+        'event_id', new.id,
+        'medication', new.payload_json->>'medication',
+        'dosage', new.payload_json->>'dosage',
+        'route', new.payload_json->>'route',
+        'high_risk_override', v_override
+      ),
+      'pediatric-medication-reviewed-' || new.id::text
+    where not exists (
+      select 1
+      from watchdog_alerts wa
+      where wa.incident_id = new.incident_id
+        and wa.alert_type = 'HIGH_RISK_PEDIATRIC_MEDICATION_OVERRIDE'
+        and wa.dedupe_key = 'pediatric-medication-reviewed-' || new.id::text
+    );
+  end if;
+
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists audit_verify_pediatric_safety on events;
+create trigger audit_verify_pediatric_safety
+after insert on events
+for each row
+execute function trg_verify_pediatric_safety();
+
+create or replace view vw_command_spatial_heatmap as
+with active_critical_alerts as (
+  select incident_id, patient_id, true as has_critical_alert
+  from watchdog_alerts
+  where resolved_at is null
+    and severity = 'critical'
+  group by incident_id, patient_id
+)
+select
+  p.incident_id,
+  coalesce(p.location_json->>'building', 'unknown') as building_id,
+  coalesce(p.location_json->>'floor', 'unknown') as floor_id,
+  count(p.id) as total_patients_on_site,
+  count(p.id) filter (where p.current_triage = 'red') as count_red_triage,
+  count(p.id) filter (where p.current_triage = 'yellow') as count_yellow_triage,
+  count(p.id) filter (where p.current_triage = 'green') as count_green_triage,
+  count(p.id) filter (where p.current_triage = 'black') as count_deceased,
+  case
+    when bool_or(coalesce(aca.has_critical_alert, false)) then 'high_danger'
+    when count(p.id) filter (where p.current_triage in ('red','yellow')) > 0 then 'active'
+    else 'stable'
+  end as structural_alert_state
+from patients p
+left join active_critical_alerts aca
+  on aca.incident_id = p.incident_id
+ and aca.patient_id = p.id
+where p.current_status not in ('handed_over', 'closed', 'self_evacuated', 'deceased')
+group by p.incident_id, coalesce(p.location_json->>'building', 'unknown'), coalesce(p.location_json->>'floor', 'unknown');
+
 create or replace view vw_command_incident_throughput_funnel as
 with patient_lifecycle_milestones as (
   select

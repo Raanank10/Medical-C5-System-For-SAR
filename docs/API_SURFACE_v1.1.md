@@ -130,6 +130,34 @@ for event in events:
 Clinical events should almost never be rejected. Bad-but-important clinical data is accepted and flagged.
 Only malformed/unparseable envelopes are rejected and quarantined.
 
+## Pediatric High-Risk Medication Event
+
+For patients under age 8, adult-range medication doses must not be blocked in the field UI. The client requires an explicit double confirmation and appends override metadata to the local outbox.
+
+```json
+{
+  "type": "MEDICATION_ADMINISTERED",
+  "patient_id": "30000000-0000-0000-0000-000000000099",
+  "payload_json": {
+    "medication": "Fentanyl",
+    "dosage": "100 mcg",
+    "route": "BUCCAL",
+    "is_pediatric_override": true,
+    "high_risk_override": {
+      "required": true,
+      "confirmed_twice": true,
+      "reason": "Emergency administration due to severe trauma; weight estimated via age group."
+    }
+  }
+}
+```
+
+Backend projection:
+
+- missing or false `confirmed_twice` creates a critical `HIGH_RISK_CLINICAL_VIOLATION` watchdog alert
+- confirmed high-risk overrides create a warning `HIGH_RISK_PEDIATRIC_MEDICATION_OVERRIDE` alert for commander awareness and AAR review
+- the clinical event remains immutable either way
+
 ## MIST Handover Event
 
 When a medic completes MIST handover, the client writes a local `PATIENT_HANDED_OVER` event before attempting network delivery. The receiving unit may scan a secure QR link, but the QR must contain a temporary encrypted token/signature, not embedded clinical files.

@@ -12,6 +12,11 @@
   const TOURNIQUET_WARN_MS = 40 * 60 * 1000;
   const TOURNIQUET_CRITICAL_MS = 60 * 60 * 1000;
   const AVPU_RANK = { A: 0, V: 1, P: 2, U: 3 };
+  const PEDIATRIC_AGE_CUTOFF = 8;
+  const PEDIATRIC_HIGH_RISK_DOSE_LIMITS = {
+    morphine: { max: 4, unit: "mg" },
+    fentanyl: { max: 50, unit: "mcg" },
+  };
   const VITALS_CLOSED_STATUSES = new Set([
     "closed",
     "deceased",
@@ -27,6 +32,20 @@
     if (VITALS_CLOSED_STATUSES.has(patient.patientStatus)) return false;
     if (patient.triage === "black") return false;
     return true;
+  }
+
+  function isPediatricPatient(patient = {}) {
+    if (patient.patientAge == null || patient.patientAge === "") return patient.patientAgeGroup === "pediatric";
+    const age = Number(patient.patientAge);
+    return patient.patientAgeGroup === "pediatric" || (Number.isFinite(age) && age < PEDIATRIC_AGE_CUTOFF);
+  }
+
+  function isHighRiskDose(medicationName, selectedDose, patient = {}) {
+    if (!isPediatricPatient(patient)) return false;
+    const key = String(medicationName || "").toLowerCase();
+    const limit = PEDIATRIC_HIGH_RISK_DOSE_LIMITS[key];
+    const dose = Number(selectedDose);
+    return !!limit && Number.isFinite(dose) && dose > limit.max;
   }
 
   function vitalsAgeMs(patient, nowMs = Date.now()) {
@@ -135,8 +154,12 @@
     detectDeterioration,
     elapsedMinutes,
     isCriticalAlert,
+    isHighRiskDose,
+    isPediatricPatient,
     isRoutineAlert,
     needsVitals,
+    PEDIATRIC_AGE_CUTOFF,
+    PEDIATRIC_HIGH_RISK_DOSE_LIMITS,
     suggestMstartTriage,
     timeCodeToTodayMs,
     tourniquetTimer,

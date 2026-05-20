@@ -30,6 +30,13 @@ Required early capture:
 
 The flow should feel like tactical documentation, not a form. Each screen should answer one operational question.
 
+The app should offer two entry paths:
+
+- Quick Patient: 10-15 second casualty creation with location/access/triage and all other fields treated as optional debt.
+- Extended Patient: full vitals, body map, interventions, and treatment detail.
+
+Quick Patient records must create `needs_full_assessment = true` and a commander-visible incomplete-assessment alert.
+
 Lifecycle status must be projected from events, not manually selected by the medic:
 
 - quick patient created: `identified`
@@ -76,11 +83,15 @@ Black/expectant triage must not force the medic through vitals, interventions, o
 
 When Black is selected:
 
-- route immediately to the confirmation/summary screen
+- require a large double-confirmation target before routing to summary
 - set tactical status to deceased/expectant
 - clear full-assessment debt
 - write a lightweight local `PATIENT_TRIAGED_EXPECTANT` event
 - avoid empty vitals or treatment payloads
+
+## Pediatric Medication Guardrail
+
+For children under age 8, the UI must not require exact weight before treatment. Use age group or age estimate locally, warn on adult-range doses, require double confirmation, and write override metadata into the event payload. The save action still completes locally; risk is escalated through watchdog alerts and AAR review.
 
 ## Tourniquet Clock
 
