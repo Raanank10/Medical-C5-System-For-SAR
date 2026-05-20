@@ -8,12 +8,12 @@
 <meta name="theme-color" content="#0a0a0f">
 <title>RESCUE</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans+Hebrew:wght@300;400;500;600;700&display=swap');
 :root{
   --red:#e63946; --yellow:#f4a261; --green:#2a9d8f; --black:#4a4a4a;
   --bg:#0a0a0f; --surface:#13131a; --surface2:#1c1c27; --border:#2a2a3a;
   --text:#e8e8f0; --muted:#7070a0; --accent:#4361ee; --orange:#ff6b35;
-  --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans Hebrew',sans-serif;
+  --mono:'IBM Plex Mono','Cascadia Mono','Consolas','Roboto Mono',monospace;
+  --sans:'IBM Plex Sans Hebrew','Noto Sans Hebrew','Arial Hebrew','Segoe UI',Arial,sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100dvh;overflow-x:hidden;direction:rtl;}
@@ -94,6 +94,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .alert-banner-title{font-weight:700;font-size:13px;color:var(--red);}
 .alert-banner.warn .alert-banner-title{color:var(--orange);}
 .alert-banner-sub{font-size:11px;color:var(--muted);margin-top:1px;}
+.ack-btn{border:1px solid var(--accent);background:rgba(67,97,238,.16);color:#fff;border-radius:10px;padding:8px 10px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;}
 .alert-slicer{display:flex;gap:6px;padding:4px 16px 8px;overflow-x:auto;}
 .alert-slice{background:var(--surface);border:1px solid var(--border);border-radius:999px;color:var(--muted);font-size:12px;font-weight:700;padding:7px 11px;white-space:nowrap;cursor:pointer;}
 .alert-slice.active{background:rgba(230,57,70,0.12);border-color:var(--red);color:var(--red);}
@@ -225,6 +226,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .count-stepper .vital-btn{flex:1;min-width:42px;font-size:16px;font-weight:700;}
 .count-stepper .vital-val{min-width:56px;flex:none;}
 .count-row + .calc-confirm{margin-top:8px;}
+.count-timer{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;margin-top:8px;}
+.count-timer button{min-height:44px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;font-weight:800;cursor:pointer;}
+.count-timer button.primary{border-color:var(--accent);background:rgba(67,97,238,.16);color:#fff;}
+.count-timer .timer-readout{font-family:var(--mono);font-size:12px;color:var(--accent);min-width:54px;text-align:center;}
 .avpu-row{display:flex;gap:8px;}
 .avpu-btn{flex:1;padding:14px 4px;background:var(--surface2);border:2px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:18px;font-weight:700;cursor:pointer;text-align:center;transition:all 0.12s;min-height:56px;touch-action:manipulation;}
 .avpu-btn.selected{border-color:var(--accent);background:rgba(67,97,238,0.15);color:var(--accent);}
@@ -372,6 +377,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .sync-pill.offline{border-color:var(--red);color:var(--red);}
 .demo-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 16px 12px;}
 .demo-mini-btn{background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--sans);font-weight:700;font-size:13px;padding:11px 8px;cursor:pointer;}
+.experiment-strip{margin:0 16px 10px;background:rgba(67,97,238,.08);border:1px solid rgba(67,97,238,.35);border-radius:12px;padding:11px 12px;}
+.experiment-title{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;color:var(--accent);text-transform:uppercase;margin-bottom:5px;}
+.experiment-meta{font-size:12px;color:var(--text);line-height:1.55;}
 .aar-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:0 16px 12px;}
 .aar-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 10px;text-align:center;}
 .aar-num{font-family:var(--mono);font-size:26px;font-weight:800;}
@@ -397,7 +405,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen active">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">PC DEMO MVP v1</div>
+      <div class="demo-kicker">FIELD EXPERIMENT v1.2</div>
       <div class="demo-title">C5 Sentinel-SAR</div>
       <div class="demo-sub">
         תרחיש הדגמה מבצעי למפקד מחלקה: פצועים, מדדים, חסמי עורקים, התראות, תמונת מצב ואירוע מסכם.
@@ -440,10 +448,14 @@ textarea{resize:vertical;min-height:70px;}
 
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Demo MVP v1</div>
+      <div class="demo-strip-title">Field Experiment — Synthetic Scenario Mode v1.2</div>
       <div class="demo-strip-sub" id="demo-status-line">תרחיש PC פעיל</div>
     </div>
     <div class="sync-pill" id="sync-pill-dashboard">SYNC</div>
+  </div>
+  <div class="experiment-strip">
+    <div class="experiment-title">controlled field test</div>
+    <div class="experiment-meta" id="experiment-line-dashboard">—</div>
   </div>
 
   <!-- Big action buttons -->
@@ -474,6 +486,8 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-actions">
     <button class="demo-mini-btn" onclick="goTo('aar')">AAR חי</button>
+    <button class="demo-mini-btn" onclick="addObserverNote()">הערת צופה</button>
+    <button class="demo-mini-btn" onclick="exportExperimentLog()">ייצוא ניסוי</button>
     <button class="demo-mini-btn" onclick="loadDemoScenario(true);goTo('dashboard')">אפס דמו</button>
   </div>
 
@@ -670,7 +684,7 @@ textarea{resize:vertical;min-height:70px;}
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
         <input type="text" id="quick-tq-time" inputmode="numeric" maxlength="4"
           placeholder="אוטומטי" style="flex:1;font-family:var(--mono);font-size:18px;letter-spacing:4px"
-          oninput="onQuickTQTimeInput(this.value)">
+          oninput="onQuickTQTimeInput(this.value)" onblur="validateQuickTQTime(true)">
         <button onclick="setQuickTQTimeNow()" style="background:var(--accent);border:none;color:white;border-radius:10px;padding:10px 14px;font-size:12px;font-weight:700;cursor:pointer">עכשיו</button>
       </div>
       <div id="quick-tq-display" style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:12px"></div>
@@ -712,15 +726,26 @@ textarea{resize:vertical;min-height:70px;}
         <strong style="color:var(--accent)">מסלול מהיר:</strong>
         מדדים בינאריים בלבד. המערכת שומרת חוב הערכה להשלמה בהמשך.
       </div>
+      <div class="field-label">יכול ללכת?</div>
+      <div class="tap-grid tap-grid-2" id="rapid-walking-grid" style="margin-bottom:14px">
+        <button class="tap-btn" onclick="selectRapidWalking(this,true)"><span class="icon">🚶</span>הולך</button>
+        <button class="tap-btn" onclick="selectRapidWalking(this,false)"><span class="icon">🛑</span>לא הולך</button>
+      </div>
+      <div class="field-label">דימום מאסיבי?</div>
+      <div class="tap-grid tap-grid-2" id="rapid-bleeding-grid" style="margin-bottom:14px">
+        <button class="tap-btn" onclick="selectRapidBleeding(this,true)"><span class="icon">🔴</span>כן</button>
+        <button class="tap-btn" onclick="selectRapidBleeding(this,false)"><span class="icon">✅</span>לא</button>
+      </div>
       <div class="field-label">נשימה</div>
       <div class="tap-grid tap-grid-2" id="rapid-breathing-grid" style="margin-bottom:14px">
         <button class="tap-btn" onclick="selectRapidBreathing(this,true)"><span class="icon">✅</span>נושם</button>
         <button class="tap-btn" onclick="selectRapidBreathing(this,false)"><span class="icon">🚫</span>לא נושם</button>
       </div>
-      <div class="field-label">הכרה — AVPU בינארי</div>
-      <div class="tap-grid tap-grid-2" id="rapid-avpu-grid" style="margin-bottom:14px">
+      <div class="field-label">הכרה — AVPU מהיר</div>
+      <div class="tap-grid" id="rapid-avpu-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
         <button class="tap-btn" onclick="selectRapidAvpu(this,'A')"><span class="icon">👀</span>AVPU = A</button>
-        <button class="tap-btn" onclick="selectRapidAvpu(this,'V')"><span class="icon">⚠</span>AVPU אינו A</button>
+        <button class="tap-btn" onclick="selectRapidAvpu(this,'V')"><span class="icon">🗣</span>V</button>
+        <button class="tap-btn" onclick="selectRapidAvpu(this,'P')"><span class="icon">⚠</span>P/U</button>
       </div>
       <div class="field-label">לחץ דם / דופק רדיאלי</div>
       <div class="tap-grid tap-grid-2" id="rapid-bp-grid" style="margin-bottom:14px">
@@ -758,6 +783,11 @@ textarea{resize:vertical;min-height:70px;}
         <div class="count-mult">× 4</div>
       </div>
       <div class="calc-confirm" id="v-pulse-calc">20 פעימות ב-15 שניות = 80 BPM</div>
+      <div class="count-timer">
+        <button class="primary" onclick="startCountTimer('pulse15',15)">START 15s</button>
+        <button onclick="stopCountTimer('pulse15')">STOP</button>
+        <div class="timer-readout" id="timer-pulse15">READY</div>
+      </div>
     </div>
 
     <!-- RR 30s -->
@@ -778,6 +808,11 @@ textarea{resize:vertical;min-height:70px;}
         <div class="count-mult">× 2</div>
       </div>
       <div class="calc-confirm" id="v-rr-calc">8 נשימות ב-30 שניות = 16 / דקה</div>
+      <div class="count-timer">
+        <button class="primary" onclick="startCountTimer('rr30',30)">START 30s</button>
+        <button onclick="stopCountTimer('rr30')">STOP</button>
+        <div class="timer-readout" id="timer-rr30">READY</div>
+      </div>
       <button id="no-breathing-btn" onclick="setNoBreathing()" style="background:rgba(230,57,70,0.1);border:1.5px solid var(--red);border-radius:10px;padding:10px;color:var(--red);font-size:14px;font-weight:700;cursor:pointer;width:100%">🚫 לא נושם</button>
     </div>
 
@@ -955,7 +990,7 @@ textarea{resize:vertical;min-height:70px;}
       <div style="font-weight:700;font-size:14px;color:var(--red);margin-bottom:10px">🔴 פרטי חסם עורקים</div>
       <div class="field-label">שעת הנחה (4 ספרות)</div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-        <input type="text" id="tourniquet-time-input" inputmode="numeric" maxlength="4" placeholder="אוטומטי" style="flex:1;font-family:var(--mono);font-size:18px;letter-spacing:4px" oninput="onTQTimeInput(this.value)">
+        <input type="text" id="tourniquet-time-input" inputmode="numeric" maxlength="4" placeholder="אוטומטי" style="flex:1;font-family:var(--mono);font-size:18px;letter-spacing:4px" oninput="onTQTimeInput(this.value)" onblur="validateTQTimeInput(true)">
         <button onclick="setTQTimeNow()" style="background:var(--accent);border:none;color:white;border-radius:10px;padding:10px 14px;font-size:12px;font-weight:700;cursor:pointer">עכשיו</button>
       </div>
       <div id="tq-time-display" style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:12px"></div>
@@ -1085,6 +1120,10 @@ textarea{resize:vertical;min-height:70px;}
     </div>
     <div class="sync-pill" id="sync-pill-command">SYNC</div>
   </div>
+  <div class="experiment-strip">
+    <div class="experiment-title">field experiment control</div>
+    <div class="experiment-meta" id="experiment-line-command">—</div>
+  </div>
   <div style="display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto" id="cmd-site-tabs"></div>
   <div style="padding:12px 16px 0"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px" id="cmd-totals"></div></div>
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('priority')"><span>תעדוף מפקד</span><span class="cmd-panel-sub" id="cmd-panel-priority-meta">OPEN</span></button>
@@ -1099,6 +1138,7 @@ textarea{resize:vertical;min-height:70px;}
   <div id="cmd-panel-alerts" class="cmd-panel-body"><div id="cmd-alerts" style="padding:6px 16px 0"></div></div>
   <div class="demo-actions">
     <button class="demo-mini-btn" onclick="goTo('aar')">פתח AAR</button>
+    <button class="demo-mini-btn" onclick="exportExperimentLog()">ייצוא ניסוי</button>
     <button class="demo-mini-btn" onclick="setDemoSyncMode()">החלף Sync</button>
   </div>
   <div style="display:flex;gap:6px;padding:10px 16px 4px;overflow-x:auto">
@@ -1141,6 +1181,7 @@ textarea{resize:vertical;min-height:70px;}
   <div id="aar-insights"></div>
   <div class="demo-actions">
     <button class="demo-mini-btn" onclick="goTo('commander')">חזרה לחפ״ק</button>
+    <button class="demo-mini-btn" onclick="exportExperimentLog()">ייצוא AAR</button>
     <button class="demo-mini-btn" onclick="loadDemoScenario(true);goTo('aar')">אפס AAR</button>
   </div>
   <div style="height:70px"></div>
@@ -1171,6 +1212,11 @@ textarea{resize:vertical;min-height:70px;}
         <div class="count-mult">× 4</div>
       </div>
       <div class="calc-confirm" id="mv-pulse-calc">20 פעימות ב-15 שניות = 80 BPM</div>
+      <div class="count-timer">
+        <button class="primary" onclick="startCountTimer('mpulse15',15)">START 15s</button>
+        <button onclick="stopCountTimer('mpulse15')">STOP</button>
+        <div class="timer-readout" id="timer-mpulse15">READY</div>
+      </div>
     </div>
 
     <!-- SpO2 -->
@@ -1218,6 +1264,11 @@ textarea{resize:vertical;min-height:70px;}
         <div class="count-mult">× 2</div>
       </div>
       <div class="calc-confirm" id="mv-rr-calc">8 נשימות ב-30 שניות = 16 / דקה</div>
+      <div class="count-timer">
+        <button class="primary" onclick="startCountTimer('mrr30',30)">START 30s</button>
+        <button onclick="stopCountTimer('mrr30')">STOP</button>
+        <div class="timer-readout" id="timer-mrr30">READY</div>
+      </div>
       <button onclick="setModalNoBreathing()" style="background:rgba(230,57,70,0.1);border:1.5px solid var(--red);border-radius:10px;padding:10px;color:var(--red);font-size:14px;font-weight:700;cursor:pointer;width:100%">🚫 לא נושם</button>
     </div>
 
@@ -1251,12 +1302,21 @@ textarea{resize:vertical;min-height:70px;}
 'use strict';
 const C5Rules = window.C5DomainRules;
 if(!C5Rules) throw new Error('C5 domain rules failed to load');
+
+// v1.2 field-flow map:
+// Regular: dashboard -> step1 intake -> step3 hemorrhage/TQ -> step4 full vitals -> step5 triage -> step2 location -> step6 body/trap -> step7 treatment -> step8 summary.
+// Rapid: dashboard -> step1 intake -> step2 location -> step4 binary vitals -> step5 triage -> step6 body/trap -> step8 summary.
+// Black/expectant: step5 selection -> panic double-confirm -> optional trap modal -> step8 summary.
+
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
 const VITALS_INTERVAL_MS = C5Rules.VITALS_INTERVAL_MS;
 const WARN_AT_MS = C5Rules.WARN_AT_MS;
+const APP_VERSION = '1.2.0';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
+const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
+const CONFLICT_LOG_KEY = 'c5-sentinel-sar-conflict-log-v1';
 const DEVICE_ID_KEY = 'c5-sentinel-sar-device-id';
 const AVPU_RANK = C5Rules.AVPU_RANK;
 const COUNT_LIMITS = {
@@ -1336,8 +1396,9 @@ function freshState(){
     accessibility:null, trapStatus:null, sabcde:{},
     flowMode:'extended', patientAgeGroup:'adult', patientAge:null,
     injury:null, injuryZones:new Set(), patientStatus:'identified',
+    rapidWalking:null, rapidMajorBleeding:null,
     interventions:new Set(), triage:null,
-    needsFullAssessment:true, localEvents:[], pediatricOverrides:{}, pendingMedicationOverride:null,
+    needsFullAssessment:true, localEvents:[], localStockCache:{CAT_TOURNIQUET:2,MORPHINE_10MG:4,FENTANYL_ACTIQ:2,IV_FLUID_500ML:3,BANDAGE_6INCH:8}, pediatricOverrides:{}, pendingMedicationOverride:null,
     vitalsMedicName:'', txMedicName:''
   };
 }
@@ -1367,6 +1428,11 @@ let holdTimer=null, holdInterval=null;
 let patients = [];
 let demoSyncMode = 'fresh';
 let lastSyncAt = Date.now();
+let experimentStartedAt = new Date().toISOString();
+let experimentPhase = 'intake-drill';
+let demoRevision = 0;
+let modalOpenedLastModified = null;
+let vitalCountdowns = {};
 
 function minutesAgo(min){ return Date.now() - min * 60 * 1000; }
 function timeAgoLabel(ms){
@@ -1382,7 +1448,8 @@ function toast(text){
   setTimeout(()=>msg.remove(),2200);
 }
 function demoPatient(id, triage, accessibility, location, injury, patientStatus, vitals, lastVitalsMin, extra={}){
-  const t=timeAgoLabel(minutesAgo(extra.createdMin||35));
+  const createdAt=minutesAgo(extra.createdMin||35);
+  const t=timeAgoLabel(createdAt);
   const deterioration=extra.deterioration||[];
   return {
     id, triage, accessibility, trapStatus:extra.trapStatus||normalizeTrapStatus({accessibility}), location, locDetail:extra.locDetail||'',
@@ -1395,6 +1462,7 @@ function demoPatient(id, triage, accessibility, location, injury, patientStatus,
     tourniquet:extra.tourniquet||null,
     medic:extra.medic||'',
     lastTouchedBy:extra.lastTouchedBy||extra.medic||'PHONE-ALFA',
+    lastModifiedAt:extra.lastModifiedAt||new Date(createdAt).toISOString(),
     confirmedClinical:extra.confirmedClinical!==false,
     needsFullAssessment:!!extra.needsFullAssessment,
     unsyncedEvents:extra.unsyncedEvents||0,
@@ -1440,7 +1508,7 @@ function loadDemoScenario(persist=false){
       {pulse:96,spo2:97,bp_estimate:'radial',rr:22,avpu:'A'},3,{siteId:'SITE_A', medic:'חובש לוי', lastTouchedBy:'PHONE-BETA', needsFullAssessment:true}),
     demoPatient('P-003','green','full','בניין 15B, קומה 1','ילד, שפשופים וחרדה','evacuated',
       {pulse:110,spo2:99,bp_estimate:'radial',rr:28,avpu:'A'},1,{siteId:'SITE_B', medic:'חובש כהן', createdMin:28, patientAgeGroup:'pediatric', patientAge:6, lastTouchedBy:'PHONE-ALFA',
-        events:[{type:'PATIENT_HANDED_OVER',time:timeAgoLabel(minutesAgo(4)),detail:'הועבר למד"א — QR handover'}]}),
+        events:[{type:'PATIENT_HANDED_OVER',time:timeAgoLabel(minutesAgo(4)),detail:'הועבר למד"א — MIST logged'}]}),
     demoPatient('P-004','red','none','בניין 15B, קומה 2, חדר מדרגות','לכוד — נדרש חילוץ','monitoring',
       {pulse:118,spo2:null,bp_estimate:'carotid',rr:30,avpu:'V'},12,{siteId:'SITE_B', medic:'חובש לוי', alert:true, lastTouchedBy:'PHONE-BETA',
         events:[{type:'PATIENT_ACCESS_UPDATED',time:timeAgoLabel(minutesAgo(20)),detail:'סטטוס חילוץ: לכוד',warn:true}]}),
@@ -1454,7 +1522,17 @@ function loadDemoScenario(persist=false){
 }
 function saveDemoState(){
   try{
-    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:2,savedAt:new Date().toISOString(),siteData,patients,demoSyncMode,lastSyncAt}));
+    const raw=localStorage.getItem(DEMO_STORAGE_KEY);
+    if(raw){
+      const current=JSON.parse(raw);
+      if(current.revision && current.revision > demoRevision){
+        const conflicts=conflictLog();
+        conflicts.push({timestamp:new Date().toISOString(),device_id:getDeviceId(),local_revision:demoRevision,stored_revision:current.revision,reason:'last_write_conflict_detected'});
+        localStorage.setItem(CONFLICT_LOG_KEY, JSON.stringify(conflicts.slice(-200)));
+      }
+    }
+    demoRevision += 1;
+    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:3,appVersion:APP_VERSION,revision:demoRevision,savedAt:new Date().toISOString(),experimentStartedAt,experimentPhase,siteData,patients,demoSyncMode,lastSyncAt}));
   }catch(e){}
 }
 function loadStoredDemoState(){
@@ -1466,6 +1544,7 @@ function loadStoredDemoState(){
     siteData=saved.siteData||siteData;
     patients=saved.patients;
     patients.forEach(p=>{
+      if(!p.lastModifiedAt) p.lastModifiedAt=saved.savedAt||new Date().toISOString();
       if(!p.trapStatus) p.trapStatus=normalizeTrapStatus(p);
       if(Array.isArray(p.vitalsHistory)){
         p.vitalsHistory.forEach(h=>{ if(h.rr===undefined) h.rr=p.vitals?.rr ?? null; });
@@ -1473,6 +1552,9 @@ function loadStoredDemoState(){
     });
     demoSyncMode=saved.demoSyncMode||'fresh';
     lastSyncAt=saved.lastSyncAt||Date.now();
+    demoRevision=saved.revision||0;
+    experimentStartedAt=saved.experimentStartedAt||experimentStartedAt;
+    experimentPhase=saved.experimentPhase||experimentPhase;
     allSites.find(s=>s.id==='SITE_A').externalReports=siteData.externalReports||[];
     return true;
   }catch(e){ return false; }
@@ -1503,6 +1585,87 @@ function updateDemoStatus(){
   const handed=patients.filter(p=>['evacuating','evacuated'].includes(p.patientStatus)).length;
   const line=`${patients.length} פצועים · ${openAlerts} התראות · ${handed} הועברו`;
   ['demo-status-line','cmd-demo-line'].forEach(id=>{const el=document.getElementById(id); if(el) el.textContent=line;});
+  updateExperimentLine();
+}
+
+function haptic(pattern=35){
+  try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(e){}
+}
+function observerNotes(){
+  try{return JSON.parse(localStorage.getItem(OBSERVER_NOTES_KEY)||'[]');}catch(e){return [];}
+}
+function conflictLog(){
+  try{return JSON.parse(localStorage.getItem(CONFLICT_LOG_KEY)||'[]');}catch(e){return [];}
+}
+function updateExperimentLine(){
+  const started=new Date(experimentStartedAt);
+  const mins=Math.max(0, Math.round((Date.now()-started.getTime())/60000));
+  const notes=observerNotes().length;
+  const conflicts=conflictLog().length;
+  const line=`תרחיש: ${siteData.name||'ללא מוקד'} · תפקיד: חובש/PC · מכשיר: ${getDeviceId()} · התחלה: ${started.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})} · שלב: ${experimentPhase} · ${notes} הערות · ${conflicts} התנגשויות · ${mins} דק׳`;
+  ['experiment-line-dashboard','experiment-line-command'].forEach(id=>{const el=document.getElementById(id); if(el) el.textContent=line;});
+}
+function addObserverNote(){
+  const text=prompt('הערת צופה לניסוי:');
+  if(!text) return;
+  const notes=observerNotes();
+  notes.push({timestamp:new Date().toISOString(),device_id:getDeviceId(),phase:experimentPhase,note:text});
+  localStorage.setItem(OBSERVER_NOTES_KEY, JSON.stringify(notes));
+  toast('הערת צופה נשמרה');
+  updateExperimentLine();
+}
+function csvEscape(v){ return `"${String(v ?? '').replace(/"/g,'""')}"`; }
+function toCsv(rows, headers){
+  return [headers.join(','), ...rows.map(r=>headers.map(h=>csvEscape(r[h])).join(','))].join('\n');
+}
+function downloadTextFile(filename, text, type='text/plain'){
+  const blob=new Blob([text],{type});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1200);
+}
+function assessmentDebtForPatient(p){
+  const debt=[];
+  if(!p.location || p.location==='לא צוין') debt.push('missing_location');
+  if(!p.triage || p.triage==='pending') debt.push('missing_triage');
+  if(!p.vitals || p.vitals.rr===null || p.vitals.rr===undefined || !p.vitals.avpu || !p.vitals.bp_estimate) debt.push('missing_vitals');
+  if(!normalizeTrapStatus(p)) debt.push('missing_trap_status');
+  if(!p.txHistory || !p.txHistory.length) debt.push('missing_treatment');
+  if(!['evacuating','evacuated','handed_over'].includes(p.patientStatus)) debt.push('missing_handover');
+  if(needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS) debt.push('stale_vitals');
+  if(p.tourniquet && !p.tourniquet.timeCode) debt.push('tourniquet_time_unknown');
+  return debt;
+}
+function exportExperimentLog(){
+  const events=patients.flatMap(p=>(p.events||[]).map(e=>({
+    patient_id:p.id, triage:p.triage, location:p.location, type:e.type, time:e.time,
+    detail:e.detail, warn:!!e.warn, device_id:p.lastTouchedBy||p.medic||''
+  })));
+  const patientRows=patients.map(p=>({
+    id:p.id, triage:p.triage, status:p.patientStatus, location:p.location,
+    trap_status:normalizeTrapStatus(p)||'', last_touched_by:p.lastTouchedBy||p.medic||'',
+    needs_full_assessment:!!p.needsFullAssessment, assessment_debt:assessmentDebtForPatient(p).join('|'),
+    last_modified_at:p.lastModifiedAt||''
+  }));
+  const metrics={
+    app_version:APP_VERSION,
+    scenario_name:siteData.name,
+    device_id:getDeviceId(),
+    started_at:experimentStartedAt,
+    exported_at:new Date().toISOString(),
+    total_patients:patients.length,
+    stale_patients:patients.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS).length,
+    unsynced_events:patients.reduce((s,p)=>s+(p.unsyncedEvents||0),0)+localOutboxCount(),
+    commander_open_alerts:patients.filter(p=>isCriticalAlert(p)||hasRoutineAlert(p)).length,
+    acknowledged_alerts:patients.filter(p=>p.alertAcknowledgedAt).length,
+    conflict_count:conflictLog().length
+  };
+  downloadTextFile('experiment_events.csv', toCsv(events, ['patient_id','triage','location','type','time','detail','warn','device_id']), 'text/csv');
+  downloadTextFile('patients_summary.csv', toCsv(patientRows, ['id','triage','status','location','trap_status','last_touched_by','needs_full_assessment','assessment_debt','last_modified_at']), 'text/csv');
+  downloadTextFile('aar_metrics.json', JSON.stringify(metrics,null,2), 'application/json');
+  downloadTextFile('observer_notes.csv', toCsv(observerNotes(), ['timestamp','device_id','phase','note']), 'text/csv');
+  toast('קבצי ניסוי יוצאו');
 }
 
 // ═══════════════════════════════════════════════
@@ -1559,6 +1722,7 @@ function goTo(screen){
   document.getElementById('screen-'+screen).classList.add('active');
   window.scrollTo(0,0);
   if(screen==='dashboard'){ renderDashboard(); renderAlerts(); }
+  if(screen==='step2')     { const b=document.querySelector('#screen-step2 .btn-back'); if(b) b.setAttribute('onclick', `goTo('${state.flowMode==='quick' && !state.triage ? 'step1' : 'step5'}')`); }
   if(screen==='step4')     { setVitalsModeView(); setDeviceLabels(); checkStep4(); }
   if(screen==='step5')     showMstartSuggestion();
   if(screen==='step7')     { renderTourniquetReminder(); setDeviceLabels(); checkStep7(); }
@@ -1670,9 +1834,9 @@ function renderAlerts(){
   list.forEach(p=>{
     if(isCriticalAlert(p)){
       const reason=(p.deterioration&&p.deterioration.length)?p.deterioration.join(' · '):TRIAGE_LABELS[p.triage];
-      h+=`<div class="alert-banner" onclick="openQuickVitals('${p.id}')"><span style="font-size:20px">🚨</span><div style="flex:1"><div class="alert-banner-title">${p.id} — קריטי</div><div class="alert-banner-sub">${reason}</div></div></div>`;
+      h+=`<div class="alert-banner" onclick="openQuickVitals('${p.id}')"><span style="font-size:20px">🚨</span><div style="flex:1"><div class="alert-banner-title">${p.id} — קריטי</div><div class="alert-banner-sub">${reason}</div></div><button class="ack-btn" onclick="event.stopPropagation();acknowledgeAlert('${p.id}')">בטיפול</button></div>`;
     } else {
-      h+=`<div class="alert-banner warn" onclick="openQuickVitals('${p.id}')"><span style="font-size:20px">⏱</span><div><div class="alert-banner-title">${p.id} — מדדים נדרשים</div><div class="alert-banner-sub">${p.location}</div></div></div>`;
+      h+=`<div class="alert-banner warn" onclick="openQuickVitals('${p.id}')"><span style="font-size:20px">⏱</span><div style="flex:1"><div class="alert-banner-title">${p.id} — מדדים נדרשים</div><div class="alert-banner-sub">${p.location}</div></div><button class="ack-btn" onclick="event.stopPropagation();acknowledgeAlert('${p.id}')">בטיפול</button></div>`;
     }
   });
   document.getElementById('alerts-banner').innerHTML=h;
@@ -1719,6 +1883,33 @@ function setModalNoBreathing(){
   document.getElementById('mv-rr-rate').textContent='0';
   const calc=document.getElementById('mv-rr-calc');
   if(calc) calc.textContent='0 נשימות ב-30 שניות = 0 / דקה';
+}
+
+function startCountTimer(kind, seconds){
+  stopCountTimer(kind, false);
+  haptic(35);
+  const el=document.getElementById(`timer-${kind}`);
+  let remaining=seconds;
+  if(el) el.textContent=`${remaining}s`;
+  vitalCountdowns[kind]=setInterval(()=>{
+    remaining -= 1;
+    if(el) el.textContent=remaining>0?`${remaining}s`:'DONE';
+    if(remaining<=0){
+      stopCountTimer(kind, false);
+      haptic([120,70,120]);
+      updateCountDisplay(kind);
+    }
+  },1000);
+}
+function stopCountTimer(kind, buzz=true){
+  if(vitalCountdowns[kind]){
+    clearInterval(vitalCountdowns[kind]);
+    delete vitalCountdowns[kind];
+  }
+  if(buzz) haptic(45);
+  updateCountDisplay(kind);
+  const el=document.getElementById(`timer-${kind}`);
+  if(el && el.textContent!=='DONE') el.textContent='STOP';
 }
 
 // ── Fix 5: black skip toggle ──────────────────────────────
@@ -1799,7 +1990,7 @@ function openPatient(id){
       </div>`).join('')}
     <div style="height:80px"></div>`;
 
-  document.getElementById('detail-bottom-bar').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn-primary" onclick="openQuickVitals('${p.id}')">📊 עדכן מדדים</button><button class="btn-primary" style="background:var(--green)" onclick="handoverPatient('${p.id}')">MIST מסירה</button></div>`;
+  document.getElementById('detail-bottom-bar').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn-primary" onclick="openQuickVitals('${p.id}')">📊 עדכן מדדים</button><button class="btn-primary" style="background:var(--green)" onclick="handoverPatient('${p.id}')">MIST נרשם</button></div>`;
   goTo('patient');
 }
 
@@ -1809,14 +2000,15 @@ function handoverPatient(id){
   p.patientStatus='evacuating';
   p.needsFullAssessment=false;
   p.lastTouchedBy=deviceId;
+  p.lastModifiedAt=new Date().toISOString();
   p.unsyncedEvents=(p.unsyncedEvents||0)+1;
   const event={
     type:'PATIENT_HANDED_OVER',
     time:nowT(),
-    detail:'MIST handover — secure QR token queued',
+    detail:'MIST handover logged locally',
     warn:false,
     payload_json:{
-      handover_method:'secure_qr_token',
+      handover_method:'mist_logged_local',
       receiving_unit_transport:'pending',
       mist_summary:{mechanism:p.injury, injuries:p.injury, signs:`HR ${p.vitals.pulse}, RR ${p.vitals.rr}, AVPU=${p.vitals.avpu||'—'}`, treatment:(p.txHistory||[]).map(tx=>tx.text).join('; ')||'none recorded'}
     }
@@ -1828,7 +2020,7 @@ function handoverPatient(id){
     localStorage.setItem('c5_local_sqlite_outbox', JSON.stringify(outbox.slice(-500)));
   }catch(e){}
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
-  toast('MIST נרשם ונשלח לתור סנכרון');
+  toast('MIST נרשם מקומית');
   openPatient(id);
 }
 
@@ -2006,13 +2198,17 @@ function selectFlowMode(btn, val){
 function continueAfterIntake(){
   if(state.flowMode === 'quick'){
     state.needsFullAssessment = true;
-    goTo('step4');
+    goTo('step2');
     return;
   }
   goTo('step3');
 }
 
 function continueAfterLocation(){
+  if(state.flowMode === 'quick' && !state.triage){
+    goTo('step4');
+    return;
+  }
   goTo('step6');
 }
 
@@ -2030,7 +2226,7 @@ function continueAfterTriage(){
       warn:true,
       payload_json:{needs_full_assessment:true, triage:state.triage, capture_mode:'quick_dirty'}
     });
-    goTo('step2');
+    goTo('step6');
     return;
   }
   goTo('step2');
@@ -2095,10 +2291,26 @@ function setVitalsModeView(){
 function updateRapidVitalsSummary(){
   const el=document.getElementById('rapid-vitals-summary');
   if(!el) return;
+  const walking=state.rapidWalking===null?'—':state.rapidWalking?'הולך':'לא הולך';
+  const bleeding=state.rapidMajorBleeding===null?'—':state.rapidMajorBleeding?'דימום':'ללא דימום';
   const breathing=flowVitals.rr===0?'לא נושם':flowVitals.rr?'נושם':'—';
-  const avpu=flowVitals.avpu?flowVitals.avpu==='A'?'A':'לא A':'—';
+  const avpu=flowVitals.avpu||'—';
   const bp=flowVitals.bp_estimate==='radial'?'מעל 100':flowVitals.bp_estimate?'מתחת 100':'—';
-  el.textContent=`נשימה: ${breathing} · AVPU: ${avpu} · לחץ דם: ${bp}`;
+  el.textContent=`הליכה: ${walking} · דימום: ${bleeding} · נשימה: ${breathing} · AVPU: ${avpu} · לחץ דם: ${bp}`;
+}
+function selectRapidWalking(btn, canWalk){
+  document.querySelectorAll('#rapid-walking-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  state.rapidWalking=canWalk;
+  if(canWalk && !state.triage) state.triage='green';
+  updateRapidVitalsSummary();
+}
+function selectRapidBleeding(btn, hasBleeding){
+  document.querySelectorAll('#rapid-bleeding-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  state.rapidMajorBleeding=hasBleeding;
+  if(hasBleeding) projectPatientStatus('stabilizing','MAJOR_BLEEDING_NOTED',{capture_mode:'rapid'});
+  updateRapidVitalsSummary();
 }
 function selectRapidBreathing(btn, isBreathing){
   document.querySelectorAll('#rapid-breathing-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
@@ -2110,7 +2322,7 @@ function selectRapidBreathing(btn, isBreathing){
 function selectRapidAvpu(btn, val){
   document.querySelectorAll('#rapid-avpu-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
-  flowVitals.avpu = val === 'A' ? 'A' : 'V';
+  flowVitals.avpu = val;
   updateRapidVitalsSummary();
 }
 function selectRapidBp(btn, val){
@@ -2118,6 +2330,7 @@ function selectRapidBp(btn, val){
   btn.classList.add('selected');
   flowVitals.bp_estimate = val;
   flowVitals.pulse = val === 'radial' ? 88 : 128;
+  counts.pulse15 = Math.round(flowVitals.pulse/4);
   updateRapidVitalsSummary();
 }
 function toggleSpo2(){
@@ -2201,6 +2414,7 @@ function toggleChip(btn, key){
   btn.classList.toggle('selected');
   if(state.interventions.has(key)) state.interventions.delete(key);
   else state.interventions.add(key);
+  if(key==='tourniquet' && state.interventions.has(key)) haptic([120,60,120]);
   document.getElementById('tourniquet-wrap').style.display=state.interventions.has('tourniquet')?'block':'none';
   document.getElementById('morphine-wrap').style.display=state.interventions.has('morphine')?'block':'none';
   document.getElementById('fluids-wrap').style.display=state.interventions.has('fluids')?'block':'none';
@@ -2224,9 +2438,26 @@ function setTQTimeNow(){
   tqData.time=t;
   updateTQDisplay(t);
 }
+function isValidTimeCode(val){
+  if(!/^\d{4}$/.test(val||'')) return false;
+  const hh=Number(val.slice(0,2)), mm=Number(val.slice(2));
+  return hh>=0 && hh<=23 && mm>=0 && mm<=59;
+}
 function onTQTimeInput(val){
-  if(val.length===4&&/^\d{4}$/.test(val)){ tqData.time=val; updateTQDisplay(val); }
+  if(val.length===4&&isValidTimeCode(val)){ tqData.time=val; updateTQDisplay(val); }
   else { tqData.time=null; document.getElementById('tq-time-display').textContent=''; }
+}
+function validateTQTimeInput(showToast=false){
+  const el=document.getElementById('tourniquet-time-input');
+  const val=el?.value||'';
+  if(!val) return true;
+  const ok=isValidTimeCode(val);
+  if(!ok){
+    tqData.time=null;
+    document.getElementById('tq-time-display').textContent='שעה לא תקינה — השתמש בפורמט HHMM, 0000-2359';
+    if(showToast) toast('שעת חסם לא תקינה');
+  }
+  return ok;
 }
 function updateTQDisplay(val){ document.getElementById('tq-time-display').textContent=`שעת הנחה: ${val.slice(0,2)}:${val.slice(2)}`; }
 function toggleLimb(btn, key){
@@ -2253,10 +2484,9 @@ function showMstartSuggestion(){
   const modeNote=state.flowMode === 'quick' ? 'מדדים בינאריים — נשמר כחוב הערכה' : reason;
   document.getElementById('triage-suggestion-text').innerHTML=`<span style="color:${colors[triage]}">${short[triage]}</span> <span style="font-size:12px;color:var(--muted);font-weight:400">— ${modeNote}</span>`;
   document.getElementById('triage-suggestion').style.display='block';
-  if(!state.triage){
-    const btn=document.querySelector(`#triage-grid .tap-btn.triage-${triage}`);
-    if(btn) selectTriage(btn,triage);
-  }
+  const selectedTriage=state.triage || triage;
+  const btn=document.querySelector(`#triage-grid .tap-btn.triage-${selectedTriage}`);
+  if(btn) selectTriage(btn, selectedTriage);
   if(triage==='black') showBlackSkip(); else hideBlackSkip();
 }
 
@@ -2311,6 +2541,8 @@ function vitalsCapturePayload(scope='flow'){
   const rrKey=scope==='modal'?'mrr30':'rr30';
   const rrMethod=counts[rrKey]===0 ? 'clinical_override' : 'stepper';
   return {
+    capture_mode: state.flowMode === 'quick' && scope === 'flow' ? 'rapid_binary' : 'counted',
+    rapid_avpu_binary: false,
     heart_rate:{raw_count:counts[pulseKey], window_seconds:15, calculated_bpm:counts[pulseKey]*4, entry_method:'stepper'},
     respiratory_rate:{raw_count:counts[rrKey], window_seconds:30, calculated_per_min:counts[rrKey]*2, entry_method:rrMethod}
   };
@@ -2366,6 +2598,15 @@ function queueMedicationEventsBeforeSave(){
   });
 }
 
+function queueInventoryBeforeSave(patientId){
+  if(quickTqData.applied) trackSupplyConsumption('CAT_TOURNIQUET', 1, patientId);
+  if(state.interventions.has('tourniquet')) trackSupplyConsumption('CAT_TOURNIQUET', 1, patientId);
+  if(state.interventions.has('bandage')) trackSupplyConsumption('BANDAGE_6INCH', 1, patientId);
+  if(state.interventions.has('morphine')) trackSupplyConsumption('MORPHINE_10MG', 1, patientId);
+  if(state.interventions.has('atq')) trackSupplyConsumption('FENTANYL_ACTIQ', 1, patientId);
+  if(state.interventions.has('fluids')) trackSupplyConsumption('IV_FLUID_500ML', Math.max(1, Math.ceil((doses.fluids||500)/500)), patientId);
+}
+
 function buildLocStr(){
   if(state.buildingType==='building'){
     let s='קומה '+state.locFloor;
@@ -2417,6 +2658,7 @@ function savePatient(){
   const t=nowT();
   const vitalsCapture=vitalsCapturePayload('flow');
   queueMedicationEventsBeforeSave();
+  queueInventoryBeforeSave(newId);
   const effectiveStatus=state.patientStatus || 'identified';
   const effectiveInjury=state.injury || 'לא תועד';
   const missingFields=[];
@@ -2453,6 +2695,7 @@ function savePatient(){
     patientAgeGroup:state.patientAgeGroup,
     patientAge:state.patientAge,
     lastTouchedBy:deviceId,
+    lastModifiedAt:new Date().toISOString(),
     confirmedClinical:true,
     unsyncedEvents:(state.localEvents||[]).length,
     locationHistory:[{time:t, location:locStr, source:'field'}],
@@ -2500,12 +2743,13 @@ function closeNewPatientIdModal(){
 function openQuickVitals(pid){
   const p=patients.find(x=>x.id===pid); if(!p) return;
   modalPid=pid;
+  modalOpenedLastModified=p.lastModifiedAt||null;
   modalVitals={...p.vitals};
   counts.mpulse15=Math.round(p.vitals.pulse/4);
   counts.mrr30=Math.round(p.vitals.rr/2);
   document.getElementById('modal-pid-title').textContent=`עדכון מדדים — ${p.id}`;
   document.getElementById('modal-last-vitals').textContent=`אחרון: דופק ${p.vitals.pulse} · נשימות ${p.vitals.rr ?? '—'} · SpO₂ ${p.vitals.spo2||'—'} · AVPU ${p.vitals.avpu||'—'}`;
-  document.getElementById('mv-spo2').textContent=p.vitals.spo2||98;
+  document.getElementById('mv-spo2').textContent=p.vitals.spo2 ?? '—';
   setDeviceLabels();
   document.getElementById('btn-save-modal').disabled=false;
   updateCountDisplay('mpulse15');
@@ -2529,6 +2773,17 @@ function selectModalAVPU(val){
 function saveModalVitals(){
   const p=patients.find(x=>x.id===modalPid); if(!p) return;
   const medicName=getDeviceId();
+  try{
+    const saved=JSON.parse(localStorage.getItem(DEMO_STORAGE_KEY)||'{}');
+    const savedPatient=(saved.patients||[]).find(x=>x.id===modalPid);
+    if(savedPatient?.lastModifiedAt && modalOpenedLastModified && savedPatient.lastModifiedAt!==modalOpenedLastModified){
+      const conflicts=conflictLog();
+      conflicts.push({timestamp:new Date().toISOString(),patient_id:modalPid,device_id:medicName,opened_at:modalOpenedLastModified,stored_at:savedPatient.lastModifiedAt,reason:'simultaneous_patient_edit'});
+      localStorage.setItem(CONFLICT_LOG_KEY, JSON.stringify(conflicts.slice(-200)));
+      saveLocalEvent({type:'PATIENT_EDIT_CONFLICT_DETECTED',detail:`עריכה מקבילה זוהתה עבור ${modalPid}`,warn:true,payload_json:{patient_id:modalPid,opened_last_modified_at:modalOpenedLastModified,stored_last_modified_at:savedPatient.lastModifiedAt}});
+      toast('זוהתה עריכה מקבילה — נשמר עם סימון קונפליקט');
+    }
+  }catch(e){}
   const prev={...p.vitals};
   const next={...modalVitals};
 
@@ -2583,6 +2838,9 @@ function saveModalVitals(){
   p.vitals = {...next};
   p.vitalsCapture = vitalsCapturePayload('modal');
   p.lastVitalsAt = Date.now();
+  p.lastTouchedBy = medicName;
+  p.lastModifiedAt = new Date().toISOString();
+  p.unsyncedEvents=(p.unsyncedEvents||0)+1;
   p.alert = flags.length > 0 || !!criticalEvent || triageChanged;
   if(!p.vitalsHistory) p.vitalsHistory = [];
   p.vitalsHistory.push({t:Date.now(), pulse:next.pulse, spo2:next.spo2, rr:next.rr, avpu:next.avpu});
@@ -2614,11 +2872,24 @@ function getSitePatients(siteId){
 }
 let cmdActiveSite='ALL', cmdFilter='all', alertFilter='critical', cmdAlertFilter='critical';
 let cmdPanelOpen={priority:true,heatmap:false,devices:false,duplicates:false,alerts:true};
-function isCriticalAlert(p){ return C5Rules.isCriticalAlert(p); }
-function hasRoutineAlert(p){ return C5Rules.isRoutineAlert(p); }
+function isCriticalAlert(p){ return !p?.alertAcknowledgedAt && C5Rules.isCriticalAlert(p); }
+function hasRoutineAlert(p){ return !p?.alertAcknowledgedAt && C5Rules.isRoutineAlert(p); }
 function openPatientFromAlert(id){
   openPatient(id);
   goTo('patient');
+}
+function acknowledgeAlert(id){
+  const p=patients.find(x=>x.id===id); if(!p) return;
+  p.alertAcknowledgedAt=new Date().toISOString();
+  p.alertAcknowledgedBy=getDeviceId();
+  p.lastTouchedBy=getDeviceId();
+  p.lastModifiedAt=new Date().toISOString();
+  p.events=p.events||[];
+  p.events.unshift({type:'WATCHDOG_ACKNOWLEDGED',time:nowT(),detail:`Acknowledged — in treatment by ${getDeviceId()}`,warn:false});
+  p.unsyncedEvents=(p.unsyncedEvents||0)+1;
+  saveDemoState(); renderDashboard(); renderAlerts();
+  if(document.getElementById('screen-commander').classList.contains('active')) renderCommander();
+  toast('התראה אושרה — בטיפול');
 }
 function setAlertFilter(f,btn){
   alertFilter=f;
@@ -2775,9 +3046,9 @@ function renderCmdContent(){
   cmdAlertList.forEach(p=>{
     if(isCriticalAlert(p)){
       const reason=(p.deterioration&&p.deterioration.length)?p.deterioration.join(' · '):TRIAGE_LABELS[p.triage];
-      ah+=`<div class="alert-banner" style="margin:6px 16px 0" onclick="openPatientFromAlert('${p.id}')"><span style="font-size:18px">🚨</span><div style="flex:1"><div class="alert-banner-title">${p.id} — קריטי</div><div class="alert-banner-sub">${reason} · ${p.location}</div></div></div>`;
+      ah+=`<div class="alert-banner" style="margin:6px 16px 0" onclick="openPatientFromAlert('${p.id}')"><span style="font-size:18px">🚨</span><div style="flex:1"><div class="alert-banner-title">${p.id} — קריטי</div><div class="alert-banner-sub">${reason} · ${p.location}</div></div><button class="ack-btn" onclick="event.stopPropagation();acknowledgeAlert('${p.id}')">בטיפול</button></div>`;
     } else {
-      ah+=`<div class="alert-banner warn" style="margin:6px 16px 0" onclick="openPatientFromAlert('${p.id}')"><span style="font-size:18px">⏱</span><div><div class="alert-banner-title">${p.id} — מדדים נדרשים</div><div class="alert-banner-sub">${p.location}</div></div></div>`;
+      ah+=`<div class="alert-banner warn" style="margin:6px 16px 0" onclick="openPatientFromAlert('${p.id}')"><span style="font-size:18px">⏱</span><div style="flex:1"><div class="alert-banner-title">${p.id} — מדדים נדרשים</div><div class="alert-banner-sub">${p.location}</div></div><button class="ack-btn" onclick="event.stopPropagation();acknowledgeAlert('${p.id}')">בטיפול</button></div>`;
     }
   });
   if(cmdActiveSite==='ALL'){
@@ -2833,7 +3104,7 @@ function renderCmdPatients(){
         <div style="margin-top:3px">${triagePill(p.triage)}</div>
         <div style="font-size:12px;color:var(--muted)">${p.injury} · ${STATUS_LABELS[p.patientStatus]||''}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">נגע אחרון: ${p.lastTouchedBy||p.medic||'—'} · ${p.confirmedClinical===false?'מדווח':'מאושר שדה'}</div>
-        ${p.needsFullAssessment?`<div style="font-size:11px;color:var(--orange);font-weight:700;margin-top:2px">Assessment incomplete</div>`:''}
+        ${assessmentDebtForPatient(p).length?`<div style="font-size:11px;color:var(--orange);font-weight:700;margin-top:2px">Assessment debt: ${assessmentDebtForPatient(p).join(', ')}</div>`:''}
         ${tourniquetTimerLabel(p)?`<div style="margin-top:4px"><span class="tq-timer ${tourniquetTimerLabel(p).cls}">${tourniquetTimerLabel(p).label}</span></div>`:''}
         ${p.deterioration&&p.deterioration.length?`<div style="font-size:11px;color:var(--red);font-weight:700;margin-top:2px">⚠ ${p.deterioration.join(' · ')}</div>`:''}
         ${!(p.deterioration&&p.deterioration.length)&&needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS?`<div style="font-size:11px;color:var(--orange);margin-top:2px">⏱ מדדים נדרשים</div>`:''}
@@ -2907,6 +3178,7 @@ let quickTqData = { applied: false, time: null, limbs: new Set() };
 
 function toggleQuickTQ(btn, applied) {
   quickTqData.applied = applied;
+  if(applied) haptic([120,60,120]);
   document.getElementById('quick-tq-yes-btn').classList.remove('selected');
   document.getElementById('quick-tq-no-btn').classList.remove('selected');
   btn.classList.add('selected');
@@ -2927,10 +3199,26 @@ function setQuickTQTimeNow() {
 }
 
 function onQuickTQTimeInput(val) {
-  if (val.length === 4 && /^\d{4}$/.test(val)) {
+  if (val.length === 4 && isValidTimeCode(val)) {
     quickTqData.time = val;
     document.getElementById('quick-tq-display').textContent = `שעת הנחה: ${val.slice(0,2)}:${val.slice(2)}`;
+  } else {
+    quickTqData.time = null;
+    document.getElementById('quick-tq-display').textContent = '';
   }
+}
+
+function validateQuickTQTime(showToast=false) {
+  const el=document.getElementById('quick-tq-time');
+  const val=el?.value||'';
+  if(!val) return true;
+  const ok=isValidTimeCode(val);
+  if(!ok){
+    quickTqData.time=null;
+    document.getElementById('quick-tq-display').textContent='שעה לא תקינה — השתמש בפורמט HHMM, 0000-2359';
+    if(showToast) toast('שעת חסם לא תקינה');
+  }
+  return ok;
 }
 
 function toggleQuickLimb(btn, key) {
@@ -2973,6 +3261,24 @@ function saveLocalEvent(event){
     outbox.push(entry);
     localStorage.setItem(key, JSON.stringify(outbox.slice(-500)));
   }catch(e){}
+}
+
+function trackSupplyConsumption(itemType, qtyUsed, associatedPatientId=null){
+  if(!state.localStockCache) state.localStockCache={};
+  state.localStockCache[itemType]=(state.localStockCache[itemType]||0)-Math.abs(qtyUsed);
+  saveLocalEvent({
+    type:'INVENTORY_LEDGER_MOVEMENT',
+    detail:`Inventory consumed: ${itemType} x${qtyUsed}`,
+    warn:state.localStockCache[itemType] < 0,
+    payload_json:{
+      item_type:itemType,
+      movement_type:'treatment_consumed',
+      quantity_delta:-Math.abs(qtyUsed),
+      patient_context:associatedPatientId,
+      local_stock_after:state.localStockCache[itemType],
+      battery_at_log:null
+    }
+  });
 }
 
 function confirmPediatricOverride(){
@@ -3057,6 +3363,7 @@ function showPanicConfirm({title, message, confirmLabel='אשר 1/2', onConfirm}
   document.getElementById('panic-confirm-modal').classList.remove('hidden');
 }
 function initiateBlackTriage(){
+  haptic([180,80,180]);
   showPanicConfirm({
     title:'אזהרה: סימון חלל / Expectant',
     message:'בחירה זו תסמן את הפצוע כשחור ותדלג על מדדים, טיפולים ו-MIST. נדרש אישור כפול כדי למנוע טעות מגע.',
@@ -3066,6 +3373,7 @@ function initiateBlackTriage(){
 }
 function confirmPanicAction(){
   panicConfirmCount += 1;
+  haptic(panicConfirmCount < 2 ? 80 : [180,80,180]);
   const btn=document.getElementById('panic-confirm-btn');
   if(panicConfirmCount < 2){
     btn.textContent='הקש שוב לאישור 2/2';

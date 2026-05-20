@@ -32,8 +32,8 @@ flowchart LR
 | Field app | Capture patients, vitals, treatments, handovers, and local alerts | `index.html` |
 | Command dashboard | Show incident state, stale data, high-risk alerts, and site progress | `index.html`, `assets/mockups/` |
 | Domain rules | Triage, vitals timers, tourniquet timers, and alert classification | `src/domain/rules.js` |
-| Sync API | Accept and return ordered event batches | `docs/API_SURFACE_v1.1.md` |
-| Event store | Preserve clinical and operational history | `database/001_postgresql_schema_v1.1.sql` |
+| Sync API | Accept and return ordered event batches | `docs/API_SURFACE_v1.2.md` |
+| Event store | Preserve clinical and operational history | `database/001_postgresql_schema_v1.2.sql` |
 | Projectors | Convert raw events into command-ready state | SQL views and future workers |
 | Analytics | Compute KPIs and generate AAR material | `analytics/c5_sentinel_sar_analytics_v1_1/` |
 

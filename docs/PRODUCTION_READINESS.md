@@ -75,6 +75,15 @@ This is enough for workflow validation and engineering iteration. It is not enou
 - Command dashboard refresh should poll the precomputed state endpoint at a fixed interval, for example every 5 seconds.
 - Throughput analytics should use the precomputed/state pipeline and `vw_command_incident_throughput_funnel`.
 
+### v1.2 Field Experiment Guardrails
+
+- Demo handover language must not imply a real QR transfer unless an actual scan target is generated and tested.
+- Vitals count windows must support timer-guided 15s/30s counting for gloved, one-handed use.
+- Alert acknowledgment is required so commanders can distinguish "unseen" from "seen and being handled."
+- Field experiment runs must export `experiment_events.csv`, `patients_summary.csv`, `aar_metrics.json`, and `observer_notes.csv`.
+- Static demos may use localStorage, but the UI must surface edit conflicts and assessment debt instead of pretending the data is complete.
+- Logistics must use an append-only inventory ledger; negative stock is accepted and escalated, never blocked.
+
 ## Development Priority
 
 The next production-aligned build work should happen in this order:

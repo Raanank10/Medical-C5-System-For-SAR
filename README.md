@@ -22,11 +22,11 @@ The current implementation is intentionally lightweight: a standalone HTML proto
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Field/command prototype | Active v1.1 demo | `index.html` and `demo/rescue-app.html` |
-| Product specification | Active v1.1 docs | `docs/C5_SENTINEL_SAR_MVP_SPEC_v1.1.md` |
-| API contract | Draft v1.1 | `docs/API_SURFACE_v1.1.md` |
-| Data model | Draft PostgreSQL schema | `database/001_postgresql_schema_v1.1.sql` |
-| Demo data | Draft seed data | `database/002_seed_demo_data_v1.1.sql` |
+| Field/command prototype | Active v1.2 demo | `index.html` and `demo/rescue-app.html` |
+| Product specification | Active v1.2 docs | `docs/C5_SENTINEL_SAR_MVP_SPEC_v1.2.md` |
+| API contract | Draft v1.2 | `docs/API_SURFACE_v1.2.md` |
+| Data model | Draft PostgreSQL schema | `database/001_postgresql_schema_v1.2.sql` |
+| Demo data | Draft seed data | `database/002_seed_demo_data_v1.2.sql` |
 | Analytics/AAR | Working local package | `analytics/c5_sentinel_sar_analytics_v1_1/` |
 | Production backend | Not implemented | Planned after the workflow stabilizes |
 | Native mobile app | Not implemented | Planned after local storage and sync are validated |
@@ -82,14 +82,14 @@ python -c "from db import DB; from kpis import KPIEngine; from report import Rep
 |   |-- TACTICAL_UI_GUIDELINES.md      # field UI principles and New Patient guardrails
 |   |-- PRODUCTION_READINESS.md        # path from prototype to pilot/production readiness
 |   |-- OPERATIONS_SAFETY.md           # safety/privacy boundaries
-|   |-- C5_SENTINEL_SAR_MVP_SPEC_v1.1.md
-|   |-- API_SURFACE_v1.1.md
+|   |-- C5_SENTINEL_SAR_MVP_SPEC_v1.2.md
+|   |-- API_SURFACE_v1.2.md
 |   |-- METRICS_DICTIONARY.md
 |   |-- PC_DEMO_SCRIPT.md
 |   `-- ROADMAP.md
 |-- database/
-|   |-- 001_postgresql_schema_v1.1.sql
-|   |-- 002_seed_demo_data_v1.1.sql
+|   |-- 001_postgresql_schema_v1.2.sql
+|   |-- 002_seed_demo_data_v1.2.sql
 |   `-- 003_mci_ui_alignment.sql
 |-- src/
 |   `-- domain/rules.js               # testable triage, vitals, alert, and timing rules
@@ -138,7 +138,7 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the active build plan.
 - [Operations and safety notes](docs/OPERATIONS_SAFETY.md)
 - [Metrics dictionary](docs/METRICS_DICTIONARY.md)
 - [Demo script](docs/PC_DEMO_SCRIPT.md)
-- [v1.1 changelog](docs/CHANGELOG_v1.1.md)
+- [v1.2 changelog](docs/CHANGELOG_v1.2.md)
 
 ## Safety Status
 
