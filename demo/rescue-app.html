@@ -683,6 +683,8 @@ textarea{resize:vertical;min-height:70px;}
     <div id="common-loc-fields" style="display:none">
       <div class="field-label">אזור / תיאור מדויק</div>
       <input type="text" id="location-free" placeholder="לדוגמה: ליד הדלת האדומה, מתחת לשרידים..." oninput="state.locFree=this.value">
+      <div class="field-label" style="margin-top:12px">תיאור לבוש / סימני זיהוי</div>
+      <input type="text" id="wearing-free" placeholder="לדוגמה: חולצה כחולה, קסדה, תיק שחור..." oninput="state.wearingDesc=this.value">
     </div>
   </div>
   <div class="bottom-bar"><button class="btn-primary" id="btn-step2" onclick="continueAfterLocation()">המשך</button></div>
@@ -748,7 +750,7 @@ textarea{resize:vertical;min-height:70px;}
     <div id="rapid-vitals-panel" style="display:none">
       <div style="background:rgba(67,97,238,0.08);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.55">
         <strong style="color:var(--accent)">מסלול מהיר:</strong>
-        מדדים בינאריים בלבד. המערכת שומרת חוב הערכה להשלמה בהמשך.
+        מדדים בינאריים בלבד. המערכת שומרת תזכר על בדיקת מדדים בהמשך.
       </div>
       <div class="field-label">יכול ללכת?</div>
       <div class="tap-grid tap-grid-2" id="rapid-walking-grid" style="margin-bottom:14px">
@@ -1433,7 +1435,7 @@ const COUNT_BASELINE = {pulse15:20, rr30:8, mpulse15:20, mrr30:8};
 function freshState(){
   return {
     patientDraftId:`draft-${Date.now()}-${uid()}`,
-    buildingType:null, locFloor:'', locApt:'', locRoom:'', locFree:'',
+    buildingType:null, locFloor:'', locApt:'', locRoom:'', locFree:'', wearingDesc:'',
     accessibility:null, trapStatus:null, sabcde:{},
     flowMode:'extended', patientAgeGroup:'adult', patientAge:null,
     injury:null, injuryZones:new Set(), patientStatus:'identified',
@@ -2247,7 +2249,7 @@ function startNewPatient(mode='extended'){
   if(modeBtn) modeBtn.classList.add('selected');
   const adultBtn=document.querySelector('#age-grid .tap-btn');
   if(adultBtn) adultBtn.classList.add('selected');
-  ['location-free','other-tx-text','tourniquet-time-input'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['location-free','wearing-free','other-tx-text','tourniquet-time-input'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('building-fields').style.display='none';
   document.getElementById('house-fields').style.display='none';
   document.getElementById('common-loc-fields').style.display='none';
@@ -2412,14 +2414,19 @@ function updateRapidVitalsSummary(){
   const bleeding=state.rapidMajorBleeding===null?'—':state.rapidMajorBleeding?'דימום':'ללא דימום';
   const breathing=flowVitals.rr===0?'לא נושם':flowVitals.rr?'נושם':'—';
   const avpu=flowVitals.avpu||'—';
-  const bp=flowVitals.bp_estimate==='radial'?'מעל 100':flowVitals.bp_estimate?'מתחת 100':'—';
+  const bp=flowVitals.bp_estimate==='radial'?'מעל 100':flowVitals.bp_estimate==='weak'?'80-100':flowVitals.bp_estimate==='absent'?'מתחת 80':'—';
   el.textContent=`הליכה: ${walking} · דימום: ${bleeding} · נשימה: ${breathing} · AVPU: ${avpu} · לחץ דם: ${bp}`;
 }
 function selectRapidWalking(btn, canWalk){
   document.querySelectorAll('#rapid-walking-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
   state.rapidWalking=canWalk;
-  if(canWalk && !state.triage) state.triage='green';
+  if(canWalk){
+    state.triage='green';
+    selectRapidBreathing(null, true, true);
+    selectRapidAvpu(null, 'A', true);
+    selectRapidBp(null, 'radial', true);
+  }
   updateRapidVitalsSummary();
 }
 function selectRapidBleeding(btn, hasBleeding){
@@ -2429,25 +2436,30 @@ function selectRapidBleeding(btn, hasBleeding){
   if(hasBleeding) projectPatientStatus('stabilizing','MAJOR_BLEEDING_NOTED',{capture_mode:'rapid'});
   updateRapidVitalsSummary();
 }
-function selectRapidBreathing(btn, isBreathing){
+function selectRapidBreathing(btn, isBreathing, auto=false){
   document.querySelectorAll('#rapid-breathing-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
-  btn.classList.add('selected');
+  const target=btn || document.querySelector(`#rapid-breathing-grid .tap-btn:nth-child(${isBreathing?1:2})`);
+  if(target) target.classList.add('selected');
   counts.rr30 = isBreathing ? 8 : 0;
   flowVitals.rr = isBreathing ? 16 : 0;
+  if(auto) saveLocalEvent({type:'RAPID_WALKING_AUTO_FILLED_VITALS',detail:'Walking patient auto-set breathing yes',warn:false,payload_json:{assumption:'walking_implies_breathing'}});
   updateRapidVitalsSummary();
 }
-function selectRapidAvpu(btn, val){
+function selectRapidAvpu(btn, val, auto=false){
   document.querySelectorAll('#rapid-avpu-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
-  btn.classList.add('selected');
+  const target=btn || document.querySelector(`#rapid-avpu-grid .tap-btn[onclick*="'${val}'"]`);
+  if(target) target.classList.add('selected');
   flowVitals.avpu = val;
   updateRapidVitalsSummary();
 }
-function selectRapidBp(btn, val){
+function selectRapidBp(btn, val, auto=false){
   document.querySelectorAll('#rapid-bp-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
-  btn.classList.add('selected');
+  const target=btn || document.querySelector(`#rapid-bp-grid .tap-btn[onclick*="'${val}'"]`);
+  if(target) target.classList.add('selected');
   flowVitals.bp_estimate = val;
   flowVitals.pulse = val === 'radial' ? 88 : val === 'weak' ? 108 : 132;
   counts.pulse15 = Math.round(flowVitals.pulse/4);
+  if(auto) saveLocalEvent({type:'RAPID_WALKING_AUTO_FILLED_VITALS',detail:'Walking patient auto-set AVPU A and BP over 100',warn:false,payload_json:{assumption:'walking_implies_avpu_a_bp_over_100'}});
   updateRapidVitalsSummary();
 }
 function toggleSpo2(){
@@ -2808,6 +2820,7 @@ function renderSummary(){
     <div class="summary-row"><span class="summary-key">מזהה</span><span class="summary-val" style="font-family:var(--mono);font-weight:700">${newId}</span></div>
     <div class="summary-row"><span class="summary-key">מיון</span><span class="summary-val">${triagePill(state.triage)}</span></div>
     <div class="summary-row"><span class="summary-key">מיקום</span><span class="summary-val">${locStr}</span></div>
+    <div class="summary-row"><span class="summary-key">לבוש / זיהוי</span><span class="summary-val">${state.wearingDesc||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">חילוץ</span><span class="summary-val">${TRAP_LABELS[state.trapStatus]||'לא תועד'}</span></div>
     <div class="summary-row"><span class="summary-key">מסלול</span><span class="summary-val">${state.flowMode==='quick'?'מהיר — חוב הערכה':'מורחב'}</span></div>
     <div class="summary-row"><span class="summary-key">גיל</span><span class="summary-val">${state.patientAgeGroup==='pediatric'?'ילד מתחת 8':'מבוגר / 8+'}</span></div>
@@ -2869,7 +2882,7 @@ function savePatient(){
   }));
   patients.push({
     id:newId, triage:state.triage, accessibility:state.accessibility, trapStatus:state.trapStatus,
-    location:locStr, locDetail:'',
+    location:locStr, locDetail:state.wearingDesc||'',
     injury:effectiveInjury, injuryZones:[...state.injuryZones], patientStatus:effectiveStatus,
     needsFullAssessment:state.needsFullAssessment,
     patientAgeGroup:state.patientAgeGroup,
