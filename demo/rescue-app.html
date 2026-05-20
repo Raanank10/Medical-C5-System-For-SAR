@@ -436,6 +436,10 @@ textarea{resize:vertical;min-height:70px;}
         <div class="demo-icon">🎖</div>
         <div><strong>תצוגת מפקד / חפ״ק</strong><span>ספירת פצועים, התראות, מוקדים ופינויים.</span></div>
       </button>
+      <button class="demo-card" onclick="startPcDemo('logistics')">
+        <div class="demo-icon">📦</div>
+        <div><strong>קצין לוגיסטיקה</strong><span>מלאי ציוד רפואי לפי פלוגה, שריפה ודחיפות אספקה.</span></div>
+      </button>
       <button class="demo-card" onclick="startPcDemo('aar')">
         <div class="demo-icon">📋</div>
         <div><strong>AAR חי</strong><span>סיכום אירוע, KPI ותובנות אחרי פעולה.</span></div>
@@ -500,11 +504,24 @@ textarea{resize:vertical;min-height:70px;}
       <span style="font-size:22px">🎖</span> תצוגת מפקד / חמ"ל
     </button>
   </div>
+  <div style="padding:0 16px 10px">
+    <button onclick="goTo('logistics')" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;color:var(--text);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;">
+      <span style="font-size:22px">📦</span> תצוגת קצין לוגיסטיקה
+    </button>
+  </div>
   <div class="demo-actions">
     <button class="demo-mini-btn" onclick="goTo('aar')">AAR חי</button>
     <button class="demo-mini-btn" onclick="addObserverNote()">הערת צופה</button>
     <button class="demo-mini-btn" onclick="exportExperimentLog()">ייצוא ניסוי</button>
     <button class="demo-mini-btn" onclick="loadDemoScenario(true);goTo('dashboard')">אפס דמו</button>
+  </div>
+  <div id="observer-note-panel" class="aar-note" style="display:none">
+    <div class="aar-note-title">הערת צופה לניסוי</div>
+    <textarea id="observer-note-text" placeholder="מה קרה בשטח? טעות הקשה, עיכוב, תגובת חובש..." style="margin-bottom:10px"></textarea>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button class="demo-mini-btn" onclick="saveObserverNote()">שמור הערה</button>
+      <button class="demo-mini-btn" onclick="hideObserverNote()">בטל</button>
+    </div>
   </div>
 
   <div class="alert-slicer" id="alert-slicer">
@@ -594,7 +611,7 @@ textarea{resize:vertical;min-height:70px;}
     <div class="field-label">הערות</div>
     <textarea id="report-notes" placeholder="מידע נוסף..."></textarea>
   </div>
-  <div class="bottom-bar"><button class="btn-primary" id="btn-save-report" onclick="saveReport()" disabled>שמור דיווח</button></div>
+  <div class="bottom-bar"><button class="btn-primary" id="btn-save-report" onclick="saveReport()">שמור דיווח</button></div>
 </div>
 
 <!-- ══════════════════════ STEP 1 — INTAKE MODE ══ -->
@@ -1189,6 +1206,29 @@ textarea{resize:vertical;min-height:70px;}
   <div style="height:60px"></div>
 </div>
 
+<!-- ══════════════════════ LOGISTICS OFFICER ══ -->
+<div id="screen-logistics" class="screen">
+  <div class="header">
+    <div class="header-left">
+      <div class="header-subtitle">LOGISTICS // RESUPPLY</div>
+      <div class="header-title">קצין לוגיסטיקה</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="header-time" id="log-clock">--:--</div>
+      <button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goTo('dashboard')">✕</button>
+    </div>
+  </div>
+  <div class="demo-strip">
+    <div>
+      <div class="demo-strip-title">תמונת מלאי לפי פלוגה</div>
+      <div class="demo-strip-sub">נגזר ממודל append-only של inventory ledger. אין עריכת CRUD של מלאי.</div>
+    </div>
+    <div class="sync-pill" id="sync-pill-logistics">LEDGER</div>
+  </div>
+  <div id="logistics-summary" class="cmd-priority-grid"></div>
+  <div id="logistics-companies" class="cmd-status-matrix" style="padding-bottom:90px"></div>
+</div>
+
 <!-- ══════════════════════ AAR ══ -->
 <div id="screen-aar" class="screen">
   <div class="header">
@@ -1253,7 +1293,8 @@ textarea{resize:vertical;min-height:70px;}
     <!-- SpO2 -->
     <div class="vital-row row" style="margin-bottom:9px">
       <div><div class="vital-label">סטורציה</div><div class="vital-unit">SpO₂ %</div></div>
-      <div class="vital-ctrl">
+      <button id="modal-spo2-toggle" onclick="toggleModalSpo2()" style="background:var(--surface2);border:1px solid var(--border);color:var(--accent);border-radius:10px;padding:10px 12px;font-size:12px;font-weight:800;cursor:pointer">+ הוסף</button>
+      <div class="vital-ctrl" id="modal-spo2-ctrl" style="display:none">
         <button class="vital-btn" onmousedown="startHold('mspo2',-1)" onmouseup="stopHold()" ontouchstart="startHold('mspo2',-1)" ontouchend="stopHold()" onclick="changeVital('mspo2',-1)">−</button>
         <div class="vital-val" id="mv-spo2">98</div>
         <button class="vital-btn" onmousedown="startHold('mspo2',1)" onmouseup="stopHold()" ontouchstart="startHold('mspo2',1)" ontouchend="stopHold()" onclick="changeVital('mspo2',1)">+</button>
@@ -1350,7 +1391,102 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 
-<script src="../src/domain/rules.js"></script>
+<script>
+(function initDomainRules(root, factory) {
+  root.C5DomainRules = factory();
+})(typeof globalThis !== "undefined" ? globalThis : window, function buildDomainRules() {
+  "use strict";
+  const VITALS_INTERVAL_MS = 5 * 60 * 1000;
+  const WARN_AT_MS = 4 * 60 * 1000;
+  const TOURNIQUET_WARN_MS = 40 * 60 * 1000;
+  const TOURNIQUET_CRITICAL_MS = 60 * 60 * 1000;
+  const AVPU_RANK = { A: 0, V: 1, P: 2, U: 3 };
+  const PEDIATRIC_AGE_CUTOFF = 8;
+  const PEDIATRIC_HIGH_RISK_DOSE_LIMITS = {morphine: { max: 4, unit: "mg" }, fentanyl: { max: 50, unit: "mcg" }};
+  const VITALS_CLOSED_STATUSES = new Set(["closed","deceased","evacuated","evacuating","handed_over","self_evacuated"]);
+  function needsVitals(patient) {
+    if (!patient) return false;
+    if (VITALS_CLOSED_STATUSES.has(patient.patientStatus)) return false;
+    if (patient.triage === "black") return false;
+    return true;
+  }
+  function isPediatricPatient(patient = {}) {
+    if (patient.patientAge == null || patient.patientAge === "") return patient.patientAgeGroup === "pediatric";
+    const age = Number(patient.patientAge);
+    return patient.patientAgeGroup === "pediatric" || (Number.isFinite(age) && age < PEDIATRIC_AGE_CUTOFF);
+  }
+  function isHighRiskDose(medicationName, selectedDose, patient = {}) {
+    if (!isPediatricPatient(patient)) return false;
+    const key = String(medicationName || "").toLowerCase();
+    const limit = PEDIATRIC_HIGH_RISK_DOSE_LIMITS[key];
+    const dose = Number(selectedDose);
+    return !!limit && Number.isFinite(dose) && dose > limit.max;
+  }
+  function vitalsAgeMs(patient, nowMs = Date.now()) { return nowMs - (patient?.lastVitalsAt || 0); }
+  function vitalsTimer(patient, nowMs = Date.now()) {
+    if (!needsVitals(patient)) return null;
+    const age = vitalsAgeMs(patient, nowMs);
+    if (age >= VITALS_INTERVAL_MS) return { cls: "overdue", minutes: Math.floor(age / 60000), remainingMinutes: 0 };
+    const remainingMinutes = Math.ceil((VITALS_INTERVAL_MS - age) / 60000);
+    if (age >= WARN_AT_MS) return { cls: "warn", minutes: Math.floor(age / 60000), remainingMinutes };
+    return { cls: "ok", minutes: Math.floor(age / 60000), remainingMinutes };
+  }
+  function elapsedMinutes(timestamp, nowMs = Date.now()) {
+    const parsed = typeof timestamp === "string" ? Date.parse(timestamp) : timestamp;
+    return Number.isFinite(parsed) ? Math.max(0, Math.floor((nowMs - parsed) / 60000)) : 0;
+  }
+  function tourniquetTimer(patient, nowMs = Date.now()) {
+    const tourniquet = patient?.tourniquet;
+    if (!tourniquet || !tourniquet.appliedAt) return null;
+    const elapsedMs = nowMs - tourniquet.appliedAt;
+    const minutes = elapsedMinutes(tourniquet.appliedAt, nowMs);
+    const cls = elapsedMs >= TOURNIQUET_CRITICAL_MS ? "critical" : elapsedMs >= TOURNIQUET_WARN_MS ? "warn" : "";
+    return { cls, minutes, limb: tourniquet.limb || "לא צוין" };
+  }
+  function timeCodeToTodayMs(code, nowMs = Date.now()) {
+    if (!code || !/^\d{4}$/.test(code)) return nowMs;
+    const now = new Date(nowMs);
+    const day = new Date(nowMs);
+    day.setHours(Number(code.slice(0, 2)), Number(code.slice(2)), 0, 0);
+    if (day.getTime() > now.getTime() + 60000) day.setDate(day.getDate() - 1);
+    return day.getTime();
+  }
+  function computeMstartTriage(vitals) {
+    if (!vitals) return null;
+    if (vitals.rr === 0) return "black";
+    const highRR = vitals.rr > 30 || (vitals.rr > 0 && vitals.rr < 10);
+    const lowBP = vitals.bp_estimate === "absent" || vitals.bp_estimate === "carotid";
+    const badAVPU = vitals.avpu && vitals.avpu !== "A";
+    const badSpo2 = vitals.spo2 && vitals.spo2 < 94;
+    if (highRR || lowBP || badAVPU || badSpo2) return "red";
+    if (vitals.avpu === "A" && !lowBP && !highRR) return "green";
+    return "yellow";
+  }
+  function suggestMstartTriage({ vitals, sabcde = {} } = {}) {
+    const v = vitals || {};
+    if (v.rr === 0) return { triage: "black", reason: "MCI: לא נושם — מסווג שחור", reasons: [] };
+    if (sabcde.B === "abnormal" && sabcde.A !== "managed") return { triage: "black", reason: "ללא נשימה לאחר פתיחת נתיב אוויר", reasons: [] };
+    const reasons = [];
+    if (v.rr > 30 || (v.rr > 0 && v.rr < 10)) reasons.push(`נשימות ${v.rr}/דקה`);
+    if (v.bp_estimate === "absent" || v.bp_estimate === "carotid") reasons.push("לחץ דם ירוד");
+    if (v.avpu && v.avpu !== "A") reasons.push(`AVPU ${v.avpu}`);
+    if (v.spo2 && v.spo2 < 94) reasons.push(`SpO₂ ${v.spo2}%`);
+    if (reasons.length) return { triage: "red", reason: reasons.join(" · "), reasons };
+    if (v.avpu === "A") return { triage: "green", reason: "מדדים תקינים · AVPU A", reasons: [] };
+    return { triage: "yellow", reason: "מדדים בינוניים", reasons: [] };
+  }
+  function detectDeterioration(prev = {}, next = {}) {
+    const flags = [];
+    if (next.spo2 && prev.spo2 && next.spo2 <= prev.spo2 - 5) flags.push(`⬇ SpO₂ ${prev.spo2}→${next.spo2}%`);
+    if (next.avpu && prev.avpu && AVPU_RANK[next.avpu] > AVPU_RANK[prev.avpu]) flags.push(`⬇ AVPU ${prev.avpu}→${next.avpu}`);
+    if (Number.isFinite(next.pulse) && Number.isFinite(prev.pulse) && Math.abs(next.pulse - prev.pulse) >= 25) flags.push(`⚡ דופק ${prev.pulse}→${next.pulse}`);
+    return flags;
+  }
+  function isRoutineAlert(patient, nowMs = Date.now()) { return needsVitals(patient) && vitalsAgeMs(patient, nowMs) >= VITALS_INTERVAL_MS; }
+  function isCriticalAlert(patient) { return !!(patient && (patient.alert || (patient.deterioration && patient.deterioration.length))); }
+  return {AVPU_RANK, TOURNIQUET_CRITICAL_MS, TOURNIQUET_WARN_MS, VITALS_INTERVAL_MS, WARN_AT_MS, computeMstartTriage, detectDeterioration, elapsedMinutes, isCriticalAlert, isHighRiskDose, isPediatricPatient, isRoutineAlert, needsVitals, PEDIATRIC_AGE_CUTOFF, PEDIATRIC_HIGH_RISK_DOSE_LIMITS, suggestMstartTriage, timeCodeToTodayMs, tourniquetTimer, vitalsAgeMs, vitalsTimer};
+});
+</script>
 <script>
 'use strict';
 const C5Rules = window.C5DomainRules;
@@ -1485,6 +1621,7 @@ let modalPid = null;
 let modalVitals = {...VITALS_BASELINE};
 let modalTreatmentNeeded = null;
 let modalTreatments = new Set();
+let modalSpo2Active = false;
 
 // Hold timer
 let holdTimer=null, holdInterval=null;
@@ -1695,7 +1832,7 @@ function setDemoSyncMode(){
 }
 function updateDemoStatus(){
   const label = demoSyncMode==='fresh' ? `Fresh · ${timeAgoLabel(lastSyncAt)}` : demoSyncMode==='stale' ? `Stale · ${timeAgoLabel(lastSyncAt)}` : `Offline · ${timeAgoLabel(lastSyncAt)}`;
-  ['sync-pill-dashboard','sync-pill-command','sync-pill-aar'].forEach(id=>{
+  ['sync-pill-dashboard','sync-pill-command','sync-pill-aar','sync-pill-logistics'].forEach(id=>{
     const el=document.getElementById(id); if(!el) return;
     el.textContent=label;
     el.className='sync-pill '+(demoSyncMode==='fresh'?'':demoSyncMode);
@@ -1725,11 +1862,25 @@ function updateExperimentLine(){
   ['experiment-line-dashboard','experiment-line-command'].forEach(id=>{const el=document.getElementById(id); if(el) el.textContent=line;});
 }
 function addObserverNote(){
-  const text=prompt('הערת צופה לניסוי:');
-  if(!text) return;
+  const panel=document.getElementById('observer-note-panel');
+  const input=document.getElementById('observer-note-text');
+  if(panel) panel.style.display='block';
+  if(input) input.focus();
+}
+function hideObserverNote(){
+  const panel=document.getElementById('observer-note-panel');
+  const input=document.getElementById('observer-note-text');
+  if(panel) panel.style.display='none';
+  if(input) input.value='';
+}
+function saveObserverNote(){
+  const input=document.getElementById('observer-note-text');
+  const text=(input?.value||'').trim();
+  if(!text){ toast('אין טקסט לשמירה'); return; }
   const notes=observerNotes();
   notes.push({timestamp:new Date().toISOString(),device_id:getDeviceId(),phase:experimentPhase,note:text});
   localStorage.setItem(OBSERVER_NOTES_KEY, JSON.stringify(notes));
+  hideObserverNote();
   toast('הערת צופה נשמרה');
   updateExperimentLine();
 }
@@ -1745,13 +1896,14 @@ function downloadTextFile(filename, text, type='text/plain'){
   setTimeout(()=>URL.revokeObjectURL(url),1200);
 }
 function assessmentDebtForPatient(p){
+  if(p.triage === 'black') return [];
   const debt=[];
   if(!p.location || p.location==='לא צוין') debt.push('missing_location');
   if(!p.triage || p.triage==='pending') debt.push('missing_triage');
   if(!p.vitals || p.vitals.rr===null || p.vitals.rr===undefined || !p.vitals.avpu || !p.vitals.bp_estimate) debt.push('missing_vitals');
   if(!normalizeTrapStatus(p)) debt.push('missing_trap_status');
   if(!p.txHistory || !p.txHistory.length) debt.push('missing_treatment');
-  if(!['evacuating','evacuated','handed_over'].includes(p.patientStatus)) debt.push('missing_handover');
+  if(!['evacuating','evacuated','handed_over'].includes(p.patientStatus)) debt.push('pending_handover');
   if(needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS) debt.push('stale_vitals');
   if(p.tourniquet && !p.tourniquet.timeCode) debt.push('tourniquet_time_unknown');
   return debt;
@@ -1780,11 +1932,20 @@ function exportExperimentLog(){
     acknowledged_alerts:patients.filter(p=>p.alertAcknowledgedAt).length,
     conflict_count:conflictLog().length
   };
-  downloadTextFile('experiment_events.csv', toCsv(events, ['patient_id','triage','location','type','time','detail','warn','device_id']), 'text/csv');
-  downloadTextFile('patients_summary.csv', toCsv(patientRows, ['id','triage','status','location','trap_status','last_touched_by','needs_full_assessment','assessment_debt','last_modified_at']), 'text/csv');
-  downloadTextFile('aar_metrics.json', JSON.stringify(metrics,null,2), 'application/json');
-  downloadTextFile('observer_notes.csv', toCsv(observerNotes(), ['timestamp','device_id','phase','note']), 'text/csv');
-  toast('קבצי ניסוי יוצאו');
+  const observer=observerNotes();
+  downloadTextFile('rescue_incident_export.json', JSON.stringify({
+    metadata:{app_version:APP_VERSION, exported_at:new Date().toISOString(), device_id:getDeviceId(), experiment_phase:experimentPhase},
+    experiment_events:events,
+    patients_summary:patientRows,
+    aar_metrics:metrics,
+    observer_notes:observer,
+    csv:{
+      experiment_events:toCsv(events, ['patient_id','triage','location','type','time','detail','warn','device_id']),
+      patients_summary:toCsv(patientRows, ['id','triage','status','location','trap_status','last_touched_by','needs_full_assessment','assessment_debt','last_modified_at']),
+      observer_notes:toCsv(observer, ['timestamp','device_id','phase','note'])
+    }
+  },null,2), 'application/json');
+  toast('קובץ ניסוי אחד יוצא');
 }
 
 // ═══════════════════════════════════════════════
@@ -1792,7 +1953,7 @@ function exportExperimentLog(){
 // ═══════════════════════════════════════════════
 function updateClock(){
   const t=nowT();
-  ['clock','cmd-clock'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=t;});
+  ['clock','cmd-clock','log-clock'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=t;});
   updateDemoStatus();
 }
 setInterval(updateClock,1000); updateClock();
@@ -1835,6 +1996,7 @@ function projectPatientStatus(nextStatus, eventType, payload={}){
 }
 
 function goTo(screen){
+  Object.keys(vitalCountdowns||{}).forEach(k=>stopCountTimer(k, false));
   if(screen==='step5') projectPatientStatus('observing','VITALS_RECORDED');
   if(screen==='step6') syncComputedStatusDisplay();
   if(/^step[1-8]$/.test(screen)) saveActiveRecoveryState(screen);
@@ -1850,6 +2012,7 @@ function goTo(screen){
   if(screen==='step7')     { renderTourniquetReminder(); renderLocalStockPanel(); updatePediatricTreatmentUi(); setDeviceLabels(); checkStep7(); }
   if(screen==='step8')     renderSummary();
   if(screen==='commander') renderCommander();
+  if(screen==='logistics') renderLogisticsOfficer();
   if(screen==='aar')       renderAar();
   updateDemoStatus();
 }
@@ -2352,6 +2515,10 @@ function continueAfterIntake(){
 }
 
 function continueAfterLocation(){
+  if(!hasLocationCaptured()){
+    toast('יש להזין לפחות פרט מיקום אחד לפני סיכום');
+    return;
+  }
   goTo('step8');
 }
 
@@ -2740,7 +2907,10 @@ function updateCountDisplay(key){
 function changeVital(key, delta){
   const b=VITALS_BOUNDS[key]; if(!b) return;
   if(key==='spo2'){ flowVitals.spo2=Math.min(b.max,Math.max(b.min,(flowVitals.spo2??98)+delta)); document.getElementById('v-spo2').textContent=flowVitals.spo2; }
-  if(key==='mspo2'){ modalVitals.spo2=Math.min(b.max,Math.max(b.min,(modalVitals.spo2||98)+delta)); document.getElementById('mv-spo2').textContent=modalVitals.spo2; }
+  if(key==='mspo2'){
+    if(!modalSpo2Active){ toast('הוסף SpO₂ לפני שינוי ערך'); return; }
+    modalVitals.spo2=Math.min(b.max,Math.max(b.min,(modalVitals.spo2??98)+delta)); document.getElementById('mv-spo2').textContent=modalVitals.spo2;
+  }
   saveActiveRecoveryState(activeScreenId());
 }
 function startHold(key, delta, isCount=false){
@@ -2758,7 +2928,7 @@ function vitalsCapturePayload(scope='flow'){
   const rrMethod=counts[rrKey]===0 ? 'clinical_override' : 'stepper';
   return {
     capture_mode: state.flowMode === 'quick' && scope === 'flow' ? 'rapid_binary' : 'counted',
-    rapid_avpu_binary: false,
+    rapid_avpu_binary: state.flowMode === 'quick' && scope === 'flow',
     heart_rate:{raw_count:counts[pulseKey], window_seconds:15, calculated_bpm:counts[pulseKey]*4, entry_method:'stepper'},
     respiratory_rate:{raw_count:counts[rrKey], window_seconds:30, calculated_per_min:counts[rrKey]*2, entry_method:rrMethod}
   };
@@ -2965,6 +3135,7 @@ function openQuickVitals(pid){
   modalPid=pid;
   modalOpenedLastModified=p.lastModifiedAt||null;
   modalVitals={...p.vitals};
+  modalSpo2Active=p.vitals.spo2 != null;
   modalTreatmentNeeded=null;
   modalTreatments=new Set();
   counts.mpulse15=Math.round(p.vitals.pulse/4);
@@ -2972,6 +3143,8 @@ function openQuickVitals(pid){
   document.getElementById('modal-pid-title').textContent=`עדכון מדדים — ${p.id}`;
   document.getElementById('modal-last-vitals').textContent=`אחרון: דופק ${p.vitals.pulse} · נשימות ${p.vitals.rr ?? '—'} · SpO₂ ${p.vitals.spo2||'—'} · AVPU ${p.vitals.avpu||'—'}`;
   document.getElementById('mv-spo2').textContent=p.vitals.spo2 ?? '—';
+  document.getElementById('modal-spo2-ctrl').style.display=modalSpo2Active?'flex':'none';
+  document.getElementById('modal-spo2-toggle').textContent=modalSpo2Active?'✕ הסר':'+ הוסף';
   setDeviceLabels();
   document.getElementById('btn-save-modal').disabled=false;
   updateCountDisplay('mpulse15');
@@ -2985,6 +3158,16 @@ function openQuickVitals(pid){
 }
 function closeVitalsModal(e){ if(e.target.id==='vitals-modal') document.getElementById('vitals-modal').classList.add('hidden'); }
 function checkModalReady(){ document.getElementById('btn-save-modal').disabled=false; }
+function toggleModalSpo2(){
+  modalSpo2Active=!modalSpo2Active;
+  const ctrl=document.getElementById('modal-spo2-ctrl');
+  const btn=document.getElementById('modal-spo2-toggle');
+  if(ctrl) ctrl.style.display=modalSpo2Active?'flex':'none';
+  if(btn) btn.textContent=modalSpo2Active?'✕ הסר':'+ הוסף';
+  if(modalSpo2Active && modalVitals.spo2 == null) modalVitals.spo2=98;
+  if(!modalSpo2Active) modalVitals.spo2=null;
+  document.getElementById('mv-spo2').textContent=modalVitals.spo2 ?? '—';
+}
 function selectModalBP(btn,val){
   document.querySelectorAll('#modal-bp-grid .bp-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected'); modalVitals.bp_estimate=val;
@@ -3109,6 +3292,10 @@ function saveModalVitals(){
       detail:`מיון שונה: ${TRIAGE_LABELS[oldTriage]} → ${TRIAGE_LABELS[newMstart]} (MSTART אוטומטי)`,
       warn: newMstart === 'red' || newMstart === 'black'
     });
+  }
+  if(criticalEvent || (triageChanged && ['red','black'].includes(newMstart))){
+    delete p.alertAcknowledgedAt;
+    delete p.alertAcknowledgedBy;
   }
 
   // ── Commit vitals ────────────────────────────
@@ -3254,6 +3441,50 @@ function duplicateCandidates(pts){
 function inventoryReadModel(pts){
   const latestStock=[...pts].reverse().find(p=>p.stockSnapshot)?.stockSnapshot || state.localStockCache || SUPPLY_BASELINE;
   return {...SUPPLY_BASELINE, ...latestStock};
+}
+function logisticsCompanies(){
+  const companyDefs=[
+    {id:'ALFA', name:'פלוגה א', siteId:'SITE_A'},
+    {id:'BRAVO', name:'פלוגה ב', siteId:'SITE_B'},
+    {id:'CHARLIE', name:'פלוגה ג', siteId:'ALL'}
+  ];
+  return companyDefs.map(c=>{
+    const pts=c.siteId==='ALL' ? patients : patients.filter(p=>(p.siteId||'SITE_A')===c.siteId);
+    const inventory=inventoryReadModel(pts);
+    const lowItems=Object.entries(inventory).filter(([,count])=>count<=1);
+    const consumed=(pts||[]).reduce((sum,p)=>sum+(p.txHistory?.length||0),0);
+    return {...c, patients:pts.length, inventory, lowItems, consumed};
+  });
+}
+function renderLogisticsOfficer(){
+  updateClock();
+  const companies=logisticsCompanies();
+  const totalLow=companies.reduce((sum,c)=>sum+c.lowItems.length,0);
+  const totalStock=companies.reduce((sum,c)=>sum+Object.values(c.inventory).reduce((a,b)=>a+Number(b||0),0),0);
+  const summary=document.getElementById('logistics-summary');
+  if(summary) summary.innerHTML=[
+    {n:companies.length,l:'פלוגות במעקב',c:''},
+    {n:totalLow,l:'פריטים מתחת לסף',c:totalLow?'critical':''},
+    {n:totalStock,l:'יחידות מלאי נגזרות',c:''},
+    {n:localOutboxCount(),l:'אירועי ledger ממתינים',c:localOutboxCount()?'critical':''}
+  ].map(x=>`<div class="cmd-priority-card ${x.c}"><div class="cmd-priority-num">${x.n}</div><div class="cmd-priority-label">${x.l}</div></div>`).join('');
+  const body=document.getElementById('logistics-companies');
+  if(body) body.innerHTML=companies.map(c=>{
+    const logistics=Object.entries(c.inventory).map(([item,count])=>{
+      const cls=count<=0?'empty':count<=1?'low':'';
+      return `<span class="${cls}">${SUPPLY_LABELS[item]||item}: ${count}</span>`;
+    }).join('');
+    const state=c.lowItems.some(([,count])=>count<=0)?'CRITICAL':c.lowItems.length?'LOW':'OK';
+    return `<div class="cmd-matrix-row ${state==='CRITICAL'?'critical':''}">
+      <div>
+        <div class="cmd-matrix-title">${c.name} · ${c.id}</div>
+        <div class="cmd-matrix-sub">${c.patients} פצועים מקושרים · ${c.consumed} פעולות טיפול · ${state}</div>
+        <div class="cmd-logistics">${logistics}</div>
+      </div>
+      <div class="cmd-matrix-counts"><span class="${state==='OK'?'':'low'}">${state}</span></div>
+    </div>`;
+  }).join('');
+  updateDemoStatus();
 }
 function buildIncidentCommandStateSnapshot(pts, site){
   const inventory=inventoryReadModel(pts);
