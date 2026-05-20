@@ -772,9 +772,10 @@ textarea{resize:vertical;min-height:70px;}
         <button class="tap-btn" onclick="selectRapidAvpu(this,'P')"><span class="icon">⚠</span>P/U</button>
       </div>
       <div class="field-label">לחץ דם / דופק רדיאלי</div>
-      <div class="tap-grid tap-grid-2" id="rapid-bp-grid" style="margin-bottom:14px">
+      <div class="tap-grid" id="rapid-bp-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
         <button class="tap-btn" onclick="selectRapidBp(this,'radial')"><span class="icon">✅</span>מעל 100</button>
-        <button class="tap-btn" onclick="selectRapidBp(this,'carotid')"><span class="icon">⚠</span>מתחת 100</button>
+        <button class="tap-btn" onclick="selectRapidBp(this,'weak')"><span class="icon">⚠</span>80-100</button>
+        <button class="tap-btn" onclick="selectRapidBp(this,'absent')"><span class="icon">🚨</span>מתחת 80</button>
       </div>
       <div class="calc-confirm" id="rapid-vitals-summary">נשימה: — · AVPU: — · לחץ דם: —</div>
     </div>
@@ -1057,7 +1058,7 @@ textarea{resize:vertical;min-height:70px;}
     <div class="field-label" style="margin-top:4px">זיהוי חובש מטפל</div>
     <div class="device-card">הטיפול ייחתם אוטומטית על ידי מכשיר <span class="device-id" id="tx-device-id">—</span></div>
   </div>
-  <div class="bottom-bar"><button class="btn-primary" id="btn-step7" onclick="goTo('step8')">המשך לסיכום</button></div>
+  <div class="bottom-bar"><button class="btn-primary" id="btn-step7" onclick="goTo('step2')">המשך למיקום</button></div>
 </div>
 
 <!-- ══════════════════════ STEP 8 — SUMMARY ══ -->
@@ -1332,9 +1333,9 @@ const C5Rules = window.C5DomainRules;
 if(!C5Rules) throw new Error('C5 domain rules failed to load');
 
 // v1.2 field-flow map:
-// Regular: dashboard -> step1 intake -> step2 location -> step3 hemorrhage/TQ -> step4 full vitals -> step5 triage -> step6 body/trap -> step7 treatment -> step8 summary.
-// Rapid: dashboard -> step1 intake -> step2 location -> step4 binary vitals -> step5 triage -> step6 body/trap -> step8 summary.
-// Black/expectant: step5 selection -> panic double-confirm -> optional trap modal -> step8 summary.
+// Regular: dashboard -> step1 intake -> step3 hemorrhage/TQ -> step4 full vitals -> step5 triage -> step6 body/trap -> step7 treatment/MIST -> step2 location -> step8 summary.
+// Rapid: dashboard -> step1 intake -> step4 binary vitals -> step5 triage -> step6 body/trap -> step2 location -> step8 summary.
+// Black/expectant: step5 selection -> panic double-confirm -> trap modal if missing -> step2 location if missing -> step8 summary.
 
 // ═══════════════════════════════════════════════
 //  CONSTANTS
@@ -1364,8 +1365,9 @@ const COUNT_LIMITS = {
 const VITALS_BOUNDS = {spo2:{min:50,max:100}, mspo2:{min:50,max:100}};
 const BP_LABELS = {
   radial:'מעל 100 — עורק רדיאלי',
+  weak:'בין 80 ל-100 — דופק חלש / גבולי',
   carotid:'מעל 70 — עורק קרוטיד',
-  absent:'מתחת 70 — ללא דופק היקפי'
+  absent:'מתחת 80 — ללא דופק היקפי / הלם'
 };
 const ACCESS_LABELS = {partial:'לכוד', trapped:'לכוד', full:'לא לכוד', free:'לא לכוד', none:'לכוד', not_trapped:'לא לכוד'};
 const TRAP_LABELS = {trapped:'לכוד', not_trapped:'לא לכוד', unknown:'לא תועד'};
@@ -1813,9 +1815,10 @@ function goTo(screen){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+screen).classList.add('active');
   window.scrollTo(0,0);
+  updateFlowChrome(screen);
   if(screen==='dashboard'){ renderDashboard(); renderAlerts(); }
-  if(screen==='step2')     { const b=document.querySelector('#screen-step2 .btn-back'); if(b) b.setAttribute('onclick', "goTo('step1')"); }
-  if(screen==='step3')     { const b=document.querySelector('#screen-step3 .btn-back'); if(b) b.setAttribute('onclick', "goTo('step2')"); }
+  if(screen==='step2')     { const b=document.querySelector('#screen-step2 .btn-back'); if(b) b.setAttribute('onclick', `goTo('${state.triage==='black'?'step5':state.flowMode==='quick'?'step6':'step7'}')`); }
+  if(screen==='step3')     { const b=document.querySelector('#screen-step3 .btn-back'); if(b) b.setAttribute('onclick', "goTo('step1')"); }
   if(screen==='step4')     { setVitalsModeView(); setDeviceLabels(); checkStep4(); }
   if(screen==='step5')     showMstartSuggestion();
   if(screen==='step7')     { renderTourniquetReminder(); renderLocalStockPanel(); updatePediatricTreatmentUi(); setDeviceLabels(); checkStep7(); }
@@ -1823,6 +1826,27 @@ function goTo(screen){
   if(screen==='commander') renderCommander();
   if(screen==='aar')       renderAar();
   updateDemoStatus();
+}
+
+function setStepChrome(screen, stepText, titleText=null){
+  const root=document.getElementById('screen-'+screen);
+  if(!root) return;
+  const step=root.querySelector('.flow-step');
+  const title=root.querySelector('.flow-title');
+  if(step) step.textContent=stepText;
+  if(titleText && title) title.textContent=titleText;
+}
+function updateFlowChrome(screen){
+  const isQuick=state.flowMode==='quick';
+  const isBlack=state.triage==='black';
+  if(screen==='step1') setStepChrome('step1', isQuick?'שלב 1 / 6':'שלב 1 / 8');
+  if(screen==='step2') setStepChrome('step2', isBlack?'שלב 3 / 4':isQuick?'שלב 5 / 6':'שלב 7 / 8', 'מיקום');
+  if(screen==='step3') setStepChrome('step3','שלב 2 / 8');
+  if(screen==='step4') setStepChrome('step4', isQuick?'שלב 2 / 6':'שלב 3 / 8');
+  if(screen==='step5') setStepChrome('step5', isQuick?'שלב 3 / 6':'שלב 4 / 8');
+  if(screen==='step6') setStepChrome('step6', isQuick?'שלב 4 / 6':'שלב 5 / 8');
+  if(screen==='step7') setStepChrome('step7','שלב 6 / 8');
+  if(screen==='step8') setStepChrome('step8', isBlack?'שלב 4 / 4':isQuick?'שלב 6 / 6':'שלב 8 / 8');
 }
 
 // ═══════════════════════════════════════════════
@@ -2283,6 +2307,7 @@ function selectFlowMode(btn, val){
   btn.classList.add('selected');
   state.flowMode = val;
   state.needsFullAssessment = val === 'quick';
+  updateFlowChrome('step1');
   if(val === 'quick'){
     flowVitals = {pulse:null, spo2:null, bp_estimate:null, rr:null, avpu:null};
     counts = {...counts, pulse15:0, rr30:0};
@@ -2297,15 +2322,11 @@ function selectFlowMode(btn, val){
 
 function continueAfterIntake(){
   state.needsFullAssessment = state.flowMode === 'quick';
-  goTo('step2');
+  goTo(state.flowMode === 'quick' ? 'step4' : 'step3');
 }
 
 function continueAfterLocation(){
-  if(state.flowMode === 'quick' && !state.triage){
-    goTo('step4');
-    return;
-  }
-  goTo('step3');
+  goTo('step8');
 }
 
 function continueAfterAccess(){
@@ -2425,7 +2446,7 @@ function selectRapidBp(btn, val){
   document.querySelectorAll('#rapid-bp-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
   flowVitals.bp_estimate = val;
-  flowVitals.pulse = val === 'radial' ? 88 : 128;
+  flowVitals.pulse = val === 'radial' ? 88 : val === 'weak' ? 108 : 132;
   counts.pulse15 = Math.round(flowVitals.pulse/4);
   updateRapidVitalsSummary();
 }
@@ -3648,10 +3669,21 @@ function closePanicModal(e){ if(e.target.id==='panic-confirm-modal') cancelPanic
 
 function continueAfterInjuryTrap(){
   if(state.flowMode === 'quick'){
-    goTo('step8');
+    goTo('step2');
     return;
   }
   goTo('step7');
+}
+
+function hasLocationCaptured(){
+  return !!(state.buildingType && (state.locFree || state.locRoom || state.locFloor || state.locApt));
+}
+function routeBlackAfterGuardrails(){
+  if(!hasLocationCaptured()){
+    goTo('step2');
+    return;
+  }
+  goTo('step8');
 }
 
 // ── Skip to summary for black triage ─────────────────────
@@ -3677,10 +3709,10 @@ function skipToSummaryBlack() {
     });
   }
   if(!state.trapStatus){
-    showTrapStatusModal(()=>goTo('step8'));
+    showTrapStatusModal(routeBlackAfterGuardrails);
     return;
   }
-  goTo('step8');
+  routeBlackAfterGuardrails();
 }
 
 // ── Re-triage after modal vitals save ────────────────────
