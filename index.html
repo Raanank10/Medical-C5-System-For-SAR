@@ -1315,6 +1315,28 @@ textarea{resize:vertical;min-height:70px;}
     <div class="field-label">זיהוי חובש</div>
     <div class="device-card" style="margin:0 0 14px">עדכון המדדים ייחתם על ידי מכשיר <span class="device-id" id="modal-device-id">—</span></div>
 
+    <div class="field-label">האם נדרש טיפול חדש עכשיו?</div>
+    <div class="tap-grid tap-grid-2" id="modal-treatment-needed-grid" style="margin-bottom:12px">
+      <button class="tap-btn" onclick="setModalTreatmentNeeded(false)"><span class="icon">✅</span>לא כרגע</button>
+      <button class="tap-btn" onclick="setModalTreatmentNeeded(true)"><span class="icon">🩺</span>כן — בחר טיפול</button>
+    </div>
+    <div id="modal-treatment-choices" style="display:none;margin-bottom:14px">
+      <div class="chip-grid" style="margin-bottom:10px">
+        <button class="chip" onclick="toggleModalTreatment(this,'bandage')"><span class="chip-icon">🩹</span>חבישה</button>
+        <button class="chip" onclick="toggleModalTreatment(this,'tourniquet')"><span class="chip-icon">🔴</span>חסם עורקים</button>
+        <button class="chip" onclick="toggleModalTreatment(this,'iv')"><span class="chip-icon">💉</span>פתיחת וריד</button>
+        <button class="chip" onclick="toggleModalTreatment(this,'morphine')"><span class="chip-icon">💊</span>מורפיום</button>
+        <button class="chip" onclick="toggleModalTreatment(this,'fluids')"><span class="chip-icon">🩺</span>נוזלים IV</button>
+        <button class="chip" onclick="toggleModalTreatment(this,'airway_mgmt')"><span class="chip-icon">💨</span>פתיחת נ"א</button>
+        <button class="chip" onclick="toggleModalTreatment(this,'cpr')"><span class="chip-icon">❤️</span>החייאה</button>
+        <button class="chip" onclick="toggleModalTreatment(this,'atq')"><span class="chip-icon">🟠</span>אקטיק</button>
+        <button class="chip" onclick="toggleModalTreatment(this,'other_tx')"><span class="chip-icon">➕</span>אחר</button>
+      </div>
+      <div id="modal-treatment-other-wrap" style="display:none">
+        <input type="text" id="modal-treatment-other" placeholder="פרט טיפול אחר...">
+      </div>
+    </div>
+
     <button class="btn-primary" id="btn-save-modal" onclick="saveModalVitals()" style="background:var(--green)">✓ שמור מדדים</button>
   </div>
 </div>
@@ -1385,7 +1407,7 @@ const STATUS_LABELS = {
   evacuated:'מחולץ'
 };
 const TRIAGE_LABELS = {red:'קשה — אדום', yellow:'בינוני — צהוב', green:'קל — ירוק', black:'לא בר הצלה — שחור', pending:'ממתין — חסר נתונים', unknown:'לא ידוע'};
-const INT_LABELS = {bandage:'חבישה', tourniquet:'חסם עורקים', iv:'פתיחת וריד', airway_mgmt:'פתיחת נ"א', cpr:'החייאה', atq:'אקטיק'};
+const INT_LABELS = {bandage:'חבישה', tourniquet:'חסם עורקים', iv:'פתיחת וריד', morphine:'מורפיום', fluids:'נוזלים IV', airway_mgmt:'פתיחת נ"א', cpr:'החייאה', atq:'אקטיק', other_tx:'אחר'};
 const MEDICATION_LABELS = {morphine:'Morphine', atq:'Actiq/Fentanyl'};
 const MEDICATION_ROUTES = {morphine:'IV', atq:'PO/BUCCAL'};
 const LIMB_LABELS = {yl:'יד שמאל', yr:'יד ימין', rl:'רגל שמאל', rr:'רגל ימין'};
@@ -1461,6 +1483,8 @@ let tqData = {time:null, limbs:new Set()};
 // Modal
 let modalPid = null;
 let modalVitals = {...VITALS_BASELINE};
+let modalTreatmentNeeded = null;
+let modalTreatments = new Set();
 
 // Hold timer
 let holdTimer=null, holdInterval=null;
@@ -2941,6 +2965,8 @@ function openQuickVitals(pid){
   modalPid=pid;
   modalOpenedLastModified=p.lastModifiedAt||null;
   modalVitals={...p.vitals};
+  modalTreatmentNeeded=null;
+  modalTreatments=new Set();
   counts.mpulse15=Math.round(p.vitals.pulse/4);
   counts.mrr30=Math.round(p.vitals.rr/2);
   document.getElementById('modal-pid-title').textContent=`עדכון מדדים — ${p.id}`;
@@ -2954,6 +2980,7 @@ function openQuickVitals(pid){
   if(p.vitals.avpu){ const btn=document.getElementById('mavpu-'+p.vitals.avpu); if(btn) btn.classList.add('selected'); }
   document.querySelectorAll('#modal-bp-grid .bp-btn').forEach(b=>b.classList.remove('selected'));
   if(p.vitals.bp_estimate){ const btn=document.querySelector(`#modal-bp-grid .bp-btn[data-bp="${p.vitals.bp_estimate}"]`); if(btn) btn.classList.add('selected'); }
+  resetModalTreatmentUi();
   document.getElementById('vitals-modal').classList.remove('hidden');
 }
 function closeVitalsModal(e){ if(e.target.id==='vitals-modal') document.getElementById('vitals-modal').classList.add('hidden'); }
@@ -2965,6 +2992,61 @@ function selectModalBP(btn,val){
 function selectModalAVPU(val){
   document.querySelectorAll('#modal-avpu-grid .avpu-btn').forEach(b=>b.classList.remove('selected'));
   document.getElementById('mavpu-'+val).classList.add('selected'); modalVitals.avpu=val;
+}
+function resetModalTreatmentUi(){
+  document.querySelectorAll('#modal-treatment-needed-grid .tap-btn,#modal-treatment-choices .chip').forEach(b=>b.classList.remove('selected'));
+  const choices=document.getElementById('modal-treatment-choices');
+  const otherWrap=document.getElementById('modal-treatment-other-wrap');
+  const other=document.getElementById('modal-treatment-other');
+  if(choices) choices.style.display='none';
+  if(otherWrap) otherWrap.style.display='none';
+  if(other) other.value='';
+}
+function setModalTreatmentNeeded(needed){
+  modalTreatmentNeeded=needed;
+  document.querySelectorAll('#modal-treatment-needed-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  const btn=document.querySelector(`#modal-treatment-needed-grid .tap-btn:nth-child(${needed?2:1})`);
+  if(btn) btn.classList.add('selected');
+  const choices=document.getElementById('modal-treatment-choices');
+  if(choices) choices.style.display=needed?'block':'none';
+  if(!needed){
+    modalTreatments.clear();
+    document.querySelectorAll('#modal-treatment-choices .chip').forEach(b=>b.classList.remove('selected'));
+    const otherWrap=document.getElementById('modal-treatment-other-wrap');
+    if(otherWrap) otherWrap.style.display='none';
+  }
+}
+function toggleModalTreatment(btn, key){
+  btn.classList.toggle('selected');
+  if(modalTreatments.has(key)) modalTreatments.delete(key);
+  else modalTreatments.add(key);
+  const otherWrap=document.getElementById('modal-treatment-other-wrap');
+  if(otherWrap) otherWrap.style.display=modalTreatments.has('other_tx')?'block':'none';
+  if(modalTreatments.size) modalTreatmentNeeded=true;
+}
+function modalTreatmentText(){
+  if(!modalTreatmentNeeded || !modalTreatments.size) return '';
+  const otherText=(document.getElementById('modal-treatment-other')?.value||'').trim();
+  return [...modalTreatments].map(k=>k==='other_tx' ? (otherText||'אחר') : (INT_LABELS[k]||k)).join(', ');
+}
+function queueModalTreatmentEvents(patient, text, medicName){
+  if(!text) return;
+  if(!patient.txHistory) patient.txHistory=[];
+  patient.txHistory.unshift({time:nowT(), text, medic:medicName});
+  patient.events.unshift({type:'INTERVENTION_LOGGED', time:nowT(), detail:`${text} — נרשם מתוך עדכון מדדים`, warn:false});
+  patient.patientStatus = patient.patientStatus === 'identified' || patient.patientStatus === 'observing' ? 'stabilizing' : patient.patientStatus;
+  saveLocalEvent({
+    type:'TREATMENT_NEEDED_RECORDED',
+    detail:text,
+    warn:false,
+    payload_json:{patient_id:patient.id, treatments:[...modalTreatments], note:text}
+  });
+  modalTreatments.forEach(key=>{
+    const spec=INTERVENTION_SUPPLY[key];
+    if(!spec) return;
+    const qty=typeof spec.qty==='function'?spec.qty():spec.qty;
+    consumeFieldSupply(spec.item, -Math.abs(qty), patient.id);
+  });
 }
 function saveModalVitals(){
   const p=patients.find(x=>x.id===modalPid); if(!p) return;
@@ -3043,6 +3125,11 @@ function saveModalVitals(){
 
   const detail = `דופק ${next.pulse} / נשימות ${next.rr} / SpO₂ ${next.spo2||'לא נמדד'} / ${BP_LABELS[next.bp_estimate]||'—'} / AVPU: ${next.avpu||'—'} — ${vitalsCaptureLabel('modal')} — מכשיר: ${medicName}`;
   p.events.unshift({type:'VITALS_UPDATED', time:nowT(), detail, warn:flags.length>0});
+  const treatmentText=modalTreatmentText();
+  queueModalTreatmentEvents(p, treatmentText, medicName);
+  if(modalTreatmentNeeded===false){
+    p.events.unshift({type:'NO_NEW_TREATMENT_NEEDED', time:nowT(), detail:'לא נדרש טיפול חדש בעת עדכון מדדים', warn:false});
+  }
   if(flags.length) p.events.unshift({type:'DETERIORATION_FLAGGED', time:nowT(), detail:flags.join(' · '), warn:true});
   if(criticalEvent) p.events.unshift({type:'CRITICAL_DETERIORATION', time:nowT(), detail:criticalEvent, warn:true});
 
