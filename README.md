@@ -2,7 +2,7 @@
 
 Development repository for an offline-first medical command-and-control prototype for search-and-rescue mass-casualty operations.
 
-[Live demo](https://raanank10.github.io/Medical-C5-System-For-SAR/) | [Development guide](docs/DEVELOPMENT.md) | [Architecture](docs/ARCHITECTURE.md) | [Tactical UI](docs/TACTICAL_UI_GUIDELINES.md) | [Production readiness](docs/PRODUCTION_READINESS.md)
+[Live demo](https://raanank10.github.io/Medical-C5-System-For-SAR/) | [Development guide](docs/DEVELOPMENT.md) | [Architecture](docs/ARCHITECTURE.md) | [Tactical UI](docs/TACTICAL_UI_GUIDELINES.md) | [Field gaps](docs/FIELD_EXPERIMENT_GAPS.md) | [Production readiness](docs/PRODUCTION_READINESS.md)
 
 ![C5 Sentinel-SAR Command Dashboard](assets/mockups/command_dashboard.png)
 
@@ -134,6 +134,7 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the active build plan.
 - [Architecture](docs/ARCHITECTURE.md)
 - [Tactical UI guidelines](docs/TACTICAL_UI_GUIDELINES.md)
 - [Production readiness path](docs/PRODUCTION_READINESS.md)
+- [Field experiment gap register](docs/FIELD_EXPERIMENT_GAPS.md)
 - [Operations and safety notes](docs/OPERATIONS_SAFETY.md)
 - [Metrics dictionary](docs/METRICS_DICTIONARY.md)
 - [Demo script](docs/PC_DEMO_SCRIPT.md)

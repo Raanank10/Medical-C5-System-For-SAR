@@ -158,6 +158,28 @@ Backend projection:
 - confirmed high-risk overrides create a warning `HIGH_RISK_PEDIATRIC_MEDICATION_OVERRIDE` alert for commander awareness and AAR review
 - the clinical event remains immutable either way
 
+## Binary Trap Status Event
+
+The client no longer asks for partial/full/no-access during initial capture. Extraction state is recorded after vitals/triage as a binary rescue tasking event.
+
+```json
+{
+  "type": "PATIENT_ACCESS_UPDATED",
+  "patient_id": "30000000-0000-0000-0000-000000000099",
+  "payload_json": {
+    "trap_status": "trapped",
+    "access_status": "trapped"
+  }
+}
+```
+
+Allowed client values:
+
+- `trapped`
+- `not_trapped`
+
+Backend compatibility maps `not_trapped` to legacy `access_status = free`; legacy `partial` remains read-compatible but should not be emitted by new clients.
+
 ## MIST Handover Event
 
 When a medic completes MIST handover, the client writes a local `PATIENT_HANDED_OVER` event before attempting network delivery. The receiving unit may scan a secure QR link, but the QR must contain a temporary encrypted token/signature, not embedded clinical files.

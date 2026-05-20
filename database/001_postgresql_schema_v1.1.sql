@@ -197,6 +197,13 @@ create table if not exists patients (
   tourniquet_used boolean,
   injury_zones jsonb not null default '[]'::jsonb,
   is_trapped boolean generated always as (access_status in ('trapped','partial')) stored,
+  trap_status text generated always as (
+    case
+      when access_status in ('trapped','partial') then 'trapped'
+      when access_status = 'free' then 'not_trapped'
+      else 'unknown'
+    end
+  ) stored,
   location_json jsonb not null default '{}'::jsonb,
   location_recorded_at timestamptz,
   last_vitals_at timestamptz,
@@ -685,7 +692,15 @@ begin
 
     elsif new.type = 'PATIENT_ACCESS_UPDATED' then
       update patients
-      set access_status = coalesce((new.payload_json->>'access_status')::access_status, access_status),
+      set access_status = coalesce(
+            case
+              when new.payload_json->>'trap_status' = 'trapped' then 'trapped'::access_status
+              when new.payload_json->>'trap_status' = 'not_trapped' then 'free'::access_status
+              else null
+            end,
+            (new.payload_json->>'access_status')::access_status,
+            access_status
+          ),
           access_recorded_at = new.local_timestamp,
           updated_at = now(),
           version = version + 1

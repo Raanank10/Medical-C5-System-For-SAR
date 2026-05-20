@@ -28,7 +28,6 @@
 
   function needsVitals(patient) {
     if (!patient) return false;
-    if (patient.accessibility === "none") return false;
     if (VITALS_CLOSED_STATUSES.has(patient.patientStatus)) return false;
     if (patient.triage === "black") return false;
     return true;
@@ -100,7 +99,7 @@
     return "yellow";
   }
 
-  function suggestMstartTriage({ vitals, sabcde = {}, accessibility } = {}) {
+  function suggestMstartTriage({ vitals, sabcde = {} } = {}) {
     const v = vitals || {};
     if (v.rr === 0) {
       return { triage: "black", reason: "MCI: לא נושם — מסווג שחור", reasons: [] };
@@ -116,8 +115,8 @@
     if (v.spo2 && v.spo2 < 94) reasons.push(`SpO₂ ${v.spo2}%`);
 
     if (reasons.length) return { triage: "red", reason: reasons.join(" · "), reasons };
-    if (accessibility === "full" && v.avpu === "A") {
-      return { triage: "green", reason: "גישה מלאה · מדדים תקינים", reasons: [] };
+    if (v.avpu === "A") {
+      return { triage: "green", reason: "מדדים תקינים · AVPU A", reasons: [] };
     }
     return { triage: "yellow", reason: "מדדים בינוניים", reasons: [] };
   }

@@ -37,6 +37,13 @@ The app should offer two entry paths:
 
 Quick Patient records must create `needs_full_assessment = true` and a commander-visible incomplete-assessment alert.
 
+Extraction status should be asked late, after vitals/triage, and should be binary:
+
+- `trapped`: extraction team must physically free or move the casualty from the structure/vehicle/rubble.
+- `not_trapped`: the casualty can be moved without a dedicated extraction task.
+
+Avoid early `partial/full/no access` choices in the medic flow; those blur clinical access with rescue tasking and slow first registration.
+
 Lifecycle status must be projected from events, not manually selected by the medic:
 
 - quick patient created: `identified`

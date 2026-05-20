@@ -14,7 +14,7 @@ function patient(overrides = {}) {
 }
 
 assert.equal(rules.needsVitals(patient()), true);
-assert.equal(rules.needsVitals(patient({ accessibility: "none" })), false);
+assert.equal(rules.needsVitals(patient({ trapStatus: "trapped" })), true);
 assert.equal(rules.needsVitals(patient({ patientStatus: "evacuated" })), false);
 assert.equal(rules.needsVitals(patient({ patientStatus: "evacuating" })), false);
 assert.equal(rules.needsVitals(patient({ patientStatus: "deceased" })), false);
@@ -62,8 +62,8 @@ assert.equal(rules.computeMstartTriage({ rr: 16, bp_estimate: "radial", avpu: "A
 assert.equal(rules.computeMstartTriage({ rr: 16, bp_estimate: null, avpu: null, spo2: null }), "yellow");
 
 assert.deepEqual(
-  rules.suggestMstartTriage({ vitals: { rr: 16, bp_estimate: "radial", avpu: "A", spo2: 98 }, accessibility: "full" }),
-  { triage: "green", reason: "גישה מלאה · מדדים תקינים", reasons: [] },
+  rules.suggestMstartTriage({ vitals: { rr: 16, bp_estimate: "radial", avpu: "A", spo2: 98 } }),
+  { triage: "green", reason: "מדדים תקינים · AVPU A", reasons: [] },
 );
 assert.equal(
   rules.suggestMstartTriage({ vitals: { rr: 16 }, sabcde: { A: "blocked", B: "abnormal" } }).triage,

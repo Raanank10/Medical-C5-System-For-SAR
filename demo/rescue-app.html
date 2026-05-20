@@ -621,33 +621,21 @@ textarea{resize:vertical;min-height:70px;}
       </button>
     </div>
   </div>
-  <div class="bottom-bar"><button class="btn-primary" id="btn-step1" onclick="goTo('step2')">המשך</button></div>
+  <div class="bottom-bar"><button class="btn-primary" id="btn-step1" onclick="continueAfterLocation()">המשך</button></div>
 </div>
 
-<!-- ══════════════════════ STEP 2 — ACCESSIBILITY ══ -->
+<!-- ══════════════════════ STEP 2 — RESERVED CHECKPOINT ══ -->
 <div id="screen-step2" class="screen">
   <div class="flow-header">
     <button class="btn-back" onclick="goTo('step1')">←</button>
-    <div><div class="flow-step">שלב 2 / 8</div><div class="flow-title">סטטוס לכוד</div></div>
+    <div><div class="flow-step">שלב ביניים</div><div class="flow-title">המשך הערכה</div></div>
   </div>
   <div class="progress-bar"><div class="progress-fill" style="width:25%"></div></div>
   <div class="flow-content">
-    <div class="tap-grid tap-grid-1" id="access-grid">
-      <button class="tap-btn" onclick="selectAccess(this,'partial')">
-        <span class="icon">🦽</span>
-        <div style="font-weight:700">לכוד עם גישה חלקית</div>
-        <div style="font-size:11px;color:var(--muted)">ניתן לגשת בחלקו — טיפול אפשרי</div>
-      </button>
-      <button class="tap-btn" onclick="selectAccess(this,'full')">
-        <span class="icon">🚶</span>
-        <div style="font-weight:700">לכוד עם גישה מלאה</div>
-        <div style="font-size:11px;color:var(--muted)">גישה פיזית מלאה לפצוע</div>
-      </button>
-      <button class="tap-btn" onclick="selectAccess(this,'none')">
-        <span class="icon">🚫</span>
-        <div style="font-weight:700">לכוד ללא גישה</div>
-        <div style="font-size:11px;color:var(--muted)">יודעים מיקומו — עובדים על חילוץ</div>
-      </button>
+    <div class="computed-status-card">
+      <div class="computed-status-title">סטטוס חילוץ עבר לשלב מאוחר</div>
+      <div class="computed-status-value">לכוד / לא לכוד</div>
+      <div class="computed-status-note">הבחירה הבינארית נשאלת לאחר מדדים ומיון, כדי לא לעכב רישום ראשוני.</div>
     </div>
   </div>
   <div class="bottom-bar"><button class="btn-primary" id="btn-step2" onclick="continueAfterAccess()">המשך</button></div>
@@ -656,7 +644,7 @@ textarea{resize:vertical;min-height:70px;}
 <!-- ══════════════════════ STEP 3 — QUICK TOURNIQUET ══ -->
 <div id="screen-step3" class="screen">
   <div class="flow-header">
-    <button class="btn-back" onclick="goTo('step2')">←</button>
+    <button class="btn-back" onclick="goTo('step1')">←</button>
     <div><div class="flow-step">שלב 3 / 7</div><div class="flow-title">חסם עורקים מיידי</div></div>
   </div>
   <div class="progress-bar"><div class="progress-fill" style="width:42.8%"></div></div>
@@ -886,6 +874,19 @@ textarea{resize:vertical;min-height:70px;}
       <div class="computed-status-value" id="computed-status-label">זוהה</div>
       <div class="computed-status-note">המערכת מעדכנת סטטוס לפי פעולות: פתיחת פצוע, חסם עורקים, מדדים, חילוץ או מסירה. החובש לא נדרש לבחור סטטוס ידנית.</div>
     </div>
+    <div class="field-label" style="margin-top:16px">סטטוס חילוץ</div>
+    <div class="tap-grid tap-grid-2" id="trap-grid">
+      <button class="tap-btn" onclick="selectTrapStatus(this,'trapped')">
+        <span class="icon">⛓️</span>
+        <div style="font-weight:700">לכוד</div>
+        <div style="font-size:11px;color:var(--muted)">נדרש חילוץ פיזי / פינוי מהמבנה</div>
+      </button>
+      <button class="tap-btn" onclick="selectTrapStatus(this,'not_trapped')">
+        <span class="icon">🚶</span>
+        <div style="font-weight:700">לא לכוד</div>
+        <div style="font-size:11px;color:var(--muted)">ניתן להזזה / פינוי ללא חילוץ מורכב</div>
+      </button>
+    </div>
   </div>
   <div class="bottom-bar"><button class="btn-primary" id="btn-step6" onclick="goTo('step7')">המשך</button></div>
 </div>
@@ -993,6 +994,19 @@ textarea{resize:vertical;min-height:70px;}
     <div class="panic-message" id="pediatric-risk-message">המינון שנבחר חורג מהרף המומלץ לילד.</div>
     <button class="panic-confirm-btn" id="pediatric-risk-confirm" style="background:var(--orange)" onclick="confirmPediatricOverride()">אישור חירום 1/2</button>
     <button class="panic-cancel-btn" onclick="cancelPediatricOverride()">ביטול מינון</button>
+  </div>
+</div>
+
+<!-- ══════════════════════ TRAP STATUS MODAL ══ -->
+<div class="modal-overlay panic-modal hidden" id="trap-status-modal" onclick="closeTrapStatusModal(event)">
+  <div class="modal-sheet panic-sheet" style="border-color:var(--yellow);box-shadow:0 22px 90px rgba(244,162,97,.2)">
+    <div class="panic-title" style="color:var(--yellow)">סטטוס חילוץ אחרון</div>
+    <div class="panic-message">בחר מצב בינארי לפני סגירה: לכוד או לא לכוד. אם אין זמן, ניתן לשמור כחסר נתון והחמ״ל יראה חוב הערכה.</div>
+    <div class="tap-grid tap-grid-2">
+      <button class="tap-btn" onclick="confirmTrapStatus('trapped')"><span class="icon">⛓️</span><div style="font-weight:800">לכוד</div></button>
+      <button class="tap-btn" onclick="confirmTrapStatus('not_trapped')"><span class="icon">🚶</span><div style="font-weight:800">לא לכוד</div></button>
+    </div>
+    <button class="panic-cancel-btn" onclick="confirmTrapStatus(null)">שמור ללא סטטוס חילוץ</button>
   </div>
 </div>
 
@@ -1220,7 +1234,8 @@ const BP_LABELS = {
   carotid:'מעל 70 — עורק קרוטיד',
   absent:'מתחת 70 — ללא דופק היקפי'
 };
-const ACCESS_LABELS = {partial:'לכוד עם גישה חלקית', full:'לכוד עם גישה מלאה', none:'לכוד ללא גישה'};
+const ACCESS_LABELS = {partial:'לכוד', trapped:'לכוד', full:'לא לכוד', free:'לא לכוד', none:'לכוד', not_trapped:'לא לכוד'};
+const TRAP_LABELS = {trapped:'לכוד', not_trapped:'לא לכוד', unknown:'לא תועד'};
 const STATUS_LABELS = {
   identified:'זוהה',
   stabilizing:'ייצוב בטיפול',
@@ -1283,13 +1298,19 @@ const COUNT_BASELINE = {pulse15:20, rr30:8, mpulse15:20, mrr30:8};
 function freshState(){
   return {
     buildingType:null, locFloor:'', locApt:'', locRoom:'', locFree:'',
-    accessibility:null, sabcde:{},
+    accessibility:null, trapStatus:null, sabcde:{},
     flowMode:'extended', patientAgeGroup:'adult', patientAge:null,
     injury:null, injuryZones:new Set(), patientStatus:'identified',
     interventions:new Set(), triage:null,
     needsFullAssessment:true, localEvents:[], pediatricOverrides:{}, pendingMedicationOverride:null,
     vitalsMedicName:'', txMedicName:''
   };
+}
+function normalizeTrapStatus(patient){
+  if(patient?.trapStatus) return patient.trapStatus;
+  if(['trapped','partial','none'].includes(patient?.accessibility)) return 'trapped';
+  if(['not_trapped','full','free'].includes(patient?.accessibility)) return 'not_trapped';
+  return null;
 }
 let state = freshState();
 let flowVitals = {...VITALS_BASELINE};
@@ -1329,7 +1350,7 @@ function demoPatient(id, triage, accessibility, location, injury, patientStatus,
   const t=timeAgoLabel(minutesAgo(extra.createdMin||35));
   const deterioration=extra.deterioration||[];
   return {
-    id, triage, accessibility, location, locDetail:extra.locDetail||'',
+    id, triage, accessibility, trapStatus:extra.trapStatus||normalizeTrapStatus({accessibility}), location, locDetail:extra.locDetail||'',
     injury, patientStatus, time:t, vitals,
     txHistory:extra.txHistory||[],
     alert:deterioration.length>0 || !!extra.alert,
@@ -1385,9 +1406,9 @@ function loadDemoScenario(persist=false){
     demoPatient('P-003','green','full','בניין 15B, קומה 1','ילד, שפשופים וחרדה','evacuated',
       {pulse:110,spo2:99,bp_estimate:'radial',rr:28,avpu:'A'},1,{siteId:'SITE_B', medic:'חובש כהן', createdMin:28, patientAgeGroup:'pediatric', patientAge:6, lastTouchedBy:'PHONE-ALFA',
         events:[{type:'PATIENT_HANDED_OVER',time:timeAgoLabel(minutesAgo(4)),detail:'הועבר למד"א — QR handover'}]}),
-    demoPatient('P-004','red','none','בניין 15B, קומה 2, חדר מדרגות','לכוד ללא גישה מלאה','monitoring',
+    demoPatient('P-004','red','none','בניין 15B, קומה 2, חדר מדרגות','לכוד — נדרש חילוץ','monitoring',
       {pulse:118,spo2:null,bp_estimate:'carotid',rr:30,avpu:'V'},12,{siteId:'SITE_B', medic:'חובש לוי', alert:true, lastTouchedBy:'PHONE-BETA',
-        events:[{type:'ACCESS_UPDATED',time:timeAgoLabel(minutesAgo(20)),detail:'לכוד ללא גישה — נדרש חילוץ',warn:true}]}),
+        events:[{type:'PATIENT_ACCESS_UPDATED',time:timeAgoLabel(minutesAgo(20)),detail:'סטטוס חילוץ: לכוד',warn:true}]}),
     demoPatient('P-005','yellow','partial','חצר אחורית, סמוך לכניסה','פגיעת ראש קלה','in_treatment',
       {pulse:88,spo2:95,bp_estimate:'radial',rr:18,avpu:'A'},6,{siteId:'SITE_A', medic:'חובש כהן', lastTouchedBy:'PHONE-ALFA', confirmedClinical:false})
   ];
@@ -1398,7 +1419,7 @@ function loadDemoScenario(persist=false){
 }
 function saveDemoState(){
   try{
-    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify({siteData,patients,demoSyncMode,lastSyncAt}));
+    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:2,savedAt:new Date().toISOString(),siteData,patients,demoSyncMode,lastSyncAt}));
   }catch(e){}
 }
 function loadStoredDemoState(){
@@ -1410,6 +1431,7 @@ function loadStoredDemoState(){
     siteData=saved.siteData||siteData;
     patients=saved.patients;
     patients.forEach(p=>{
+      if(!p.trapStatus) p.trapStatus=normalizeTrapStatus(p);
       if(Array.isArray(p.vitalsHistory)){
         p.vitalsHistory.forEach(h=>{ if(h.rr===undefined) h.rr=p.vitals?.rr ?? null; });
       }
@@ -1420,6 +1442,7 @@ function loadStoredDemoState(){
     return true;
   }catch(e){ return false; }
 }
+window.addEventListener('beforeunload', saveDemoState);
 function startPcDemo(screen){
   if(!patients.length) loadDemoScenario(true);
   goTo(screen);
@@ -1535,7 +1558,7 @@ function renderDashboard(){
         <div class="patient-badges">
           ${triagePill(p.triage)}
           <span class="badge ${['stabilizing','in_treatment'].includes(p.patientStatus)?'badge-green':['evacuating','evacuated'].includes(p.patientStatus)?'badge-accent':p.patientStatus==='deceased'?'badge-red':'badge-muted'}">${STATUS_LABELS[p.patientStatus]||''}</span>
-          <span class="badge badge-muted">${ACCESS_LABELS[p.accessibility]||''}</span>
+          <span class="badge badge-muted">${TRAP_LABELS[normalizeTrapStatus(p)]||'לא תועד'}</span>
           ${p.needsFullAssessment?'<span class="badge badge-orange">חסר הערכה</span>':''}
           ${p.patientAgeGroup==='pediatric'?'<span class="badge badge-yellow">ילד</span>':''}
           ${p.unsyncedEvents?`<span class="badge badge-accent">${p.unsyncedEvents} unsynced</span>`:''}
@@ -1706,7 +1729,7 @@ function openPatient(id){
     <div class="summary-card">
       <div class="summary-row"><span class="summary-key">מיון</span><span class="summary-val">${triagePill(p.triage)}</span></div>
       <div class="summary-row"><span class="summary-key">מיקום</span><span class="summary-val">${p.location}${p.locDetail?' · '+p.locDetail:''}</span></div>
-      <div class="summary-row"><span class="summary-key">נגישות</span><span class="summary-val">${ACCESS_LABELS[p.accessibility]||''}</span></div>
+      <div class="summary-row"><span class="summary-key">חילוץ</span><span class="summary-val">${TRAP_LABELS[normalizeTrapStatus(p)]||'לא תועד'}</span></div>
       <div class="summary-row"><span class="summary-key">פציעה</span><span class="summary-val">${p.injury}</span></div>
       <div class="summary-row"><span class="summary-key">מצב</span><span class="summary-val">${STATUS_LABELS[p.patientStatus]||''}</span></div>
       ${tq?`<div class="summary-row"><span class="summary-key">חסם עורקים</span><span class="summary-val"><span class="tq-timer ${tq.cls}">${tq.label}</span></span></div>`:''}
@@ -1926,6 +1949,15 @@ function selectAgeGroup(btn, val){
   state.patientAge = val === 'pediatric' ? 7 : null;
 }
 
+function continueAfterLocation(){
+  if(state.flowMode === 'quick'){
+    state.needsFullAssessment = true;
+    goTo('step5');
+    return;
+  }
+  goTo('step3');
+}
+
 function continueAfterAccess(){
   if(state.flowMode === 'quick'){
     state.needsFullAssessment = true;
@@ -1973,6 +2005,18 @@ function selectAccess(btn, val){
   btn.classList.add('selected');
   state.accessibility = val;
   document.getElementById('btn-step2').disabled = false;
+}
+function selectTrapStatus(btn, val){
+  document.querySelectorAll('#trap-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  if(btn) btn.classList.add('selected');
+  state.trapStatus = val;
+  state.accessibility = val === 'trapped' ? 'trapped' : 'free';
+  saveLocalEvent({
+    type:'PATIENT_ACCESS_UPDATED',
+    detail:`סטטוס חילוץ: ${TRAP_LABELS[val]}`,
+    warn:false,
+    payload_json:{trap_status:val, access_status:val === 'trapped' ? 'trapped' : 'free'}
+  });
 }
 
 // Step 3 — SABCDE
@@ -2259,7 +2303,7 @@ function renderSummary(){
     <div class="summary-row"><span class="summary-key">מזהה</span><span class="summary-val" style="font-family:var(--mono);font-weight:700">${newId}</span></div>
     <div class="summary-row"><span class="summary-key">מיון</span><span class="summary-val">${triagePill(state.triage)}</span></div>
     <div class="summary-row"><span class="summary-key">מיקום</span><span class="summary-val">${locStr}</span></div>
-    <div class="summary-row"><span class="summary-key">נגישות</span><span class="summary-val">${ACCESS_LABELS[state.accessibility]||'—'}</span></div>
+    <div class="summary-row"><span class="summary-key">חילוץ</span><span class="summary-val">${TRAP_LABELS[state.trapStatus]||'לא תועד'}</span></div>
     <div class="summary-row"><span class="summary-key">מסלול</span><span class="summary-val">${state.flowMode==='quick'?'מהיר — חוב הערכה':'מורחב'}</span></div>
     <div class="summary-row"><span class="summary-key">גיל</span><span class="summary-val">${state.patientAgeGroup==='pediatric'?'ילד מתחת 8':'מבוגר / 8+'}</span></div>
     <div class="summary-row"><span class="summary-key">SABCDE</span><span class="summary-val" style="font-size:11px">${sab}</span></div>
@@ -2291,7 +2335,7 @@ function savePatient(){
   const effectiveInjury=state.injury || 'לא תועד';
   const missingFields=[];
   if(!state.triage) missingFields.push('triage');
-  if(!state.accessibility) missingFields.push('accessibility');
+  if(!state.trapStatus) missingFields.push('trap_status');
   if(!state.injury) missingFields.push('injury');
   if(missingFields.length && state.triage !== 'black'){
     saveLocalEvent({
@@ -2316,7 +2360,7 @@ function savePatient(){
     warn:e.warn !== false
   }));
   patients.push({
-    id:newId, triage:state.triage, accessibility:state.accessibility,
+    id:newId, triage:state.triage, accessibility:state.accessibility, trapStatus:state.trapStatus,
     location:locStr, locDetail:'',
     injury:effectiveInjury, injuryZones:[...state.injuryZones], patientStatus:effectiveStatus,
     needsFullAssessment:state.needsFullAssessment,
@@ -2543,7 +2587,7 @@ function duplicateCandidates(pts){
       const a=pts[i], b=pts[j];
       const sameSector=sectorFromLocation(a.location).building===sectorFromLocation(b.location).building && sectorFromLocation(a.location).floor===sectorFromLocation(b.location).floor;
       const injuryOverlap=(a.injury||'').split(/[ +,]/).some(token=>token.length>2 && (b.injury||'').includes(token));
-      if(sameSector && (injuryOverlap || a.accessibility===b.accessibility)) pairs.push([a,b]);
+      if(sameSector && (injuryOverlap || normalizeTrapStatus(a)===normalizeTrapStatus(b))) pairs.push([a,b]);
     }
   }
   return pairs.slice(0,4);
@@ -2551,7 +2595,7 @@ function duplicateCandidates(pts){
 function renderCommandOperationalPanels(pts, site){
   const stale=pts.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS);
   const tqOverdue=pts.filter(p=>p.tourniquet && Date.now()-p.tourniquet.appliedAt>=40*60*1000);
-  const trappedSilent=pts.filter(p=>p.accessibility==='none' && vitalsAgeMs(p)>=10*60*1000);
+  const trappedSilent=pts.filter(p=>normalizeTrapStatus(p)==='trapped' && vitalsAgeMs(p)>=10*60*1000);
   const evacBlocked=pts.filter(p=>p.triage==='red' && !['evacuating','evacuated','handed_over'].includes(p.patientStatus));
   const unsynced=pts.reduce((sum,p)=>sum+(p.unsyncedEvents||0),0)+localOutboxCount();
   const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>s.externalReports||[]):site.externalReports||siteData.externalReports||[];
@@ -2660,7 +2704,7 @@ function renderCmdPatients(){
   let list=[...pts];
   if(cmdFilter==='red') list=list.filter(p=>p.triage==='red');
   else if(cmdFilter==='yellow') list=list.filter(p=>p.triage==='yellow');
-  else if(cmdFilter==='trapped') list=list.filter(p=>p.accessibility==='none');
+  else if(cmdFilter==='trapped') list=list.filter(p=>normalizeTrapStatus(p)==='trapped');
   else if(cmdFilter==='alerts') list=list.filter(p=>(p.deterioration&&p.deterioration.length)||(needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS));
   list.sort((a,b)=>{
     const ad=(a.deterioration&&a.deterioration.length)?0:1, bd=(b.deterioration&&b.deterioration.length)?0:1;
@@ -2668,11 +2712,11 @@ function renderCmdPatients(){
     return (pri[a.triage]||0)-(pri[b.triage]||0);
   });
   if(!list.length){ document.getElementById('cmd-patient-table').innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:14px">אין פצועים בסינון זה</div>'; return; }
-  const accIcon={partial:'🦽',full:'🚶',none:'🚫'};
+  const trapIcon={trapped:'⛓️',not_trapped:'🚶'};
   const sCol=s=>!s?'var(--muted)':s<94?'var(--red)':s<97?'var(--yellow)':'var(--green)';
   document.getElementById('cmd-patient-table').innerHTML=list.map(p=>`
     <div class="cmd-row ${triageKey(p.triage)}" onclick="openPatient('${p.id}');goTo('patient')">
-      <div><div style="font-family:var(--mono);font-weight:700;font-size:15px">${p.id}</div><div style="font-size:16px;margin-top:2px">${accIcon[p.accessibility]||'?'}</div></div>
+      <div><div style="font-family:var(--mono);font-weight:700;font-size:15px">${p.id}</div><div style="font-size:16px;margin-top:2px">${trapIcon[normalizeTrapStatus(p)]||'?'}</div></div>
       <div>
         <div style="font-weight:600;font-size:13px">${p.location}</div>
         <div style="margin-top:3px">${triagePill(p.triage)}</div>
@@ -2876,6 +2920,20 @@ function closePediatricRisk(){
 }
 function closePediatricRiskModal(e){ if(e.target.id==='pediatric-risk-modal') cancelPediatricOverride(); }
 
+let trapStatusAfterSelect = null;
+function showTrapStatusModal(afterSelect){
+  trapStatusAfterSelect = afterSelect || null;
+  document.getElementById('trap-status-modal').classList.remove('hidden');
+}
+function confirmTrapStatus(val){
+  if(val) selectTrapStatus(null, val);
+  document.getElementById('trap-status-modal').classList.add('hidden');
+  const next=trapStatusAfterSelect;
+  trapStatusAfterSelect=null;
+  if(next) next();
+}
+function closeTrapStatusModal(e){ if(e.target.id==='trap-status-modal') confirmTrapStatus(null); }
+
 let panicAction = null;
 let panicConfirmCount = 0;
 
@@ -2938,6 +2996,10 @@ function skipToSummaryBlack() {
         bypass_flow:true
       }
     });
+  }
+  if(!state.trapStatus){
+    showTrapStatusModal(()=>goTo('step8'));
+    return;
   }
   goTo('step8');
 }
