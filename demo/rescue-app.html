@@ -624,9 +624,9 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-step2" class="screen">
   <div class="flow-header">
     <button class="btn-back" onclick="goTo('step5')">←</button>
-    <div><div class="flow-step">שלב 6 / 8</div><div class="flow-title">מיקום</div></div>
+    <div><div class="flow-step">שלב 2 / 8</div><div class="flow-title">מיקום</div></div>
   </div>
-  <div class="progress-bar"><div class="progress-fill" style="width:70%"></div></div>
+  <div class="progress-bar"><div class="progress-fill" style="width:25%"></div></div>
   <div class="flow-content">
     <div class="field-label">סוג המבנה</div>
     <div class="tap-grid tap-grid-2" id="building-type-grid" style="margin-bottom:16px">
@@ -668,9 +668,9 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-step3" class="screen">
   <div class="flow-header">
     <button class="btn-back" onclick="goTo('step1')">←</button>
-    <div><div class="flow-step">שלב 3 / 7</div><div class="flow-title">חסם עורקים מיידי</div></div>
+    <div><div class="flow-step">שלב 3 / 8</div><div class="flow-title">חסם עורקים מיידי</div></div>
   </div>
-  <div class="progress-bar"><div class="progress-fill" style="width:42.8%"></div></div>
+  <div class="progress-bar"><div class="progress-fill" style="width:37.5%"></div></div>
   <div class="flow-content">
     <div style="background:rgba(230,57,70,0.08);border:1px solid var(--red);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.6">
       <strong style="color:var(--red)">⚠ עצור דימום חיצוני לפני הכל.</strong><br>
@@ -717,9 +717,9 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-step4" class="screen">
   <div class="flow-header">
     <button class="btn-back" onclick="goTo('step3')">←</button>
-    <div><div class="flow-step">שלב 4 / 7</div><div class="flow-title">מדדים חיוניים</div></div>
+    <div><div class="flow-step">שלב 4 / 8</div><div class="flow-title">מדדים חיוניים</div></div>
   </div>
-  <div class="progress-bar"><div class="progress-fill" style="width:57.1%"></div></div>
+  <div class="progress-bar"><div class="progress-fill" style="width:50%"></div></div>
   <div class="flow-content">
     <div id="rapid-vitals-panel" style="display:none">
       <div style="background:rgba(67,97,238,0.08);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.55">
@@ -897,7 +897,7 @@ textarea{resize:vertical;min-height:70px;}
     </div>
     <div id="black-skip-wrap" style="display:none;margin-top:14px">
       <button onclick="initiateBlackTriage()" style="width:100%;padding:16px;background:rgba(74,74,74,0.15);border:2px solid #666;border-radius:14px;color:#aaa;font-size:16px;font-weight:700;cursor:pointer">
-        דלג לסיכום ואשר — לא בר הצלה ←
+        אשר שחור והמשך לסטטוס חילוץ / סיכום ←
       </button>
     </div>
   </div>
@@ -1304,7 +1304,7 @@ const C5Rules = window.C5DomainRules;
 if(!C5Rules) throw new Error('C5 domain rules failed to load');
 
 // v1.2 field-flow map:
-// Regular: dashboard -> step1 intake -> step3 hemorrhage/TQ -> step4 full vitals -> step5 triage -> step2 location -> step6 body/trap -> step7 treatment -> step8 summary.
+// Regular: dashboard -> step1 intake -> step2 location -> step3 hemorrhage/TQ -> step4 full vitals -> step5 triage -> step6 body/trap -> step7 treatment -> step8 summary.
 // Rapid: dashboard -> step1 intake -> step2 location -> step4 binary vitals -> step5 triage -> step6 body/trap -> step8 summary.
 // Black/expectant: step5 selection -> panic double-confirm -> optional trap modal -> step8 summary.
 
@@ -1722,7 +1722,8 @@ function goTo(screen){
   document.getElementById('screen-'+screen).classList.add('active');
   window.scrollTo(0,0);
   if(screen==='dashboard'){ renderDashboard(); renderAlerts(); }
-  if(screen==='step2')     { const b=document.querySelector('#screen-step2 .btn-back'); if(b) b.setAttribute('onclick', `goTo('${state.flowMode==='quick' && !state.triage ? 'step1' : 'step5'}')`); }
+  if(screen==='step2')     { const b=document.querySelector('#screen-step2 .btn-back'); if(b) b.setAttribute('onclick', "goTo('step1')"); }
+  if(screen==='step3')     { const b=document.querySelector('#screen-step3 .btn-back'); if(b) b.setAttribute('onclick', "goTo('step2')"); }
   if(screen==='step4')     { setVitalsModeView(); setDeviceLabels(); checkStep4(); }
   if(screen==='step5')     showMstartSuggestion();
   if(screen==='step7')     { renderTourniquetReminder(); setDeviceLabels(); checkStep7(); }
@@ -2196,12 +2197,8 @@ function selectFlowMode(btn, val){
 }
 
 function continueAfterIntake(){
-  if(state.flowMode === 'quick'){
-    state.needsFullAssessment = true;
-    goTo('step2');
-    return;
-  }
-  goTo('step3');
+  state.needsFullAssessment = state.flowMode === 'quick';
+  goTo('step2');
 }
 
 function continueAfterLocation(){
@@ -2209,7 +2206,7 @@ function continueAfterLocation(){
     goTo('step4');
     return;
   }
-  goTo('step6');
+  goTo('step3');
 }
 
 function continueAfterAccess(){
@@ -2229,7 +2226,7 @@ function continueAfterTriage(){
     goTo('step6');
     return;
   }
-  goTo('step2');
+  goTo('step6');
 }
 
 // Step 2 — Location
@@ -2240,7 +2237,7 @@ function selectBuildingType(btn, val){
   document.getElementById('building-fields').style.display = val==='building'?'block':'none';
   document.getElementById('house-fields').style.display = val==='house'?'block':'none';
   document.getElementById('common-loc-fields').style.display = 'block';
-  document.getElementById('btn-step1').disabled = false;
+  document.getElementById('btn-step2').disabled = false;
 }
 function selectRoom(btn, val){
   document.querySelectorAll('#room-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
@@ -2285,7 +2282,7 @@ function setVitalsModeView(){
   const back=document.querySelector('#screen-step4 .btn-back');
   if(rapid) rapid.style.display = state.flowMode === 'quick' ? 'block' : 'none';
   if(regular) regular.style.display = state.flowMode === 'quick' ? 'none' : 'block';
-  if(back) back.setAttribute('onclick', `goTo('${state.flowMode === 'quick' ? 'step1' : 'step3'}')`);
+  if(back) back.setAttribute('onclick', `goTo('${state.flowMode === 'quick' ? 'step2' : 'step3'}')`);
   updateRapidVitalsSummary();
 }
 function updateRapidVitalsSummary(){
