@@ -2126,9 +2126,23 @@ function clearDemoScenario(){
   allSites.forEach(s=>{ if(s.id!=='ALL') s.externalReports=[]; });
   demoSyncMode='fresh';
   lastSyncAt=Date.now();
+  experimentStartedAt=new Date().toISOString();
+  experimentPhase='intake-drill';
+  demoRevision=0;
+  try{
+    localStorage.removeItem(ACTIVE_RECOVERY_KEY);
+    localStorage.removeItem(OBSERVER_NOTES_KEY);
+    localStorage.removeItem(CONFLICT_LOG_KEY);
+    localStorage.removeItem('c5_local_sqlite_outbox');
+  }catch(e){}
   saveDemoState();
   renderDashboard();
   renderAlerts();
+  renderCommander();
+  renderLogisticsOfficer();
+  renderRolesAuthorization();
+  renderAar();
+  if(document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard(activeRoleDashboard);
   toast('התרחיש נוקה');
 }
 function saveDemoState(){
