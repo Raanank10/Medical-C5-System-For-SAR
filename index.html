@@ -95,6 +95,11 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .alert-banner.warn .alert-banner-title{color:var(--orange);}
 .alert-banner-sub{font-size:11px;color:var(--muted);margin-top:1px;}
 .ack-btn{border:1px solid var(--accent);background:rgba(67,97,238,.16);color:#fff;border-radius:10px;padding:8px 10px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;}
+.alert-meta-line{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;}
+.alert-meta-chip{border:1px solid var(--border);border-radius:999px;padding:3px 7px;font-family:var(--mono);font-size:9px;font-weight:900;color:var(--muted);background:rgba(255,255,255,.03);}
+.alert-meta-chip.owner{border-color:var(--accent);color:var(--accent);}
+.alert-meta-chip.action{border-color:var(--yellow);color:var(--yellow);}
+.alert-meta-chip.escalate{border-color:var(--orange);color:var(--orange);}
 .alert-slicer{display:flex;gap:6px;padding:4px 16px 8px;overflow-x:auto;}
 .alert-slice{background:var(--surface);border:1px solid var(--border);border-radius:999px;color:var(--muted);font-size:12px;font-weight:700;padding:7px 11px;white-space:nowrap;cursor:pointer;}
 .alert-slice.active{background:rgba(230,57,70,0.12);border-color:var(--red);color:var(--red);}
@@ -115,6 +120,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .tap-grid{display:grid;gap:10px;}
 .tap-grid-2{grid-template-columns:1fr 1fr;}
 .tap-grid-1{grid-template-columns:1fr;}
+.tap-grid-3{grid-template-columns:repeat(3,1fr);}
+.chip-row{display:flex;gap:8px;overflow-x:auto;flex-wrap:wrap;}
 .tap-btn{background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:16px 12px;color:var(--text);font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;text-align:center;transition:all 0.12s;display:flex;flex-direction:column;align-items:center;gap:7px;line-height:1.3;min-height:56px;touch-action:manipulation;}
 .tap-btn .icon{font-size:26px;}
 .tap-btn:active{transform:scale(0.97);}
@@ -359,6 +366,12 @@ input[type=range]{width:100%;accent-color:var(--orange);}
 .cmd-panel-toggle{width:calc(100% - 32px);margin:10px 16px 0;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px 12px;color:var(--text);font-size:13px;font-weight:800;cursor:pointer;display:flex;justify-content:space-between;align-items:center;text-align:right;}
 .cmd-panel-toggle .cmd-panel-sub{font-family:var(--mono);font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.8px;}
 .cmd-panel-body.collapsed{display:none;}
+.reinforcement-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:11px 12px;margin:7px 16px;}
+.reinforcement-card.immediate{border-color:var(--red);background:rgba(230,57,70,.08);}
+.reinforcement-card.high{border-color:var(--orange);background:rgba(255,107,53,.08);}
+.request-status-row{display:flex;gap:6px;overflow-x:auto;margin-top:9px;}
+.request-status-btn{border:1px solid var(--border);background:var(--surface2);color:var(--muted);border-radius:999px;padding:7px 9px;font-size:10px;font-weight:900;white-space:nowrap;cursor:pointer;}
+.request-status-btn.active{border-color:var(--accent);color:#fff;background:rgba(67,97,238,.18);}
 .cmd-status-matrix{display:grid;gap:7px;padding:8px 16px 0;}
 .cmd-matrix-row{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 11px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;}
 .cmd-matrix-row.critical{border-color:var(--red);background:rgba(230,57,70,.08);}
@@ -446,7 +459,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen active">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V1.2</div>
+      <div class="demo-kicker">Demo V1.3</div>
       <div class="demo-title">דמו לניהול תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         דמו לניהול תמונת מצב רפואית באירוע חילוץ. באירוע חילוץ, למפקד אין תמונת מצב רפואית בזמן אמת: מי קשה, מי עם חסם, מי לא עודכן, מי לכוד, מי ממתין לפינוי, ומה חסר בדיווח. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן.
@@ -498,7 +511,7 @@ textarea{resize:vertical;min-height:70px;}
 
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Field Experiment — Synthetic Scenario Mode v1.2</div>
+      <div class="demo-strip-title">Field Experiment — Synthetic Scenario Mode v1.3</div>
       <div class="demo-strip-sub" id="demo-status-line">תרחיש PC פעיל</div>
     </div>
     <div class="sync-pill" id="sync-pill-dashboard">SYNC</div>
@@ -555,8 +568,8 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 
   <div class="alert-slicer" id="alert-slicer">
-    <button class="alert-slice active" onclick="setAlertFilter('critical',this)">קריטי <span id="alert-critical-count">0</span></button>
-    <button class="alert-slice other" onclick="setAlertFilter('routine',this)">אחר <span id="alert-routine-count">0</span></button>
+    <button class="alert-slice active" onclick="setAlertFilter('critical',this)">עכשיו לטפל <span id="alert-critical-count">0</span></button>
+    <button class="alert-slice other" onclick="setAlertFilter('routine',this)">להשלים כשאפשר <span id="alert-routine-count">0</span></button>
     <button class="alert-slice" onclick="setAlertFilter('all',this)">הכל <span id="alert-all-count">0</span></button>
   </div>
   <div id="alerts-banner"></div>
@@ -1165,6 +1178,48 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 
+<!-- ══════════════════════ MEDICAL REINFORCEMENT REQUEST MODAL ══ -->
+<div class="modal-overlay hidden" id="reinforcement-modal" onclick="closeReinforcementModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="field-label">בקשת תגבור רפואי</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.55;margin-bottom:14px">אובייקט פיקודי ל-PC/CC: מה נדרש, למה, איפה, ומה הסטטוס. לא כפתור פאניקה כללי.</div>
+    <div class="field-label">מה צריך?</div>
+    <div class="tap-grid tap-grid-2" id="reinforcement-resource-grid" style="margin-bottom:14px">
+      <button class="tap-btn" onclick="selectReinforcementResource(this,'one_medic')">חובש נוסף</button>
+      <button class="tap-btn" onclick="selectReinforcementResource(this,'two_medics')">2+ חובשים</button>
+      <button class="tap-btn" onclick="selectReinforcementResource(this,'paramedic')">פראמדיק</button>
+      <button class="tap-btn" onclick="selectReinforcementResource(this,'doctor')">רופא</button>
+      <button class="tap-btn" onclick="selectReinforcementResource(this,'evac_team')">צוות פינוי / אלונקה</button>
+      <button class="tap-btn" onclick="selectReinforcementResource(this,'medical_equipment')">ציוד רפואי</button>
+    </div>
+    <div class="field-label">למה?</div>
+    <div class="chip-row" id="reinforcement-reason-grid" style="margin-bottom:14px">
+      <button class="chip" onclick="toggleReinforcementReason(this,'red_patient')">פצוע אדום</button>
+      <button class="chip" onclick="toggleReinforcementReason(this,'multiple_patients')">ריבוי פצועים</button>
+      <button class="chip" onclick="toggleReinforcementReason(this,'tourniquet')">חסם / דימום</button>
+      <button class="chip" onclick="toggleReinforcementReason(this,'trapped')">לכודים</button>
+      <button class="chip" onclick="toggleReinforcementReason(this,'evac_delay')">פינוי מתעכב</button>
+      <button class="chip" onclick="toggleReinforcementReason(this,'equipment_shortage')">חוסר ציוד</button>
+      <button class="chip" onclick="toggleReinforcementReason(this,'single_medic_overload')">עומס על חובש יחיד</button>
+    </div>
+    <div class="field-label">דחיפות</div>
+    <div class="tap-grid tap-grid-3" id="reinforcement-urgency-grid" style="margin-bottom:14px">
+      <button class="tap-btn triage-red" onclick="selectReinforcementUrgency(this,'immediate')">עכשיו</button>
+      <button class="tap-btn triage-yellow" onclick="selectReinforcementUrgency(this,'high')">דחוף</button>
+      <button class="tap-btn triage-green" onclick="selectReinforcementUrgency(this,'routine')">כשאפשר</button>
+    </div>
+    <div class="field-label">מיקום</div>
+    <input id="reinforcement-location" type="text" placeholder="מוקד / בניין / קומה..." style="margin-bottom:12px">
+    <div class="field-label">הערת PC קצרה</div>
+    <textarea id="reinforcement-note" placeholder="לדוגמה: פצוע אדום עם חסם, מדדים באיחור, פינוי מתעכב"></textarea>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+      <button class="btn-primary" onclick="submitReinforcementRequest()">שלח בקשה</button>
+      <button class="btn-secondary" onclick="hideReinforcementModal()">ביטול</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════════ SUCCESS ══ -->
 <div id="screen-success" class="screen">
   <div class="success-screen">
@@ -1220,6 +1275,8 @@ textarea{resize:vertical;min-height:70px;}
   <div style="padding:12px 16px 0"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px" id="cmd-totals"></div></div>
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('priority')"><span>תעדוף מפקד</span><span class="cmd-panel-sub" id="cmd-panel-priority-meta">OPEN</span></button>
   <div id="cmd-panel-priority" class="cmd-panel-body"><div id="cmd-priority-board" class="cmd-priority-grid"></div></div>
+  <button class="cmd-panel-toggle" onclick="toggleCmdPanel('reinforcement')"><span>בקשות תגבור רפואי</span><span class="cmd-panel-sub" id="cmd-panel-reinforcement-meta">OPEN</span></button>
+  <div id="cmd-panel-reinforcement" class="cmd-panel-body"><div id="cmd-reinforcement-requests"></div></div>
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('heatmap')"><span>מפת חום מרחבית</span><span class="cmd-panel-sub" id="cmd-panel-heatmap-meta">COLLAPSED</span></button>
   <div id="cmd-panel-heatmap" class="cmd-panel-body collapsed"><div id="cmd-heatmap" class="cmd-status-matrix"></div></div>
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('devices')"><span>מכשירים / Sync</span><span class="cmd-panel-sub" id="cmd-panel-devices-meta">COLLAPSED</span></button>
@@ -1232,6 +1289,7 @@ textarea{resize:vertical;min-height:70px;}
   <div id="cmd-panel-alerts" class="cmd-panel-body"><div id="cmd-alerts" style="padding:6px 16px 0"></div></div>
   <div class="demo-actions">
     <button class="demo-mini-btn" onclick="goTo('aar')">פתח סיכום אירוע חי</button>
+    <button class="demo-mini-btn" onclick="openReinforcementRequest()">בקשת תגבור רפואי</button>
     <button class="demo-mini-btn" onclick="goTo('roles')">תפקידים והרשאות</button>
     <button class="demo-mini-btn" onclick="goTo('logistics')">Log-O</button>
     <button class="demo-mini-btn" onclick="exportExperimentLog()">ייצוא ניסוי</button>
@@ -1576,7 +1634,7 @@ textarea{resize:vertical;min-height:70px;}
 const C5Rules = window.C5DomainRules;
 if(!C5Rules) throw new Error('C5 domain rules failed to load');
 
-// v1.2 field-flow map:
+// v1.3 field-flow map:
 // Regular: dashboard -> step1 intake -> step3 hemorrhage/TQ -> step4 full vitals -> step5 triage -> step6 body/trap -> step7 treatment/MIST -> step2 location -> step8 summary.
 // Rapid: dashboard -> step1 intake -> step4 binary vitals -> step5 triage -> step6 body/trap -> step2 location -> step8 summary.
 // Black/expectant: step5 selection -> panic double-confirm -> trap modal if missing -> step2 location if missing -> step8 summary.
@@ -1586,7 +1644,7 @@ if(!C5Rules) throw new Error('C5 domain rules failed to load');
 // ═══════════════════════════════════════════════
 const VITALS_INTERVAL_MS = C5Rules.VITALS_INTERVAL_MS;
 const WARN_AT_MS = C5Rules.WARN_AT_MS;
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
 const CONFLICT_LOG_KEY = 'c5-sentinel-sar-conflict-log-v1';
@@ -1594,6 +1652,55 @@ const ACTIVE_RECOVERY_KEY = 'c5_active_recovery_state';
 const DEVICE_ID_KEY = 'c5-sentinel-sar-device-id';
 const SUPPLY_BASELINE = Object.freeze({CAT_TOURNIQUET:2,MORPHINE_10MG:4,FENTANYL_ACTIQ:2,IV_FLUID_500ML:3,BANDAGE_6INCH:8});
 const SUPPLY_LABELS = {CAT_TOURNIQUET:'CAT חסם',MORPHINE_10MG:'Morphine',FENTANYL_ACTIQ:'Actiq/Fentanyl',IV_FLUID_500ML:'נוזלים 500',BANDAGE_6INCH:'חבישה'};
+const ROLE_LABELS = {medic:'MEDIC ACTION', pc:'PC DECISION', cc:'COMPANY RISK', logistics:'LOGISTICS', chamal:'SYSTEM'};
+const ACTION_LABELS = {
+  update_vitals:'עדכן מדדים',
+  assign_medic:'הקצה חובש',
+  request_evac:'הקצה פינוי',
+  acknowledge:'אשר בטיפול',
+  merge_duplicate:'בדוק כפילות',
+  verify_report:'אמת דיווח',
+  request_reinforcement:'בקש תגבור',
+  dispatch_supply:'שגר אספקה',
+  review_sync:'בדוק Sync'
+};
+const ALERT_CATEGORY_LABELS = {
+  urgent:'טיפול דחוף',
+  rescue:'חילוץ / לכודים',
+  evac:'פינוי',
+  data:'פערי מידע',
+  integrity:'אמינות תמונת מצב',
+  forces:'חובשים / מכשירים',
+  complete:'להשלים כשאפשר',
+  system:'מערכת'
+};
+const REINFORCEMENT_RESOURCE_LABELS = {
+  one_medic:'חובש נוסף',
+  two_medics:'2+ חובשים',
+  paramedic:'פראמדיק',
+  doctor:'רופא',
+  evac_team:'צוות פינוי / אלונקה',
+  medical_equipment:'ציוד רפואי'
+};
+const REINFORCEMENT_REASON_LABELS = {
+  red_patient:'פצוע אדום',
+  multiple_patients:'ריבוי פצועים',
+  tourniquet:'חסם / דימום',
+  trapped:'לכודים',
+  evac_delay:'פינוי מתעכב',
+  equipment_shortage:'חוסר ציוד',
+  single_medic_overload:'עומס על חובש יחיד'
+};
+const REINFORCEMENT_STATUS_LABELS = {
+  pending:'ממתין',
+  acknowledged:'אושר',
+  assigned:'הוקצה',
+  en_route:'בדרך',
+  arrived:'הגיע',
+  denied:'לא זמין',
+  cancelled:'בוטל',
+  resolved:'נסגר'
+};
 const INTERVENTION_SUPPLY = {
   tourniquet:{item:'CAT_TOURNIQUET', qty:1},
   bandage:{item:'BANDAGE_6INCH', qty:1},
@@ -1647,6 +1754,7 @@ const AUTH_MATRIX = [
   {action:'Record vitals and interventions', medic:'yes', pc:'yes', log_o:'no', cc:'no', chamal:'no'},
   {action:'Override MSTART / JumpSTART triage', medic:'yes', pc:'yes', log_o:'no', cc:'no', chamal:'no'},
   {action:'Mark patient handed over', medic:'yes', pc:'yes', log_o:'no', cc:'no', chamal:'no'},
+  {action:'Request medical reinforcement', medic:'limited', pc:'yes', log_o:'no', cc:'yes', chamal:'yes'},
   {action:'Request resupply', medic:'yes', pc:'no', log_o:'no', cc:'no', chamal:'no'},
   {action:'Dispatch supply to Log-O', medic:'no', pc:'yes', log_o:'no', cc:'no', chamal:'no'},
   {action:'Manage kit templates', medic:'no', pc:'yes', log_o:'yes', cc:'yes', chamal:'no'},
@@ -1747,6 +1855,8 @@ let experimentPhase = 'intake-drill';
 let demoRevision = 0;
 let modalOpenedLastModified = null;
 let vitalCountdowns = {};
+let reinforcementRequests = [];
+let reinforcementDraft = {resourceType:null, reasonCodes:new Set(), urgency:'high', targetLocation:'', freeText:''};
 
 function serializeActiveDraft(screen=null){
   return {
@@ -1881,6 +1991,27 @@ function loadDemoScenario(persist=false){
     demoPatient('P-005','yellow','partial','חצר אחורית, סמוך לכניסה','פגיעת ראש קלה','in_treatment',
       {pulse:88,spo2:95,bp_estimate:'radial',rr:18,avpu:'A'},6,{siteId:'SITE_A', medic:'חובש כהן', lastTouchedBy:'PHONE-ALFA', confirmedClinical:false})
   ];
+  reinforcementRequests=[
+    {
+      id:'REQ-001',
+      type:'medical_reinforcement',
+      requestedByRole:'pc',
+      requestedById:getDeviceId(),
+      siteId:'SITE_A',
+      eventName:siteData.name,
+      company:companyLabelForSite('SITE_A'),
+      targetLocation:'מוקד A · בניין 15A · קומה 3',
+      resourceType:'paramedic',
+      quantity:1,
+      urgency:'immediate',
+      reasonCodes:['red_patient','tourniquet','evac_delay'],
+      linkedPatientIds:['P-001'],
+      freeText:'פצוע אדום עם חסם, מדדים באיחור ופינוי מתעכב',
+      status:'pending',
+      createdAt:new Date(minutesAgo(2)).toISOString(),
+      statusHistory:[{status:'pending', at:new Date(minutesAgo(2)).toISOString(), by:getDeviceId()}]
+    }
+  ];
   demoSyncMode='fresh';
   lastSyncAt=Date.now();
   if(persist) saveDemoState();
@@ -1892,6 +2023,7 @@ function activateSignedDemoScenario(){
 }
 function clearDemoScenario(){
   patients=[];
+  reinforcementRequests=[];
   siteData={name:'', address:'', eventType:null, description:'', externalReports:[]};
   allSites.forEach(s=>{ if(s.id!=='ALL') s.externalReports=[]; });
   demoSyncMode='fresh';
@@ -1913,7 +2045,7 @@ function saveDemoState(){
       }
     }
     demoRevision += 1;
-    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:3,appVersion:APP_VERSION,revision:demoRevision,savedAt:new Date().toISOString(),experimentStartedAt,experimentPhase,siteData,patients,demoSyncMode,lastSyncAt}));
+    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:4,appVersion:APP_VERSION,revision:demoRevision,savedAt:new Date().toISOString(),experimentStartedAt,experimentPhase,siteData,patients,reinforcementRequests,demoSyncMode,lastSyncAt}));
   }catch(e){}
 }
 function loadStoredDemoState(){
@@ -1924,6 +2056,7 @@ function loadStoredDemoState(){
     if(!saved || !Array.isArray(saved.patients)) return false;
     siteData=saved.siteData||siteData;
     patients=saved.patients;
+    reinforcementRequests=Array.isArray(saved.reinforcementRequests)?saved.reinforcementRequests:[];
     patients.forEach(p=>{
       if(!p.lastModifiedAt) p.lastModifiedAt=saved.savedAt||new Date().toISOString();
       if(!p.trapStatus) p.trapStatus=normalizeTrapStatus(p);
@@ -1963,7 +2096,8 @@ function updateDemoStatus(){
   });
   const openAlerts=patients.filter(p=>p.alert || (needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS)).length;
   const handed=patients.filter(p=>['evacuating','evacuated'].includes(p.patientStatus)).length;
-  const line=`${patients.length} פצועים · ${openAlerts} התראות · ${handed} הועברו`;
+  const openRequests=reinforcementRequests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).length;
+  const line=`${patients.length} פצועים · ${openAlerts} התראות · ${openRequests} תגבור · ${handed} הועברו`;
   ['demo-status-line','cmd-demo-line'].forEach(id=>{const el=document.getElementById(id); if(el) el.textContent=line;});
   updateExperimentLine();
 }
@@ -2033,6 +2167,11 @@ function assessmentDebtForPatient(p){
   return debt;
 }
 function exportExperimentLog(){
+  const alertRows=buildAlertObjects(patients).map(a=>({
+    id:a.id, type:a.type, severity:a.severity, owner:a.owner, audience:a.audience.join('|'),
+    escalates_to:a.escalatesTo||'', action_required:a.actionRequired, scope:a.scope,
+    category:a.category, patient_id:a.patientId||'', site_id:a.siteId||'', title:a.title
+  }));
   const events=patients.flatMap(p=>(p.events||[]).map(e=>({
     patient_id:p.id, triage:p.triage, location:p.location, type:e.type, time:e.time,
     detail:e.detail, warn:!!e.warn, device_id:p.lastTouchedBy||p.medic||''
@@ -2052,8 +2191,9 @@ function exportExperimentLog(){
     total_patients:patients.length,
     stale_patients:patients.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS).length,
     unsynced_events:patients.reduce((s,p)=>s+(p.unsyncedEvents||0),0)+localOutboxCount(),
-    commander_open_alerts:patients.filter(p=>isCriticalAlert(p)||hasRoutineAlert(p)).length,
+    commander_open_alerts:alertRows.filter(a=>a.audience.includes('pc')||a.audience.includes('chamal')).length,
     acknowledged_alerts:patients.filter(p=>p.alertAcknowledgedAt).length,
+    reinforcement_requests_open:reinforcementRequests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).length,
     conflict_count:conflictLog().length
   };
   const observer=observerNotes();
@@ -2061,10 +2201,13 @@ function exportExperimentLog(){
     metadata:{app_version:APP_VERSION, exported_at:new Date().toISOString(), device_id:getDeviceId(), experiment_phase:experimentPhase},
     experiment_events:events,
     patients_summary:patientRows,
+    alert_ownership:alertRows,
+    reinforcement_requests:reinforcementRequests,
     aar_metrics:metrics,
     observer_notes:observer,
     csv:{
       experiment_events:toCsv(events, ['patient_id','triage','location','type','time','detail','warn','device_id']),
+      alert_ownership:toCsv(alertRows, ['id','type','severity','owner','audience','escalates_to','action_required','scope','category','patient_id','site_id','title']),
       patients_summary:toCsv(patientRows, ['id','triage','status','location','trap_status','last_touched_by','needs_full_assessment','assessment_debt','last_modified_at']),
       observer_notes:toCsv(observer, ['timestamp','device_id','phase','note'])
     }
@@ -2258,28 +2401,117 @@ function tourniquetRecordFromState(){
 function detectDeterioration(prev,next){
   return C5Rules.detectDeterioration(prev,next);
 }
+function minutesUntilEscalation(alert){
+  if(!alert?.escalatesTo || !alert.escalateAfterMin) return null;
+  const start=Date.parse(alert.createdAt||'') || Date.now();
+  return Math.ceil((start + alert.escalateAfterMin*60000 - Date.now())/60000);
+}
+function escalationLabel(alert){
+  const mins=minutesUntilEscalation(alert);
+  if(mins===null) return 'ללא הסלמה';
+  if(mins<=0) return `הוסלם ל-${(alert.escalatesTo||'').toUpperCase()}`;
+  return `הסלמה ל-${(alert.escalatesTo||'').toUpperCase()} בעוד ${mins} דק׳`;
+}
+function pushAlert(list, alert){
+  list.push({
+    severity:'medium',
+    owner:'medic',
+    audience:['medic'],
+    escalatesTo:null,
+    escalateAfterMin:null,
+    actionRequired:'acknowledge',
+    scope:'patient',
+    category:'complete',
+    createdAt:new Date().toISOString(),
+    ...alert
+  });
+}
+function buildAlertObjects(pts=patients){
+  const alerts=[];
+  pts.forEach(p=>{
+    const siteId=p.siteId||'SITE_A';
+    const base={patientId:p.id, siteId, createdAt:p.lastModifiedAt||p.createdAt||new Date().toISOString()};
+    const redOrYellow=['red','yellow'].includes(p.triage);
+    if(isCriticalAlert(p)){
+      const reason=(p.deterioration&&p.deterioration.length)?p.deterioration.join(' · '):TRIAGE_LABELS[p.triage]||'שינוי קריטי';
+      pushAlert(alerts,{...base,id:`clinical-${p.id}`,type:'CRITICAL_CLINICAL_ACTION',severity:'critical',owner:'medic',audience:['medic','pc'],escalatesTo:'pc',escalateAfterMin:5,actionRequired:'update_vitals',scope:'patient',category:'urgent',title:`${p.id} — הידרדרות / מיון קריטי`,detail:reason});
+    }
+    if(p.triage==='red'){
+      pushAlert(alerts,{...base,id:`pc-red-${p.id}`,type:'RED_CASUALTY_CREATED',severity:'high',owner:'pc',audience:['pc','chamal','cc'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'request_evac',scope:'patient',category:'urgent',title:`${p.id} — פצוע אדום`,detail:`${p.location} · ${p.injury||'פציעה לא צוינה'}`});
+    }
+    if(p.triage==='red' && !['evacuating','evacuated','handed_over'].includes(p.patientStatus)){
+      pushAlert(alerts,{...base,id:`evac-${p.id}`,type:'RED_WITHOUT_EVAC_STATUS',severity:'high',owner:'pc',audience:['pc','cc'],escalatesTo:'cc',escalateAfterMin:5,actionRequired:'request_evac',scope:'patient',category:'evac',title:`${p.id} — אדום ללא סטטוס פינוי`,detail:'נדרש תעדוף / הקצאת פינוי או אישור עיכוב'});
+    }
+    if(needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS){
+      pushAlert(alerts,{...base,id:`vitals-${p.id}`,type:redOrYellow?'STALE_VITALS_PRIORITY':'STALE_VITALS_GREEN',severity:redOrYellow?'high':'medium',owner:'medic',audience:redOrYellow?['medic','pc']:['medic'],escalatesTo:redOrYellow?'pc':null,escalateAfterMin:redOrYellow?5:null,actionRequired:'update_vitals',scope:'patient',category:redOrYellow?'data':'complete',title:`${p.id} — מדדים באיחור`,detail:`עדכון אחרון: ${timeAgoLabel(p.lastVitalsAt||patientClockStart(p))}`});
+    }
+    const debt=assessmentDebtForPatient(p).filter(x=>!['pending_handover'].includes(x));
+    if(debt.length && p.triage!=='black'){
+      pushAlert(alerts,{...base,id:`debt-${p.id}`,type:'ASSESSMENT_DEBT',severity:redOrYellow?'medium':'low',owner:'medic',audience:redOrYellow?['medic','pc']:['medic'],escalatesTo:redOrYellow?'pc':null,escalateAfterMin:redOrYellow?8:null,actionRequired:'update_vitals',scope:'patient',category:redOrYellow?'data':'complete',title:`${p.id} — יש לקחת מדדים`,detail:debt.join(' · ')});
+    }
+    if(!normalizeTrapStatus(p) && p.triage!=='black'){
+      pushAlert(alerts,{...base,id:`trap-missing-${p.id}`,type:'MISSING_TRAP_STATUS',severity:'medium',owner:'medic',audience:['medic','pc'],escalatesTo:'pc',escalateAfterMin:5,actionRequired:'update_vitals',scope:'patient',category:'rescue',title:`${p.id} — חסר לכוד / לא לכוד`,detail:'סטטוס חילוץ בינארי חסר ומשפיע על תמונת החילוץ'});
+    }
+    if(normalizeTrapStatus(p)==='trapped' && vitalsAgeMs(p)>=10*60*1000){
+      pushAlert(alerts,{...base,id:`trapped-silent-${p.id}`,type:'TRAPPED_NO_MEDIC_CONTACT',severity:'high',owner:'pc',audience:['pc','cc'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'assign_medic',scope:'patient',category:'rescue',title:`${p.id} — לכוד ללא קשר חובש`,detail:`${p.location} · ${timeAgoLabel(p.lastVitalsAt||patientClockStart(p))}`});
+    }
+    if(p.tourniquet?.appliedAt){
+      const tqMin=Math.floor((Date.now()-p.tourniquet.appliedAt)/60000);
+      if(tqMin>=60){
+        pushAlert(alerts,{...base,id:`tq-${p.id}`,type:tqMin>=120?'TOURNIQUET_CRITICAL':'TOURNIQUET_WARNING',severity:tqMin>=120?'critical':'high',owner:'medic',audience:tqMin>=120?['medic','pc','cc']:['medic','pc'],escalatesTo:tqMin>=120?'cc':'pc',escalateAfterMin:tqMin>=120?0:10,actionRequired:'update_vitals',scope:'patient',category:'urgent',title:`${p.id} — חסם עורקים ${tqMin>=120?'קריטי':'אזהרה'}`,detail:`${p.tourniquet.limb||'גפה לא צוינה'} · ${tqMin} דק׳`});
+      }
+    }
+  });
+  duplicateCandidates(pts).forEach(([a,b],idx)=>pushAlert(alerts,{id:`dup-${a.id}-${b.id}`,type:'DUPLICATE_SUSPECTED',severity:'medium',owner:'pc',audience:['pc','chamal'],escalatesTo:null,actionRequired:'merge_duplicate',scope:'site',category:'integrity',siteId:a.siteId||b.siteId||'SITE_A',patientId:a.id,title:`חשד לכפילות ${a.id} ↔ ${b.id}`,detail:'בדיקה ידנית בלבד; אין מיזוג הרסני של אירועים'}));
+  const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>s.externalReports||[]):((allSites.find(s=>s.id===cmdActiveSite)||siteData).externalReports||siteData.externalReports||[]);
+  const conflicts=externalConflictCount(pts,reports);
+  if(conflicts>0) pushAlert(alerts,{id:`external-conflict-${cmdActiveSite}`,type:'EXTERNAL_REPORT_CONFLICT',severity:conflicts>2?'high':'medium',owner:'chamal',audience:['pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'verify_report',scope:'site',category:'integrity',siteId:cmdActiveSite,title:'פער דיווח חיצוני מול שדה',detail:`${conflicts} פערים בין דיווח חיצוני לספירה מאושרת`});
+  const unsynced=pts.reduce((sum,p)=>sum+(p.unsyncedEvents||0),0)+localOutboxCount();
+  if(unsynced>0) pushAlert(alerts,{id:`sync-backlog-${cmdActiveSite}`,type:'UNSYNCED_EVENT_BACKLOG',severity:unsynced>5?'high':'low',owner:'chamal',audience:unsynced>5?['pc','cc','chamal']:['medic','pc'],escalatesTo:unsynced>5?'cc':null,escalateAfterMin:unsynced>5?5:null,actionRequired:'review_sync',scope:'system',category:'integrity',siteId:cmdActiveSite,title:'אירועים מקומיים לא מסונכרנים',detail:`${unsynced} אירועים ממתינים בתור המקומי`});
+  reinforcementRequests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).forEach(r=>{
+    pushAlert(alerts,{id:`reinforcement-${r.id}`,type:'MEDICAL_REINFORCEMENT_REQUEST',severity:r.urgency==='immediate'?'high':'medium',owner:'cc',audience:['pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:r.urgency==='immediate'?3:10,actionRequired:'request_reinforcement',scope:'company',category:'forces',siteId:r.siteId,title:`בקשת תגבור — ${REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType}`,detail:`${r.targetLocation} · ${REINFORCEMENT_STATUS_LABELS[r.status]||r.status} · ${(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')}`});
+  });
+  return alerts;
+}
+function alertMetaHtml(alert){
+  const action=ACTION_LABELS[alert.actionRequired]||alert.actionRequired;
+  return `<div class="alert-meta-line">
+    <span class="alert-meta-chip owner">${ROLE_LABELS[alert.owner]||alert.owner}</span>
+    <span class="alert-meta-chip action">פעולה: ${action}</span>
+    <span class="alert-meta-chip">${ALERT_CATEGORY_LABELS[alert.category]||alert.category}</span>
+    <span class="alert-meta-chip escalate">${escalationLabel(alert)}</span>
+  </div>`;
+}
+function renderAlertCard(alert, mode='commander'){
+  const warn=alert.severity==='critical'||alert.severity==='high'?'':' warn';
+  const icon=alert.category==='evac'?'🚑':alert.category==='rescue'?'⛓️':alert.category==='integrity'?'📡':alert.category==='forces'?'➕':alert.category==='system'?'SYNC':'🚨';
+  const click=alert.patientId?`onclick="openPatientFromAlert('${alert.patientId}')"`:'';
+  const ack=alert.patientId?`<button class="ack-btn" onclick="event.stopPropagation();acknowledgeAlert('${alert.patientId}')">בטיפול</button>`:'';
+  return `<div class="alert-banner${warn}" style="margin:${mode==='commander'?'6px 16px 0':'5px 16px'}" ${click}>
+    <span style="font-size:18px">${icon}</span>
+    <div style="flex:1">
+      <div class="alert-banner-title">${alert.title}</div>
+      <div class="alert-banner-sub">${alert.detail||''}</div>
+      ${alertMetaHtml(alert)}
+    </div>${ack}</div>`;
+}
 function renderAlerts(){
-  const critical=patients.filter(isCriticalAlert);
-  const routine=patients.filter(p=>hasRoutineAlert(p)&&!isCriticalAlert(p));
+  const medicAlerts=buildAlertObjects(patients).filter(a=>a.audience.includes('medic'));
+  const critical=medicAlerts.filter(a=>a.category==='urgent');
+  const routine=medicAlerts.filter(a=>a.category==='complete');
+  const system=medicAlerts.filter(a=>a.category==='system'||a.category==='integrity');
   const criticalCount=document.getElementById('alert-critical-count');
   const routineCount=document.getElementById('alert-routine-count');
   const allCount=document.getElementById('alert-all-count');
   if(criticalCount) criticalCount.textContent=critical.length;
   if(routineCount) routineCount.textContent=routine.length;
-  if(allCount) allCount.textContent=critical.length+routine.length;
-  let list = alertFilter==='critical' ? critical : alertFilter==='routine' ? routine : [...critical,...routine];
+  if(allCount) allCount.textContent=medicAlerts.length;
+  let list = alertFilter==='critical' ? critical : alertFilter==='routine' ? routine : [...critical,...routine,...system];
   let h='';
   if(!list.length){
     h=`<div class="alert-banner muted"><span style="font-size:18px">✓</span><div><div class="alert-banner-title" style="color:var(--muted)">אין התראות ${alertFilter==='critical'?'קריטיות':alertFilter==='routine'?'אחרות':''}</div><div class="alert-banner-sub">אפשר לעבור בין הסינונים בלי להציף את החובש.</div></div></div>`;
   }
-  list.forEach(p=>{
-    if(isCriticalAlert(p)){
-      const reason=(p.deterioration&&p.deterioration.length)?p.deterioration.join(' · '):TRIAGE_LABELS[p.triage];
-      h+=`<div class="alert-banner" onclick="openQuickVitals('${p.id}')"><span style="font-size:20px">🚨</span><div style="flex:1"><div class="alert-banner-title">${p.id} — קריטי</div><div class="alert-banner-sub">${reason}</div></div><button class="ack-btn" onclick="event.stopPropagation();acknowledgeAlert('${p.id}')">בטיפול</button></div>`;
-    } else {
-      h+=`<div class="alert-banner warn" onclick="openQuickVitals('${p.id}')"><span style="font-size:20px">⏱</span><div style="flex:1"><div class="alert-banner-title">${p.id} — מדדים נדרשים</div><div class="alert-banner-sub">${p.location}</div></div><button class="ack-btn" onclick="event.stopPropagation();acknowledgeAlert('${p.id}')">בטיפול</button></div>`;
-    }
-  });
+  list.forEach(a=>{ h+=renderAlertCard(a,'medic'); });
   document.getElementById('alerts-banner').innerHTML=h;
 }
 setInterval(()=>{ renderAlerts(); renderDashboard(); },30000);
@@ -3528,7 +3760,7 @@ function getSitePatients(siteId){
   return [];
 }
 let cmdActiveSite='ALL', cmdFilter='all', alertFilter='critical', cmdAlertFilter='critical', commandRole='pc', ccCompanySite='SITE_A';
-let cmdPanelOpen={priority:true,heatmap:false,devices:false,watchdogs:false,duplicates:false,alerts:true};
+let cmdPanelOpen={priority:true,reinforcement:true,heatmap:false,devices:false,watchdogs:false,duplicates:false,alerts:true};
 function companyLabelForSite(siteId){
   return siteId==='SITE_B' ? 'פלוגה ב / BRAVO' : siteId==='SITE_A' ? 'פלוגה א / ALFA' : 'כל הפלוגות';
 }
@@ -3797,6 +4029,117 @@ function renderWatchdogPanel(pts){
     </div>`;
   }).join('') || '<div class="cmd-matrix-row"><div class="cmd-matrix-sub">אין Watchdogs פעילים.</div></div>';
 }
+function defaultReinforcementLocation(){
+  const site=allSites.find(s=>s.id===cmdActiveSite)||allSites.find(s=>s.id==='SITE_A')||siteData;
+  if(cmdActiveSite==='ALL') return siteData.name||'כל המוקדים';
+  return `${site.name||siteData.name||cmdActiveSite}${siteData.address?' · '+siteData.address:''}`;
+}
+function openReinforcementRequest(prefill={}){
+  reinforcementDraft={
+    resourceType:prefill.resourceType||null,
+    reasonCodes:new Set(prefill.reasonCodes||[]),
+    urgency:prefill.urgency||'high',
+    targetLocation:prefill.targetLocation||defaultReinforcementLocation(),
+    freeText:prefill.freeText||''
+  };
+  document.querySelectorAll('#reinforcement-resource-grid .tap-btn,#reinforcement-reason-grid .chip,#reinforcement-urgency-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  const loc=document.getElementById('reinforcement-location');
+  const note=document.getElementById('reinforcement-note');
+  if(loc) loc.value=reinforcementDraft.targetLocation;
+  if(note) note.value=reinforcementDraft.freeText;
+  const modal=document.getElementById('reinforcement-modal');
+  if(modal) modal.classList.remove('hidden');
+}
+function hideReinforcementModal(){
+  const modal=document.getElementById('reinforcement-modal');
+  if(modal) modal.classList.add('hidden');
+}
+function closeReinforcementModal(e){ if(e.target.id==='reinforcement-modal') hideReinforcementModal(); }
+function selectReinforcementResource(btn, resourceType){
+  reinforcementDraft.resourceType=resourceType;
+  document.querySelectorAll('#reinforcement-resource-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  if(btn) btn.classList.add('selected');
+}
+function toggleReinforcementReason(btn, reason){
+  if(reinforcementDraft.reasonCodes.has(reason)){
+    reinforcementDraft.reasonCodes.delete(reason);
+    if(btn) btn.classList.remove('selected');
+  }else{
+    reinforcementDraft.reasonCodes.add(reason);
+    if(btn) btn.classList.add('selected');
+  }
+}
+function selectReinforcementUrgency(btn, urgency){
+  reinforcementDraft.urgency=urgency;
+  document.querySelectorAll('#reinforcement-urgency-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  if(btn) btn.classList.add('selected');
+}
+function submitReinforcementRequest(){
+  if(!reinforcementDraft.resourceType){ toast('בחר סוג תגבור'); return; }
+  const loc=document.getElementById('reinforcement-location')?.value.trim() || defaultReinforcementLocation();
+  const note=document.getElementById('reinforcement-note')?.value.trim() || '';
+  const siteId=cmdActiveSite==='ALL'?'SITE_A':cmdActiveSite;
+  const req={
+    id:`REQ-${String(reinforcementRequests.length+1).padStart(3,'0')}`,
+    type:'medical_reinforcement',
+    requestedByRole:commandRole==='cc'?'cc':'pc',
+    requestedById:getDeviceId(),
+    siteId,
+    eventName:siteData.name||'אירוע ללא שם',
+    company:companyLabelForSite(siteId),
+    targetLocation:loc,
+    resourceType:reinforcementDraft.resourceType,
+    quantity:reinforcementDraft.resourceType==='two_medics'?2:1,
+    urgency:reinforcementDraft.urgency,
+    reasonCodes:[...reinforcementDraft.reasonCodes],
+    linkedPatientIds:patients.filter(p=>(p.siteId||'SITE_A')===siteId && p.triage==='red').map(p=>p.id).slice(0,3),
+    freeText:note,
+    status:'pending',
+    createdAt:new Date().toISOString(),
+    statusHistory:[{status:'pending', at:new Date().toISOString(), by:getDeviceId()}]
+  };
+  reinforcementRequests.unshift(req);
+  saveLocalEvent({type:'MEDICAL_REINFORCEMENT_REQUESTED',detail:`${REINFORCEMENT_RESOURCE_LABELS[req.resourceType]} · ${loc}`,payload_json:req,warn:req.urgency==='immediate'});
+  hideReinforcementModal();
+  saveDemoState();
+  renderCommander();
+  toast('בקשת תגבור רפואי נוצרה');
+}
+function updateReinforcementStatus(id, status){
+  const req=reinforcementRequests.find(r=>r.id===id); if(!req) return;
+  req.status=status;
+  req.statusHistory=req.statusHistory||[];
+  req.statusHistory.push({status, at:new Date().toISOString(), by:getDeviceId()});
+  saveLocalEvent({type:'MEDICAL_REINFORCEMENT_STATUS_UPDATED',detail:`${id} → ${status}`,payload_json:{request_id:id,status},warn:false});
+  saveDemoState();
+  renderCommander();
+}
+function renderReinforcementPanel(){
+  const body=document.getElementById('cmd-reinforcement-requests'); if(!body) return;
+  const visible=reinforcementRequests.filter(r=>commandRole!=='cc' || r.siteId===ccCompanySite);
+  const open=visible.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status));
+  setCmdPanelMeta('reinforcement', `${open.length} OPEN · ${visible.length} TOTAL`);
+  const createButton=`<div style="padding:8px 16px 0"><button class="btn-primary" onclick="openReinforcementRequest()" style="background:var(--accent)">+ בקשת תגבור רפואי</button></div>`;
+  if(!visible.length){
+    body.innerHTML=createButton+`<div class="alert-banner muted" style="margin-top:8px"><span>✓</span><div><div class="alert-banner-title" style="color:var(--muted)">אין בקשות תגבור פתוחות</div><div class="alert-banner-sub">PC יוצר בקשה, CC/חמ״ל מאשרים ומשייכים משאב.</div></div></div>`;
+    return;
+  }
+  body.innerHTML=createButton+visible.map(r=>{
+    const reasons=(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')||'ללא סיבה מקודדת';
+    const statuses=['pending','acknowledged','assigned','en_route','arrived','denied','cancelled','resolved'];
+    return `<div class="reinforcement-card ${r.urgency}">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+        <div>
+          <div style="font-weight:900;font-size:14px">${r.id} · ${REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType}</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.45;margin-top:3px">${r.company||''} · ${r.targetLocation} · ${reasons}</div>
+          ${r.freeText?`<div style="font-size:12px;margin-top:5px">${r.freeText}</div>`:''}
+        </div>
+        <div class="watchdog-tag ${r.urgency==='immediate'?'red':r.urgency==='high'?'amber':'ok'}">${REINFORCEMENT_STATUS_LABELS[r.status]||r.status}</div>
+      </div>
+      <div class="request-status-row">${statuses.map(s=>`<button class="request-status-btn ${r.status===s?'active':''}" onclick="updateReinforcementStatus('${r.id}','${s}')">${REINFORCEMENT_STATUS_LABELS[s]}</button>`).join('')}</div>
+    </div>`;
+  }).join('');
+}
 function renderCommandOperationalPanels(pts, site){
   const stale=pts.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS);
   const tqOverdue=pts.filter(p=>p.tourniquet && Date.now()-p.tourniquet.appliedAt>=60*60*1000);
@@ -3812,8 +4155,10 @@ function renderCommandOperationalPanels(pts, site){
     {n:stale.length,l:'פצועים עם מידע ישן',c:stale.length?'critical':''},
     {n:trappedSilent.length,l:'לכודים ללא קשר חובש',c:trappedSilent.length?'critical':''},
     {n:evacBlocked.length,l:'פינויים חסומים / ממתינים',c:evacBlocked.length?'critical':''},
+    {n:reinforcementRequests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).length,l:'בקשות תגבור פתוחות',c:reinforcementRequests.some(r=>r.urgency==='immediate'&&r.status==='pending')?'critical':''},
     {n:unsynced,l:'אירועים מקומיים שלא סונכרנו',c:unsynced?'':''}
   ].map(x=>`<div class="cmd-priority-card ${x.c}"><div class="cmd-priority-num">${x.n}</div><div class="cmd-priority-label">${x.l}</div></div>`).join('');
+  renderReinforcementPanel();
 
   const commandState=buildIncidentCommandStateSnapshot(pts, site);
   document.getElementById('cmd-heatmap').innerHTML=commandState.sectors.map(s=>{
@@ -3852,7 +4197,8 @@ function renderCommandOperationalPanels(pts, site){
     <div class="cmd-matrix-counts"><span style="color:var(--orange)">possible duplicate</span></div>
   </div>`).join(''):`<div class="cmd-matrix-row"><div class="cmd-matrix-sub">${conflicts?`${conflicts} פערי דיווח חיצוני מול שדה`:'אין כפילויות חשודות כרגע'}</div></div>`;
   setCmdPanelMeta('duplicates', `${dupes.length} CANDIDATES`);
-  setCmdPanelMeta('alerts', `${stale.length + tqOverdue.length + conflicts} OPEN`);
+  const roleAudience=commandRole==='cc'?'cc':commandRole==='chamal'?'chamal':'pc';
+  setCmdPanelMeta('alerts', `${buildAlertObjects(pts).filter(a=>a.audience.includes(roleAudience)).length} ROUTED`);
 }
 function renderCmdContent(){
   const pts=getSitePatients(cmdActiveSite);
@@ -3869,25 +4215,32 @@ function renderCmdContent(){
     <div class="cmd-stat-card green"><div class="cmd-stat-num">${c.green}</div><div class="cmd-stat-label">קל</div></div>
     <div class="cmd-stat-card black"><div class="cmd-stat-num">${c.black}</div><div class="cmd-stat-label">לא בר הצלה</div></div>`;
   renderCommandOperationalPanels(pts, site);
-  const critical=pts.filter(isCriticalAlert);
-  const routine=pts.filter(p=>hasRoutineAlert(p)&&!isCriticalAlert(p));
-  const cmdAlertList=cmdAlertFilter==='critical'?critical:cmdAlertFilter==='routine'?routine:[...critical,...routine];
+  const roleAudience=commandRole==='cc'?'cc':commandRole==='chamal'?'chamal':'pc';
+  const commandAlerts=buildAlertObjects(pts).filter(a=>a.audience.includes(roleAudience));
+  const critical=commandAlerts.filter(a=>['urgent','evac'].includes(a.category));
+  const rescue=commandAlerts.filter(a=>a.category==='rescue');
+  const data=commandAlerts.filter(a=>a.category==='data');
+  const integrity=commandAlerts.filter(a=>a.category==='integrity');
+  const forces=commandAlerts.filter(a=>a.category==='forces');
+  const cmdAlertList=cmdAlertFilter==='critical'?critical:
+    cmdAlertFilter==='rescue'?rescue:
+    cmdAlertFilter==='evac'?commandAlerts.filter(a=>a.category==='evac'):
+    cmdAlertFilter==='data'?data:
+    cmdAlertFilter==='integrity'?integrity:
+    cmdAlertFilter==='forces'?forces:commandAlerts;
   let ah=`<div class="alert-slicer" id="cmd-alert-slicer" style="padding-top:0">
-    <button class="alert-slice ${cmdAlertFilter==='critical'?'active':''}" onclick="setCmdAlertFilter('critical',this)">קריטי ${critical.length}</button>
-    <button class="alert-slice other ${cmdAlertFilter==='routine'?'active':''}" onclick="setCmdAlertFilter('routine',this)">אחר ${routine.length}</button>
-    <button class="alert-slice ${cmdAlertFilter==='all'?'active':''}" onclick="setCmdAlertFilter('all',this)">הכל ${critical.length+routine.length}</button>
+    <button class="alert-slice ${cmdAlertFilter==='critical'?'active':''}" onclick="setCmdAlertFilter('critical',this)">קריטי עכשיו ${critical.length}</button>
+    <button class="alert-slice other ${cmdAlertFilter==='rescue'?'active':''}" onclick="setCmdAlertFilter('rescue',this)">חילוץ ${rescue.length}</button>
+    <button class="alert-slice other ${cmdAlertFilter==='evac'?'active':''}" onclick="setCmdAlertFilter('evac',this)">פינוי ${commandAlerts.filter(a=>a.category==='evac').length}</button>
+    <button class="alert-slice other ${cmdAlertFilter==='data'?'active':''}" onclick="setCmdAlertFilter('data',this)">פערי מידע ${data.length}</button>
+    <button class="alert-slice other ${cmdAlertFilter==='integrity'?'active':''}" onclick="setCmdAlertFilter('integrity',this)">אמינות ${integrity.length}</button>
+    <button class="alert-slice other ${cmdAlertFilter==='forces'?'active':''}" onclick="setCmdAlertFilter('forces',this)">כוחות ${forces.length}</button>
+    <button class="alert-slice ${cmdAlertFilter==='all'?'active':''}" onclick="setCmdAlertFilter('all',this)">הכל ${commandAlerts.length}</button>
   </div>`;
   if(!cmdAlertList.length){
-    ah+=`<div class="alert-banner muted" style="margin:6px 16px 0"><span style="font-size:18px">✓</span><div><div class="alert-banner-title" style="color:var(--muted)">אין התראות ${cmdAlertFilter==='critical'?'קריטיות':cmdAlertFilter==='routine'?'אחרות':''}</div><div class="alert-banner-sub">תמונת המצב נקייה בסינון הנוכחי.</div></div></div>`;
+    ah+=`<div class="alert-banner muted" style="margin:6px 16px 0"><span style="font-size:18px">✓</span><div><div class="alert-banner-title" style="color:var(--muted)">אין התראות בסינון זה</div><div class="alert-banner-sub">התראות v1.3 ממוינות לפי בעלים, פעולה נדרשת והסלמה.</div></div></div>`;
   }
-  cmdAlertList.forEach(p=>{
-    if(isCriticalAlert(p)){
-      const reason=(p.deterioration&&p.deterioration.length)?p.deterioration.join(' · '):TRIAGE_LABELS[p.triage];
-      ah+=`<div class="alert-banner" style="margin:6px 16px 0" onclick="openPatientFromAlert('${p.id}')"><span style="font-size:18px">🚨</span><div style="flex:1"><div class="alert-banner-title">${p.id} — קריטי</div><div class="alert-banner-sub">${reason} · ${p.location}</div></div><button class="ack-btn" onclick="event.stopPropagation();acknowledgeAlert('${p.id}')">בטיפול</button></div>`;
-    } else {
-      ah+=`<div class="alert-banner warn" style="margin:6px 16px 0" onclick="openPatientFromAlert('${p.id}')"><span style="font-size:18px">⏱</span><div style="flex:1"><div class="alert-banner-title">${p.id} — מדדים נדרשים</div><div class="alert-banner-sub">${p.location}</div></div><button class="ack-btn" onclick="event.stopPropagation();acknowledgeAlert('${p.id}')">בטיפול</button></div>`;
-    }
-  });
+  cmdAlertList.forEach(a=>{ ah+=renderAlertCard(a,'commander'); });
   if(cmdActiveSite==='ALL'){
     ah+=`<div style="margin:8px 16px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px">${allSites.filter(s=>s.id!=='ALL').map(s=>{
       const sp=getSitePatients(s.id); const sc={red:0,yellow:0,green:0};
