@@ -447,9 +447,9 @@ textarea{resize:vertical;min-height:70px;}
   <div class="demo-hero">
     <div>
       <div class="demo-kicker">Demo V1.2</div>
-      <div class="demo-title">Demo V1.2</div>
+      <div class="demo-title">דמו לניהול תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
-        C5 Sentinel-SAR במצב נקי. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן.
+        דמו לניהול תמונת מצב רפואית באירוע חילוץ. באירוע חילוץ, למפקד אין תמונת מצב רפואית בזמן אמת: מי קשה, מי עם חסם, מי לא עודכן, מי לכוד, מי ממתין לפינוי, ומה חסר בדיווח. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן.
       </div>
     </div>
     <div class="demo-grid">
@@ -917,6 +917,10 @@ textarea{resize:vertical;min-height:70px;}
         <div class="bp-btn-value" style="color:var(--green)">מעל 100</div>
         <div class="bp-btn-desc">נמשש עורק<br>רדיאלי</div>
       </button>
+      <button class="bp-btn" data-bp="weak" onclick="selectBP(this,'weak')">
+        <div class="bp-btn-value" style="color:var(--yellow)">80-100</div>
+        <div class="bp-btn-desc">דופק חלש<br>גבולי</div>
+      </button>
       <button class="bp-btn" data-bp="carotid" onclick="selectBP(this,'carotid')">
         <div class="bp-btn-value" style="color:var(--yellow)">מעל 70</div>
         <div class="bp-btn-desc">נמשש עורק<br>קרוטיד</div>
@@ -1382,6 +1386,10 @@ textarea{resize:vertical;min-height:70px;}
         <div class="bp-btn-value" style="color:var(--green)">מעל 100</div>
         <div class="bp-btn-desc">עורק רדיאלי</div>
       </button>
+      <button class="bp-btn" data-bp="weak" onclick="selectModalBP(this,'weak')">
+        <div class="bp-btn-value" style="color:var(--yellow)">80-100</div>
+        <div class="bp-btn-desc">דופק חלש / גבולי</div>
+      </button>
       <button class="bp-btn" data-bp="carotid" onclick="selectModalBP(this,'carotid')">
         <div class="bp-btn-value" style="color:var(--yellow)">מעל 70</div>
         <div class="bp-btn-desc">עורק קרוטיד</div>
@@ -1530,10 +1538,11 @@ textarea{resize:vertical;min-height:70px;}
     if (vitals.rr === 0) return "black";
     const highRR = vitals.rr > 30 || (vitals.rr > 0 && vitals.rr < 10);
     const lowBP = vitals.bp_estimate === "absent" || vitals.bp_estimate === "carotid";
+    const weakBP = vitals.bp_estimate === "weak";
     const badAVPU = vitals.avpu && vitals.avpu !== "A";
     const badSpo2 = vitals.spo2 && vitals.spo2 < 94;
     if (highRR || lowBP || badAVPU || badSpo2) return "red";
-    if (vitals.avpu === "A" && !lowBP && !highRR) return "green";
+    if (vitals.avpu === "A" && !lowBP && !weakBP && !highRR) return "green";
     return "yellow";
   }
   function suggestMstartTriage({ vitals, sabcde = {} } = {}) {
@@ -1546,6 +1555,7 @@ textarea{resize:vertical;min-height:70px;}
     if (v.avpu && v.avpu !== "A") reasons.push(`AVPU ${v.avpu}`);
     if (v.spo2 && v.spo2 < 94) reasons.push(`SpO₂ ${v.spo2}%`);
     if (reasons.length) return { triage: "red", reason: reasons.join(" · "), reasons };
+    if (v.bp_estimate === "weak") return { triage: "yellow", reason: "לחץ דם גבולי 80-100", reasons: ["לחץ דם גבולי"] };
     if (v.avpu === "A") return { triage: "green", reason: "מדדים תקינים · AVPU A", reasons: [] };
     return { triage: "yellow", reason: "מדדים בינוניים", reasons: [] };
   }
@@ -3948,6 +3958,45 @@ setInterval(()=>{ if(document.getElementById('screen-commander').classList.conta
 // ═══════════════════════════════════════════════
 //  LIVE INCIDENT SUMMARY PREVIEW
 // ═══════════════════════════════════════════════
+function eventTimestampMs(event, patient){
+  const raw=event?.local_timestamp||event?.timestamp||event?.created_at||event?.server_timestamp||event?.t;
+  if(typeof raw==='number') return raw;
+  const parsed=Date.parse(raw||'');
+  if(Number.isFinite(parsed)) return parsed;
+  const label=String(event?.time||'');
+  const ago=label.match(/לפני\s*(\d+)\s*דק/);
+  if(ago) return Date.now() - Number(ago[1]) * 60 * 1000;
+  const hhmm=label.match(/^(\d{1,2}):(\d{2})$/);
+  if(hhmm){
+    const d=new Date();
+    d.setHours(Number(hhmm[1]), Number(hhmm[2]), 0, 0);
+    if(d.getTime() > Date.now() + 60000) d.setDate(d.getDate()-1);
+    return d.getTime();
+  }
+  return patientClockStart(patient);
+}
+function firstPatientRegistrationMinutes(){
+  if(!patients.length) return '—';
+  const first=Math.min(...patients.map(p=>patientClockStart(p)).filter(Number.isFinite));
+  if(!Number.isFinite(first)) return '—';
+  return `${Math.max(0, Math.round((Date.now()-first)/60000))}m`;
+}
+function firstRedIdentificationMinutes(){
+  const starts=patients.map(p=>patientClockStart(p)).filter(Number.isFinite);
+  if(!starts.length) return '—';
+  const incidentStart=Math.min(...starts);
+  const redTimes=[];
+  patients.filter(p=>p.triage==='red').forEach(p=>{
+    const redEvent=(p.events||[]).find(e=>
+      ['TRIAGE_SET','MSTART_TRIAGE_OVERRIDE','TRIAGE_OVERRIDDEN'].includes(e.type) &&
+      String(e.detail||'').includes('אדום')
+    );
+    redTimes.push(eventTimestampMs(redEvent, p));
+  });
+  const firstRed=Math.min(...redTimes.filter(Number.isFinite));
+  if(!Number.isFinite(firstRed)) return '—';
+  return `${Math.max(0, Math.round((firstRed-incidentStart)/60000))}m`;
+}
 function renderAar(){
   const total=patients.length;
   const red=patients.filter(p=>p.triage==='red').length;
@@ -3965,15 +4014,15 @@ function renderAar(){
     <div class="aar-card"><div class="aar-num" style="color:var(--red)">${red}</div><div class="aar-label">אדומים פעילים</div></div>
     <div class="aar-card"><div class="aar-num" style="color:var(--green)">${handed}</div><div class="aar-label">הועברו</div></div>
     <div class="aar-card"><div class="aar-num" style="color:var(--orange)">${openAlerts}</div><div class="aar-label">התראות פתוחות</div></div>
-    <div class="aar-card"><div class="aar-num">${patients.length?Math.min(...patients.map(p=>elapsedMinutes(p.lastVitalsAt))):0}m</div><div class="aar-label">זמן לרישום ראשון</div></div>
-    <div class="aar-card"><div class="aar-num" style="color:var(--red)">${patients.find(p=>p.triage==='red')?'≤10m':'—'}</div><div class="aar-label">זיהוי אדום ראשון</div></div>
+    <div class="aar-card"><div class="aar-num">${firstPatientRegistrationMinutes()}</div><div class="aar-label">זמן מאז רישום ראשון</div></div>
+    <div class="aar-card"><div class="aar-num" style="color:var(--red)">${firstRedIdentificationMinutes()}</div><div class="aar-label">זיהוי אדום ראשון</div></div>
     <div class="aar-card"><div class="aar-num" style="color:var(--orange)">${stale}</div><div class="aar-label">פצועים עם מידע ישן</div></div>
     <div class="aar-card"><div class="aar-num" style="color:var(--accent)">${unsynced}</div><div class="aar-label">פערי Sync</div></div>
     <div class="aar-card"><div class="aar-num">${busiest[1]}</div><div class="aar-label">פצועים למכשיר מוביל</div></div>
     <div class="aar-card"><div class="aar-num" style="color:${extDelta?'var(--orange)':'var(--green)'}">${extDelta}</div><div class="aar-label">פער דיווח חיצוני/שדה</div></div>
   `;
-  const events=patients.flatMap(p=>(p.events||[]).map(e=>({...e,pid:p.id,triage:p.triage,loc:p.location})));
-  const timeline=events.slice(0,10).map(e=>`
+  const events=patients.flatMap(p=>(p.events||[]).map(e=>({...e,pid:p.id,triage:p.triage,loc:p.location,_ts:eventTimestampMs(e,p)})));
+  const timeline=events.sort((a,b)=>(b._ts||0)-(a._ts||0)).slice(0,10).map(e=>`
     <div class="timeline-entry">
       <div class="tl-line"><div class="tl-dot${e.warn?' warn':''}"></div></div>
       <div class="tl-body">

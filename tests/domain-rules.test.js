@@ -59,6 +59,7 @@ assert.equal(rules.computeMstartTriage({ rr: 16, bp_estimate: "absent", avpu: "A
 assert.equal(rules.computeMstartTriage({ rr: 16, bp_estimate: "radial", avpu: "V", spo2: 98 }), "red");
 assert.equal(rules.computeMstartTriage({ rr: 16, bp_estimate: "radial", avpu: "A", spo2: 91 }), "red");
 assert.equal(rules.computeMstartTriage({ rr: 16, bp_estimate: "radial", avpu: "A", spo2: 98 }), "green");
+assert.equal(rules.computeMstartTriage({ rr: 16, bp_estimate: "weak", avpu: "A", spo2: 98 }), "yellow");
 assert.equal(rules.computeMstartTriage({ rr: 16, bp_estimate: null, avpu: null, spo2: null }), "yellow");
 
 assert.deepEqual(

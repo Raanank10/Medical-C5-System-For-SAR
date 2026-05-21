@@ -92,10 +92,11 @@
     if (vitals.rr === 0) return "black";
     const highRR = vitals.rr > 30 || (vitals.rr > 0 && vitals.rr < 10);
     const lowBP = vitals.bp_estimate === "absent" || vitals.bp_estimate === "carotid";
+    const weakBP = vitals.bp_estimate === "weak";
     const badAVPU = vitals.avpu && vitals.avpu !== "A";
     const badSpo2 = vitals.spo2 && vitals.spo2 < 94;
     if (highRR || lowBP || badAVPU || badSpo2) return "red";
-    if (vitals.avpu === "A" && !lowBP && !highRR) return "green";
+    if (vitals.avpu === "A" && !lowBP && !weakBP && !highRR) return "green";
     return "yellow";
   }
 
@@ -115,6 +116,7 @@
     if (v.spo2 && v.spo2 < 94) reasons.push(`SpO₂ ${v.spo2}%`);
 
     if (reasons.length) return { triage: "red", reason: reasons.join(" · "), reasons };
+    if (v.bp_estimate === "weak") return { triage: "yellow", reason: "לחץ דם גבולי 80-100", reasons: ["לחץ דם גבולי"] };
     if (v.avpu === "A") {
       return { triage: "green", reason: "מדדים תקינים · AVPU A", reasons: [] };
     }
