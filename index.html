@@ -272,6 +272,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 
 /* ── BOTTOM BAR ── */
 .bottom-bar{position:fixed;bottom:0;left:0;right:0;padding:14px 16px;background:rgba(10,10,15,0.97);border-top:1px solid var(--border);backdrop-filter:blur(8px);}
+.home-btn{position:fixed;top:12px;left:12px;z-index:180;background:var(--surface2);border:1px solid var(--border);color:var(--text);min-width:56px;height:44px;border-radius:12px;font-family:var(--sans);font-size:13px;font-weight:900;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.25);display:none;align-items:center;justify-content:center;gap:6px;}
+.home-btn.visible{display:flex;}
 .btn-primary{width:100%;padding:17px;background:var(--accent);border:none;border-radius:14px;color:white;font-family:var(--sans);font-size:17px;font-weight:700;cursor:pointer;transition:opacity 0.1s;min-height:56px;touch-action:manipulation;}
 .btn-primary:active{opacity:0.85;}
 .btn-primary:disabled{background:var(--surface2);color:var(--muted);}
@@ -438,15 +440,16 @@ textarea{resize:vertical;min-height:70px;}
 </style>
 </head>
 <body>
+<button id="global-home-btn" class="home-btn" onclick="goHome()">ראשי</button>
 
 <!-- ══════════════════════ PC DEMO LAUNCHER ══ -->
 <div id="screen-demo" class="screen active">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">FIELD EXPERIMENT v1.2</div>
-      <div class="demo-title">C5 Sentinel-SAR</div>
+      <div class="demo-kicker">Demo V1.2</div>
+      <div class="demo-title">Demo V1.2</div>
       <div class="demo-sub">
-        תרחיש הדגמה מבצעי למפקד מחלקה: פצועים, מדדים, חסמי עורקים, התראות, תמונת מצב ואירוע מסכם.
+        C5 Sentinel-SAR במצב נקי. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן.
       </div>
     </div>
     <div class="demo-grid">
@@ -468,14 +471,15 @@ textarea{resize:vertical;min-height:70px;}
       </button>
       <button class="demo-card" onclick="startPcDemo('aar')">
         <div class="demo-icon">📋</div>
-        <div><strong>AAR חי</strong><span>סיכום אירוע, KPI ותובנות אחרי פעולה.</span></div>
+        <div><strong>סיכום אירוע חי</strong><span>סיכום אירוע, KPI ותובנות אחרי פעולה.</span></div>
       </button>
     </div>
     <div class="demo-panel">
-      <div class="demo-strip-title">תרחיש נטען</div>
-      <div class="demo-strip-sub">מוקד A — הרצל 12, פגיעה במבנה, 5 פצועים, התראת חובש שקט, פצוע אדום עם חסם עורקים ומדדים באיחור.</div>
+      <div class="demo-strip-title">תרחיש דמו חתום</div>
+      <div class="demo-strip-sub">מיועד להפעלה יזומה על ידי חובש / PC / CC בלבד לצורכי הדגמה. ברירת המחדל של האפליקציה נשארת נקייה.</div>
       <div style="display:flex;gap:8px;margin-top:12px">
-        <button class="demo-mini-btn" onclick="loadDemoScenario(true);toast('תרחיש ההדגמה אופס')">אפס תרחיש</button>
+        <button class="demo-mini-btn" onclick="activateSignedDemoScenario()">הפעל תרחיש דמו</button>
+        <button class="demo-mini-btn" onclick="clearDemoScenario()">נקה תרחיש</button>
         <button class="demo-mini-btn" onclick="continueDemo()">המשך מהשמירה</button>
       </div>
     </div>
@@ -536,10 +540,10 @@ textarea{resize:vertical;min-height:70px;}
     </button>
   </div>
   <div class="demo-actions">
-    <button class="demo-mini-btn" onclick="goTo('aar')">AAR חי</button>
+    <button class="demo-mini-btn" onclick="goTo('aar')">סיכום אירוע חי</button>
     <button class="demo-mini-btn" onclick="addObserverNote()">הערת צופה</button>
     <button class="demo-mini-btn" onclick="exportExperimentLog()">ייצוא ניסוי</button>
-    <button class="demo-mini-btn" onclick="loadDemoScenario(true);goTo('dashboard')">אפס דמו</button>
+    <button class="demo-mini-btn" onclick="clearDemoScenario();goTo('dashboard')">נקה דמו</button>
   </div>
   <div id="observer-note-panel" class="aar-note" style="display:none">
     <div class="aar-note-title">הערת צופה לניסוי</div>
@@ -590,7 +594,7 @@ textarea{resize:vertical;min-height:70px;}
   <div class="site-section">
     <div class="site-section-header">
       <span>דיווחים חיצוניים</span>
-      <button onclick="goTo('add-report')" style="background:none;border:none;color:var(--accent);font-size:13px;font-weight:700;cursor:pointer">+ הוסף</button>
+      <button onclick="prepareExternalReport();goTo('add-report')" style="background:none;border:none;color:var(--accent);font-size:13px;font-weight:700;cursor:pointer">+ הוסף</button>
     </div>
     <div class="site-section-body" id="ext-reports-list"><div style="color:var(--muted);font-size:13px;text-align:center;padding:8px 0">אין דיווחים עדיין</div></div>
   </div>
@@ -634,6 +638,11 @@ textarea{resize:vertical;min-height:70px;}
     </div>
     <div class="field-label">יעד פינוי</div>
     <input type="text" id="report-evac-dest" placeholder="איכילוב, שיבא..." style="margin-bottom:12px">
+    <div class="field-label">שם אירוע / מוקד</div>
+    <input type="text" id="report-event-name" placeholder="לדוגמה: מוקד A — הרצל 12" style="margin-bottom:12px">
+    <div class="field-label">פלוגה מטפלת</div>
+    <input type="text" id="report-company" placeholder="לדוגמה: פלוגה א / ALFA" style="margin-bottom:12px">
+    <input type="hidden" id="report-patient-id">
     <div class="field-label">הערות</div>
     <textarea id="report-notes" placeholder="מידע נוסף..."></textarea>
   </div>
@@ -652,12 +661,12 @@ textarea{resize:vertical;min-height:70px;}
     <div class="tap-grid tap-grid-2" id="flow-mode-grid" style="margin-bottom:16px">
       <button class="tap-btn" onclick="selectFlowMode(this,'quick')">
         <span class="icon">⚡</span>
-        <div style="font-weight:700">מהיר</div>
-        <div style="font-size:11px;color:var(--muted)">מדדים בינאריים, כל השאר חוב הערכה</div>
+        <div style="font-weight:700">מסלול מהיר — פתיחת פצוע ב־20 שניות</div>
+        <div style="font-size:11px;color:var(--muted)">מדדים בינאריים, יש לקחת מדדים בהמשך</div>
       </button>
       <button class="tap-btn selected" onclick="selectFlowMode(this,'extended')">
         <span class="icon">🩺</span>
-        <div style="font-weight:700">רגיל</div>
+        <div style="font-weight:700">מסלול מלא — לאחר ייצוב</div>
         <div style="font-size:11px;color:var(--muted)">חסם, מדדים מלאים, טיפול</div>
       </button>
     </div>
@@ -676,7 +685,7 @@ textarea{resize:vertical;min-height:70px;}
       </button>
     </div>
     <div class="peds-estimate" id="peds-estimate-panel">
-      <div class="risk-panel-title">אומדן פדיאטרי מקומי</div>
+      <div class="risk-panel-title">אומדן גיל ומשקל</div>
       <div class="peds-estimate-grid">
         <input type="range" id="peds-age-slider" min="0" max="7" step="1" value="7" oninput="setPediatricAge(Number(this.value))">
         <div class="peds-estimate-value" id="peds-estimate-value">גיל 7 · 22kg</div>
@@ -695,6 +704,8 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="progress-bar"><div class="progress-fill" style="width:25%"></div></div>
   <div class="flow-content">
+    <div class="field-label">תיאור פצוע / לבוש / סימני זיהוי</div>
+    <input type="text" id="wearing-free" placeholder="לדוגמה: חולצה כחולה, קסדה, תיק שחור..." style="margin-bottom:16px" oninput="state.wearingDesc=this.value">
     <div class="field-label">סוג המבנה</div>
     <div class="tap-grid tap-grid-2" id="building-type-grid" style="margin-bottom:16px">
       <button class="tap-btn" onclick="selectBuildingType(this,'building')"><span class="icon">🏢</span>בניין רב קומות</button>
@@ -726,8 +737,6 @@ textarea{resize:vertical;min-height:70px;}
     <div id="common-loc-fields" style="display:none">
       <div class="field-label">אזור / תיאור מדויק</div>
       <input type="text" id="location-free" placeholder="לדוגמה: ליד הדלת האדומה, מתחת לשרידים..." oninput="state.locFree=this.value">
-      <div class="field-label" style="margin-top:12px">תיאור לבוש / סימני זיהוי</div>
-      <input type="text" id="wearing-free" placeholder="לדוגמה: חולצה כחולה, קסדה, תיק שחור..." oninput="state.wearingDesc=this.value">
     </div>
   </div>
   <div class="bottom-bar"><button class="btn-primary" id="btn-step2" onclick="continueAfterLocation()">המשך</button></div>
@@ -793,7 +802,7 @@ textarea{resize:vertical;min-height:70px;}
     <div id="rapid-vitals-panel" style="display:none">
       <div style="background:rgba(67,97,238,0.08);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.55">
         <strong style="color:var(--accent)">מסלול מהיר:</strong>
-        מדדים בינאריים בלבד. המערכת שומרת תזכר על בדיקת מדדים בהמשך.
+        מדדים בינאריים בלבד. המערכת שומרת תזכורת: יש לקחת מדדים בהמשך.
       </div>
       <div class="field-label">יכול ללכת?</div>
       <div class="tap-grid tap-grid-2" id="rapid-walking-grid" style="margin-bottom:14px">
@@ -1045,7 +1054,7 @@ textarea{resize:vertical;min-height:70px;}
       <div class="tq-reminder-body" id="quick-tq-reminder-body"></div>
     </div>
     <div class="stock-panel">
-      <div class="stock-panel-title">מלאי מקומי נגזר מאירועי ledger</div>
+      <div class="stock-panel-title">המלאי האישי שלי — נגזר מאירועי ledger</div>
       <div class="stock-grid" id="tx-stock-grid"></div>
     </div>
     <div class="field-label">טיפולים שניתנו עכשיו (ניתן לבחור מספר)</div>
@@ -1143,7 +1152,7 @@ textarea{resize:vertical;min-height:70px;}
 <div class="modal-overlay panic-modal hidden" id="trap-status-modal" onclick="closeTrapStatusModal(event)">
   <div class="modal-sheet panic-sheet" style="border-color:var(--yellow);box-shadow:0 22px 90px rgba(244,162,97,.2)">
     <div class="panic-title" style="color:var(--yellow)">סטטוס חילוץ אחרון</div>
-    <div class="panic-message">בחר מצב בינארי לפני סגירה: לכוד או לא לכוד. אם אין זמן, ניתן לשמור כחסר נתון והחמ״ל יראה חוב הערכה.</div>
+    <div class="panic-message">בחר מצב בינארי לפני סגירה: לכוד או לא לכוד. אם אין זמן, ניתן לשמור כחסר נתון והחמ״ל יראה שיש לקחת מדדים.</div>
     <div class="tap-grid tap-grid-2">
       <button class="tap-btn" onclick="confirmTrapStatus('trapped')"><span class="icon">⛓️</span><div style="font-weight:800">לכוד</div></button>
       <button class="tap-btn" onclick="confirmTrapStatus('not_trapped')"><span class="icon">🚶</span><div style="font-weight:800">לא לכוד</div></button>
@@ -1198,6 +1207,11 @@ textarea{resize:vertical;min-height:70px;}
     <div class="experiment-title">field experiment control</div>
     <div class="experiment-meta" id="experiment-line-command">—</div>
   </div>
+  <div class="alert-slicer" id="command-role-slicer" style="padding-top:10px">
+    <button class="alert-slice active" onclick="switchCommandRole('pc',this)">PC / הכל</button>
+    <button class="alert-slice" onclick="switchCommandRole('chamal',this)">חמ״ל / הכל</button>
+    <button class="alert-slice other" onclick="switchCommandRole('cc',this)">CC / הפלוגה שלי</button>
+  </div>
   <div style="display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto" id="cmd-site-tabs"></div>
   <div style="padding:12px 16px 0"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px" id="cmd-totals"></div></div>
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('priority')"><span>תעדוף מפקד</span><span class="cmd-panel-sub" id="cmd-panel-priority-meta">OPEN</span></button>
@@ -1213,7 +1227,7 @@ textarea{resize:vertical;min-height:70px;}
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('alerts')"><span>התראות</span><span class="cmd-panel-sub" id="cmd-panel-alerts-meta">OPEN</span></button>
   <div id="cmd-panel-alerts" class="cmd-panel-body"><div id="cmd-alerts" style="padding:6px 16px 0"></div></div>
   <div class="demo-actions">
-    <button class="demo-mini-btn" onclick="goTo('aar')">פתח AAR</button>
+    <button class="demo-mini-btn" onclick="goTo('aar')">פתח סיכום אירוע חי</button>
     <button class="demo-mini-btn" onclick="goTo('roles')">תפקידים והרשאות</button>
     <button class="demo-mini-btn" onclick="goTo('logistics')">Log-O</button>
     <button class="demo-mini-btn" onclick="exportExperimentLog()">ייצוא ניסוי</button>
@@ -1284,23 +1298,23 @@ textarea{resize:vertical;min-height:70px;}
   <div class="demo-actions">
     <button class="demo-mini-btn" onclick="goTo('commander')">חזרה לחפ״ק</button>
     <button class="demo-mini-btn" onclick="goTo('logistics')">Log-O</button>
-    <button class="demo-mini-btn" onclick="goTo('aar')">AAR</button>
+    <button class="demo-mini-btn" onclick="goTo('aar')">סיכום אירוע חי</button>
   </div>
   <div style="height:70px"></div>
 </div>
 
-<!-- ══════════════════════ AAR ══ -->
+<!-- ══════════════════════ LIVE INCIDENT SUMMARY ══ -->
 <div id="screen-aar" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle">AAR // LIVE</div>
+      <div class="header-subtitle">LIVE INCIDENT SUMMARY</div>
       <div class="header-title">סיכום אירוע חי</div>
     </div>
     <button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goTo('commander')">✕</button>
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">AAR Preview</div>
+      <div class="demo-strip-title">סיכום אירוע חי</div>
       <div class="demo-strip-sub">נבנה מתוך האירועים שנקלטו בדמו המקומי.</div>
     </div>
     <div class="sync-pill" id="sync-pill-aar">SYNC</div>
@@ -1312,8 +1326,8 @@ textarea{resize:vertical;min-height:70px;}
   <div id="aar-insights"></div>
   <div class="demo-actions">
     <button class="demo-mini-btn" onclick="goTo('commander')">חזרה לחפ״ק</button>
-    <button class="demo-mini-btn" onclick="exportExperimentLog()">ייצוא AAR</button>
-    <button class="demo-mini-btn" onclick="loadDemoScenario(true);goTo('aar')">אפס AAR</button>
+    <button class="demo-mini-btn" onclick="exportExperimentLog()">ייצוא סיכום</button>
+    <button class="demo-mini-btn" onclick="clearDemoScenario();goTo('aar')">נקה סיכום</button>
   </div>
   <div style="height:70px"></div>
 </div>
@@ -1609,10 +1623,10 @@ const MEDICATION_ROUTES = {morphine:'IV', atq:'PO/BUCCAL'};
 const LIMB_LABELS = {yl:'יד שמאל', yr:'יד ימין', rl:'רגל שמאל', rr:'רגל ימין'};
 const ROLE_DEFS = [
   {key:'medic', label:'Medic', he:'חובש', desc:'פותח פצועים, מדדים, התערבויות, MIST וטיוטת אירוע מקומית כשאין אירוע רשמי.'},
-  {key:'pc', label:'PC', he:'מפקד מחלקה / Supervisor', desc:'פותח ומאשר אירוע רשמי, מנהל תמונת מצב, התראות, אספקה ו-AAR.'},
+  {key:'pc', label:'PC', he:'מפקד מחלקה / Supervisor', desc:'פותח ומאשר אירוע רשמי, מנהל תמונת מצב, התראות, אספקה וסיכום אירוע חי.'},
   {key:'log_o', label:'Log-O', he:'קצין לוגיסטיקה', desc:'מנהל ערכות ורצי אספקה, רואה מלאי לפי פלוגה, לא מבצע רישום קליני.'},
   {key:'cc', label:'CC', he:'מפקד פלוגה', desc:'סמכות פיקודית לפתיחת/אישור אירוע, סגירה, אתר נקי, דשבורד וייצוא.'},
-  {key:'chamal', label:'Chamal', he:'חמ״ל', desc:'תמונת מצב מלאה, אישור טיוטות, ניהול אירוע ברמת חטיבה/AAR, ללא רישום פצועים.'}
+  {key:'chamal', label:'Chamal', he:'חמ״ל', desc:'תמונת מצב מלאה, אישור טיוטות, ניהול אירוע ברמת חטיבה וסיכום אירוע חי, ללא רישום פצועים.'}
 ];
 const AUTH_MATRIX = [
   {action:'Create local draft incident', medic:'yes', pc:'yes', log_o:'no', cc:'yes', chamal:'yes'},
@@ -1631,7 +1645,7 @@ const AUTH_MATRIX = [
   {action:'Confirm Site Clear', medic:'no', pc:'yes', log_o:'no', cc:'yes', chamal:'yes'},
   {action:'View full command dashboard', medic:'no', pc:'yes', log_o:'yes', cc:'yes', chamal:'yes'},
   {action:'View conflict log', medic:'no', pc:'yes', log_o:'no', cc:'yes', chamal:'yes'},
-  {action:'Unlock and export AAR', medic:'no', pc:'yes', log_o:'no', cc:'yes', chamal:'yes'}
+  {action:'Unlock and export live incident summary', medic:'no', pc:'yes', log_o:'no', cc:'yes', chamal:'yes'}
 ];
 const BODY_ZONE_LABELS = {
   head:'ראש',
@@ -1670,7 +1684,7 @@ function setDeviceLabels(){
 //  STATE
 // ═══════════════════════════════════════════════
 let siteData = {name:'', address:'', eventType:null, description:'', externalReports:[]};
-let reportState = {source:null, red:0, yellow:0, green:0};
+let reportState = {source:null, red:0, yellow:0, green:0, patientId:null};
 
 // BASELINES — used to reset, not carry over
 const VITALS_BASELINE = {pulse:80, spo2:null, bp_estimate:null, rr:16, avpu:null};
@@ -1683,7 +1697,7 @@ function freshState(){
     accessibility:null, trapStatus:null, sabcde:{},
     flowMode:'extended', patientAgeGroup:'adult', patientAge:null,
     injury:null, injuryZones:new Set(), patientStatus:'identified',
-    rapidWalking:null, rapidMajorBleeding:null,
+    rapidWalking:null, rapidMajorBleeding:null, rapidAutoFilled:false,
     interventions:new Set(), triage:null,
     needsFullAssessment:true, localEvents:[], localStockCache:{...SUPPLY_BASELINE}, supplyMovements:{}, pediatricOverrides:{}, pendingMedicationOverride:null,
     vitalsMedicName:'', txMedicName:''
@@ -1862,6 +1876,21 @@ function loadDemoScenario(persist=false){
   if(persist) saveDemoState();
   renderDashboard(); renderAlerts();
 }
+function activateSignedDemoScenario(){
+  loadDemoScenario(true);
+  toast('תרחיש דמו חתום הופעל');
+}
+function clearDemoScenario(){
+  patients=[];
+  siteData={name:'', address:'', eventType:null, description:'', externalReports:[]};
+  allSites.forEach(s=>{ if(s.id!=='ALL') s.externalReports=[]; });
+  demoSyncMode='fresh';
+  lastSyncAt=Date.now();
+  saveDemoState();
+  renderDashboard();
+  renderAlerts();
+  toast('התרחיש נוקה');
+}
 function saveDemoState(){
   try{
     const raw=localStorage.getItem(DEMO_STORAGE_KEY);
@@ -1903,12 +1932,11 @@ function loadStoredDemoState(){
 }
 window.addEventListener('beforeunload', ()=>{ saveActiveRecoveryState(activeScreenId()); saveDemoState(); });
 function startPcDemo(screen){
-  if(!patients.length) loadDemoScenario(true);
   goTo(screen);
 }
 function continueDemo(){
-  if(!loadStoredDemoState()) loadDemoScenario(true);
-  goTo('commander');
+  if(!loadStoredDemoState()) toast('אין שמירת דמו קיימת');
+  goTo('dashboard');
 }
 function setDemoSyncMode(){
   demoSyncMode = demoSyncMode==='fresh' ? 'stale' : demoSyncMode==='stale' ? 'offline' : 'fresh';
@@ -2049,6 +2077,14 @@ setInterval(updateClock,1000); updateClock();
 // ═══════════════════════════════════════════════
 const TERMINAL_STATUSES = new Set(['deceased','evacuating','evacuated','handed_over','closed','self_evacuated']);
 
+function goHome(){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-demo').classList.add('active');
+  const home=document.getElementById('global-home-btn');
+  if(home) home.classList.remove('visible');
+  window.scrollTo(0,0);
+}
+
 function queueEventOnce(type, event){
   if((state.localEvents||[]).some(e=>e.type===type)) return;
   saveLocalEvent({type, ...event});
@@ -2088,6 +2124,8 @@ function goTo(screen){
   if(/^step[1-8]$/.test(screen)) saveActiveRecoveryState(screen);
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+screen).classList.add('active');
+  const home=document.getElementById('global-home-btn');
+  if(home) home.classList.toggle('visible', screen!=='demo');
   window.scrollTo(0,0);
   updateFlowChrome(screen);
   if(screen==='dashboard'){ renderDashboard(); renderAlerts(); }
@@ -2325,15 +2363,45 @@ function selectReportSource(btn,val){
   document.getElementById('btn-save-report').disabled=false;
 }
 function changeRC(color,delta){ reportState[color]=Math.max(0,(reportState[color]||0)+delta); document.getElementById('rc-'+color).textContent=reportState[color]; }
+function prepareExternalReport(){
+  reportState={source:null, red:0, yellow:0, green:0, patientId:null};
+  document.querySelectorAll('#report-source-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  ['red','yellow','green'].forEach(c=>{const el=document.getElementById('rc-'+c); if(el) el.textContent='0';});
+  ['report-patient-id','report-evac-dest','report-company','report-notes'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
+  const eventName=document.getElementById('report-event-name'); if(eventName) eventName.value=siteData.name||'';
+}
 function saveReport(){
   const labels={MDA:'מד"א',police:'משטרה',UH:'ידידים',other:'אחר'};
-  const r={sourceLabel:labels[reportState.source]||'',source:reportState.source,red:reportState.red,yellow:reportState.yellow,green:reportState.green,evacDest:document.getElementById('report-evac-dest').value,notes:document.getElementById('report-notes').value,time:nowT(),id:'RPT'+uid(),status:'new'};
+  const patientId=document.getElementById('report-patient-id')?.value || reportState.patientId || null;
+  const r={sourceLabel:labels[reportState.source]||'',source:reportState.source,red:reportState.red,yellow:reportState.yellow,green:reportState.green,evacDest:document.getElementById('report-evac-dest').value,eventName:document.getElementById('report-event-name').value||siteData.name,company:document.getElementById('report-company').value||'',patientId,notes:document.getElementById('report-notes').value,time:nowT(),id:'RPT'+uid(),status:'new'};
+  if(patientId){
+    const p=patients.find(x=>x.id===patientId);
+    if(p){
+      p.events=p.events||[];
+      p.events.unshift({type:'EXTERNAL_REPORT_UPDATED_AFTER_EXTRACTION',time:nowT(),detail:`${r.sourceLabel} · ${r.eventName||siteData.name||'אירוע'} · ${r.company||'פלוגה לא צוינה'} · ${r.notes||'ללא הערות'}`,warn:false});
+      p.lastModifiedAt=new Date().toISOString();
+      p.unsyncedEvents=(p.unsyncedEvents||0)+1;
+    }
+  }
   siteData.externalReports.push(r); lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState(); renderExtReports(); goTo('site');
 }
 function renderExtReports(){
   const el=document.getElementById('ext-reports-list');
   if(!siteData.externalReports.length){el.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:8px 0">אין דיווחים עדיין</div>';return;}
-  el.innerHTML=siteData.externalReports.map(r=>`<div style="background:var(--surface2);border-radius:12px;padding:12px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700">${r.sourceLabel}</span><span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${r.time}</span></div><div style="font-size:13px">${r.red?`<span style="color:var(--red);font-weight:700">${r.red} קשה </span>`:''}${r.yellow?`<span style="color:var(--yellow);font-weight:700">${r.yellow} בינוני </span>`:''}${r.green?`<span style="color:var(--green);font-weight:700">${r.green} קל</span>`:''}</div></div>`).join('');
+  el.innerHTML=siteData.externalReports.map(r=>`<div style="background:var(--surface2);border-radius:12px;padding:12px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700">${r.sourceLabel}</span><span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${r.time}</span></div><div style="font-size:13px">${r.patientId?`<span style="color:var(--accent);font-weight:700">${r.patientId} </span>`:''}${r.red?`<span style="color:var(--red);font-weight:700">${r.red} קשה </span>`:''}${r.yellow?`<span style="color:var(--yellow);font-weight:700">${r.yellow} בינוני </span>`:''}${r.green?`<span style="color:var(--green);font-weight:700">${r.green} קל</span>`:''}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">${r.eventName||siteData.name||''}${r.company?' · '+r.company:''}</div></div>`).join('');
+}
+
+function openLateExternalPatientUpdate(id){
+  const p=patients.find(x=>x.id===id);
+  reportState={source:null, red:0, yellow:0, green:0, patientId:id};
+  ['red','yellow','green'].forEach(c=>{const el=document.getElementById('rc-'+c); if(el) el.textContent='0';});
+  document.querySelectorAll('#report-source-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  const pid=document.getElementById('report-patient-id'); if(pid) pid.value=id;
+  const eventName=document.getElementById('report-event-name'); if(eventName) eventName.value=siteData.name||'';
+  const company=document.getElementById('report-company'); if(company) company.value=p?.company||companyLabelForSite(p?.siteId)||'';
+  const dest=document.getElementById('report-evac-dest'); if(dest) dest.value=p?.evacDestination||'';
+  const notes=document.getElementById('report-notes'); if(notes) notes.value=`עדכון מאוחר עבור ${id} אחרי חילוץ`;
+  goTo('add-report');
 }
 
 // ═══════════════════════════════════════════════
@@ -2367,6 +2435,12 @@ function openPatient(id){
       </div>
       ${p.deterioration&&p.deterioration.length?`<div style="background:rgba(230,57,70,0.1);border:1px solid var(--red);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:700;font-size:12px;color:var(--red);margin-bottom:3px">⚠ הידרדרות זוהתה</div><div style="font-size:12px">${p.deterioration.join(' · ')}</div></div>`:''}
     </div>
+    ${['evacuating','evacuated','handed_over'].includes(p.patientStatus)?`
+    <div class="summary-card">
+      <div style="font-weight:700;font-size:14px;margin-bottom:8px">עדכון מאוחר ממד״א / גורם חיצוני</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px">ניתן להוסיף מידע גם אחרי חילוץ. הדיווח יכלול את שם האירוע והפלוגה המטפלת.</div>
+      <button class="btn-secondary" onclick="openLateExternalPatientUpdate('${p.id}')">הוסף עדכון לפצוע מחולץ</button>
+    </div>`:''}
     <div class="summary-card">
       <div style="font-weight:700;font-size:14px;margin-bottom:12px">מגמת מדדים</div>
       ${buildTrendChart(p.vitalsHistory)}
@@ -2619,9 +2693,9 @@ function continueAfterTriage(){
     state.needsFullAssessment = true;
     saveLocalEvent({
       type:'QUICK_PATIENT_CREATED',
-      detail:'פתיחת פצוע מהירה — הערכה מלאה חסרה',
+      detail:'פתיחת פצוע מהירה — יש לקחת מדדים',
       warn:true,
-      payload_json:{needs_full_assessment:true, triage:state.triage, capture_mode:'quick_dirty'}
+      payload_json:{needs_full_assessment:true, triage:state.triage, capture_mode:'quick_dirty', reminder:'יש לקחת מדדים', notify_roles:['medic','cc']}
     });
     goTo('step6');
     return;
@@ -2695,15 +2769,29 @@ function updateRapidVitalsSummary(){
   const bp=flowVitals.bp_estimate==='radial'?'מעל 100':flowVitals.bp_estimate==='weak'?'80-100':flowVitals.bp_estimate==='absent'?'מתחת 80':'—';
   el.textContent=`הליכה: ${walking} · דימום: ${bleeding} · נשימה: ${breathing} · AVPU: ${avpu} · לחץ דם: ${bp}`;
 }
+function clearRapidAutoSelections(){
+  document.querySelectorAll('#rapid-breathing-grid .tap-btn,#rapid-avpu-grid .tap-btn,#rapid-bp-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  flowVitals.rr = null;
+  flowVitals.avpu = null;
+  flowVitals.bp_estimate = null;
+  flowVitals.pulse = null;
+  counts.rr30 = 0;
+  counts.pulse15 = 0;
+  state.rapidAutoFilled = false;
+}
 function selectRapidWalking(btn, canWalk){
   document.querySelectorAll('#rapid-walking-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
+  const wasAutoFilled = !!state.rapidAutoFilled;
   state.rapidWalking=canWalk;
   if(canWalk){
     state.triage='green';
     selectRapidBreathing(null, true, true);
     selectRapidAvpu(null, 'A', true);
     selectRapidBp(null, 'radial', true);
+    state.rapidAutoFilled = true;
+  } else if(wasAutoFilled){
+    clearRapidAutoSelections();
   }
   updateRapidVitalsSummary();
 }
@@ -2718,6 +2806,7 @@ function selectRapidBreathing(btn, isBreathing, auto=false){
   document.querySelectorAll('#rapid-breathing-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
   const target=btn || document.querySelector(`#rapid-breathing-grid .tap-btn:nth-child(${isBreathing?1:2})`);
   if(target) target.classList.add('selected');
+  if(!auto) state.rapidAutoFilled = false;
   counts.rr30 = isBreathing ? 8 : 0;
   flowVitals.rr = isBreathing ? 16 : 0;
   if(auto) saveLocalEvent({type:'RAPID_WALKING_AUTO_FILLED_VITALS',detail:'Walking patient auto-set breathing yes',warn:false,payload_json:{assumption:'walking_implies_breathing'}});
@@ -2727,6 +2816,7 @@ function selectRapidAvpu(btn, val, auto=false){
   document.querySelectorAll('#rapid-avpu-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
   const target=btn || document.querySelector(`#rapid-avpu-grid .tap-btn[onclick*="'${val}'"]`);
   if(target) target.classList.add('selected');
+  if(!auto) state.rapidAutoFilled = false;
   flowVitals.avpu = val;
   updateRapidVitalsSummary();
 }
@@ -2734,6 +2824,7 @@ function selectRapidBp(btn, val, auto=false){
   document.querySelectorAll('#rapid-bp-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
   const target=btn || document.querySelector(`#rapid-bp-grid .tap-btn[onclick*="'${val}'"]`);
   if(target) target.classList.add('selected');
+  if(!auto) state.rapidAutoFilled = false;
   flowVitals.bp_estimate = val;
   flowVitals.pulse = val === 'radial' ? 88 : val === 'weak' ? 108 : 132;
   counts.pulse15 = Math.round(flowVitals.pulse/4);
@@ -2949,7 +3040,7 @@ function showMstartSuggestion(){
   const {triage, reason}=suggestion;
   const colors={red:'var(--red)',yellow:'var(--yellow)',green:'var(--green)',black:'#888'};
   const short={red:'אדום — דחוף',yellow:'צהוב — דחוף',green:'ירוק — לא דחוף',black:'שחור — לא בר הצלה'};
-  const modeNote=state.flowMode === 'quick' ? 'מדדים בינאריים — נשמר כחוב הערכה' : reason;
+  const modeNote=state.flowMode === 'quick' ? 'מדדים בינאריים — יש לקחת מדדים' : reason;
   document.getElementById('triage-suggestion-text').innerHTML=`<span style="color:${colors[triage]}">${short[triage]}</span> <span style="font-size:12px;color:var(--muted);font-weight:400">— ${modeNote}</span>`;
   document.getElementById('triage-suggestion').style.display='block';
   const selectedTriage=state.triage || triage;
@@ -3096,14 +3187,13 @@ function renderSummary(){
   const locStr=buildLocStr();
   const deviceId=getDeviceId();
   const sab=Object.entries(state.sabcde).map(([k,v])=>`${k}:${v}`).join(' · ')||'—';
-  const stockLine=Object.entries(state.localStockCache||{}).map(([k,v])=>`${SUPPLY_LABELS[k]||k}: ${v}`).join(' · ');
   document.getElementById('summary-content').innerHTML=`
     <div class="summary-row"><span class="summary-key">מזהה</span><span class="summary-val" style="font-family:var(--mono);font-weight:700">${newId}</span></div>
     <div class="summary-row"><span class="summary-key">מיון</span><span class="summary-val">${triagePill(state.triage)}</span></div>
     <div class="summary-row"><span class="summary-key">מיקום</span><span class="summary-val">${locStr}</span></div>
     <div class="summary-row"><span class="summary-key">לבוש / זיהוי</span><span class="summary-val">${state.wearingDesc||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">חילוץ</span><span class="summary-val">${TRAP_LABELS[state.trapStatus]||'לא תועד'}</span></div>
-    <div class="summary-row"><span class="summary-key">מסלול</span><span class="summary-val">${state.flowMode==='quick'?'מהיר — חוב הערכה':'מורחב'}</span></div>
+    <div class="summary-row"><span class="summary-key">מסלול</span><span class="summary-val">${state.flowMode==='quick'?'מסלול מהיר — יש לקחת מדדים':'מסלול מלא — לאחר ייצוב'}</span></div>
     <div class="summary-row"><span class="summary-key">גיל</span><span class="summary-val">${state.patientAgeGroup==='pediatric'?'ילד מתחת 8':'מבוגר / 8+'}</span></div>
     <div class="summary-row"><span class="summary-key">SABCDE</span><span class="summary-val" style="font-size:11px">${sab}</span></div>
     <div class="summary-row"><span class="summary-key">דופק</span><span class="summary-val" style="font-family:var(--mono)">${flowVitals.pulse ?? '—'}${flowVitals.pulse?' bpm':''}</span></div>
@@ -3113,11 +3203,11 @@ function renderSummary(){
     <div class="summary-row"><span class="summary-key">AVPU</span><span class="summary-val" style="font-family:var(--mono)">${flowVitals.avpu||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">זיהוי מכשיר</span><span class="summary-val device-id">${deviceId}</span></div>
     ${state.triage==='black'?'<div class="summary-row" style="border:1px solid #666;background:rgba(74,74,74,0.18);border-radius:10px;padding:10px"><span class="summary-key">מסלול מהיר</span><span class="summary-val">מיון שחור — דילוג על מדדים / טיפולים / MIST</span></div>':''}
-    ${state.needsFullAssessment && state.triage!=='black'?'<div class="summary-row" style="border:1px solid var(--orange);background:rgba(255,107,53,0.12);border-radius:10px;padding:10px"><span class="summary-key">חוב הערכה</span><span class="summary-val">Assessment incomplete — תיווצר התראת מפקד</span></div>':''}
+    ${state.needsFullAssessment && state.triage!=='black'?'<div class="summary-row" style="border:1px solid var(--orange);background:rgba(255,107,53,0.12);border-radius:10px;padding:10px"><span class="summary-key">יש לקחת מדדים</span><span class="summary-val">תזכורת תישלח לחובש ול-CC</span></div>':''}
     <div class="summary-row"><span class="summary-key">פציעה</span><span class="summary-val">${state.injury||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">מצב</span><span class="summary-val">${STATUS_LABELS[state.patientStatus]||'—'}</span></div>
-    <div class="summary-row"><span class="summary-key">טיפולים</span><span class="summary-val">${intStr||'ללא'}</span></div>
-    <div class="summary-row"><span class="summary-key">מלאי מקומי</span><span class="summary-val" style="font-size:11px">${stockLine||'—'}</span></div>
+    <div class="summary-row"><span class="summary-key">טיפולים שניתנו</span><span class="summary-val">${intStr||'ללא'}</span></div>
+    <div class="summary-row"><span class="summary-key">מלאי אישי</span><span class="summary-val"><button class="demo-mini-btn" style="padding:7px 10px;margin:0" onclick="showOwnInventory()">הצג מלאי שלי</button></span></div>
     <div class="summary-row"><span class="summary-key">חתימת טיפול</span><span class="summary-val device-id">${deviceId}</span></div>
     <div class="summary-row"><span class="summary-key">זמן פתיחה</span><span class="summary-val" style="font-family:var(--mono)">${nowT()}</span></div>`;
 }
@@ -3149,9 +3239,9 @@ function savePatient(){
   }
   if(state.needsFullAssessment && state.triage !== 'black'){
     queueEventOnce('ASSESSMENT_INCOMPLETE_ALERT', {
-      detail:'Assessment incomplete — נדרש מעקב מפקד',
+      detail:'יש לקחת מדדים — תזכורת לחובש ול-CC',
       warn:true,
-      payload_json:{capture_mode:state.flowMode, needs_full_assessment:true}
+      payload_json:{capture_mode:state.flowMode, needs_full_assessment:true, reminder:'יש לקחת מדדים', notify_roles:['medic','cc'], notify_devices:[deviceId]}
     });
   }
   const txHistoryEntry = intStr ? [{time:t, text:intStr, medic:deviceId}] : [];
@@ -3427,8 +3517,26 @@ function getSitePatients(siteId){
   if(siteId==='SITE_B') return patients.filter(p=>(p.siteId||'SITE_A')==='SITE_B');
   return [];
 }
-let cmdActiveSite='ALL', cmdFilter='all', alertFilter='critical', cmdAlertFilter='critical';
+let cmdActiveSite='ALL', cmdFilter='all', alertFilter='critical', cmdAlertFilter='critical', commandRole='pc', ccCompanySite='SITE_A';
 let cmdPanelOpen={priority:true,heatmap:false,devices:false,watchdogs:false,duplicates:false,alerts:true};
+function companyLabelForSite(siteId){
+  return siteId==='SITE_B' ? 'פלוגה ב / BRAVO' : siteId==='SITE_A' ? 'פלוגה א / ALFA' : 'כל הפלוגות';
+}
+function commandVisibleSites(){
+  if(commandRole==='cc') return [ccCompanySite];
+  return allSites.map(s=>s.id);
+}
+function canSeeCommandSite(siteId){
+  return commandVisibleSites().includes(siteId) || siteId==='ALL' && commandRole!=='cc';
+}
+function switchCommandRole(role, btn){
+  commandRole=role;
+  document.querySelectorAll('#command-role-slicer .alert-slice').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  cmdActiveSite = role==='cc' ? ccCompanySite : 'ALL';
+  renderCmdTabs();
+  renderCmdContent();
+}
 function isCriticalAlert(p){ return !p?.alertAcknowledgedAt && C5Rules.isCriticalAlert(p); }
 function hasRoutineAlert(p){ return !p?.alertAcknowledgedAt && C5Rules.isRoutineAlert(p); }
 function openPatientFromAlert(id){
@@ -3487,13 +3595,18 @@ function setCmdPanelMeta(name, summary){
 }
 function renderCmdTabs(){
   const el=document.getElementById('cmd-site-tabs'); if(!el) return;
-  el.innerHTML=allSites.map(s=>{
+  const visible=allSites.filter(s=>canSeeCommandSite(s.id));
+  el.innerHTML=visible.map(s=>{
     const pts=getSitePatients(s.id);
     const hasAlert=pts.some(p=>(p.deterioration&&p.deterioration.length)||(needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS));
     return `<button class="cmd-site-tab${s.id===cmdActiveSite?' active':''}${hasAlert?' has-alert':''}" onclick="switchCmdSite('${s.id}')">${s.id==='ALL'?'🌐 הכל':s.id==='SITE_A'?'📍 A':'📍 B'}${hasAlert?' 🔴':''}</button>`;
   }).join('');
 }
 function switchCmdSite(id){
+  if(!canSeeCommandSite(id)){
+    toast('CC רואה רק את אירועי הפלוגה שלו אלא אם PC/חמ״ל משנים הרשאה');
+    return;
+  }
   cmdActiveSite=id; cmdFilter='all';
   document.querySelectorAll('.cmd-filter').forEach(b=>b.classList.remove('active'));
   const ff=document.querySelector('.cmd-filter'); if(ff) ff.classList.add('active');
@@ -3735,7 +3848,9 @@ function renderCmdContent(){
   const pts=getSitePatients(cmdActiveSite);
   const site=allSites.find(s=>s.id===cmdActiveSite)||allSites[0];
   const hdr=document.getElementById('cmd-header-label');
-  if(hdr) hdr.textContent=cmdActiveSite==='ALL'?'כל המוקדים — אגרגציה':site.name;
+  if(hdr) hdr.textContent=commandRole==='cc'
+    ? `${site.name} — CC (${companyLabelForSite(site.id)})`
+    : (cmdActiveSite==='ALL'?'כל המוקדים מכל הפלוגות — PC/חמ״ל':site.name);
   const c={red:0,yellow:0,green:0,black:0};
   pts.forEach(p=>{if(c[p.triage]!==undefined)c[p.triage]++;});
   document.getElementById('cmd-totals').innerHTML=`
@@ -3789,7 +3904,7 @@ function renderCmdContent(){
     <div class="cmd-progress"><div class="cmd-progress-fill" style="width:${pct}%"></div></div>
     <div style="font-size:11px;color:var(--muted);margin-top:4px;text-align:left">${pct}% מחולצו</div></div>`;
   const rpts=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>(s.externalReports||[]).map(r=>({...r,_site:s.name.split('—')[0].trim()}))):siteData.externalReports;
-  document.getElementById('cmd-ext-reports').innerHTML=rpts.length?rpts.map(r=>`<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px;margin-bottom:7px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700">${r.sourceLabel}</span><div style="display:flex;gap:6px">${r._site?`<span style="font-size:10px;color:var(--muted)">${r._site}</span>`:''}<span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${r.time}</span></div></div><div style="font-size:13px">${r.red?`<span style="color:var(--red);font-weight:700">${r.red} קשה </span>`:''}${r.yellow?`<span style="color:var(--yellow);font-weight:700">${r.yellow} בינוני </span>`:''}${r.green?`<span style="color:var(--green);font-weight:700">${r.green} קל</span>`:''}</div></div>`).join(''):'<div style="color:var(--muted);font-size:13px;padding:8px 0">אין דיווחים</div>';
+  document.getElementById('cmd-ext-reports').innerHTML=rpts.length?rpts.map(r=>`<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px;margin-bottom:7px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700">${r.sourceLabel}</span><div style="display:flex;gap:6px">${r._site?`<span style="font-size:10px;color:var(--muted)">${r._site}</span>`:''}<span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${r.time}</span></div></div><div style="font-size:13px">${r.patientId?`<span style="color:var(--accent);font-weight:700">${r.patientId} </span>`:''}${r.red?`<span style="color:var(--red);font-weight:700">${r.red} קשה </span>`:''}${r.yellow?`<span style="color:var(--yellow);font-weight:700">${r.yellow} בינוני </span>`:''}${r.green?`<span style="color:var(--green);font-weight:700">${r.green} קל</span>`:''}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">${r.eventName||siteData.name||''}${r.company?' · '+r.company:''}</div></div>`).join(''):'<div style="color:var(--muted);font-size:13px;padding:8px 0">אין דיווחים</div>';
   applyCmdPanelState();
 }
 function renderCmdPatients(){
@@ -3816,7 +3931,7 @@ function renderCmdPatients(){
         <div style="margin-top:3px">${triagePill(p.triage)}</div>
         <div style="font-size:12px;color:var(--muted)">${p.injury} · ${STATUS_LABELS[p.patientStatus]||''}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">נגע אחרון: ${p.lastTouchedBy||p.medic||'—'} · ${p.confirmedClinical===false?'מדווח':'מאושר שדה'}</div>
-        ${assessmentDebtForPatient(p).length?`<div style="font-size:11px;color:var(--orange);font-weight:700;margin-top:2px">Assessment debt: ${assessmentDebtForPatient(p).join(', ')}</div>`:''}
+        ${assessmentDebtForPatient(p).length?`<div style="font-size:11px;color:var(--orange);font-weight:700;margin-top:2px">יש לקחת מדדים: ${assessmentDebtForPatient(p).join(', ')}</div>`:''}
         ${tourniquetTimerLabel(p)?`<div style="margin-top:4px"><span class="tq-timer ${tourniquetTimerLabel(p).cls}">${tourniquetTimerLabel(p).label}</span></div>`:''}
         ${p.deterioration&&p.deterioration.length?`<div style="font-size:11px;color:var(--red);font-weight:700;margin-top:2px">⚠ ${p.deterioration.join(' · ')}</div>`:''}
         ${!(p.deterioration&&p.deterioration.length)&&needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS?`<div style="font-size:11px;color:var(--orange);margin-top:2px">⏱ מדדים נדרשים</div>`:''}
@@ -3831,7 +3946,7 @@ function renderCmdPatients(){
 setInterval(()=>{ if(document.getElementById('screen-commander').classList.contains('active')) renderCommander(); },30000);
 
 // ═══════════════════════════════════════════════
-//  AAR PREVIEW
+//  LIVE INCIDENT SUMMARY PREVIEW
 // ═══════════════════════════════════════════════
 function renderAar(){
   const total=patients.length;
@@ -3997,6 +4112,10 @@ function renderLocalStockPanel(){
     const cls=value<=0?'empty':value<=1?'low':'';
     return `<div class="stock-chip ${cls}"><span>${label}</span><strong>${value}</strong></div>`;
   }).join('');
+}
+function showOwnInventory(){
+  const line=Object.entries(SUPPLY_LABELS).map(([key,label])=>`${label}: ${localStock(key)}`).join(' · ');
+  toast(line || 'אין נתוני מלאי');
 }
 function consumeFieldSupply(itemType, quantityDelta, patientId=null, movementType='treatment_consumed'){
   if(!state.localStockCache) state.localStockCache={};
@@ -4230,8 +4349,6 @@ function computeMstartTriage(v) {
 // ═══════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════
-if(!loadStoredDemoState()) loadDemoScenario(false);
-restoreActiveRecoveryState();
 updateCountDisplay('pulse15');
 updateCountDisplay('rr30');
 renderDashboard();
