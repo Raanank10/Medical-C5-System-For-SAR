@@ -22,8 +22,8 @@ The current implementation is intentionally lightweight: a standalone HTML proto
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Field/command prototype | Active v1.3 demo | `index.html` and `demo/rescue-app.html` |
-| Product specification | Active v1.2 docs + v1.3 alert addendum | `docs/C5_SENTINEL_SAR_MVP_SPEC_v1.2.md`, `docs/ALERT_OWNERSHIP_v1.3.md` |
+| Field/command prototype | Active v2.0 demo | `index.html` and `demo/rescue-app.html` |
+| Product specification | Active v2.0 role-command addendum | `docs/ROLE_COMMAND_MODEL_v2.0.md`, `docs/ALERT_OWNERSHIP_v1.3.md`, `docs/C5_SENTINEL_SAR_MVP_SPEC_v1.2.md` |
 | API contract | Draft v1.2 | `docs/API_SURFACE_v1.2.md` |
 | Data model | Draft PostgreSQL schema | `database/001_postgresql_schema_v1.2.sql` |
 | Demo data | Draft seed data | `database/002_seed_demo_data_v1.2.sql` |
@@ -84,6 +84,7 @@ python -c "from db import DB; from kpis import KPIEngine; from report import Rep
 |   |-- OPERATIONS_SAFETY.md           # safety/privacy boundaries
 |   |-- ROLE_AUTHORIZATION_AND_WATCHDOGS_v1.2.md
 |   |-- ALERT_OWNERSHIP_v1.3.md
+|   |-- ROLE_COMMAND_MODEL_v2.0.md
 |   |-- C5_SENTINEL_SAR_MVP_SPEC_v1.2.md
 |   |-- API_SURFACE_v1.2.md
 |   |-- METRICS_DICTIONARY.md
@@ -140,8 +141,10 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the active build plan.
 - [Operations and safety notes](docs/OPERATIONS_SAFETY.md)
 - [Role authorization and watchdog stack](docs/ROLE_AUTHORIZATION_AND_WATCHDOGS_v1.2.md)
 - [Alert ownership and reinforcement workflow v1.3](docs/ALERT_OWNERSHIP_v1.3.md)
+- [Role-based medical command model v2.0](docs/ROLE_COMMAND_MODEL_v2.0.md)
 - [Metrics dictionary](docs/METRICS_DICTIONARY.md)
 - [Demo script](docs/PC_DEMO_SCRIPT.md)
+- [v2.0 changelog](docs/CHANGELOG_v2.0.md)
 - [v1.3 changelog](docs/CHANGELOG_v1.3.md)
 - [v1.2 changelog](docs/CHANGELOG_v1.2.md)
 

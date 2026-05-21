@@ -47,7 +47,7 @@ Required fields:
 
 | Field | Meaning |
 |---|---|
-| `resourceType` | `one_medic`, `two_medics`, `paramedic`, `doctor`, `evac_team`, or `medical_equipment`. |
+| `resourceType` | v2.0 values include `one_medic`, `two_medics`, `paramedic`, `doctor_treatment`, `doctor_death_cert`, `urgent_evac`, `routine_evac`, `evac_coordination`, and equipment-specific request types. |
 | `reasonCodes` | Structured reasons such as `red_patient`, `tourniquet`, `trapped`, `evac_delay`, or `equipment_shortage`. |
 | `urgency` | `immediate`, `high`, or `routine`. |
 | `targetLocation` | Site/building/floor or free location. |
