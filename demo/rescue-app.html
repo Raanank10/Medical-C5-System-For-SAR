@@ -472,20 +472,23 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen active">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.0</div>
-      <div class="demo-title">דמו לניהול תמונת מצב רפואית באירוע חילוץ</div>
+      <div class="demo-kicker">Demo V2.1</div>
+      <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
-        דמו לניהול תמונת מצב רפואית באירוע חילוץ. באירוע חילוץ, למפקד אין תמונת מצב רפואית בזמן אמת: מי קשה, מי עם חסם, מי לא עודכן, מי לכוד, מי ממתין לפינוי, ומה חסר בדיווח. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
+        חובש יכול להתחיל טיפול בפצוע כמעט בלי להזין נתונים, וכל פעולה קטנה שהוא מתעד בונה אוטומטית תמונת מצב לחוג"ד ולמ״פ רפואה. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
+      </div>
+      <div class="demo-strip-sub" style="margin-top:12px">
+        הערה לדמו: בדמו ניתן לבחור תפקיד כדי להציג את יכולות המערכת. בניסוי שטח, כל משתמש ייכנס אוטומטית לתפקיד שהוגדר לו: חובש, חוג"ד, מ״פ רפואה, רופא/פראמדיק או חמ״ל.
       </div>
     </div>
     <div class="demo-grid">
       <button class="demo-card" onclick="startRoleDashboard('medic')">
         <div class="demo-icon">🚑</div>
-        <div><strong>חובש</strong><span>הפצועים שלי, התראות פעולה, פתיחת פצוע וטיוטת מוקד.</span></div>
+        <div><strong>חובש</strong><span>התחל טיפול עכשיו, מוקד בדרך, וטיפול מיידי שמדליק את תמונת החוג"ד.</span></div>
       </button>
       <button class="demo-card" onclick="startRoleDashboard('pc')">
         <div class="demo-icon">🎖</div>
-        <div><strong>מומלץ להתחיל כאן — מ״מ רפואה</strong><span>חובשים, הקצאות, מוקדים, בקשות תגבור והתראות החלטה.</span></div>
+        <div><strong>מומלץ להתחיל כאן — חוג"ד</strong><span>חובשים, הקצאות, מוקדים, בקשות תגבור והתראות החלטה.</span></div>
       </button>
       <button class="demo-card" onclick="startRoleDashboard('cc')">
         <div class="demo-icon">🏥</div>
@@ -510,17 +513,18 @@ textarea{resize:vertical;min-height:70px;}
     </div>
     <div class="demo-panel">
       <div class="demo-strip-title">תרחיש דמו חתום</div>
-      <div class="demo-strip-sub">מיועד להפעלה יזומה על ידי חובש / מ״מ רפואה / מ״פ רפואה בלבד לצורכי הדגמה. ברירת המחדל של האפליקציה נשארת נקייה.</div>
+      <div class="demo-strip-sub">מיועד להפעלה יזומה על ידי חובש / חוג"ד / מ״פ רפואה בלבד לצורכי הדגמה. ברירת המחדל של האפליקציה נשארת נקייה.</div>
       <div style="display:flex;gap:8px;margin-top:12px">
         <button class="demo-mini-btn" onclick="activateSignedDemoScenario()">הפעל תרחיש דמו</button>
+        <button class="demo-mini-btn" onclick="playMedicCommanderSequence()">הדגם רצף חובש ← חוג"ד</button>
         <button class="demo-mini-btn" onclick="clearDemoScenario()">נקה תרחיש</button>
         <button class="demo-mini-btn" onclick="continueDemo()">המשך מהשמירה</button>
       </div>
     </div>
     <div class="demo-panel">
       <div class="demo-strip-title">איך לבדוק את הדמו ב־2 דקות</div>
-      <div class="demo-strip-sub">הפעל תרחיש דמו · פתח מ״מ רפואה · בדוק חובשים/פצועים/התראות · פתח בקשת תגבור רפואי · פתח פצוע במסלול מהיר · סמן חשד לנפטר וראה בקשת רופא לא דחופה · פתח סיכום אירוע חי.</div>
-      <div class="demo-strip-sub" style="margin-top:10px">מה לבדוק: האם תצוגת מ״מ רפואה ברורה? האם ההתראות מחולקות נכון? האם בקשת רופא/פראמדיק מרגישה נכונה? האם סימון חשד לנפטר + בקשת רופא אוטומטית נכון? מה חסר לתרגיל קטן?</div>
+      <div class="demo-strip-sub">הפעל תרחיש דמו · פתח חוג"ד · בדוק חובשים/פצועים/התראות · פתח בקשת תגבור רפואי · פתח פצוע במסלול מהיר · סמן חשד לנפטר וראה בקשת רופא לא דחופה · פתח סיכום אירוע חי.</div>
+      <div class="demo-strip-sub" style="margin-top:10px">מה לבדוק: האם תצוגת חוג"ד ברורה? האם ההתראות מחולקות נכון? האם בקשת רופא/פראמדיק מרגישה נכונה? האם סימון חשד לנפטר + בקשת רופא אוטומטית נכון? מה חסר לתרגיל קטן?</div>
     </div>
   </div>
 </div>
@@ -529,7 +533,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.0</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.1</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -539,12 +543,53 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System v2.0</div>
+      <div class="demo-strip-title">Role-Based Medical Command System v2.1</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
   </div>
   <div class="role-shell" id="role-dashboard-body"></div>
+</div>
+
+<!-- ══════════════════════ MEDIC EN ROUTE ══ -->
+<div id="screen-enroute" class="screen">
+  <div class="header">
+    <div class="header-left">
+      <div class="header-subtitle">MEDIC // EN ROUTE</div>
+      <div class="header-title">בדרך לאירוע</div>
+    </div>
+    <div class="header-time" id="enroute-clock">--:--</div>
+  </div>
+  <div class="demo-strip">
+    <div>
+      <div class="demo-strip-title">אזעקה → נסיעה → הגעה</div>
+      <div class="demo-strip-sub">לפני שיש פצועים, החובש מזין מוקד משוער ופצועים קלים שכבר פונו. זה בונה לחוג"ד תמונת מצב עוד לפני הטיפול הראשון.</div>
+    </div>
+    <div class="sync-pill">LOCAL</div>
+  </div>
+  <div class="flow-content">
+    <div class="field-label">כתובת / מוקד ידוע</div>
+    <input type="text" id="enroute-address" placeholder="לדוגמה: הרצל 12, בניין 15A" style="margin-bottom:12px">
+    <div class="field-label">סוג מבנה / מצב ראשוני</div>
+    <div class="tap-grid tap-grid-2" id="enroute-type-grid" style="margin-bottom:14px">
+      <button class="tap-btn" onclick="selectEnrouteType(this,'collapse')"><span class="icon">🏚️</span>קריסה מלאה</button>
+      <button class="tap-btn" onclick="selectEnrouteType(this,'partial_collapse')"><span class="icon">⚠</span>קריסה חלקית</button>
+      <button class="tap-btn" onclick="selectEnrouteType(this,'intact_trapped')"><span class="icon">🏢</span>מבנה עומד + לכודים</button>
+      <button class="tap-btn" onclick="selectEnrouteType(this,'unknown')"><span class="icon">📍</span>לא ידוע</button>
+    </div>
+    <div class="field-label">פינוי ראשוני</div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px">
+      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px">פצועים קלים שפונו לפני הגעת הכוח הרפואי. זה נספר בתמונת החוג"ד בלי לפתוח רשומות פצוע בודדות.</div>
+      <div class="vital-ctrl" style="justify-content:center">
+        <button class="vital-btn" style="border-radius:10px 0 0 10px" onclick="changeInitialEvac(-1)">−</button>
+        <div class="vital-val" id="enroute-evac-count" style="min-width:64px">0</div>
+        <button class="vital-btn" style="border-radius:0 10px 10px 0" onclick="changeInitialEvac(1)">+</button>
+      </div>
+    </div>
+    <div class="field-label">הערת מוקד חופשית</div>
+    <textarea id="enroute-notes" placeholder="סכנות, כניסה מומלצת, לכודים מדווחים..."></textarea>
+  </div>
+  <div class="bottom-bar"><button class="btn-primary" onclick="arriveAtSite()" style="background:var(--green)">הגעתי למוקד — פתח מצב טיפול</button></div>
 </div>
 
 <!-- ══════════════════════ DASHBOARD ══ -->
@@ -560,7 +605,7 @@ textarea{resize:vertical;min-height:70px;}
   <div class="demo-strip">
     <div>
       <div class="demo-strip-title">תרחיש הדגמה מבצעי</div>
-      <div class="demo-strip-sub" id="demo-status-line">תרחיש מ״מ רפואה פעיל</div>
+      <div class="demo-strip-sub" id="demo-status-line">תרחיש חוג"ד פעיל</div>
     </div>
     <div class="sync-pill" id="sync-pill-dashboard">SYNC</div>
   </div>
@@ -573,11 +618,11 @@ textarea{resize:vertical;min-height:70px;}
   <div class="action-bar">
     <button class="action-btn primary" onclick="guardedNewPatient()">
       <div class="action-icon">🩺</div>
-      <div class="action-label">פצוע חדש</div>
+      <div class="action-label">פצוע חדש — טיפול מיידי</div>
     </button>
     <button class="action-btn site-btn" onclick="goTo('site')">
       <div class="action-icon">🏢</div>
-      <div class="action-label">פתח אירוע חדש</div>
+      <div class="action-label">עדכן מוקד / פינוי ראשוני</div>
     </button>
   </div>
 
@@ -592,7 +637,7 @@ textarea{resize:vertical;min-height:70px;}
   <!-- Commander button -->
   <div style="padding:0 16px 10px">
     <button onclick="goTo('commander')" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;color:var(--text);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;">
-      <span style="font-size:22px">🎖</span> תצוגת מ״מ רפואה / חפ״ק רפואי
+      <span style="font-size:22px">🎖</span> תצוגת חוג"ד / חפ״ק רפואי
     </button>
   </div>
   <div style="padding:0 16px 10px">
@@ -646,6 +691,15 @@ textarea{resize:vertical;min-height:70px;}
       </div>
       <div id="event-type-other-wrap" style="display:none;margin-bottom:12px">
         <input type="text" id="event-type-other" placeholder="תאר...">
+      </div>
+      <div class="field-label">פינוי ראשוני</div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px">
+        <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px">פצועים קלים שפונו לפני הגעת הכוח הרפואי. נספרים בתמונת חוג"ד בלי לפתוח רשומת פצוע.</div>
+        <div class="vital-ctrl" style="justify-content:center">
+          <button class="vital-btn" style="border-radius:10px 0 0 10px" onclick="changeSiteInitialEvac(-1)">−</button>
+          <div class="vital-val" id="site-initial-evac" style="min-width:64px">0</div>
+          <button class="vital-btn" style="border-radius:0 10px 10px 0" onclick="changeSiteInitialEvac(1)">+</button>
+        </div>
       </div>
       <div class="field-label">תיאור חופשי</div>
       <textarea id="site-description" placeholder="פרטים נוספים, סכנות ידועות..."></textarea>
@@ -1250,7 +1304,7 @@ textarea{resize:vertical;min-height:70px;}
   <div class="modal-sheet">
     <div class="modal-handle"></div>
     <div class="field-label">בקשת תגבור רפואי</div>
-    <div style="font-size:13px;color:var(--muted);line-height:1.55;margin-bottom:14px">אובייקט פיקודי למ״מ רפואה / מ״פ רפואה: מה נדרש, למה, איפה, ומה הסטטוס. לא כפתור פאניקה כללי.</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.55;margin-bottom:14px">אובייקט פיקודי לחוג"ד / מ״פ רפואה: מה נדרש, למה, איפה, ומה הסטטוס. לא כפתור פאניקה כללי.</div>
     <div class="field-label">מה צריך?</div>
     <div class="tap-grid tap-grid-2" id="reinforcement-resource-grid" style="margin-bottom:14px">
       <button class="tap-btn" onclick="selectReinforcementResource(this,'one_medic')">חובש נוסף</button>
@@ -1285,7 +1339,7 @@ textarea{resize:vertical;min-height:70px;}
     </div>
     <div class="field-label">מיקום</div>
     <input id="reinforcement-location" type="text" placeholder="מוקד / בניין / קומה..." style="margin-bottom:12px">
-    <div class="field-label">הערת מ״מ רפואה קצרה</div>
+    <div class="field-label">הערת חוג"ד קצרה</div>
     <textarea id="reinforcement-note" placeholder="לדוגמה: פצוע אדום עם חסם, מדדים באיחור, פינוי מתעכב"></textarea>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
       <button class="btn-primary" onclick="submitReinforcementRequest()">שלח בקשה</button>
@@ -1331,7 +1385,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">תצוגת מ״מ רפואה / חפ״ק רפואי</div>
+      <div class="demo-strip-title">תצוגת חוג"ד / חפ״ק רפואי</div>
       <div class="demo-strip-sub" id="cmd-demo-line">נתוני דמו מסונכרנים מקומית</div>
     </div>
     <div class="sync-pill" id="sync-pill-command">SYNC</div>
@@ -1341,7 +1395,7 @@ textarea{resize:vertical;min-height:70px;}
     <div class="experiment-meta" id="experiment-line-command">—</div>
   </div>
   <div class="alert-slicer" id="command-role-slicer" style="padding-top:10px">
-    <button class="alert-slice active" onclick="switchCommandRole('pc',this)">מ״מ רפואה / הכל</button>
+    <button class="alert-slice active" onclick="switchCommandRole('pc',this)">חוג"ד / הכל</button>
     <button class="alert-slice" onclick="switchCommandRole('chamal',this)">חמ״ל / הכל</button>
     <button class="alert-slice other" onclick="switchCommandRole('cc',this)">מ״פ רפואה / הפלוגה שלי</button>
   </div>
@@ -1423,7 +1477,7 @@ textarea{resize:vertical;min-height:70px;}
   <div class="demo-strip">
     <div>
       <div class="demo-strip-title">Local draft incident rule</div>
-      <div class="demo-strip-sub">חובש רשאי לפתוח טיוטת אירוע רק כשאין אירוע רשמי. מ״מ רפואה / מ״פ רפואה / חמ״ל מאשרים טיוטה באירוע audit בלתי מחיק.</div>
+      <div class="demo-strip-sub">חובש רשאי לפתוח טיוטת אירוע רק כשאין אירוע רשמי. חוג"ד / מ״פ רפואה / חמ״ל מאשרים טיוטה באירוע audit בלתי מחיק.</div>
     </div>
     <div class="sync-pill" id="sync-pill-roles">AUTH</div>
   </div>
@@ -1718,7 +1772,7 @@ textarea{resize:vertical;min-height:70px;}
 const C5Rules = window.C5DomainRules;
 if(!C5Rules) throw new Error('C5 domain rules failed to load');
 
-// v2.0 field-flow map:
+// v2.1 field-flow map:
 // Regular: dashboard -> step1 intake -> step3 hemorrhage/TQ -> step4 full vitals -> step5 triage -> step6 body/trap -> step7 treatment/MIST -> step2 location -> step8 summary.
 // Rapid: dashboard -> step1 intake -> step4 binary vitals -> step5 triage -> step6 body/trap -> step2 location -> step8 summary.
 // Black/expectant: step5 selection -> panic double-confirm -> trap modal if missing -> step2 location if missing -> step8 summary.
@@ -1728,7 +1782,7 @@ if(!C5Rules) throw new Error('C5 domain rules failed to load');
 // ═══════════════════════════════════════════════
 const VITALS_INTERVAL_MS = C5Rules.VITALS_INTERVAL_MS;
 const WARN_AT_MS = C5Rules.WARN_AT_MS;
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
 const CONFLICT_LOG_KEY = 'c5-sentinel-sar-conflict-log-v1';
@@ -1736,7 +1790,7 @@ const ACTIVE_RECOVERY_KEY = 'c5_active_recovery_state';
 const DEVICE_ID_KEY = 'c5-sentinel-sar-device-id';
 const SUPPLY_BASELINE = Object.freeze({CAT_TOURNIQUET:2,MORPHINE_10MG:4,FENTANYL_ACTIQ:2,IV_FLUID_500ML:3,BANDAGE_6INCH:8});
 const SUPPLY_LABELS = {CAT_TOURNIQUET:'CAT חסם',MORPHINE_10MG:'Morphine',FENTANYL_ACTIQ:'Actiq/Fentanyl',IV_FLUID_500ML:'נוזלים 500',BANDAGE_6INCH:'חבישה'};
-const ROLE_LABELS = {medic:'פעולת חובש', pc:'החלטת מ״מ רפואה', cc:'סיכון מ״פ רפואה', logistics:'לוגיסטיקה', chamal:'מערכת'};
+const ROLE_LABELS = {medic:'פעולת חובש', pc:'החלטת חוג"ד', cc:'סיכון מ״פ רפואה', logistics:'לוגיסטיקה', chamal:'מערכת'};
 const ACTION_LABELS = {
   update_vitals:'עדכן מדדים',
   assign_medic:'הקצה חובש',
@@ -1799,7 +1853,7 @@ const REINFORCEMENT_STATUS_LABELS = {
 const DEMO_USERS = [
   {userId:'USR-COHEN', fullName:'סמ״ר נועם כהן', role:'medic', callsign:'חובש 1', platoonId:'PLT-A', companyId:'COMP-1', active:true},
   {userId:'USR-LEVI', fullName:'סמ״ר דניאל לוי', role:'medic', callsign:'חובש 2', platoonId:'PLT-A', companyId:'COMP-1', active:true},
-  {userId:'USR-BARAK', fullName:'סגן רועי ברק', role:'pc', callsign:'מ״מ רפואה א', platoonId:'PLT-A', companyId:'COMP-1', active:true},
+  {userId:'USR-BARAK', fullName:'סגן רועי ברק', role:'pc', callsign:'חוג"ד א', platoonId:'PLT-A', companyId:'COMP-1', active:true},
   {userId:'USR-MIZRAHI', fullName:'סרן יעל מזרחי', role:'cc', callsign:'מ״פ רפואה', platoonId:null, companyId:'COMP-1', active:true},
   {userId:'USR-DR', fullName:'ד״ר איתן שלו', role:'doctor', callsign:'רופא חברה', platoonId:null, companyId:'COMP-1', active:true},
   {userId:'USR-PARA', fullName:'רס״ר מיה אדרי', role:'paramedic', callsign:'פראמדיקית', platoonId:null, companyId:'COMP-1', active:true},
@@ -1849,7 +1903,7 @@ const MEDICATION_ROUTES = {morphine:'IV', atq:'PO/BUCCAL'};
 const LIMB_LABELS = {yl:'יד שמאל', yr:'יד ימין', rl:'רגל שמאל', rr:'רגל ימין'};
 const ROLE_DEFS = [
   {key:'medic', label:'Medic', he:'חובש', desc:'פותח פצועים, מדדים, התערבויות, MIST וטיוטת אירוע מקומית כשאין אירוע רשמי.'},
-  {key:'pc', label:'מ״מ רפואה', he:'מפקד מחלקה רפואית / חפ״ק רפואי', desc:'פותח ומאשר אירוע רשמי, מנהל תמונת מצב, התראות, אספקה וסיכום אירוע חי.'},
+  {key:'pc', label:'חוג"ד', he:'חוג"ד / חפ״ק רפואי', desc:'פותח ומאשר אירוע רשמי, מנהל תמונת מצב, התראות, אספקה וסיכום אירוע חי.'},
   {key:'log_o', label:'Log-O', he:'קצין לוגיסטיקה', desc:'מנהל ערכות ורצי אספקה, רואה מלאי לפי פלוגה, לא מבצע רישום קליני.'},
   {key:'cc', label:'מ״פ רפואה', he:'מפקד פלוגה רפואית', desc:'סמכות פיקודית לפתיחת/אישור אירוע, סגירה, אתר נקי, דשבורד וייצוא.'},
   {key:'chamal', label:'Chamal', he:'חמ״ל', desc:'תמונת מצב מלאה, אישור טיוטות, ניהול אירוע ברמת חטיבה וסיכום אירוע חי, ללא רישום פצועים.'}
@@ -1910,7 +1964,7 @@ function setDeviceLabels(){
 // ═══════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════
-let siteData = {name:'', address:'', eventType:null, description:'', externalReports:[]};
+let siteData = {name:'', address:'', eventType:null, buildingType:null, description:'', externalReports:[], initialEvacuatedGreen:0};
 let reportState = {source:null, red:0, yellow:0, green:0, patientId:null};
 
 // BASELINES — used to reset, not carry over
@@ -2097,6 +2151,8 @@ function loadDemoScenario(persist=false){
     name:'מוקד A — הרצל 12',
     address:'הרצל 12, תל אביב',
     eventType:'house_hit',
+    buildingType:'partial_collapse',
+    initialEvacuatedGreen:4,
     description:'פגיעה במבנה מגורים. מדרגות חסומות חלקית, עבודה בשני מוקדים.',
     externalReports:[
       {sourceLabel:'מד"א',source:'MDA',red:1,yellow:1,green:0,evacDest:'איכילוב',notes:'ניידת בדרך',time:timeAgoLabel(minutesAgo(18)),id:'RPT001',status:'new'}
@@ -2164,10 +2220,47 @@ function activateSignedDemoScenario(){
   loadDemoScenario(true);
   toast('תרחיש דמו חתום הופעל');
 }
+function playMedicCommanderSequence(){
+  clearDemoScenario();
+  siteData={
+    name:'מוקד חי — הדגמת חובש',
+    address:'הרצל 12, בניין 15A',
+    eventType:'collapse',
+    buildingType:'partial_collapse',
+    description:'רצף מודגם: חובש פועל, תמונת חוג"ד מתעדכנת.',
+    externalReports:[],
+    initialEvacuatedGreen:3
+  };
+  allSites.find(s=>s.id==='SITE_A').externalReports=[];
+  goTo('commander');
+  toast('שלב 1: מוקד נפתח בדרך לאירוע');
+  setTimeout(()=>{
+    createImmediateInterventionPatient('tourniquet');
+    goTo('commander');
+    toast('שלב 2: פצוע אדום + חסם הופיע לחוג"ד');
+  },900);
+  setTimeout(()=>{
+    const p=patients[0];
+    if(p){
+      p.vitals={pulse:132,spo2:91,bp_estimate:'carotid',rr:34,avpu:'P'};
+      p.deterioration=['דופק גבוה','SpO₂ נמוך','AVPU P'];
+      p.alert=true;
+      p.events.unshift({type:'VITALS_RECORDED',time:nowT(),detail:'דופק 132 / נשימות 34 / SpO₂ 91 / AVPU P',warn:true});
+      saveLocalEvent({type:'VITALS_RECORDED',detail:'מדדים מדרדרים ברצף הדמו',warn:true,payload_json:{patient_id:p.id}});
+    }
+    renderCommander();
+    toast('שלב 3: מדדים ועדיפות פינוי התעדכנו');
+  },2100);
+  setTimeout(()=>{
+    createMedicalResourceRequest({resourceType:'paramedic',reasonCodes:['red_patient','tourniquet'],urgency:'immediate',siteId:'SITE_A',targetLocation:'מוקד חי · בניין 15A',linkedPatientIds:patients[0]?[patients[0].id]:[],requestedByRole:'pc',requestedByName:displayUser('USR-BARAK')});
+    saveDemoState(); renderCommander();
+    toast('שלב 4: חוג"ד פתח בקשת פראמדיק');
+  },3300);
+}
 function clearDemoScenario(){
   patients=[];
   reinforcementRequests=[];
-  siteData={name:'', address:'', eventType:null, description:'', externalReports:[]};
+  siteData={name:'', address:'', eventType:null, buildingType:null, description:'', externalReports:[], initialEvacuatedGreen:0};
   allSites.forEach(s=>{ if(s.id!=='ALL') s.externalReports=[]; });
   demoSyncMode='fresh';
   lastSyncAt=Date.now();
@@ -2266,17 +2359,17 @@ function updateDemoStatus(){
 
 function startRoleDashboard(role){
   activeRoleDashboard=role;
-  if(!patients.length) loadDemoScenario(true);
+  if(role!=='medic' && !patients.length) loadDemoScenario(true);
   goTo('role-dashboard');
 }
 function roleConfig(role){
   return {
     medic:{title:'חובש — מפעיל פצועים', actor:'חובש — משתמש מחובר', audience:'medic', legacy:'dashboard', responsibilities:['פתיחת פצועים ועדכון מדדים','תיעוד טיפול ומיון','סימון לכוד / לא לכוד / לא ידוע','טיוטת מוקד ראשונית','סימון חשד לנפטר / לא בר הצלה ופתיחת בקשת רופא אוטומטית']},
-    pc:{title:'מ״מ רפואה / חפ״ק רפואי', actor:'מ״מ רפואה — משתמש מחובר', audience:'pc', legacy:'commander', responsibilities:['ניהול כל החובשים במחלקה','אישור טיוטות מוקד','הקצאה מחדש בתוך המחלקה','בקשת חובשים / פראמדיק / רופא','ניהול פינוי ותעדוף מקומי']},
+    pc:{title:'חוג"ד / חפ״ק רפואי', actor:'חוג"ד — משתמש מחובר', audience:'pc', legacy:'commander', responsibilities:['ניהול כל החובשים במחלקה','אישור טיוטות מוקד','הקצאה מחדש בתוך המחלקה','בקשת חובשים / פראמדיק / רופא','ניהול פינוי ותעדוף מקומי']},
     cc:{title:'מ״פ רפואה', actor:'מ״פ רפואה — משתמש מחובר', audience:'cc', legacy:'commander', responsibilities:['פיקוד ישיר על משאבים רפואיים','הקצאה בין מחלקות','אישור / דחייה / ניתוב בקשות תגבור','ניהול תורי רופא / פראמדיק / קביעת מוות','הסרת צווארי בקבוק ברמת פלוגה']},
-    doctor:{title:'רופא / פראמדיק — תור סקירה רפואית', actor:'רופא / פראמדיק — משתמש מחובר', audience:'doctor', legacy:'commander', responsibilities:['סקירת פצועים קשים','מענה לבקשות מ״מ רפואה / מ״פ רפואה','החלטה רפואית בכירה','קביעת מוות / אישור מוות','סגירת בקשת סקירה רפואית']},
+    doctor:{title:'רופא / פראמדיק — תור סקירה רפואית', actor:'רופא / פראמדיק — משתמש מחובר', audience:'doctor', legacy:'commander', responsibilities:['סקירת פצועים קשים','מענה לבקשות חוג"ד / מ״פ רפואה','החלטה רפואית בכירה','קביעת מוות / אישור מוות','סגירת בקשת סקירה רפואית']},
     logistics:{title:'קצין לוגיסטיקה / Log-O', actor:'רס״ם אמיר דגן — Log-O', audience:'logistics', legacy:'logistics', responsibilities:['מלאי ציוד רפואי לפי מחלקה / מוקד','מענה לבקשות ציוד','הקצאת אספקה מחדש','מעקב burn rate','הצפת חוסר המשפיע על טיפול']},
-    chamal:{title:'חמ״ל / מפעיל', actor:'חמ״ל — משתמש מחובר', audience:'chamal', legacy:'commander', responsibilities:['תמונת מצב כללית','אמינות נתונים ו-Sync','כפילויות ודיווחים חיצוניים','תמיכה במ״מ רפואה / מ״פ רפואה','ייצוא סיכום אירוע חי']},
+    chamal:{title:'חמ״ל / מפעיל', actor:'חמ״ל — משתמש מחובר', audience:'chamal', legacy:'commander', responsibilities:['תמונת מצב כללית','אמינות נתונים ו-Sync','כפילויות ודיווחים חיצוניים','תמיכה בחוג"ד / מ״פ רפואה','ייצוא סיכום אירוע חי']},
     admin:{title:'מנהל דמו', actor:'מנהל דמו', audience:'chamal', legacy:'roles', responsibilities:['הפעלת תרחיש חתום','ניקוי דמו','ייצוא ניסוי','בדיקת הרשאות','הפרדת דמו מנתוני אמת']}
   }[role] || roleConfig('medic');
 }
@@ -2312,6 +2405,23 @@ function renderMedicScopeNote(){
   const levi=patients.filter(p=>(p.assignedMedicId||userIdFromMedic(p.medic||p.lastTouchedBy))==='USR-LEVI').length;
   return roleSection('היקף תצוגה', roleRow('מוצג: החובש שלי בלבד', `${mine} פצועים מקושרים. חובש לוי מנהל ${levi} פצועים נוספים בתרחיש.`));
 }
+function renderMedicActionPanel(){
+  return `
+    <div class="role-section" style="border-color:var(--accent)">
+      <div class="role-section-title">התחל טיפול עכשיו</div>
+      <div class="demo-actions" style="margin:0;grid-template-columns:1fr 1fr">
+        <button class="demo-mini-btn" onclick="startMedicTreatmentNow()" style="background:var(--red);border-color:var(--red);color:white">פצוע חדש — טיפול מיידי</button>
+        <button class="demo-mini-btn" onclick="createImmediateInterventionPatient('tourniquet')">הנחת חסם עורקים</button>
+        <button class="demo-mini-btn" onclick="createImmediateInterventionPatient('airway')">פתיחת נתיב אוויר</button>
+        <button class="demo-mini-btn" onclick="createImmediateInterventionPatient('pressure_bandage')">חבישת לחץ</button>
+      </div>
+      <div class="role-row" style="margin-top:10px">
+        <div class="role-row-title">טיוטת מוקד / בדרך לאירוע</div>
+        <div class="role-row-sub">כתובת, סוג מבנה ופינוי ראשוני של קלים לפני פתיחת פצועים.</div>
+        <button class="demo-mini-btn" onclick="goTo('enroute')" style="margin-top:8px">פתח מסך בדרך לאירוע</button>
+      </div>
+    </div>`;
+}
 function renderDoctorLegacyNote(){
   return roleSection('הערת תצוגה', roleRow('מסך עבודה מלא', 'פותח תצוגת חפ״ק רפואי עם דגש על פצועים אדומים / שחורים ותורי רופא, כדי לשמור דמו קצר וברור.'));
 }
@@ -2325,7 +2435,7 @@ function renderCcCommandBoard(){
     roleMetric(DEMO_PLATOONS.length,'מחלקות פעילות'),
     roleMetric(allSites.filter(s=>s.id!=='ALL').length,'מוקדים פעילים'),
     roleMetric(patients.filter(p=>['red','yellow'].includes(p.triage)).length,'אדום / צהוב'),
-    roleMetric(openReqs.length,'בקשות מ״מ פתוחות'),
+    roleMetric(openReqs.length,'בקשות חוג"ד פתוחות'),
     roleMetric(doctorReqs.length,'רופא / פראמדיק'),
     roleMetric(deathReqs.length,'קביעת מוות'),
     roleMetric(overloaded,'מחלקות עמוסות'),
@@ -2365,7 +2475,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
   if(header) header.textContent=cfg.title;
   if(sub) sub.textContent=cfg.actor;
   const ctx=document.getElementById('role-context-line');
-  if(ctx) ctx.textContent='כל השמות בדמו פיקטיביים. זהו v2.0: אחריות, התראות, אובייקטים ופעולות לפי תפקיד.';
+  if(ctx) ctx.textContent='כל השמות בדמו פיקטיביים. זהו v2.1: חובש פועל, וכל פעולה בונה תמונת מצב לחוג"ד ולמ״פ רפואה.';
   const metrics=[
     roleMetric(pts.length, role==='medic'?'הפצועים שלי':role==='pc'?'פצועי המחלקה':'פצועים גלויים'),
     roleMetric(alerts.length, 'התראות לפעולה'),
@@ -2380,7 +2490,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
   }else if(role==='cc'){
     objects=DEMO_PLATOONS.map(pl=>{
       const plPts=patients.filter(p=>(p.assignedPlatoonId||'PLT-A')===pl.platoonId);
-      return roleRow(pl.name,`${plPts.length} פצועים · ${plPts.filter(p=>p.triage==='red').length} אדומים · מ״מ רפואה: ${displayUser(pl.pcId)}`);
+      return roleRow(pl.name,`${plPts.length} פצועים · ${plPts.filter(p=>p.triage==='red').length} אדומים · חוג"ד: ${displayUser(pl.pcId)}`);
     }).join('');
   }else if(role==='logistics'){
     objects=logisticsCompanies().map(c=>roleRow(c.name,`${c.lowItems.length} פריטים מתחת לסף · ${c.patients} פצועים מקושרים`)).join('');
@@ -2390,7 +2500,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
   const reqHtml=requests.slice(0,8).map(r=>roleRow(`${r.id} · ${REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType}`,`${r.targetLocation} · ${REINFORCEMENT_STATUS_LABELS[r.status]||r.status} · ${(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')}`)).join('');
   const actions=[
     `<button class="demo-mini-btn" onclick="openLegacyForRole('${role}')">פתח מסך עבודה מלא</button>`,
-    role==='medic'?`<button class="demo-mini-btn" onclick="goTo('dashboard')">פצוע חדש / הפצועים שלי</button>`:'',
+    role==='medic'?`<button class="demo-mini-btn" onclick="startMedicTreatmentNow()">התחל טיפול עכשיו</button><button class="demo-mini-btn" onclick="goTo('enroute')">טיוטת מוקד בדרך</button>`:'',
     ['pc','cc'].includes(role)?`<button class="demo-mini-btn" onclick="openReinforcementRequest()">בקשת תגבור רפואי</button>`:'',
     role==='pc'?`<button class="demo-mini-btn" onclick="demoReassignWithinPlatoon()">הדגם הקצאה בתוך מחלקה</button>`:'',
     role==='cc'?`<button class="demo-mini-btn" onclick="demoReassignBetweenPlatoons()">הדגם הקצאה בין מחלקות</button>`:'',
@@ -2398,6 +2508,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
   ].filter(Boolean).join('');
   document.getElementById('role-dashboard-body').innerHTML=`
     <div class="role-top-grid">${metrics}</div>
+    ${role==='medic'?renderMedicActionPanel():''}
     ${role==='medic'?renderMedicScopeNote():''}
     ${role==='doctor'?renderDoctorLegacyNote():''}
     ${role==='cc'?renderCcCommandBoard():''}
@@ -2450,7 +2561,7 @@ function updateExperimentLine(){
   const mins=Math.max(0, Math.round((Date.now()-started.getTime())/60000));
   const notes=observerNotes().length;
   const conflicts=conflictLog().length;
-  const line=`תרחיש: ${siteData.name||'ללא מוקד'} · תפקידים: חובש/מ״מ רפואה/לוגיסטיקה/מ״פ רפואה/חמ״ל · מכשיר: ${getDeviceId()} · התחלה: ${started.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})} · שלב: ${experimentPhase} · ${notes} הערות · ${conflicts} התנגשויות · ${mins} דק׳`;
+  const line=`תרחיש: ${siteData.name||'ללא מוקד'} · תפקידים: חובש/חוג"ד/לוגיסטיקה/מ״פ רפואה/חמ״ל · מכשיר: ${getDeviceId()} · התחלה: ${started.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})} · שלב: ${experimentPhase} · ${notes} הערות · ${conflicts} התנגשויות · ${mins} דק׳`;
   ['experiment-line-dashboard','experiment-line-command'].forEach(id=>{const el=document.getElementById(id); if(el) el.textContent=line;});
 }
 function addObserverNote(){
@@ -2618,6 +2729,13 @@ function goTo(screen){
   window.scrollTo(0,0);
   updateFlowChrome(screen);
   if(screen==='dashboard'){ renderDashboard(); renderAlerts(); }
+  if(screen==='site'){
+    renderReports();
+    const ev=document.getElementById('site-initial-evac'); if(ev) ev.textContent=siteData.initialEvacuatedGreen||0;
+    const name=document.getElementById('site-name-input'); if(name && !name.value) name.value=siteData.name||'';
+    const addr=document.getElementById('site-address'); if(addr && !addr.value) addr.value=siteData.address||'';
+    const desc=document.getElementById('site-description'); if(desc && !desc.value) desc.value=siteData.description||'';
+  }
   if(screen==='step2')     { const b=document.querySelector('#screen-step2 .btn-back'); if(b) b.setAttribute('onclick', `goTo('${state.triage==='black'?'step5':state.flowMode==='quick'?'step6':'step7'}')`); }
   if(screen==='step3')     { const b=document.querySelector('#screen-step3 .btn-back'); if(b) b.setAttribute('onclick', "goTo('step1')"); }
   if(screen==='step4')     { setVitalsModeView(); setDeviceLabels(); checkStep4(); }
@@ -2628,6 +2746,7 @@ function goTo(screen){
   if(screen==='logistics') renderLogisticsOfficer();
   if(screen==='roles')     renderRolesAuthorization();
   if(screen==='role-dashboard') renderRoleDashboard(activeRoleDashboard);
+  if(screen==='enroute') { const el=document.getElementById('enroute-clock'); if(el) el.textContent=nowT(); }
   if(screen==='aar')       renderAar();
   updateDemoStatus();
 }
@@ -2659,13 +2778,15 @@ function updateFlowChrome(screen){
 function renderDashboard(){
   const c={red:0,yellow:0,green:0,black:0};
   patients.forEach(p=>{if(c[p.triage]!==undefined)c[p.triage]++;});
+  c.green += siteData.initialEvacuatedGreen || 0;
   document.getElementById('count-red').textContent=c.red;
   document.getElementById('count-yellow').textContent=c.yellow;
   document.getElementById('count-green').textContent=c.green;
   document.getElementById('count-black').textContent=c.black;
   document.getElementById('site-name-header').textContent=siteData.name||'אין מוקד פעיל';
 
-  document.getElementById('patient-list').innerHTML=patients.map(p=>{
+  const evacNote=(siteData.initialEvacuatedGreen||0) ? `<div class="patient-card green" style="cursor:default"><div class="patient-id">MASS</div><div class="patient-info"><div style="font-weight:700">פינוי ראשוני לפני הגעת כוח רפואי</div><div style="font-size:12px;color:var(--muted);margin-top:2px">${siteData.initialEvacuatedGreen} פצועים קלים פונו ללא פתיחת רשומות פצוע.</div><div class="patient-badges"><span class="triage-pill green">קל — ירוק</span><span class="badge badge-muted">מונה מוקד</span></div></div></div>` : '';
+  document.getElementById('patient-list').innerHTML=evacNote+patients.map(p=>{
     const timer=vitalsTimerLabel(p);
     const tq=tourniquetTimerLabel(p);
     const det=p.deterioration&&p.deterioration.length;
@@ -2865,13 +2986,66 @@ function guardedNewPatient(mode='extended'){
     // Show message
     const msg=document.createElement('div');
     msg.style.cssText='position:fixed;top:80px;left:50%;transform:translateX(-50%);background:var(--red);color:white;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:700;z-index:500;white-space:nowrap';
-    msg.textContent='יש לפתוח אירוע לפני הוספת פצוע';
+    msg.textContent='יש להזין מוקד בדרך לאירוע לפני פתיחת פצוע';
     document.body.appendChild(msg);
     setTimeout(()=>msg.remove(),2500);
-    goTo('site');
+    goTo('enroute');
     return;
   }
   startNewPatient(mode);
+}
+function startMedicTreatmentNow(){
+  if(!siteData.name || siteData.name.trim()==='') goTo('enroute');
+  else guardedNewPatient('quick');
+}
+function createImmediateInterventionPatient(kind='tourniquet'){
+  if(!siteData.name || siteData.name.trim()===''){ goTo('enroute'); return; }
+  const id='P'+String(patients.length+1).padStart(3,'0');
+  const t=nowT();
+  const label={tourniquet:'הנחת חסם עורקים',airway:'פתיחת נתיב אוויר',pressure_bandage:'חבישת לחץ'}[kind]||'טיפול מיידי';
+  const isTq=kind==='tourniquet';
+  const p={
+    id, triage:'red', accessibility:'trapped', trapStatus:'trapped',
+    location:siteData.address||siteData.name||'מוקד פעיל', locDetail:'נפתח מטיפול מיידי',
+    injury:isTq?'דימום מסיבי — טיפול מיידי':'טיפול מיידי בשטח',
+    patientStatus:'stabilizing',
+    time:t,
+    vitals:{pulse:120,spo2:null,bp_estimate:'carotid',rr:28,avpu:'V'},
+    txHistory:[{time:t,text:label,medic:getDeviceId()}],
+    alert:true,
+    deterioration:[],
+    lastVitalsAt:Date.now(),
+    vitalsHistory:[{t:Date.now(),pulse:120,spo2:null,rr:28,avpu:'V'}],
+    tourniquet:isTq?{limb:'לא צוין',appliedAt:Date.now()}:null,
+    medic:'חובש כהן',
+    lastTouchedBy:getDeviceId(),
+    lastModifiedAt:new Date().toISOString(),
+    confirmedClinical:true,
+    needsFullAssessment:true,
+    unsyncedEvents:2,
+    patientAgeGroup:'adult',
+    patientAge:null,
+    fullName:'לא מזוהה',
+    identityStatus:'unknown',
+    temporaryDescription:'נפתח באנונימי מטיפול מציל חיים',
+    assignedMedicId:'USR-COHEN',
+    assignedPlatoonId:'PLT-A',
+    locationHistory:[{time:t,location:siteData.address||siteData.name,source:'field'}],
+    siteId:'SITE_A',
+    events:[
+      {type:'QUICK_PATIENT_CREATED',time:t,detail:'פצוע אנונימי נפתח מטיפול מיידי',warn:false},
+      {type:isTq?'TOURNIQUET_APPLIED':'IMMEDIATE_INTERVENTION_RECORDED',time:t,detail:label,warn:isTq},
+      {type:'TRIAGE_SET',time:t,detail:'מיון: אדום — נגזר מפעולת טיפול מצילת חיים',warn:true},
+      {type:'WATCHDOG_ALERT',time:t,detail:isTq?'חסם עורקים — טיימר חוג"ד החל':'טיפול מיידי נרשם לחוג"ד',warn:true}
+    ]
+  };
+  patients.unshift(p);
+  if(isTq) reconcileSupplySource(`immediate:${id}:tq`, 'CAT_TOURNIQUET', 1);
+  saveLocalEvent({type:isTq?'TOURNIQUET_APPLIED':'IMMEDIATE_INTERVENTION_RECORDED',detail:label,warn:true,payload_json:{patient_id:id,source:'medic_immediate_action',auto_triage:'red'}});
+  lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
+  renderDashboard(); renderAlerts();
+  toast(`${label} · ${id} נפתח והופיע לחוג"ד`);
+  openPatient(id);
 }
 function startPatientFlow(mode){
   guardedNewPatient(mode);
@@ -2932,9 +3106,41 @@ function selectEventType(btn,val){
   btn.classList.add('selected'); siteData.eventType=val;
   document.getElementById('event-type-other-wrap').style.display=val==='other'?'block':'none';
 }
+function selectEnrouteType(btn,val){
+  document.querySelectorAll('#enroute-type-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  if(btn) btn.classList.add('selected');
+  siteData.buildingType=val;
+  siteData.eventType=val==='collapse'?'collapse':val==='partial_collapse'?'collapse':val==='intact_trapped'?'house_hit':'other';
+}
+function changeInitialEvac(delta){
+  siteData.initialEvacuatedGreen=Math.max(0,(siteData.initialEvacuatedGreen||0)+delta);
+  const el=document.getElementById('enroute-evac-count');
+  if(el) el.textContent=siteData.initialEvacuatedGreen;
+}
+function arriveAtSite(){
+  const address=document.getElementById('enroute-address')?.value.trim() || siteData.address || 'מוקד חדש';
+  const notes=document.getElementById('enroute-notes')?.value.trim() || '';
+  siteData.address=address;
+  siteData.name=siteData.name || `מוקד — ${address}`;
+  siteData.description=notes || siteData.description || 'מוקד נפתח על ידי חובש בדרך לאירוע';
+  saveLocalEvent({
+    type:'SITE_ARRIVAL_CONFIRMED',
+    detail:`חובש הגיע למוקד · פינוי ראשוני ${siteData.initialEvacuatedGreen||0} קלים`,
+    warn:false,
+    payload_json:{site_name:siteData.name,address:siteData.address,building_type:siteData.buildingType,initial_evacuated_green:siteData.initialEvacuatedGreen||0}
+  });
+  lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
+  goTo('dashboard');
+}
+function changeSiteInitialEvac(delta){
+  siteData.initialEvacuatedGreen=Math.max(0,(siteData.initialEvacuatedGreen||0)+delta);
+  const el=document.getElementById('site-initial-evac');
+  if(el) el.textContent=siteData.initialEvacuatedGreen;
+}
 function saveSite(){
   siteData.name=document.getElementById('site-name-input').value||siteData.name;
   siteData.address=document.getElementById('site-address').value;
+  siteData.description=document.getElementById('site-description')?.value||siteData.description;
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   goTo('dashboard');
 }
@@ -4293,7 +4499,7 @@ function renderCmdTabs(){
 }
 function switchCmdSite(id){
   if(!canSeeCommandSite(id)){
-    toast('מ״פ רפואה רואה רק את אירועי הפלוגה שלו אלא אם מ״מ רפואה/חמ״ל משנים הרשאה');
+    toast('מ״פ רפואה רואה רק את אירועי הפלוגה שלו אלא אם חוג"ד/חמ״ל משנים הרשאה');
     return;
   }
   cmdActiveSite=id; cmdFilter='all';
@@ -4603,7 +4809,7 @@ function renderReinforcementPanel(){
   setCmdPanelMeta('reinforcement', `${open.length} OPEN · ${visible.length} TOTAL`);
   const createButton=`<div style="padding:8px 16px 0"><button class="btn-primary" onclick="openReinforcementRequest()" style="background:var(--accent)">+ בקשת תגבור רפואי</button></div>`;
   if(!visible.length){
-    body.innerHTML=createButton+`<div class="alert-banner muted" style="margin-top:8px"><span>✓</span><div><div class="alert-banner-title" style="color:var(--muted)">אין בקשות תגבור פתוחות</div><div class="alert-banner-sub">מ״מ רפואה יוצר בקשה, מ״פ רפואה/חמ״ל מאשרים ומשייכים משאב.</div></div></div>`;
+    body.innerHTML=createButton+`<div class="alert-banner muted" style="margin-top:8px"><span>✓</span><div><div class="alert-banner-title" style="color:var(--muted)">אין בקשות תגבור פתוחות</div><div class="alert-banner-sub">חוג"ד יוצר בקשה, מ״פ רפואה/חמ״ל מאשרים ומשייכים משאב.</div></div></div>`;
     return;
   }
   body.innerHTML=createButton+visible.map(r=>{
@@ -4688,9 +4894,10 @@ function renderCmdContent(){
   const hdr=document.getElementById('cmd-header-label');
   if(hdr) hdr.textContent=commandRole==='cc'
     ? `${site.name} — מ״פ רפואה (${companyLabelForSite(site.id)})`
-    : (cmdActiveSite==='ALL'?'כל המוקדים מכל הפלוגות — מ״מ רפואה / חמ״ל':site.name);
+    : (cmdActiveSite==='ALL'?'כל המוקדים מכל הפלוגות — חוג"ד / חמ״ל':site.name);
   const c={red:0,yellow:0,green:0,black:0};
   pts.forEach(p=>{if(c[p.triage]!==undefined)c[p.triage]++;});
+  if(cmdActiveSite==='ALL' || cmdActiveSite==='SITE_A') c.green += siteData.initialEvacuatedGreen || 0;
   document.getElementById('cmd-totals').innerHTML=`
     <div class="cmd-stat-card red"><div class="cmd-stat-num">${c.red}</div><div class="cmd-stat-label">קשה</div></div>
     <div class="cmd-stat-card yellow"><div class="cmd-stat-num">${c.yellow}</div><div class="cmd-stat-label">בינוני</div></div>
@@ -4720,7 +4927,7 @@ function renderCmdContent(){
     <button class="alert-slice ${cmdAlertFilter==='all'?'active':''}" onclick="setCmdAlertFilter('all',this)">הכל ${commandAlerts.length}</button>
   </div>`;
   if(!cmdAlertList.length){
-    ah+=`<div class="alert-banner muted" style="margin:6px 16px 0"><span style="font-size:18px">✓</span><div><div class="alert-banner-title" style="color:var(--muted)">אין התראות בסינון זה</div><div class="alert-banner-sub">התראות v1.3 ממוינות לפי בעלים, פעולה נדרשת והסלמה.</div></div></div>`;
+    ah+=`<div class="alert-banner muted" style="margin:6px 16px 0"><span style="font-size:18px">✓</span><div><div class="alert-banner-title" style="color:var(--muted)">אין התראות בסינון זה</div><div class="alert-banner-sub">התראות v2.1 ממוינות לפי בעלים, פעולה נדרשת והסלמה.</div></div></div>`;
   }
   cmdAlertList.forEach(a=>{ ah+=renderAlertCard(a,'commander'); });
   if(cmdActiveSite==='ALL'){
@@ -4873,7 +5080,7 @@ function renderAar(){
   const logisticsShortages=logisticsCompanies().reduce((sum,c)=>sum+c.lowItems.length,0);
   const insights=[
     {title:'חובש', body: overdue.length ? `${overdue.length} פצועים עברו את יעד עדכון המדדים; נדרש חזרה למדדים כשאפשר.` : 'כל הפצועים הפעילים בתוך חלון המדדים.'},
-    {title:'מ״מ רפואה', body:`${openAlerts} התראות פתוחות דורשות החלטת מ״מ רפואה או חובש. נפתחו ${pcRequests} בקשות תגבור.`},
+    {title:'חוג"ד', body:`${openAlerts} התראות פתוחות דורשות החלטת חוג"ד או חובש. נפתחו ${pcRequests} בקשות תגבור.`},
     {title:'מ״פ רפואה', body:`${ccOpenRequests} בקשות משאב פתוחות ברמת פלוגה; בדוק רופא/פראמדיק וצווארי בקבוק פינוי.`},
     {title:'לוגיסטיקה', body: logisticsShortages ? `${logisticsShortages} פריטי ציוד מתחת לסף. נדרש מעקב burn rate.` : 'אין חוסר ציוד קריטי פתוח.'},
     {title:'פינוי', body:`${handed}/${total} פצועים הועברו או נסגרו בתרחיש.`}
