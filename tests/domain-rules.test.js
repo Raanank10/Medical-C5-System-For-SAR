@@ -25,7 +25,10 @@ assert.equal(rules.isPediatricPatient({ patientAgeGroup: "pediatric" }), true);
 assert.equal(rules.isPediatricPatient({ patientAge: 8 }), false);
 assert.equal(rules.isPediatricPatient({ patientAge: null, patientAgeGroup: "adult" }), false);
 assert.equal(rules.isHighRiskDose("morphine", 5, { patientAge: 6 }), true);
-assert.equal(rules.isHighRiskDose("morphine", 4, { patientAge: 6 }), false);
+assert.equal(rules.isHighRiskDose("morphine", 4, { patientAge: 6 }), true);
+assert.equal(rules.isHighRiskDose("morphine", 2, { patientAge: 6 }), false);
+assert.equal(rules.isHighRiskDose("fentanyl", 10, { patientAgeGroup: "pediatric" }), true);
+assert.equal(rules.isHighRiskDose("fentanyl", 4, { patientAgeGroup: "pediatric" }), false);
 assert.equal(rules.isHighRiskDose("morphine", 10, { patientAge: 12 }), false);
 
 assert.deepEqual(rules.vitalsTimer(patient(), baseTime + 2 * 60 * 1000), {

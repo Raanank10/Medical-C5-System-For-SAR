@@ -44,7 +44,15 @@
     const key = String(medicationName || "").toLowerCase();
     const limit = PEDIATRIC_HIGH_RISK_DOSE_LIMITS[key];
     const dose = Number(selectedDose);
-    return !!limit && Number.isFinite(dose) && dose > limit.max;
+    if (!limit || !Number.isFinite(dose)) return false;
+    const hasAge = patient.patientAge != null && patient.patientAge !== "";
+    const age = Number(patient.patientAge);
+    const kg = hasAge && Number.isFinite(age) ? Math.max(4, Math.round(age * 2 + 8)) : 4;
+    const dynamicMax =
+      key === "morphine" ? Math.min(4, Math.max(0.5, kg * 0.1))
+      : key === "fentanyl" ? Math.min(50, kg)
+      : limit.max;
+    return dose > dynamicMax;
   }
 
   function vitalsAgeMs(patient, nowMs = Date.now()) {
@@ -95,8 +103,10 @@
     const weakBP = vitals.bp_estimate === "weak";
     const badAVPU = vitals.avpu && vitals.avpu !== "A";
     const badSpo2 = vitals.spo2 && vitals.spo2 < 94;
+    const normalRR = vitals.rr >= 10 && vitals.rr <= 30;
+    const hasPerfusion = vitals.bp_estimate === "radial";
     if (highRR || lowBP || badAVPU || badSpo2) return "red";
-    if (vitals.avpu === "A" && !lowBP && !weakBP && !highRR) return "green";
+    if (vitals.avpu === "A" && hasPerfusion && normalRR) return "green";
     return "yellow";
   }
 
@@ -117,10 +127,10 @@
 
     if (reasons.length) return { triage: "red", reason: reasons.join(" · "), reasons };
     if (v.bp_estimate === "weak") return { triage: "yellow", reason: "לחץ דם גבולי 80-100", reasons: ["לחץ דם גבולי"] };
-    if (v.avpu === "A") {
+    if (v.avpu === "A" && v.bp_estimate === "radial" && v.rr >= 10 && v.rr <= 30) {
       return { triage: "green", reason: "מדדים תקינים · AVPU A", reasons: [] };
     }
-    return { triage: "yellow", reason: "מדדים בינוניים", reasons: [] };
+    return { triage: "yellow", reason: "מידע חלקי / מדדים בינוניים — לא מסווג אוטומטית כירוק", reasons: [] };
   }
 
   function detectDeterioration(prev = {}, next = {}) {
