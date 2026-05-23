@@ -180,9 +180,11 @@ Allowed client values:
 
 Backend compatibility maps `not_trapped` to legacy `access_status = free`; legacy `partial` remains read-compatible but should not be emitted by new clients.
 
-## MIST Handover Event
+## Medical Handover Event (MIST / ATMIST)
 
-When a medic completes MIST handover, the client writes a local `PATIENT_HANDED_OVER` event before attempting network delivery. The receiving unit may scan a secure QR link, but the QR must contain a temporary encrypted token/signature, not embedded clinical files.
+When a medic completes `מסירה רפואית למד״א / כוח פינוי`, the client writes a local `PATIENT_HANDED_OVER` event before attempting network delivery.
+
+The UI may explain this as MIST/ATMIST: mechanism, injuries, signs, and treatment. The receiving unit may scan a secure QR link, but the QR must contain a temporary encrypted token/signature, not embedded clinical files.
 
 Example payload:
 
@@ -352,7 +354,7 @@ Fallback sync runs every 60–90 seconds with exponential retry:
 
 # 5. Command Dashboard APIs
 
-These are not mobile operational APIs. They are service-role backed read models for PC / CC / Chamal / Log-O dashboards.
+These are not mobile operational APIs. They are service-role backed read models for חוג״ד / מ״פ רפואה / Chamal / Log-O dashboards.
 
 ```http
 GET /command/incidents/:incidentId/dashboard-state
@@ -366,7 +368,7 @@ GET /command/incidents/:incidentId/aar/live-timeline
 
 Dashboard aggregation should use precomputed current-state tables/materialized views, not repeated heavy joins over raw events.
 
-Command alert slicers should read severity-aware alert views. `critical` alerts are shown separately from routine reminders so medics and PCs are not overwhelmed by low-priority operational debt.
+Command alert slicers should read severity-aware alert views. `critical` alerts are shown separately from routine reminders so medics and חוג״דים are not overwhelmed by low-priority operational debt.
 
 ---
 

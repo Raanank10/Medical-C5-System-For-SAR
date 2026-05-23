@@ -39,7 +39,7 @@ Status: Active
 ```text
 Medic Cohen — Medic
 Medic Levi — Medic
-PC Demo — Platoon Commander
+חוג״ד Demo — Medical Platoon Commander
 Log-O Demo — Logistics Officer
 CC Demo — Company Commander
 Chamal Demo — Chamal
@@ -119,7 +119,7 @@ Permissions must be enforced at both the **API layer** and **UI layer**.
 Medic
 Platoon Commander / Supervisor (PC)
 Logistics Officer (Log-O)
-Company Commander (CC)
+מ״פ רפואה / Medical Company Commander
 Chamal
 ```
 
@@ -135,11 +135,11 @@ Chamal
 Platoon Commander, if authorized
 ```
 
-A Medic may create a **local draft incident** only when no official incident is available. A draft incident allows field data capture but must later be confirmed by PC / CC / Chamal. The confirmation event is auditable. Draft state has a single source of truth: `incidents.status = 'draft'`; there is no separate `is_draft` flag.
+A Medic may create a **local draft incident** only when no official incident is available. A draft incident allows field data capture but must later be confirmed by חוג״ד / מ״פ רפואה / Chamal. The confirmation event is auditable. Draft state has a single source of truth: `incidents.status = 'draft'`; there is no separate `is_draft` flag.
 
 ## Authorization Matrix
 
-| Action | Medic | PC / Supervisor | Log-O | CC | Chamal |
+| Action | Medic | חוג״ד | Log-O | מ״פ רפואה | Chamal |
 |---|---:|---:|---:|---:|---:|
 | Create local draft incident | ✓ | ✓ | ✗ | ✓ | ✓ |
 | Open official incident and set T₀ | ✗ | ✓ | ✗ | ✓ | ✓ |
@@ -169,7 +169,7 @@ This action is recorded as:
 MEDIC_SITE_CLOSE_REQUESTED
 ```
 
-A PC / CC / Chamal may reopen or reject the close request.
+A חוג״ד / מ״פ רפואה / Chamal may reopen or reject the close request.
 
 ---
 
@@ -215,7 +215,7 @@ DRAFT INCIDENT — pending confirmation
 Patients may be recorded, but incident approval is required.
 ```
 
-PC / CC / Chamal screens must show a high-priority blinking/pulsing approval banner until the draft incident is approved, merged, rejected, or explicitly acknowledged.
+חוג״ד / מ״פ רפואה / Chamal screens must show a high-priority blinking/pulsing approval banner until the draft incident is approved, merged, rejected, or explicitly acknowledged.
 
 ---
 
@@ -470,7 +470,7 @@ ELSE                       → GREEN
 
 ### MCI BP Override
 
-In a declared MCI, `BP=None` may be downgraded from RED to YELLOW only by Supervisor / PC / CC.
+In a declared MCI, `BP=None` may be downgraded from RED to YELLOW only by חוג״ד / מ״פ רפואה.
 
 Reason is mandatory and logged to the Conflict Log.
 
@@ -539,9 +539,9 @@ Override consequences:
 - Sync status: 🟢 Live / 🔴 Offline / 🟡 Syncing
 - Draft incident badge, if relevant
 
-### Draft Incident Approval Banner — PC / CC / Chamal
+### Draft Incident Approval Banner — חוג״ד / מ״פ רפואה / Chamal
 
-When a draft incident exists, PC / CC / Chamal screens display a high-priority blinking/pulsing banner:
+When a draft incident exists, חוג״ד / מ״פ רפואה / Chamal screens display a high-priority blinking/pulsing banner:
 
 ```text
 ⚠ Draft Incident Pending Approval
@@ -563,7 +563,7 @@ After acknowledgment: persistent amber banner
 If patients are attached: remains high-priority until resolved
 ```
 
-Medic screens show a non-blocking draft badge, but PC / CC / Chamal screens require explicit action.
+Medic screens show a non-blocking draft badge, but חוג״ד / מ״פ רפואה / Chamal screens require explicit action.
 
 ### Stat Row
 
@@ -769,7 +769,7 @@ The medic may proceed. The warning and confirmation are logged to the Conflict L
 
 ### Tourniquet Limb Consistency Check
 
-If the tourniquet limb conflicts with recorded injury location, a quiet review flag is sent to PC / CC dashboard.
+If the tourniquet limb conflicts with recorded injury location, a quiet review flag is sent to חוג״ד / מ״פ רפואה dashboard.
 
 ---
 
@@ -1307,7 +1307,7 @@ AAR is locked until:
 1. All patients across all sectors are marked `Handed Over`
 2. All active sectors/buildings have confirmed `Site Clear`
 
-PC / CC / Chamal can unlock the AAR.
+חוג״ד / מ״פ רפואה / Chamal can unlock the AAR.
 
 The report is read-only and exportable as PDF.
 
@@ -1700,7 +1700,7 @@ This keeps inventory auditable, offline-safe, and compatible with after-action l
 
 ## Draft Incident Patient Creation
 
-`+ New Patient` is allowed under a draft incident. Patients created under a draft incident are marked `Pending Incident Approval` and remain syncable. PC / CC / Chamal screens show a blinking/pulsing approval banner until the draft incident is approved, merged, rejected, or acknowledged.
+`+ New Patient` is allowed under a draft incident. Patients created under a draft incident are marked `Pending Incident Approval` and remain syncable. חוג״ד / מ״פ רפואה / Chamal screens show a blinking/pulsing approval banner until the draft incident is approved, merged, rejected, or acknowledged.
 
 ## Event-Driven Sync
 
@@ -1790,7 +1790,7 @@ severity = critical
 escalate_to_role = PC
 ```
 
-The alert remains active until acknowledged/resolved by PC / CC / Chamal.
+The alert remains active until acknowledged/resolved by חוג״ד / מ״פ רפואה / Chamal.
 
 ## 6. Row Level Security
 
@@ -1802,7 +1802,7 @@ Baseline policies:
 
 - Medics and PCs can create patients and clinical events only for incidents they are assigned to in `incident_memberships`.
 - Log-O can manage logistics events, not clinical patient events.
-- PC / CC / Chamal can read command dashboards and conflict logs.
+- חוג״ד / מ״פ רפואה / Chamal can read command dashboards and conflict logs.
 - AAR is command-only.
 - Backend service-role processes realtime outbox internally.
 

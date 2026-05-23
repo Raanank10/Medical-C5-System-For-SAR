@@ -50,7 +50,7 @@ Lifecycle status must be projected from events, not manually selected by the med
 - tourniquet, medication, or airway action: `stabilizing`
 - vitals recorded after immediate care: `observing`
 - extraction movement: `extricating`
-- MIST handover / evacuation asset scan: `evacuating`
+- `מסירה רפואית למד״א / כוח פינוי` (MIST/ATMIST handover) / evacuation asset scan: `evacuating`
 - black triage fast exit: `deceased`
 
 ## Vitals Entry
@@ -86,7 +86,7 @@ Visual requirements:
 
 ## Black Triage Fast Exit
 
-Black/expectant triage must not force the medic through vitals, interventions, or MIST forms.
+Black/expectant triage must not force the medic through vitals, interventions, or medical handover forms.
 
 When Black is selected:
 

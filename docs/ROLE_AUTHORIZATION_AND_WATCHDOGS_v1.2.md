@@ -7,16 +7,16 @@ This document defines the operating roles, the demo authorization matrix, and th
 | Role | Meaning |
 | --- | --- |
 | Medic | Field clinician. Creates casualty records, captures vitals/interventions, requests resupply, and may create a local draft incident only when no official incident is available. |
-| Platoon Commander (PC) / Supervisor | Opens official incidents, confirms drafts, supervises clinical and command state, dispatches supply to Log-O, and unlocks AAR. |
+| חוג״ד / חפ״ק רפואי | Opens official incidents, confirms drafts, supervises clinical and command state, dispatches supply to Log-O, and unlocks live incident summary / AAR. |
 | Logistics Officer (Log-O) | Manages kit templates, resupply runners, and company equipment status. Does not create or edit clinical casualty records. |
-| Company Commander (CC) | Command authority for official incident confirmation, closure/reopen, site clear, dashboard, conflict log, and AAR. |
+| מ״פ רפואה | Company medical-resource command authority for official incident confirmation, closure/reopen, site clear, resource allocation, dashboard, conflict log, and AAR. |
 | Chamal | Higher command/operations room. Confirms draft incidents, manages official incident state, sees command dashboards, conflict log, and AAR. |
 
-Medic-created draft incidents are local-first capture containers. They must later be confirmed by PC, CC, or Chamal, and the confirmation must be represented as an auditable event.
+Medic-created draft incidents are local-first capture containers. They must later be confirmed by חוג״ד, מ״פ רפואה, or Chamal, and the confirmation must be represented as an auditable event.
 
 ## Authorization Matrix
 
-| Action | Medic | PC / Supervisor | Log-O | CC | Chamal |
+| Action | Medic | חוג״ד | Log-O | מ״פ רפואה | Chamal |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Create local draft incident | Yes | Yes | No | Yes | Yes |
 | Open official incident and set T0 | No | Yes | No | Yes | Yes |

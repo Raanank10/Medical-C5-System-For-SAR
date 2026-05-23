@@ -1,6 +1,6 @@
-# Role-Based Medical Command Model v2.0
+# Role-Based Medical Command Model V2.3
 
-v2.0 changes the prototype from a shared dashboard with filters into a role-based medical command system. Every role starts from the same logic:
+V2.3 keeps the prototype as a role-based medical command system and sharpens the demo around the medical command chain: חובש starts care, חוג״ד sees the platoon picture, and מ״פ רפואה commands company-level medical resources.
 
 - What is my situation?
 - What am I responsible for?
@@ -14,9 +14,9 @@ All demo names are synthetic.
 
 | Object | Owner Flow |
 |---|---|
-| Site / מוקד | Medic may draft. Medical PC confirms/edits/assigns. Medical CC sees confirmed sites and severe draft sites. |
-| Patient / פצוע | Medic creates and updates. PC reallocates inside platoon. CC reallocates across platoons. Duplicate merges must preserve event history. |
-| Resource request / בקשת תגבור | PC creates. CC commands medical resources directly and can approve, deny, redirect, assign, or resolve. |
+| Site / מוקד | Medic may draft. חוג״ד confirms/edits/assigns. מ״פ רפואה sees confirmed sites and severe draft sites. |
+| Patient / פצוע | Medic creates and updates. חוג״ד reallocates inside platoon. מ״פ רפואה reallocates across platoons. Duplicate merges must preserve event history. |
+| Resource request / בקשת תגבור | חוג״ד creates. מ״פ רפואה commands medical resources directly and can approve, deny, redirect, assign, or resolve. |
 | Alert / התראה | Alert has owner role, audience, severity, required action, escalation rule, and linked object. |
 
 ## Roles
@@ -27,17 +27,17 @@ Patient-level operator. Owns assigned patients, vitals, treatment, trapped/not-t
 
 When a medic saves a black/not-salvageable patient, the app automatically creates a non-emergency doctor certification request.
 
-### Medical PC
+### חוג״ד / חפ״ק רפואי
 
 Platoon-level medical commander. Owns medics, patients, site drafts, same-platoon allocation, evacuation prioritization, stale data follow-up, duplicate suspicion, and doctor/paramedic requests.
 
-PC can request doctor or paramedic directly.
+חוג״ד can request doctor or paramedic directly.
 
-### Medical CC
+### מ״פ רפואה
 
 Company-level medical resource commander. Owns cross-platoon allocation, all open requests, doctor/paramedic queue, death-certification queue, logistics shortages affecting care, and evacuation bottlenecks.
 
-CC commands medical resources directly.
+מ״פ רפואה commands medical resources directly. The V2.3 demo should make this feel like a company resource command center, not a larger platoon dashboard.
 
 ### Doctor / Paramedic
 
@@ -57,7 +57,7 @@ Demo and experiment-only role for loading, clearing, exporting, and controlling 
 
 ## Resource Request Types
 
-Removed: `צוות אלונקה`.
+V2.3 does not include a generic stretcher-team request type; evacuation support is handled through medical evacuation coordination.
 
 Personnel:
 
@@ -124,3 +124,31 @@ System action:
 `DOCTOR_DEATH_CERTIFICATION_REQUESTED`
 
 The app text must make clear that the medic is recording field status, not making official death certification. The doctor owns final certification.
+
+Visible V2.3 demo chain:
+
+1. Medic marks `חשד לנפטר / לא בר הצלה`.
+2. App states: `זה אינו אישור מוות רשמי`.
+3. System automatically opens `בקשת רופא לא דחופה`.
+4. חוג״ד sees the request as pending.
+5. מ״פ רפואה sees it in the doctor-resource queue.
+6. Doctor / paramedic view sees it as a certification task.
+
+## Demo V2.3 Launcher Path
+
+Recommended demo path:
+
+- `חובש — התחלת טיפול`
+- `חוג״ד — תמונת מצב`
+- `מ״פ רפואה`
+
+Advanced views:
+
+- `AAR — מה למדנו`
+- `רופא / פראמדיק`
+- `לוגיסטיקה`
+- `חמ״ל`
+
+## Medical Handover Wording
+
+The UI should explain MIST/ATMIST as `מסירה רפואית למד״א / כוח פינוי`: a short handover containing mechanism, injuries, signs, and treatment. The Hebrew-facing command should not look like another form; it should read as a field handoff action.

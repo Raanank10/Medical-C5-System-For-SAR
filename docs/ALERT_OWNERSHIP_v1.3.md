@@ -20,15 +20,15 @@ Every routed alert should carry:
 
 Medic alerts focus on direct action: treat, reassess, complete missing rescue-critical fields, and local system status. The medic should not receive company-level command noise.
 
-PC alerts focus on decisions: prioritize red casualties, assign medics, handle trapped patients, coordinate evacuation, resolve duplicate/count uncertainty, and watch stale critical data.
+חוג״ד alerts focus on decisions: prioritize red casualties, assign medics, handle trapped patients, coordinate evacuation, resolve duplicate/count uncertainty, and watch stale critical data.
 
-CC alerts are aggregated operational risks: multiple red casualties, evacuation bottlenecks, logistics shortages, silent teams, cross-site report mismatch, and unresolved reinforcement requests.
+מ״פ רפואה alerts are aggregated operational risks: multiple red casualties, evacuation bottlenecks, logistics shortages, silent teams, cross-site report mismatch, and unresolved reinforcement requests.
 
 Chamal alerts focus on data integrity and cross-incident picture quality: sync gaps, external report conflicts, duplicate suspicion, and official incident visibility.
 
 ## Commander UI Buckets
 
-The PC/Chamal board routes alerts into:
+The חוג״ד/Chamal board routes alerts into:
 
 - `טיפול דחוף`
 - `חילוץ / לכודים`
@@ -53,4 +53,4 @@ Required fields:
 | `targetLocation` | Site/building/floor or free location. |
 | `status` | `pending`, `acknowledged`, `assigned`, `en_route`, `arrived`, `denied`, `cancelled`, or `resolved`. |
 
-The PC creates the request. CC/Chamal can track, acknowledge, assign, and close it. The event export includes both alert ownership rows and reinforcement request state.
+The חוג״ד creates the request. מ״פ רפואה/Chamal can track, acknowledge, assign, and close it. The event export includes both alert ownership rows and reinforcement request state.

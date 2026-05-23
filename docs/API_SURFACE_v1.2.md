@@ -231,9 +231,11 @@ Allowed client values:
 
 Backend compatibility maps `not_trapped` to legacy `access_status = free`; legacy `partial` remains read-compatible but should not be emitted by new clients.
 
-## MIST Handover Event
+## Medical Handover Event (MIST / ATMIST)
 
-When a medic completes MIST handover, the client writes a local `PATIENT_HANDED_OVER` event before attempting network delivery. The receiving unit may scan a secure QR link, but the QR must contain a temporary encrypted token/signature, not embedded clinical files.
+When a medic completes `מסירה רפואית למד״א / כוח פינוי`, the client writes a local `PATIENT_HANDED_OVER` event before attempting network delivery.
+
+The UI may explain this as MIST/ATMIST: mechanism, injuries, signs, and treatment. The receiving unit may scan a secure QR link, but the QR must contain a temporary encrypted token/signature, not embedded clinical files.
 
 Example payload:
 
@@ -287,7 +289,7 @@ Idempotency remains `device_id + local_event_id`. If a weak network resends the 
 
 ## Black / Expectant Fast Exit Event
 
-When a medic confirms Black triage, the client should skip remaining assessment, treatment, and MIST forms and write a lightweight terminal event.
+When a medic confirms Black triage, the client should skip remaining assessment, treatment, and medical handover forms and write a lightweight terminal event.
 
 Canonical event type: `PATIENT_TRIAGED_EXPECTANT`.
 
@@ -312,7 +314,7 @@ Server projection rules:
 - set `patients.current_triage = 'black'`
 - set `patients.current_status = 'deceased'`
 - set `patients.needs_full_assessment = false`
-- bypass normal vitals/intervention/MIST completion requirements
+- bypass normal vitals/intervention/medical handover completion requirements
 
 ## Patient Lifecycle Status Pipeline
 
@@ -324,7 +326,7 @@ Server projection rules:
 | `stabilizing` | Care is ongoing at the treatment site, such as tourniquet, medication, or airway management. |
 | `observing` | Care milestone completed; patient waits for extraction or reassessment. |
 | `extricating` | Casualty is being physically moved through the structure or ruins. |
-| `evacuating` | Loaded into vehicle/chopper or handed over through MIST/secure QR. |
+| `evacuating` | Loaded into vehicle/chopper or handed over through medical handover (MIST/ATMIST)/secure QR. |
 | `deceased` | Black triage fast-path or casualty expired during care. |
 
 The projection is event-driven:
@@ -403,7 +405,7 @@ Fallback sync runs every 60–90 seconds with exponential retry:
 
 # 5. Command Dashboard APIs
 
-These are not mobile operational APIs. They are service-role backed read models for PC / CC / Chamal / Log-O dashboards.
+These are not mobile operational APIs. They are service-role backed read models for חוג״ד / מ״פ רפואה / Chamal / Log-O dashboards.
 
 ```http
 GET /command/incidents/:incidentId/dashboard-state
@@ -417,7 +419,7 @@ GET /command/incidents/:incidentId/aar/live-timeline
 
 Dashboard aggregation should use precomputed current-state tables/materialized views, not repeated heavy joins over raw events.
 
-Command alert slicers should read severity-aware alert views. `critical` alerts are shown separately from routine reminders so medics and PCs are not overwhelmed by low-priority operational debt.
+Command alert slicers should read severity-aware alert views. `critical` alerts are shown separately from routine reminders so medics and חוג״דים are not overwhelmed by low-priority operational debt.
 
 ---
 
