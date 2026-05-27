@@ -1,6 +1,29 @@
-# Role-Based Medical Command Model V2.3
+# Role-Based Medical Command Model V2.4
 
-V2.3 keeps the prototype as a role-based medical command system and sharpens the demo around the medical command chain: חובש starts care, חוג״ד sees the platoon picture, and מ״פ רפואה commands company-level medical resources.
+V2.4 keeps the prototype as a role-based medical command system and sharpens the medic timeline: transit preparation, MSTART triage sprint, then monitoring and treatment hold until rescue. חובש starts care in a current zone, חוג״ד sees the platoon picture, and מ״פ רפואה commands company-level medical resources.
+
+## V2.4 Tactical Flow
+
+The medic workflow is split into two operational phases:
+
+1. `מסך תנועה — הכנת זירה`
+   - Optional ETA.
+   - Site and zone context.
+   - Initial evacuated counts by severity.
+   - Report source: civilian, fire/rescue, MDA, police, or other.
+   - Data is visible to חוג״ד, חמ״ל, and מ״פ רפואה and remains editable later.
+
+2. `MSTART — סריקה מהירה`
+   - New casualty in current zone.
+   - Life-saving actions stay inside the binary triage screen.
+   - A/V/P implies the casualty is breathing.
+   - The casualty is saved and the medic returns to the current-zone loop.
+
+3. `הפצועים שלי — מעקב מדדים`
+   - Medic sees assigned casualties sorted by urgency.
+   - Full vitals are taken during monitoring and treatment hold.
+   - Blood pressure is field-estimated by radial/carotid/absent pulse plus strong/weak quality.
+   - Deterioration index is shown on patient tiles.
 
 - What is my situation?
 - What am I responsible for?
@@ -37,7 +60,7 @@ Platoon-level medical commander. Owns medics, patients, site drafts, same-platoo
 
 Company-level medical resource commander. Owns cross-platoon allocation, all open requests, doctor/paramedic queue, death-certification queue, logistics shortages affecting care, and evacuation bottlenecks.
 
-מ״פ רפואה commands medical resources directly. The V2.3 demo should make this feel like a company resource command center, not a larger platoon dashboard.
+מ״פ רפואה commands medical resources directly. The V2.4 demo should make this feel like a company resource command center, not a larger platoon dashboard.
 
 ### Doctor / Paramedic
 
@@ -57,7 +80,7 @@ Demo and experiment-only role for loading, clearing, exporting, and controlling 
 
 ## Resource Request Types
 
-V2.3 does not include a generic stretcher-team request type; evacuation support is handled through medical evacuation coordination.
+V2.4 does not include a generic stretcher-team request type; evacuation support is handled through medical evacuation coordination.
 
 Personnel:
 
@@ -125,7 +148,7 @@ System action:
 
 The app text must make clear that the medic is recording field status, not making official death certification. The doctor owns final certification.
 
-Visible V2.3 demo chain:
+Visible V2.4 demo chain:
 
 1. Medic marks `חשד לנפטר / לא בר הצלה`.
 2. App states: `זה אינו אישור מוות רשמי`.
@@ -134,7 +157,7 @@ Visible V2.3 demo chain:
 5. מ״פ רפואה sees it in the doctor-resource queue.
 6. Doctor / paramedic view sees it as a certification task.
 
-## Demo V2.3 Launcher Path
+## Demo V2.4 Launcher Path
 
 Recommended demo path:
 
@@ -151,4 +174,4 @@ Advanced views:
 
 ## Medical Handover Wording
 
-The UI should explain MIST/ATMIST as `מסירה רפואית למד״א / כוח פינוי`: a short handover containing mechanism, injuries, signs, and treatment. The Hebrew-facing command should not look like another form; it should read as a field handoff action.
+The UI should explain MIST as `מסירת מצב רפואי לפינוי`: a short handover containing mechanism, injuries, signs, and treatment. The Hebrew-facing command should not look like another form; it should read as a field handoff action.

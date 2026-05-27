@@ -99,13 +99,14 @@
     if (!vitals) return null;
     if (vitals.rr === 0) return "black";
     const highRR = vitals.rr > 30 || (vitals.rr > 0 && vitals.rr < 10);
-    const lowBP = vitals.bp_estimate === "absent" || vitals.bp_estimate === "carotid";
-    const weakBP = vitals.bp_estimate === "weak";
+    const lowBP = vitals.bp_estimate === "absent" || vitals.bp_estimate === "carotid" || vitals.bp_estimate === "carotid_strong" || vitals.bp_estimate === "carotid_weak";
+    const weakBP = vitals.bp_estimate === "weak" || vitals.bp_estimate === "radial_weak" || vitals.bp_estimate === "carotid_weak";
     const badAVPU = vitals.avpu && vitals.avpu !== "A";
     const badSpo2 = vitals.spo2 && vitals.spo2 < 94;
     const normalRR = vitals.rr >= 10 && vitals.rr <= 30;
-    const hasPerfusion = vitals.bp_estimate === "radial";
+    const hasPerfusion = vitals.bp_estimate === "radial" || vitals.bp_estimate === "radial_strong" || vitals.bp_estimate === "radial_weak";
     if (highRR || lowBP || badAVPU || badSpo2) return "red";
+    if (weakBP) return "yellow";
     if (vitals.avpu === "A" && hasPerfusion && normalRR) return "green";
     return "yellow";
   }
@@ -121,13 +122,13 @@
 
     const reasons = [];
     if (v.rr > 30 || (v.rr > 0 && v.rr < 10)) reasons.push(`נשימות ${v.rr}/דקה`);
-    if (v.bp_estimate === "absent" || v.bp_estimate === "carotid") reasons.push("לחץ דם ירוד");
+    if (v.bp_estimate === "absent" || v.bp_estimate === "carotid" || v.bp_estimate === "carotid_strong" || v.bp_estimate === "carotid_weak") reasons.push("לחץ דם ירוד");
     if (v.avpu && v.avpu !== "A") reasons.push(`AVPU ${v.avpu}`);
     if (v.spo2 && v.spo2 < 94) reasons.push(`SpO₂ ${v.spo2}%`);
 
     if (reasons.length) return { triage: "red", reason: reasons.join(" · "), reasons };
-    if (v.bp_estimate === "weak") return { triage: "yellow", reason: "לחץ דם גבולי 80-100", reasons: ["לחץ דם גבולי"] };
-    if (v.avpu === "A" && v.bp_estimate === "radial" && v.rr >= 10 && v.rr <= 30) {
+    if (v.bp_estimate === "weak" || v.bp_estimate === "radial_weak") return { triage: "yellow", reason: "דופק רדיאלי חלש", reasons: ["פרפוזיה גבולית"] };
+    if (v.avpu === "A" && (v.bp_estimate === "radial" || v.bp_estimate === "radial_strong") && v.rr >= 10 && v.rr <= 30) {
       return { triage: "green", reason: "מדדים תקינים · AVPU A", reasons: [] };
     }
     return { triage: "yellow", reason: "מידע חלקי / מדדים בינוניים — לא מסווג אוטומטית כירוק", reasons: [] };
