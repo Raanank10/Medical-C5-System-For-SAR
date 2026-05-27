@@ -28,7 +28,7 @@ This is enough for workflow validation and engineering iteration. It is not enou
 - Implement sync push/pull with conflict and poison-event handling.
 - Enforce idempotent sync by `device_id + local_event_id` at the database layer.
 - Preserve dependency-aware sync ordering for offline batches such as Quick Patient followed by MIST handover.
-- Implement `מסירה רפואית למד״א / כוח פינוי` handover with `PATIENT_HANDED_OVER` events and temporary signed QR tokens; explain MIST/ATMIST as mechanism, injuries, signs, and treatment.
+- Implement `מסירת מצב רפואי לפינוי` handover with `PATIENT_HANDED_TO_MDA` / handover events and temporary signed QR tokens; explain MIST as mechanism, injuries, signs, and treatment.
 - Implement Black triage fast exit with `PATIENT_TRIAGED_EXPECTANT` and no empty vitals/treatment payloads.
 - Drive `patients.current_status` from event projections rather than manual status dropdowns.
 - Ensure handover projection resolves patient-specific watchdog alerts and closes Quick Patient assessment debt.

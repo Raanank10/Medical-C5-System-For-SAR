@@ -233,9 +233,9 @@ Backend compatibility maps `not_trapped` to legacy `access_status = free`; legac
 
 ## Medical Handover Event (MIST / ATMIST)
 
-When a medic completes `מסירה רפואית למד״א / כוח פינוי`, the client writes a local `PATIENT_HANDED_OVER` event before attempting network delivery.
+When a medic completes `מסירת מצב רפואי לפינוי`, the client writes a local handover event before attempting network delivery.
 
-The UI may explain this as MIST/ATMIST: mechanism, injuries, signs, and treatment. The receiving unit may scan a secure QR link, but the QR must contain a temporary encrypted token/signature, not embedded clinical files.
+The UI may explain this as `מסירת מצב רפואי לפינוי` / MIST: mechanism, injuries, signs, and treatment. The receiving unit may scan a secure QR link, but the QR must contain a temporary encrypted token/signature, not embedded clinical files.
 
 Example payload:
 
@@ -326,7 +326,7 @@ Server projection rules:
 | `stabilizing` | Care is ongoing at the treatment site, such as tourniquet, medication, or airway management. |
 | `observing` | Care milestone completed; patient waits for extraction or reassessment. |
 | `extricating` | Casualty is being physically moved through the structure or ruins. |
-| `evacuating` | Loaded into vehicle/chopper or handed over through medical handover (MIST/ATMIST)/secure QR. |
+| `handed_over` | Transferred to MDA / evacuation force through `מסירת מצב רפואי לפינוי` (MIST) or secure QR. |
 | `deceased` | Black triage fast-path or casualty expired during care. |
 
 The projection is event-driven:

@@ -50,7 +50,7 @@ Lifecycle status must be projected from events, not manually selected by the med
 - tourniquet, medication, or airway action: `stabilizing`
 - vitals recorded after immediate care: `observing`
 - extraction movement: `extricating`
-- `מסירה רפואית למד״א / כוח פינוי` (MIST/ATMIST handover) / evacuation asset scan: `evacuating`
+- `מסירת מצב רפואי לפינוי` (MIST handover) / evacuation asset scan: `handed_over`
 - black triage fast exit: `deceased`
 
 ## Vitals Entry

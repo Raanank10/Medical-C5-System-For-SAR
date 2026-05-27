@@ -182,7 +182,7 @@ Backend compatibility maps `not_trapped` to legacy `access_status = free`; legac
 
 ## Medical Handover Event (MIST / ATMIST)
 
-When a medic completes `מסירה רפואית למד״א / כוח פינוי`, the client writes a local `PATIENT_HANDED_OVER` event before attempting network delivery.
+When a medic completes `מסירת מצב רפואי לפינוי`, the client writes a local handover event before attempting network delivery.
 
 The UI may explain this as MIST/ATMIST: mechanism, injuries, signs, and treatment. The receiving unit may scan a secure QR link, but the QR must contain a temporary encrypted token/signature, not embedded clinical files.
 

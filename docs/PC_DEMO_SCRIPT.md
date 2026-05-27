@@ -1,4 +1,4 @@
-# Medical Command Demo Script V2.3
+# Medical Command Demo Script V2.4
 
 Purpose: show a חוג״ד and מ״פ רפואה how the prototype reduces operational fog during a SAR medical incident.
 
@@ -6,7 +6,20 @@ Recommended length: 7-10 minutes.
 
 ## Demo Setup
 
-Open `index.html` in a browser. Use a mobile-sized browser window first, then switch through the V2.3 launcher path.
+Open `index.html` in a browser. Use a mobile-sized browser window first, then switch through the V2.4 launcher path.
+
+## V2.4 First Story
+
+Show the medic timeline as two tactical phases:
+
+1. `מסך תנועה — הכנת זירה`
+   The medic enters site, optional ETA, current zone, expected casualties, and initial evacuated counts while moving to the incident.
+
+2. `MSTART — סריקה מהירה`
+   The medic opens a new casualty in the current zone, taps any life-saving action, completes binary MSTART, saves, and moves to the next trapped person.
+
+3. `הפצועים שלי — מעקב מדדים`
+   The medic returns to the monitoring queue, takes full vitals, watches trend flags, and records treatment until rescue.
 
 Recommended demo path:
 
@@ -125,7 +138,7 @@ Explain:
 
 Use the patient detail action `מסירה רפואית למד״א`.
 
-Explain that MIST/ATMIST is shown as a field handoff: mechanism, injuries, signs, and treatment. In the UI this is worded as `מסירה רפואית למד״א / כוח פינוי` so it is recognizable as a handover, not another report form.
+Explain that MIST is shown as `מסירת מצב רפואי לפינוי`: mechanism, injuries, signs, and treatment. It is a short evacuation handoff, not another report form.
 
 ### 9. End With AAR
 
