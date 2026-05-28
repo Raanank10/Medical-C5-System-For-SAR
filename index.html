@@ -479,7 +479,7 @@ textarea{resize:vertical;min-height:70px;}
       <div class="demo-kicker">Demo V2.4</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
-        חובש יכול להתחיל טיפול בפצוע כמעט בלי להזין נתונים, וכל פעולה קטנה שהוא מתעד בונה אוטומטית תמונת מצב לחוג"ד ולמ״פ רפואה. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
+        החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
       </div>
       <div class="demo-strip-sub" style="margin-top:12px">
         הערה לדמו: בדמו ניתן לבחור תפקיד כדי להציג את יכולות המערכת. בניסוי שטח, כל משתמש ייכנס אוטומטית לתפקיד שהוגדר לו: חובש, חוג"ד, מ״פ רפואה, רופא/פראמדיק או חמ״ל.
@@ -494,11 +494,11 @@ textarea{resize:vertical;min-height:70px;}
     </div>
     <div class="demo-panel">
       <div class="demo-strip-title">Recommended demo path</div>
-      <div class="demo-strip-sub">הצג את השרשרת המבצעית: חובש מתחיל טיפול → חוג״ד מקבל תמונת מצב → מ״פ רפואה מנהל משאבים.</div>
+      <div class="demo-strip-sub">1. חובש — נסיעה והתחלת סריקת MSTART · 2. חוג״ד רואה תמונת מצב מהסריקה · 3. חובש מסיים סריקה ומתחיל מעקב · 4. מ״פ רפואה מנהל משאבים · 5. AAR מציג פערים.</div>
       <div class="demo-grid" style="margin-top:12px">
         <button class="demo-card" onclick="startRoleDashboard('medic')">
           <div class="demo-icon">🚑</div>
-          <div><strong>חובש — התחלת טיפול</strong><span>נסיעה למוקד, טיפול מיידי, פתיחת פצוע כמעט בלי נתונים.</span></div>
+          <div><strong>חובש — נסיעה למוקד והתחלת סריקת MSTART</strong><span>מוקד/אזור בדרך, סימון פצועים בסריקה, ואז מעבר למעקב מדדים.</span></div>
         </button>
         <button class="demo-card" onclick="startRoleDashboard('pc')">
           <div class="demo-icon">🎖</div>
@@ -546,8 +546,8 @@ textarea{resize:vertical;min-height:70px;}
     </div>
     <div class="demo-panel">
       <div class="demo-strip-title">איך לבדוק את הדמו ב־2 דקות</div>
-      <div class="demo-strip-sub">הפעל תרחיש דמו · פתח חוג"ד · בדוק חובשים/פצועים/התראות · פתח בקשת תגבור רפואי · פתח פצוע במסלול מהיר · סמן חשד לנפטר וראה בקשת רופא לא דחופה · פתח סיכום אירוע חי.</div>
-      <div class="demo-strip-sub" style="margin-top:10px">מה לבדוק: האם תצוגת חוג"ד ברורה? האם ההתראות מחולקות נכון? האם בקשת רופא/פראמדיק מרגישה נכונה? האם סימון חשד לנפטר + בקשת רופא אוטומטית נכון? מה חסר לתרגיל קטן?</div>
+      <div class="demo-strip-sub">פתח חובש · הזן מוקד/אזור בדרך · התחל סריקת MSTART · סמן פצוע והנח חסם · האפליקציה מורידה מלאי חסמים ומתחילה טיימר · בקש השלמת ציוד · חוג"ד מאשר מהרכב או מסלים למ״פ רפואה · סיים סריקה · פתח סיכום אירוע חי.</div>
+      <div class="demo-strip-sub" style="margin-top:10px">מה לבדוק: האם הסריקה מרגישה מהירה? האם ציוד חסר לא מפריע לטיפול? האם חוג"ד רואה את רכב החוג"ד כמקור ראשון? האם מ״פ רפואה רואה רק חוסר מחלקתי/פלוגתי?</div>
     </div>
   </div>
 </div>
@@ -639,7 +639,37 @@ textarea{resize:vertical;min-height:70px;}
     <div class="field-label">הערת מוקד חופשית</div>
     <textarea id="enroute-notes" placeholder="סכנות, כניסה מומלצת, לכודים מדווחים..."></textarea>
   </div>
-  <div class="bottom-bar"><button class="btn-primary" onclick="arriveAtSite()" style="background:var(--red);font-size:16px;padding:16px">הגעתי לזירה — פתח כרטיס טיפול מהיר</button></div>
+  <div class="bottom-bar"><button class="btn-primary" onclick="arriveAtSite()" style="background:var(--red);font-size:16px;padding:16px">הגעתי — התחל סריקת MSTART</button></div>
+</div>
+
+<!-- ══════════════════════ MSTART SWEEP ══ -->
+<div id="screen-sweep" class="screen">
+  <div class="header">
+    <div class="header-left">
+      <div class="header-subtitle">MEDIC // MSTART SWEEP</div>
+      <div class="header-title">סריקת MSTART</div>
+    </div>
+    <div class="header-time" id="sweep-clock">--:--</div>
+  </div>
+  <div class="demo-strip">
+    <div>
+      <div class="demo-strip-title" id="sweep-context-title">מוקד · אזור</div>
+      <div class="demo-strip-sub">סמן פצועים בסריקה בלי שם, בלי זיהוי ובלי מדדים מלאים. כל פעולה קטנה בונה תמונת מצב לחוג"ד.</div>
+    </div>
+    <div class="sync-pill">MSTART</div>
+  </div>
+  <div style="padding:0 16px 10px">
+    <div id="sweep-zone-bar"></div>
+    <div id="sweep-stats" class="role-top-grid" style="margin-top:12px"></div>
+  </div>
+  <div class="flow-content">
+    <button class="btn-primary" onclick="startSweepCasualtyMarker()" style="background:var(--red);margin-bottom:14px">פצוע נוסף באזור הזה</button>
+    <button class="btn-secondary" onclick="openMedicResupplySheet()" style="margin-bottom:14px">חסר לי ציוד</button>
+    <div id="sweep-active-card"></div>
+  </div>
+  <div class="bottom-bar">
+    <button class="btn-primary" onclick="completeMstartSweep()" style="background:var(--green)">סיימתי סריקת MSTART באזור הזה</button>
+  </div>
 </div>
 
 <!-- ══════════════════════ DASHBOARD ══ -->
@@ -716,7 +746,7 @@ textarea{resize:vertical;min-height:70px;}
     <button class="alert-slice" onclick="setAlertFilter('all',this)">הכל <span id="alert-all-count">0</span></button>
   </div>
   <div id="alerts-banner"></div>
-  <div class="section-label">פצועים פעילים</div>
+  <div class="section-label">הפצועים שלי — מעקב מדדים</div>
   <div id="patient-list"></div>
 </div>
 
@@ -1295,7 +1325,7 @@ textarea{resize:vertical;min-height:70px;}
       <div class="tq-reminder-body" id="quick-tq-reminder-body"></div>
     </div>
     <div class="stock-panel">
-      <div class="stock-panel-title">המלאי האישי שלי — נגזר מאירועי ledger</div>
+      <div class="stock-panel-title">אזהרות ציוד אישי — לא חוסם טיפול</div>
       <div class="stock-grid" id="tx-stock-grid"></div>
     </div>
     <div class="field-label">טיפולים שניתנו עכשיו (ניתן לבחור מספר)</div>
@@ -1399,6 +1429,38 @@ textarea{resize:vertical;min-height:70px;}
       <button class="tap-btn" onclick="confirmTrapStatus('not_trapped')"><span class="icon">🚶</span><div style="font-weight:800">לא לכוד</div></button>
     </div>
     <button class="panic-cancel-btn" onclick="confirmTrapStatus(null)">שמור ללא סטטוס חילוץ</button>
+  </div>
+</div>
+
+<!-- ══════════════════════ MEDIC RESUPPLY REQUEST MODAL ══ -->
+<div class="modal-overlay hidden" id="resupply-modal" onclick="closeResupplyModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="field-label">מה חסר?</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.55;margin-bottom:14px">בקשה קצרה לחוג״ד. המיקום, האזור ושם החובש מתמלאים אוטומטית.</div>
+    <div class="tap-grid tap-grid-2" id="resupply-item-grid" style="margin-bottom:14px">
+      <button class="tap-btn" onclick="toggleResupplyItem(this,'tourniquets')">חסמי עורקים</button>
+      <button class="tap-btn" onclick="toggleResupplyItem(this,'pressureDressings')">תחבושות / חבישת לחץ</button>
+      <button class="tap-btn" onclick="toggleResupplyItem(this,'hemostaticGauze')">גזה המוסטטית</button>
+      <button class="tap-btn" onclick="toggleResupplyItem(this,'airwayEquipment')">ציוד נתיב אוויר</button>
+      <button class="tap-btn" onclick="toggleResupplyItem(this,'ivKits')">ציוד עירוי / נוזלים</button>
+      <button class="tap-btn" onclick="toggleResupplyItem(this,'blankets')">שמיכות / מניעת היפותרמיה</button>
+      <button class="tap-btn" onclick="toggleResupplyItem(this,'batteryPacks')">סוללה / טעינה</button>
+      <button class="tap-btn" onclick="toggleResupplyItem(this,'other')">אחר</button>
+    </div>
+    <div class="field-label">כמות</div>
+    <div class="tap-grid tap-grid-4" id="resupply-qty-grid" style="margin-bottom:14px">
+      <button class="tap-btn selected" onclick="selectResupplyQuantity(this,1)">1</button>
+      <button class="tap-btn" onclick="selectResupplyQuantity(this,2)">2</button>
+      <button class="tap-btn" onclick="selectResupplyQuantity(this,3)">3+</button>
+      <button class="tap-btn" onclick="selectResupplyQuantity(this,'unknown')">לא יודע / כמה שאפשר</button>
+    </div>
+    <div class="field-label">פרטים קצרים</div>
+    <textarea id="resupply-note" placeholder="אופציונלי: לדוגמה חסמים נגמרו באזור הצפוני"></textarea>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+      <button class="btn-primary" onclick="submitMedicResupplyRequest()">בקש השלמה מהחוג״ד</button>
+      <button class="btn-secondary" onclick="hideResupplyModal()">ביטול</button>
+    </div>
   </div>
 </div>
 
@@ -1890,14 +1952,28 @@ if(!C5Rules) throw new Error('C5 domain rules failed to load');
 // ═══════════════════════════════════════════════
 const VITALS_INTERVAL_MS = C5Rules.VITALS_INTERVAL_MS;
 const WARN_AT_MS = C5Rules.WARN_AT_MS;
-const APP_VERSION = '2.4.0';
+const APP_VERSION = '2.4.1';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
 const CONFLICT_LOG_KEY = 'c5-sentinel-sar-conflict-log-v1';
 const ACTIVE_RECOVERY_KEY = 'c5_active_recovery_state';
 const DEVICE_ID_KEY = 'c5-sentinel-sar-device-id';
-const SUPPLY_BASELINE = Object.freeze({CAT_TOURNIQUET:2,MORPHINE_10MG:4,FENTANYL_ACTIQ:2,IV_FLUID_500ML:3,BANDAGE_6INCH:8});
-const SUPPLY_LABELS = {CAT_TOURNIQUET:'CAT חסם',MORPHINE_10MG:'Morphine',FENTANYL_ACTIQ:'Actiq/Fentanyl',IV_FLUID_500ML:'נוזלים 500',BANDAGE_6INCH:'חבישה'};
+const SUPPLY_BASELINE = Object.freeze({tourniquets:3, pressureDressings:4, hemostaticGauze:2, airwayEquipment:2, ivKits:1, blankets:2, batteryPacks:1});
+const PC_TRUCK_BASELINE = Object.freeze({tourniquets:20, pressureDressings:30, hemostaticGauze:15, airwayEquipment:10, ivKits:8, blankets:25, batteryPacks:6});
+const COMPANY_STOCK_BASELINE = Object.freeze({tourniquets:80, pressureDressings:120, hemostaticGauze:50, airwayEquipment:35, ivKits:30, blankets:120, batteryPacks:20});
+const SUPPLY_LABELS = {
+  tourniquets:'חסמי עורקים',
+  pressureDressings:'תחבושות / חבישת לחץ',
+  hemostaticGauze:'גזה המוסטטית',
+  airwayEquipment:'ציוד נתיב אוויר',
+  ivKits:'ציוד עירוי / נוזלים',
+  blankets:'שמיכות / מניעת היפותרמיה',
+  batteryPacks:'סוללה / טעינה'
+};
+const SUPPLY_SHORT_LABELS = {tourniquets:'חסמים', pressureDressings:'חבישה', hemostaticGauze:'גזה', airwayEquipment:'נתיב אוויר', ivKits:'עירוי', blankets:'שמיכות', batteryPacks:'סוללה'};
+const SUPPLY_ALIASES = {CAT_TOURNIQUET:'tourniquets', BANDAGE_6INCH:'pressureDressings', IV_FLUID_500ML:'ivKits'};
+const SUPPLY_LOW_THRESHOLDS = {tourniquets:1, pressureDressings:1, hemostaticGauze:1, airwayEquipment:1, ivKits:0, blankets:1, batteryPacks:0};
+const PC_TRUCK_LOW_THRESHOLDS = {tourniquets:5, pressureDressings:8, hemostaticGauze:4, airwayEquipment:3, ivKits:2, blankets:8, batteryPacks:2};
 const ROLE_LABELS = {medic:'פעולת חובש', pc:'החלטת חוג"ד', cc:'סיכון מ״פ רפואה', logistics:'לוגיסטיקה', chamal:'מערכת'};
 const ACTION_LABELS = {
   update_vitals:'עדכן מדדים',
@@ -1956,7 +2032,16 @@ const REINFORCEMENT_STATUS_LABELS = {
   arrived:'הגיע',
   denied:'לא זמין',
   cancelled:'בוטל',
-  resolved:'נסגר'
+  resolved:'נסגר',
+  pending_pc:'ממתין לחוג״ד',
+  approved_from_truck:'אושר מהרכב',
+  sent_from_truck:'נשלח מהרכב',
+  collected_by_medic:'נאסף על ידי חובש',
+  delivered:'נמסר',
+  unavailable_at_truck:'לא זמין ברכב',
+  escalated_to_cc:'הוסלם למ״פ רפואה',
+  fulfilled_by_company:'הושלם מהפלוגה',
+  closed:'נסגר'
 };
 const DEMO_USERS = [
   {userId:'USR-COHEN', fullName:'סמ״ר נועם כהן', role:'medic', callsign:'חובש 1', platoonId:'PLT-A', companyId:'COMP-1', active:true},
@@ -1973,11 +2058,13 @@ const DEMO_PLATOONS = [
   {platoonId:'PLT-B', name:'מחלקה רפואית ב', pcId:'USR-BARAK', companyId:'COMP-1'}
 ];
 const INTERVENTION_SUPPLY = {
-  tourniquet:{item:'CAT_TOURNIQUET', qty:1},
-  bandage:{item:'BANDAGE_6INCH', qty:1},
-  morphine:{item:'MORPHINE_10MG', qty:1},
-  atq:{item:'FENTANYL_ACTIQ', qty:1},
-  fluids:{item:'IV_FLUID_500ML', qty:()=>Math.max(1, Math.ceil((doses.fluids||500)/500))}
+  tourniquet:{item:'tourniquets', qty:1},
+  bandage:{item:'pressureDressings', qty:1},
+  pressure_bandage:{item:'pressureDressings', qty:1},
+  hemostatic:{item:'hemostaticGauze', qty:1},
+  airway_mgmt:{item:'airwayEquipment', qty:1},
+  fluids:{item:'ivKits', qty:()=>Math.max(1, Math.ceil((doses.fluids||500)/500))},
+  blanket:{item:'blankets', qty:1}
 };
 const AVPU_RANK = C5Rules.AVPU_RANK;
 const COUNT_LIMITS = {
@@ -2080,7 +2167,7 @@ function setDeviceLabels(){
 let siteData = {
   name:'', address:'', eventType:null, buildingType:null, description:'', externalReports:[],
   floorHint:'', apartmentHint:'', eta:'', currentZone:'', lastMechanism:'',
-  likelyMechanisms:[],
+  likelyMechanisms:[], sweepSessions:[],
   initialEvacuatedGreen:0,
   initialEvacuation:{green:0,yellow:0,red:0,summary:'',source:null},
   expectedCasualties:{trapped:0,immobile:0,missing:0,severe:0}
@@ -2095,6 +2182,7 @@ function ensureSiteReadiness(){
   siteData.currentZone=siteData.currentZone||siteData.floorHint||'';
   siteData.lastMechanism=siteData.lastMechanism||'';
   siteData.likelyMechanisms=siteData.likelyMechanisms||[];
+  siteData.sweepSessions=siteData.sweepSessions||[];
   siteData.initialEvacuatedGreen=siteData.initialEvacuation.green||0;
   return siteData;
 }
@@ -2123,6 +2211,7 @@ function normalizeTrapStatus(patient){
   return null;
 }
 let state = freshState();
+let activeSweepPatientId = null;
 let flowVitals = {...VITALS_BASELINE};
 let counts = {...COUNT_BASELINE};
 let spo2Active = false;
@@ -2152,6 +2241,9 @@ let modalOpenedLastModified = null;
 let vitalCountdowns = {};
 let reinforcementRequests = [];
 let reinforcementDraft = {resourceType:null, reasonCodes:new Set(), urgency:'high', targetLocation:'', freeText:''};
+let resupplyDraft = {items:new Set(), quantity:1, note:'', linkedPatientId:null, urgency:'high', reason:'manual_request'};
+let pcTruckStock = {...PC_TRUCK_BASELINE};
+let companyStock = {...COMPANY_STOCK_BASELINE};
 let activeRoleDashboard = 'medic';
 
 function serializeActiveDraft(screen=null){
@@ -2438,7 +2530,9 @@ function playDeathCertificationSequence(){
 function clearDemoScenario(){
   patients=[];
   reinforcementRequests=[];
-  siteData={name:'', address:'', eventType:null, buildingType:null, floorHint:'', apartmentHint:'', eta:'', currentZone:'', lastMechanism:'', likelyMechanisms:[], description:'', externalReports:[], initialEvacuatedGreen:0, initialEvacuation:{green:0,yellow:0,red:0,summary:'',source:null}, expectedCasualties:{trapped:0,immobile:0,missing:0,severe:0}};
+  pcTruckStock={...PC_TRUCK_BASELINE};
+  companyStock={...COMPANY_STOCK_BASELINE};
+  siteData={name:'', address:'', eventType:null, buildingType:null, floorHint:'', apartmentHint:'', eta:'', currentZone:'', lastMechanism:'', likelyMechanisms:[], sweepSessions:[], description:'', externalReports:[], initialEvacuatedGreen:0, initialEvacuation:{green:0,yellow:0,red:0,summary:'',source:null}, expectedCasualties:{trapped:0,immobile:0,missing:0,severe:0}};
   allSites.forEach(s=>{ if(s.id!=='ALL') s.externalReports=[]; });
   demoSyncMode='fresh';
   lastSyncAt=Date.now();
@@ -2463,7 +2557,8 @@ function clearDemoScenario(){
 }
 function clearDemoPatientsOnly(){
   patients=[];
-  reinforcementRequests=reinforcementRequests.filter(r=>r.type!=='death_certification_request' && r.type!=='medical_reinforcement');
+  reinforcementRequests=reinforcementRequests.filter(r=>r.type!=='death_certification_request' && r.type!=='medical_reinforcement' && r.type!=='resupply');
+  pcTruckStock={...PC_TRUCK_BASELINE};
   try{ localStorage.removeItem('c5_local_sqlite_outbox'); }catch(e){}
   lastSyncAt=Date.now();
   demoSyncMode='fresh';
@@ -2485,7 +2580,7 @@ function saveDemoState(){
       }
     }
     demoRevision += 1;
-    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:5,appVersion:APP_VERSION,revision:demoRevision,savedAt:new Date().toISOString(),experimentStartedAt,experimentPhase,siteData,patients,reinforcementRequests,demoSyncMode,lastSyncAt}));
+    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:6,appVersion:APP_VERSION,revision:demoRevision,savedAt:new Date().toISOString(),experimentStartedAt,experimentPhase,siteData,patients,reinforcementRequests,pcTruckStock,companyStock,demoSyncMode,lastSyncAt}));
   }catch(e){}
 }
 function loadStoredDemoState(){
@@ -2498,6 +2593,8 @@ function loadStoredDemoState(){
     ensureSiteReadiness();
     patients=saved.patients;
     reinforcementRequests=Array.isArray(saved.reinforcementRequests)?saved.reinforcementRequests:[];
+    pcTruckStock={...PC_TRUCK_BASELINE, ...(saved.pcTruckStock||{})};
+    companyStock={...COMPANY_STOCK_BASELINE, ...(saved.companyStock||{})};
     patients.forEach(p=>{
       if(!p.lastModifiedAt) p.lastModifiedAt=saved.savedAt||new Date().toISOString();
       if(!p.trapStatus) p.trapStatus=normalizeTrapStatus(p);
@@ -2542,7 +2639,7 @@ function updateDemoStatus(){
   });
   const openAlerts=patients.filter(p=>p.alert || (needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS)).length;
   const handed=patients.filter(p=>['evacuating','evacuated'].includes(p.patientStatus)).length;
-  const openRequests=reinforcementRequests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).length;
+  const openRequests=reinforcementRequests.filter(isRequestOpen).length;
   const line=`${patients.length} פצועים · ${openAlerts} התראות · ${openRequests} תגבור · ${handed} הועברו`;
   ['demo-status-line','cmd-demo-line'].forEach(id=>{const el=document.getElementById(id); if(el) el.textContent=line;});
   updateExperimentLine();
@@ -2586,7 +2683,7 @@ function roleScopedPatients(role){
 }
 function roleScopedRequests(role){
   if(role==='doctor') return reinforcementRequests.filter(r=>['doctor_treatment','doctor_death_cert','paramedic'].includes(r.resourceType));
-  if(role==='logistics') return reinforcementRequests.filter(r=>['cat_tourniquets','hemostatic_gauze','airway_equipment','iv_fluids','hypothermia_blankets','medical_equipment'].includes(r.resourceType));
+  if(role==='logistics') return reinforcementRequests.filter(r=>r.type==='resupply' || ['cat_tourniquets','hemostatic_gauze','airway_equipment','iv_fluids','hypothermia_blankets','medical_equipment'].includes(r.resourceType));
   if(role==='medic') return reinforcementRequests.filter(r=>(r.linkedPatientIds||[]).some(pid=>roleScopedPatients('medic').some(p=>p.id===pid)));
   if(role==='cc') return reinforcementRequests;
   return reinforcementRequests.filter(r=>['SITE_A','SITE_B'].includes(r.siteId||'SITE_A'));
@@ -2604,7 +2701,7 @@ function renderMedicActionPanel(){
   const queue=sortedPatients(roleScopedPatients('medic')).slice(0,6).map(p=>{
     const trend=deteriorationIndex(p);
     const action=p.tourniquet?'מדדים מלאים / בדיקת חסם':needsVitals(p)?'מדדים מלאים עכשיו':normalizeTrapStatus(p)==='trapped'?'מעקב עד חילוץ':'מעקב שגרתי';
-    return roleRow(`${p.id} · ${TRIAGE_LABELS[p.triage]||p.triage} · ${TRAP_LABELS[normalizeTrapStatus(p)]||'לא תועד'}`,`${action} · ${trend.detail}`,`<button class="demo-mini-btn" onclick="openPatient('${p.id}')" style="margin-top:8px">פתח כרטיס מעקב</button>`);
+    return roleRow(`${p.id} · ${TRIAGE_LABELS[p.triage]||p.triage} · ${TRAP_LABELS[normalizeTrapStatus(p)]||'לא תועד'}`,`${action} · ${trend.detail}`,`<button class="demo-mini-btn" onclick="openQuickVitals('${p.id}')" style="margin-top:8px">מדדים מלאים עכשיו</button><button class="demo-mini-btn" onclick="openPatient('${p.id}')" style="margin-top:8px">פתח מעקב פצוע</button>`);
   }).join('');
   return `
     <div class="role-section" style="border-color:var(--accent)">
@@ -2615,17 +2712,19 @@ function renderMedicActionPanel(){
       </div>
       <div class="demo-actions" style="margin:0;grid-template-columns:1fr 1fr">
         <button class="demo-mini-btn" onclick="startMstartSweep()" style="background:var(--red);border-color:var(--red);color:white">MSTART — סריקה מהירה</button>
-        <button class="demo-mini-btn" onclick="startMstartSweep()">פצוע נוסף באזור הזה</button>
+        <button class="demo-mini-btn" onclick="startMstartSweep()">סריקה</button>
         <button class="demo-mini-btn" onclick="goTo('dashboard')">הפצועים שלי — מעקב מדדים</button>
-        <button class="demo-mini-btn" onclick="promptZoneUpdate(true)">אזור חדש</button>
+        <button class="demo-mini-btn" onclick="promptZoneUpdate(true)">מוקד / אזור</button>
       </div>
+      ${renderMedicStockWarnings()}
+      <button class="demo-mini-btn" onclick="openMedicResupplySheet()" style="margin-top:10px;background:var(--surface2);border-color:var(--border);color:var(--muted)">חסר לי ציוד</button>
       <div class="role-row" style="margin-top:10px">
         <div class="role-row-title">עדכון מוקד / צפי נפגעים</div>
         <div class="role-row-sub">כתובת, סוג מבנה, ETA, מחולצים לפני הגעה ומקור דיווח. ניתן לתקן מאוחר יותר.</div>
         <button class="demo-mini-btn" onclick="goTo('enroute')" style="margin-top:8px">פתח מסך בדרך לאירוע</button>
       </div>
     </div>
-    ${roleSection('הפצועים שלי — תור מעקב עד חילוץ', queue)}`;
+    ${roleSection('הפצועים שלי — מעקב מדדים', queue)}`;
 }
 function renderDoctorLegacyNote(){
   return roleSection('הערת תצוגה', roleRow('מסך עבודה מלא', 'פותח תצוגת חפ״ק רפואי עם דגש על פצועים אדומים / שחורים ותורי רופא, כדי לשמור דמו קצר וברור.'));
@@ -2656,13 +2755,36 @@ function renderExtractedCounterBoard(){
       <div class="role-row-sub" style="margin-top:10px">מונה מוקד בלבד: נחשב בתמונת חוג"ד ומ״פ רפואה בלי לפתוח רשומות פצוע ירוקות.</div>
     </div>`;
 }
+function renderPcTruckStockChips(){
+  const entries=Object.entries(SUPPLY_LABELS).map(([key,label])=>({key,label,value:pcTruckStock[key]??PC_TRUCK_BASELINE[key]??0, threshold:PC_TRUCK_LOW_THRESHOLDS[key]??1}));
+  return `<div class="chip-row">${entries.map(({key,value})=>`<span class="identity-chip ${value<=0?'selected':''}">${supplyLabel(key,true)}: ${value}</span>`).join('')}</div>`;
+}
+function renderPcResupplyBoard(){
+  const requests=reinforcementRequests.filter(r=>r.type==='resupply' && ['pending_pc','approved_from_truck','sent_from_truck','collected_by_medic','unavailable_at_truck','escalated_to_cc'].includes(r.status));
+  const rows=requests.map(r=>{
+    const availability=r.truckAvailability==='available'?'זמין ברכב':'לא זמין / חסר ברכב';
+    const status=REINFORCEMENT_STATUS_LABELS[r.status]||r.status;
+    const actions=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+        <button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','approved_from_truck')">אשר מהרכב</button>
+        <button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','sent_from_truck')">שלח ציוד</button>
+        <button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','collected_by_medic')">סמן נאסף</button>
+        <button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','delivered')">סמן נמסר</button>
+        <button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','escalated_to_cc')">לא זמין ברכב — הסלם למ״פ רפואה</button>
+        <button class="demo-mini-btn" onclick="toast('נשלחה בקשת הבהרה לחובש')">בקש הבהרה</button>
+      </div>`;
+    return roleRow(`${r.requestedByName} · ${resupplyItemsText(r)}`,`${r.zone||zoneLabel()} · ${REINFORCEMENT_URGENCY_LABELS[r.urgency]||r.urgency} · ${availability} · ${status}${r.linkedPatientId?' · '+r.linkedPatientId:''}`,actions);
+  }).join('');
+  const truckWarnings=Object.entries(pcTruckStock).filter(([key,value])=>value<=(PC_TRUCK_LOW_THRESHOLDS[key]??1)).map(([key,value])=>roleRow(`רכב חוג״ד · ${supplyLabel(key)}`,`${value} נותרו · אם יש טיפול פעיל יוסלם למ״פ רפואה`)).join('');
+  return roleSection('השלמות ציוד מהחובשים', `${renderPcTruckStockChips()}${rows}${truckWarnings}` || roleRow('אין בקשות השלמת ציוד פתוחות','רכב חוג״ד הוא מקור ההשלמה הראשון לפני מ״פ רפואה / לוגיסטיקה.'));
+}
 function renderPcResponsibilityBoard(){
   const medics=DEMO_USERS.filter(u=>u.role==='medic' && u.platoonId==='PLT-A');
   const myPts=roleScopedPatients('pc');
   const redYellow=myPts.filter(p=>['red','yellow'].includes(p.triage)).length;
   const trapped=myPts.filter(p=>normalizeTrapStatus(p)==='trapped').length;
   const stale=myPts.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS).length;
-  const openReqs=roleScopedRequests('pc').filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).length;
+  const openReqs=roleScopedRequests('pc').filter(isRequestOpen).length;
   const buttons=[
     ['medics',`חובשים בקריסה`,`${medics.length} חובשים · עומס לפי פצועים ועדכון אחרון`],
     ['patients',`הפצועים שלי`,`${myPts.length} פצועים · ${redYellow} אדום/צהוב · ${trapped} לכודים`],
@@ -2670,7 +2792,24 @@ function renderPcResponsibilityBoard(){
     ['requests',`בקשות ומשאבים`,`${openReqs} בקשות פתוחות`],
     ['alerts',`התראות החלטה`,`${roleAlertRows('pc').length} התראות מנותבות לחוג"ד`]
   ].map(([key,title,sub])=>`<button class="role-row" onclick="showRoleDrilldown('${key}')" style="width:100%;text-align:right;cursor:pointer"><div class="role-row-title">${title}</div><div class="role-row-sub">${sub}</div></button>`).join('');
-  return `${renderExtractedCounterBoard()}${roleSection('האחריות שלי — לחיץ', buttons)}<div id="role-drilldown-body">${pcDrilldownHtml('medics')}</div>`;
+  return `${renderSweepBoardForPc()}${renderExtractedCounterBoard()}${renderPcResupplyBoard()}${roleSection('האחריות שלי — לחיץ', buttons)}<div id="role-drilldown-body">${pcDrilldownHtml('medics')}</div>`;
+}
+function renderSweepBoardForPc(){
+  ensureSiteReadiness();
+  const activeZones=[...new Set(patients.filter(p=>p.phase==='mstart_sweep').map(p=>p.zone||p.locDetail||'אזור לא צוין'))];
+  const activeRows=activeZones.map(zone=>{
+    const list=patients.filter(p=>p.phase==='mstart_sweep' && (p.zone||p.locDetail||'אזור לא צוין')===zone);
+    const c=sweepCounts(list);
+    const last=list.map(p=>Date.parse(p.lastModifiedAt||p.createdAt||0)).filter(Boolean).sort((a,b)=>b-a)[0];
+    const mins=last?Math.max(0,Math.floor((Date.now()-last)/60000)):'—';
+    return roleRow(`סריקה פעילה · ${zone}`,`${currentMedicName()} · ${c.total} פצועים · אדום ${c.red} · צהוב ${c.yellow} · ירוק ${c.green} · שחור ${c.black} · לכודים ${c.trapped} · חסמים ${c.tourniquets} · חסר מדדים ${c.missingVitals} · עדכון אחרון ${mins} דק׳`, `<span class="identity-chip">פעולות: שייך חובש למעקב · בקש תגבור רפואי · בקש פראמדיק · בקש פינוי</span>`);
+  }).join('');
+  const completed=(siteData.sweepSessions||[]).map(s=>roleRow(
+    `הושלמה · ${s.zone}`,
+    `${s.medicName} · ${s.casualtyCountInSweep} פצועים · אדום ${s.counts?.red||0} · צהוב ${s.counts?.yellow||0} · ירוק ${s.counts?.green||0} · שחור ${s.counts?.black||0} · לכודים ${s.trapped} · חסמים ${s.tourniquets} · חסר מדדים ${s.missingFullVitals}`,
+    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><button class="demo-mini-btn" onclick="demoReassignWithinPlatoon()">שייך חובש למעקב</button><button class="demo-mini-btn" onclick="openReinforcementRequest()">בקש תגבור רפואי</button><button class="demo-mini-btn" onclick="openReinforcementRequest()">בקש פראמדיק</button><button class="demo-mini-btn" onclick="toast('מעבר לשלב מעקב אושר')">אשר מעבר לשלב מעקב</button></div>`
+  )).join('');
+  return roleSection('סריקות MSTART פעילות / הושלמו', activeRows + completed || roleRow('אין סריקות MSTART פעילות','כאשר חובש יסיים סריקה, תופיע כאן תמונת הסריקה וחוב ההערכה.'));
 }
 function pcDrilldownHtml(key){
   const myPts=roleScopedPatients('pc');
@@ -2721,7 +2860,7 @@ function companyEvacuationPriorityRows(pts=patients){
   }).join('');
 }
 function renderDeathCertificationChain(){
-  const deathReqs=reinforcementRequests.filter(r=>r.resourceType==='doctor_death_cert' && !['arrived','resolved','cancelled','denied'].includes(r.status));
+  const deathReqs=reinforcementRequests.filter(r=>r.resourceType==='doctor_death_cert' && isRequestOpen(r));
   const latest=deathReqs[0];
   const linked=latest?.linkedPatientIds?.[0] || patients.find(p=>p.triage==='black' || p.patientStatus==='deceased')?.id || 'P---';
   const chain=[
@@ -2749,8 +2888,24 @@ function renderCompanyResourceCenter(openReqs, doctorReqs, deathReqs, blockedEva
     ${roleSection('משאבים רפואיים זמינים לשיוך', seniorResources)}
   `;
 }
+function renderCcResupplyCommandBoard(){
+  const escalated=reinforcementRequests.filter(r=>r.type==='resupply' && ['escalated_to_cc','unavailable_at_truck','fulfilled_by_company'].includes(r.status));
+  const activeCritical=patients.filter(p=>['red','yellow'].includes(p.triage)).length;
+  const truckRows=DEMO_PLATOONS.map(pl=>{
+    const criticalItems=Object.entries(pcTruckStock).filter(([key,value])=>value<=(PC_TRUCK_LOW_THRESHOLDS[key]??1));
+    const text=criticalItems.length?criticalItems.map(([key,value])=>`${supplyLabel(key,true)} ${value}`).join(' · '):'מלאי רכב תקין';
+    return roleRow(`${pl.name} · רכב חוג״ד`,`${text} · ${activeCritical} אדום/צהוב פעילים בחברה`);
+  }).join('');
+  const reqRows=escalated.map(r=>roleRow(
+    `${r.id} · ${resupplyItemsText(r)}`,
+    `${r.requestedByName} · ${r.zone||r.targetLocation} · ${REINFORCEMENT_STATUS_LABELS[r.status]||r.status}`,
+    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','fulfilled_by_company')">אשר השלמה פלוגתית</button><button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','closed')">סגור</button><button class="demo-mini-btn" onclick="toast('ציוד נותב מרכב חוג״ד אחר')">נתב בין רכבים</button><button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','unavailable_at_truck')">סמן לא זמין</button></div>`
+  )).join('');
+  const impact=escalated.length?roleRow('השפעת חוסר על טיפול',`${escalated.length} בקשות ציוד הוסלמו · ${activeCritical} פצועים אדום/צהוב עשויים להיות מושפעים`):'';
+  return `${roleSection('סטטוס רכב חוג״ד לפי מחלקה', truckRows)}${roleSection('חוסרי ציוד שהוסלמו למ״פ רפואה', reqRows || roleRow('אין חוסר ציוד מחלקתי פתוח','מ״פ רפואה רואה כאן רק חוסרים שלא נפתרו ברכב חוג״ד.'))}${roleSection('השפעת חוסר על טיפול', impact)}`;
+}
 function renderCcCommandBoard(){
-  const openReqs=reinforcementRequests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status));
+  const openReqs=reinforcementRequests.filter(isRequestOpen);
   const doctorReqs=openReqs.filter(r=>['doctor_treatment','doctor_death_cert','paramedic'].includes(r.resourceType));
   const deathReqs=openReqs.filter(r=>r.resourceType==='doctor_death_cert');
   const blockedEvac=patients.filter(p=>['red','yellow'].includes(p.triage) && !['evacuating','evacuated','handed_over'].includes(p.patientStatus)).length;
@@ -2774,8 +2929,8 @@ function renderCcCommandBoard(){
     roleMetric(blockedEvac,'פינוי לא סגור')
   ].join('');
   const reqQueue=openReqs.slice(0,6).map(r=>roleRow(
-    `${REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType} · ${REINFORCEMENT_URGENCY_LABELS[r.urgency]||r.urgency}`,
-    `${r.eventName||siteNameById(r.siteId)} · ${r.targetLocation} · פתוח ${minutesSinceIso(r.createdAt)} דק׳`,
+    `${r.type==='resupply'?'השלמת ציוד':(REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType)} · ${REINFORCEMENT_URGENCY_LABELS[r.urgency]||r.urgency}`,
+    `${r.type==='resupply'?resupplyItemsText(r):r.targetLocation} · ${r.eventName||siteNameById(r.siteId)} · פתוח ${minutesSinceIso(r.createdAt)} דק׳`,
     `<span class="identity-chip">פעולות: שייך משאב · אשר · נתקב מחדש · בקש הבהרה</span>`
   )).join('');
   const deathQueue=deathReqs.map(r=>roleRow(
@@ -2791,6 +2946,7 @@ function renderCcCommandBoard(){
   return `
     <div class="role-top-grid">${snapshot}</div>
     ${renderCompanyResourceCenter(openReqs, doctorReqs, deathReqs, blockedEvac, overloaded)}
+    ${renderCcResupplyCommandBoard()}
     ${roleSection('עומס מחלקות — אדום/צהוב לפי מחלקה', platoonRows)}
     ${roleSection('תעדוף פינוי פלוגתי', companyEvacuationPriorityRows(patients))}
     ${roleSection('בקשות משאב רפואי פתוחות', reqQueue)}
@@ -2816,7 +2972,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
   const metrics=[
     roleMetric(pts.length, role==='medic'?'הפצועים שלי':role==='pc'?'פצועי המחלקה':'פצועים גלויים'),
     roleMetric(alerts.length, 'התראות לפעולה'),
-    roleMetric(requests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).length, 'בקשות פתוחות'),
+    roleMetric(requests.filter(isRequestOpen).length, 'בקשות פתוחות'),
     roleMetric(role==='cc'?DEMO_PLATOONS.length:allSites.filter(s=>s.id!=='ALL').length, role==='cc'?'מחלקות':'מוקדים')
   ].join('');
   const responsibilities=cfg.responsibilities.map(x=>roleRow(x,'אחריות תפקיד')).join('');
@@ -2842,7 +2998,10 @@ function renderRoleDashboard(role=activeRoleDashboard){
   }else{
     objects=allSites.filter(s=>s.id!=='ALL').map(s=>roleRow(s.name,`${getSitePatients(s.id).length} פצועים · ${externalConflictCount(getSitePatients(s.id), s.externalReports||[])} פערי דיווח`)).join('');
   }
-  const reqHtml=requests.slice(0,8).map(r=>roleRow(`${r.id} · ${REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType}`,`${r.targetLocation} · ${REINFORCEMENT_STATUS_LABELS[r.status]||r.status} · ${(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')}`)).join('');
+  const reqHtml=requests.slice(0,8).map(r=>roleRow(
+    `${r.id} · ${r.type==='resupply'?'השלמת ציוד':(REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType)}`,
+    `${r.type==='resupply'?resupplyItemsText(r):r.targetLocation} · ${REINFORCEMENT_STATUS_LABELS[r.status]||r.status} · ${r.type==='resupply'?(r.truckAvailability==='available'?'זמין ברכב חוג״ד':'דורש מ״פ רפואה'):(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')}`
+  )).join('');
   const actions=[
     `<button class="demo-mini-btn" onclick="openLegacyForRole('${role}')">פתח מסך עבודה מלא</button>`,
     role==='medic'?`<button class="demo-mini-btn" onclick="startMedicTreatmentNow()">התחל טיפול עכשיו</button><button class="demo-mini-btn" onclick="goTo('enroute')">טיוטת מוקד בדרך</button>`:'',
@@ -2855,15 +3014,14 @@ function renderRoleDashboard(role=activeRoleDashboard){
   document.getElementById('role-dashboard-body').innerHTML=`
     <div class="role-top-grid">${metrics}</div>
     ${role==='medic'?renderMedicActionPanel():''}
-    ${role==='medic'?renderMedicScopeNote():''}
     ${role==='pc'?renderPcResponsibilityBoard():''}
     ${role==='doctor'?renderDoctorLegacyNote():''}
     ${role==='cc'?renderCcCommandBoard():''}
-    ${role==='pc'?'':roleSection('האחריות שלי', responsibilities)}
-    ${roleSection('התראות שדורשות פעולה ממני', alertHtml)}
-    ${roleSection(role==='pc'?'האובייקטים שלי: חובשים / פצועים / מוקדים':role==='cc'?'האובייקטים שלי: מחלקות / מוקדים / משאבים':role==='doctor'?'תור סקירה רפואית':role==='logistics'?'מלאי ובקשות ציוד':'האובייקטים שלי', objects)}
-    ${roleSection('בקשות / הקצאות פתוחות', reqHtml)}
-    <div class="demo-actions" style="margin:0;grid-template-columns:1fr 1fr">${actions}</div>
+    ${role==='medic'?'':role==='pc'?'':roleSection('האחריות שלי', responsibilities)}
+    ${role==='medic'?'':roleSection('התראות שדורשות פעולה ממני', alertHtml)}
+    ${role==='medic'?'':roleSection(role==='pc'?'האובייקטים שלי: חובשים / פצועים / מוקדים':role==='cc'?'האובייקטים שלי: מחלקות / מוקדים / משאבים':role==='doctor'?'תור סקירה רפואית':role==='logistics'?'מלאי ובקשות ציוד':'האובייקטים שלי', objects)}
+    ${role==='medic'?'':roleSection('בקשות / הקצאות פתוחות', reqHtml)}
+    ${role==='medic'?'':`<div class="demo-actions" style="margin:0;grid-template-columns:1fr 1fr">${actions}</div>`}
   `;
   updateDemoStatus();
 }
@@ -2987,7 +3145,7 @@ function exportExperimentLog(){
     unsynced_events:patients.reduce((s,p)=>s+(p.unsyncedEvents||0),0)+localOutboxCount(),
     commander_open_alerts:alertRows.filter(a=>a.audience.includes('pc')||a.audience.includes('chamal')).length,
     acknowledged_alerts:patients.filter(p=>p.alertAcknowledgedAt).length,
-    reinforcement_requests_open:reinforcementRequests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).length,
+    reinforcement_requests_open:reinforcementRequests.filter(isRequestOpen).length,
     conflict_count:conflictLog().length
   };
   const observer=observerNotes();
@@ -3076,6 +3234,7 @@ function goTo(screen){
   window.scrollTo(0,0);
   updateFlowChrome(screen);
   if(screen==='dashboard'){ renderDashboard(); renderAlerts(); }
+  if(screen==='sweep'){ renderMstartSweep(); }
   if(screen==='site'){
     renderReports();
     ensureSiteReadiness();
@@ -3172,10 +3331,12 @@ function renderDashboard(){
           ${tq?`<span class="tq-timer ${tq.cls}">${tq.label}</span>`:''}
           ${det?`<span class="deteri-flag">⚠ הידרדרות</span>`:''}
           <span class="badge ${trend.cls}">${trend.label}</span>
+          ${p.priorityRecommendation?`<span class="badge badge-red">שקול קדימות: ${TRIAGE_LABELS[p.priorityRecommendation.suggested]||p.priorityRecommendation.suggested}</span>`:''}
           ${p.medicReminder?`<span class="badge badge-orange">${p.medicReminder}</span>`:''}
           <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${p.time}</span>
         </div>
         <div style="font-size:11px;color:var(--muted);margin-top:3px">${trend.detail}</div>
+        <button class="demo-mini-btn" onclick="event.stopPropagation();openMedicResupplySheet('${p.id}','manual_request')" style="margin-top:8px;background:var(--surface2);border-color:var(--border);color:var(--muted)">חסר לי ציוד</button>
       </div>
       ${p.alert?'<div class="alert-dot"></div>':''}
     </div>`;
@@ -3216,15 +3377,16 @@ function avpuSeverity(v){
   return {A:0,V:1,P:2,U:3}[v] ?? 1;
 }
 function patientPriorityScore(p){
-  const tq=p.tourniquet?.appliedAt ? Math.min(120, Math.floor((Date.now()-p.tourniquet.appliedAt)/60000)) : 0;
   const stale=needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS;
-  if(p.triage==='red' && (p.alert || (p.deterioration||[]).length)) return 0;
-  if(p.triage==='red') return 10 - Math.min(8, Math.floor(tq/15));
-  if(p.triage==='black' && p.patientStatus!=='deceased') return 20;
-  if(p.triage==='yellow' && stale) return 30;
-  if(p.triage==='yellow') return 40;
-  if(p.triage==='green' && stale) return 50;
-  return 60;
+  if(p.triage==='red') return 0;
+  if(p.tourniquet) return 10;
+  if(normalizeTrapStatus(p)==='trapped') return 20;
+  if(p.assessmentDebt?.includes('full_vitals') || p.needsFullAssessment) return 30;
+  if(stale) return 40;
+  if(p.triage==='yellow') return 50;
+  if(p.triage==='green') return 60;
+  if(p.triage==='black') return 70;
+  return 80;
 }
 function sortedPatients(list=patients){
   return [...list].sort((a,b)=>patientPriorityScore(a)-patientPriorityScore(b) || String(a.id).localeCompare(String(b.id)));
@@ -3258,8 +3420,276 @@ function updateZoneContextBar(){
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px">
         <button class="demo-mini-btn" onclick="promptZoneUpdate()">שנה אזור</button>
         <button class="demo-mini-btn" onclick="startMstartSweep()">פצוע נוסף באזור הזה</button>
-        <button class="demo-mini-btn" onclick="promptZoneUpdate(true)">אזור חדש</button>
+        <button class="demo-mini-btn" onclick="completeMstartSweep()">סיים סריקה באזור הזה</button>
       </div>
+    </div>`;
+}
+function currentMedicId(){ return 'USR-COHEN'; }
+function currentMedicName(){ return displayUser(currentMedicId()); }
+function currentSiteId(){ return 'SITE_A'; }
+function sweepPatientsForCurrentZone(){
+  return patients.filter(p=>p.phase==='mstart_sweep' && (p.zone||p.locDetail)===zoneLabel() && (p.assignedMedicId||currentMedicId())===currentMedicId());
+}
+function sweepCounts(list=sweepPatientsForCurrentZone()){
+  return {
+    total:list.length,
+    red:list.filter(p=>p.triage==='red').length,
+    yellow:list.filter(p=>p.triage==='yellow').length,
+    green:list.filter(p=>p.triage==='green').length,
+    black:list.filter(p=>p.triage==='black').length,
+    trapped:list.filter(p=>['trapped','immobile'].includes(p.mstart?.trapped)||normalizeTrapStatus(p)==='trapped').length,
+    tourniquets:list.filter(p=>(p.lifeSavingTreatments||[]).some(t=>t.treatmentType==='tourniquet')).length,
+    airway:list.filter(p=>(p.lifeSavingTreatments||[]).some(t=>t.treatmentType==='airway')).length,
+    missingVitals:list.filter(p=>p.assessmentDebt?.includes('full_vitals')).length
+  };
+}
+function createTmpCasualtyId(){
+  const n=patients.filter(p=>String(p.id).startsWith('TMP-')).length+1;
+  return `TMP-${String(n).padStart(3,'0')}`;
+}
+function suggestedSweepColor(m={}){
+  if(m.walking==='yes') return 'green';
+  if(m.breathing==='no') return 'black';
+  if(m.perfusion==='absent') return 'black';
+  if(['carotid_only','radial_weak'].includes(m.perfusion)) return 'red';
+  if(['V','P','U'].includes(m.avpu)) return 'red';
+  if(['trapped','immobile'].includes(m.trapped)) return 'yellow';
+  if(m.breathing==='yes' && m.perfusion==='radial_strong' && m.avpu==='A') return 'yellow';
+  return 'yellow';
+}
+function startSweepCasualtyMarker(){
+  ensureSiteReadiness();
+  const id=createTmpCasualtyId();
+  const t=nowT();
+  const marker={
+    id,
+    siteId:currentSiteId(),
+    zone:zoneLabel(),
+    phase:'mstart_sweep',
+    identityStatus:'unknown',
+    fullName:'לא מזוהה',
+    temporaryDescription:'סומן בסריקת MSTART',
+    assignedMedicId:currentMedicId(),
+    assignedPlatoonId:'PLT-A',
+    createdAt:new Date().toISOString(),
+    time:t,
+    mstart:{walking:null,breathing:null,perfusion:null,avpu:null,trapped:null,color:null,overrideReason:''},
+    lifeSavingTreatments:[],
+    assessmentDebt:['full_vitals','identity','evacuation_status','full_injury_assessment'],
+    triage:'pending',
+    trapStatus:'unknown',
+    accessibility:null,
+    patientStatus:'identified',
+    location:siteData.address||siteData.name||'מוקד פעיל',
+    locDetail:zoneLabel(),
+    injury:siteData.lastMechanism||'הערכת MSTART בלבד',
+    needsFullAssessment:true,
+    vitals:{pulse:null,spo2:null,bp_estimate:null,rr:null,avpu:null},
+    vitalsHistory:[],
+    txHistory:[],
+    deterioration:[],
+    alert:false,
+    tourniquet:null,
+    lastTouchedBy:getDeviceId(),
+    lastModifiedAt:new Date().toISOString(),
+    confirmedClinical:false,
+    unsyncedEvents:1,
+    events:[{type:'CASUALTY_MARKER_CREATED',time:t,detail:`${id} סומן בסריקת MSTART · אזור ${zoneLabel()}`,warn:false}]
+  };
+  patients.unshift(marker);
+  activeSweepPatientId=id;
+  saveLocalEvent({type:'CASUALTY_MARKER_CREATED',detail:`${id} · ${zoneLabel()}`,warn:false,payload_json:{patient_id:id,siteId:marker.siteId,zone:marker.zone,phase:'mstart_sweep',assessmentDebt:marker.assessmentDebt}});
+  saveDemoState();
+  renderMstartSweep();
+  if(document.getElementById('screen-commander')?.classList.contains('active')) renderCommander();
+}
+function activeSweepPatient(){
+  return patients.find(p=>p.id===activeSweepPatientId) || null;
+}
+function updateSweepField(key,value){
+  const p=activeSweepPatient(); if(!p) return;
+  p.mstart=p.mstart||{};
+  p.mstart[key]=value;
+  if(key==='avpu' && ['A','V','P','U'].includes(value) && p.mstart.breathing!=='no') p.mstart.breathing='yes';
+  if(key==='trapped'){
+    p.trapStatus=value==='not_trapped'?'not_trapped':value==='unknown'?'unknown':'trapped';
+    p.accessibility=p.trapStatus==='not_trapped'?'full':p.trapStatus==='trapped'?'trapped':null;
+  }
+  p.mstart.color=suggestedSweepColor(p.mstart);
+  p.triage=p.mstart.color;
+  p.vitals.avpu=p.mstart.avpu||null;
+  p.vitals.rr=p.mstart.breathing==='no'?0:p.mstart.breathing==='yes'?16:null;
+  p.vitals.bp_estimate={radial_strong:'radial_strong',radial_weak:'radial_weak',carotid_only:'carotid_weak',absent:'absent'}[p.mstart.perfusion]||null;
+  p.alert=['red','black'].includes(p.triage);
+  p.lastModifiedAt=new Date().toISOString();
+  p.unsyncedEvents=(p.unsyncedEvents||0)+1;
+  p.events=p.events||[];
+  p.events.unshift({type:'MSTART_FIELD_UPDATED',time:nowT(),detail:`${key}: ${value} · צבע מוצע ${TRIAGE_LABELS[p.triage]||p.triage}`,warn:p.alert});
+  saveDemoState();
+  renderMstartSweep();
+}
+function overrideSweepColor(color){
+  const p=activeSweepPatient(); if(!p) return;
+  const reason=document.getElementById('sweep-override-reason')?.value.trim()||'עקיפה ידנית בסריקה';
+  p.mstart=p.mstart||{};
+  p.mstart.color=color;
+  p.mstart.overrideReason=reason;
+  p.triage=color;
+  p.alert=['red','black'].includes(color);
+  p.events=p.events||[];
+  p.events.unshift({type:'MSTART_SWEEP_COLOR_OVERRIDDEN',time:nowT(),detail:`סיווג סריקה ידני: ${TRIAGE_LABELS[color]} · ${reason}`,warn:p.alert});
+  if(color==='black'){
+    p.patientStatus='deceased';
+    createDeathCertificationRequest(p);
+  }
+  saveLocalEvent({type:'MSTART_SWEEP_COLOR_OVERRIDDEN',detail:`${p.id} · ${TRIAGE_LABELS[color]}`,warn:p.alert,payload_json:{patient_id:p.id,color,reason}});
+  saveDemoState();
+  renderMstartSweep();
+}
+function recordSweepTreatment(type){
+  const p=activeSweepPatient(); if(!p) return;
+  const label={tourniquet:'חסם עורקים',airway:'פתיחת נתיב אוויר',pressure_bandage:'חבישת לחץ / עצירת דימום',other:'אחר / הערה קצרה'}[type]||type;
+  const event={treatmentType:type,patientId:p.id,siteId:p.siteId,zone:p.zone,performedBy:currentMedicName(),occurredAt:new Date().toISOString(),payload:{}};
+  if(type==='tourniquet'){
+    event.payload={limb:'unknown_limb',tourniquetTime:new Date().toISOString()};
+    p.tourniquet={limb:'לא צוין — להשלים',appliedAt:Date.now(),timeCode:nowT().replace(':','')};
+    if(!p.assessmentDebt.includes('tourniquet_limb')) p.assessmentDebt.push('tourniquet_limb');
+    reconcileSupplySource(`sweep:${p.id}:tq`, 'tourniquets', 1, p.id);
+    p.triage='red';
+    p.mstart.color='red';
+    p.patientStatus='stabilizing';
+  }
+  if(type==='airway'){
+    event.payload={airway_opened:true,breathing_after:p.mstart?.breathing||'unknown'};
+    p.patientStatus='stabilizing';
+    reconcileSupplySource(`sweep:${p.id}:airway`, 'airwayEquipment', 1, p.id);
+  }
+  if(type==='pressure_bandage'){
+    reconcileSupplySource(`sweep:${p.id}:pressure`, 'pressureDressings', 1, p.id);
+  }
+  p.lifeSavingTreatments=p.lifeSavingTreatments||[];
+  p.lifeSavingTreatments.unshift(event);
+  p.txHistory=p.txHistory||[];
+  p.txHistory.unshift({time:nowT(),text:label,medic:getDeviceId()});
+  p.events=p.events||[];
+  p.events.unshift({type:'LIFE_SAVING_TREATMENT_RECORDED',time:nowT(),detail:label,warn:type==='tourniquet'});
+  p.unsyncedEvents=(p.unsyncedEvents||0)+1;
+  p.lastModifiedAt=new Date().toISOString();
+  saveLocalEvent({type:'LIFE_SAVING_TREATMENT_RECORDED',detail:`${p.id} · ${label}`,warn:type==='tourniquet',payload_json:event});
+  saveDemoState();
+  renderMstartSweep();
+  if(document.getElementById('screen-commander')?.classList.contains('active')) renderCommander();
+}
+function closeSweepMarker(){
+  activeSweepPatientId=null;
+  renderMstartSweep();
+}
+function completeMstartSweep(){
+  ensureSiteReadiness();
+  const list=sweepPatientsForCurrentZone();
+  const c=sweepCounts(list);
+  const consumed={
+    tourniquets:list.reduce((sum,p)=>sum+(p.lifeSavingTreatments||[]).filter(t=>t.treatmentType==='tourniquet').length,0),
+    pressureDressings:list.reduce((sum,p)=>sum+(p.lifeSavingTreatments||[]).filter(t=>t.treatmentType==='pressure_bandage').length,0),
+    airwayEquipment:list.reduce((sum,p)=>sum+(p.lifeSavingTreatments||[]).filter(t=>t.treatmentType==='airway').length,0)
+  };
+  const session={
+    id:`SWEEP-${String((siteData.sweepSessions||[]).length+1).padStart(3,'0')}`,
+    medicId:currentMedicId(),
+    medicName:currentMedicName(),
+    siteId:currentSiteId(),
+    zone:zoneLabel(),
+    casualtyCountInSweep:c.total,
+    counts:{red:c.red,yellow:c.yellow,green:c.green,black:c.black},
+    trapped:c.trapped,
+    tourniquets:c.tourniquets,
+    airwayInterventions:c.airway,
+    consumedSupplies:consumed,
+    missingFullVitals:c.missingVitals,
+    status:'completed',
+    createdAt:new Date().toISOString(),
+    lastUpdateAt:new Date().toISOString()
+  };
+  siteData.sweepSessions=siteData.sweepSessions||[];
+  siteData.sweepSessions.unshift(session);
+  const consumedText=Object.entries(consumed).filter(([,v])=>v>0).map(([k,v])=>`${supplyLabel(k,true)} x${v}`).join(' · ')||'לא נצרך ציוד';
+  saveLocalEvent({type:'MSTART_SWEEP_COMPLETED',detail:`${session.medicName} סיים סריקת MSTART באזור ${session.zone}: ${c.total} פצועים, ${c.red} אדום, ${c.trapped} לכודים, ${c.tourniquets} חסמים · נצרך: ${consumedText}`,warn:c.red>0||c.tourniquets>0,payload_json:session});
+  activeSweepPatientId=null;
+  activeRoleDashboard='medic';
+  saveDemoState();
+  const low=lowStockEntries(state.localStockCache);
+  toast(`סריקת MSTART הסתיימה. נצרכו בסריקה: ${consumedText}${low.length?' · ציוד נמוך — מומלץ לבקש השלמה מהרכב':''}`);
+  goTo('role-dashboard');
+}
+function renderMstartSweep(){
+  ensureSiteReadiness();
+  const clock=document.getElementById('sweep-clock'); if(clock) clock.textContent=nowT();
+  const title=document.getElementById('sweep-context-title'); if(title) title.textContent=siteContextLine();
+  const bar=document.getElementById('sweep-zone-bar');
+  if(bar) bar.innerHTML=`
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px">
+      <div style="font-size:12px;color:var(--muted)">מוקד: ${siteData.address||siteData.name||'לא מוגדר'} · אזור: ${zoneLabel()}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px">
+        <button class="demo-mini-btn" onclick="promptZoneUpdate()">שנה אזור</button>
+        <button class="demo-mini-btn" onclick="startSweepCasualtyMarker()">פצוע נוסף באזור הזה</button>
+        <button class="demo-mini-btn" onclick="completeMstartSweep()">סיים סריקה באזור הזה</button>
+      </div>
+    </div>`;
+  const c=sweepCounts();
+  const stats=document.getElementById('sweep-stats');
+  if(stats) stats.innerHTML=[
+    roleMetric(c.total,'פצועים בסריקה'),
+    roleMetric(c.red,'אדום'),
+    roleMetric(c.trapped,'לכודים / לא ניידים'),
+    roleMetric(c.tourniquets,'חסמים')
+  ].join('');
+  const card=document.getElementById('sweep-active-card');
+  if(!card) return;
+  const p=activeSweepPatient();
+  if(!p){
+    const rows=sweepPatientsForCurrentZone().slice(0,6).map(x=>roleRow(`${x.id} · ${TRIAGE_LABELS[x.triage]||'טרם סווג'}`,`${x.zone} · ${TRAP_LABELS[normalizeTrapStatus(x)]||'לא ידוע'} · ${x.assessmentDebt?.includes('full_vitals')?'מדדים מלאים חסרים':'מדדים קיימים'}`,`<button class="demo-mini-btn" onclick="activeSweepPatientId='${x.id}';renderMstartSweep()" style="margin-top:8px">עדכן בסריקה</button>`)).join('');
+    card.innerHTML=roleSection('סומנו באזור הזה', rows || roleRow('אין פצועים מסומנים באזור','לחץ "פצוע נוסף באזור הזה" כדי להתחיל.'));
+    return;
+  }
+  const m=p.mstart||{};
+  const btn=(key,val,label,cls='')=>`<button class="tap-btn ${cls} ${m[key]===val?'selected':''}" onclick="updateSweepField('${key}','${val}')">${label}</button>`;
+  card.innerHTML=`
+    <div class="summary-card" style="border-color:var(--accent)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div><div style="font-family:var(--mono);font-size:22px;font-weight:900">${p.id}</div><div style="font-size:12px;color:var(--muted)">${p.zone}</div></div>
+        ${triagePill(p.triage)}
+      </div>
+      <div class="field-label">פעולות מצילות חיים בסריקה</div>
+      <div class="tap-grid tap-grid-2" style="margin-bottom:14px">
+        <button class="tap-btn triage-red" onclick="recordSweepTreatment('tourniquet')">חסם עורקים</button>
+        <button class="tap-btn triage-red" onclick="recordSweepTreatment('airway')">פתיחת נתיב אוויר</button>
+        <button class="tap-btn triage-yellow" onclick="recordSweepTreatment('pressure_bandage')">חבישת לחץ / עצירת דימום</button>
+        <button class="tap-btn" onclick="recordSweepTreatment('other')">אחר / הערה קצרה</button>
+      </div>
+      <div class="field-label">הולך?</div>
+      <div class="tap-grid tap-grid-3" style="margin-bottom:12px">${btn('walking','yes','הולך','triage-green')}${btn('walking','no','לא הולך')}${btn('walking','trapped_unknown','לא ניתן להעריך / לכוד','triage-yellow')}</div>
+      <div class="field-label">נשימה</div>
+      <div class="tap-grid tap-grid-3" style="margin-bottom:12px">${btn('breathing','yes','נושם')}${btn('breathing','no','לא נושם','triage-black')}${btn('breathing','unsure','לא בטוח','triage-yellow')}</div>
+      <div class="field-label">פרפוזיה / דופק</div>
+      <div class="tap-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:12px">${btn('perfusion','radial_strong','דופק רדיאלי חזק','triage-green')}${btn('perfusion','radial_weak','דופק רדיאלי חלש','triage-yellow')}${btn('perfusion','carotid_only','דופק קרוטידי בלבד','triage-red')}${btn('perfusion','absent','אין דופק מורגש','triage-black')}${btn('perfusion','not_checked','לא נבדק')}</div>
+      <div class="field-label">AVPU</div>
+      <div class="tap-grid tap-grid-4" style="margin-bottom:12px">${btn('avpu','A','A','triage-green')}${btn('avpu','V','V','triage-yellow')}${btn('avpu','P','P','triage-red')}${btn('avpu','U','U','triage-red')}</div>
+      <div class="field-label">לכוד / ניידות</div>
+      <div class="tap-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:12px">${btn('trapped','trapped','לכוד','triage-red')}${btn('trapped','immobile','לא יכול לנוע','triage-yellow')}${btn('trapped','not_trapped','לא לכוד')}${btn('trapped','unknown','לא ידוע')}</div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px">
+        <div style="font-size:12px;color:var(--muted)">צבע MSTART מוצע</div>
+        <div style="font-size:18px;font-weight:900;margin-top:4px">${TRIAGE_LABELS[p.triage]||'טרם סווג'}</div>
+        <input id="sweep-override-reason" type="text" placeholder="סיבת עקיפה ידנית — אופציונלי" style="margin-top:10px">
+        <div class="tap-grid tap-grid-4" style="margin-top:10px">
+          <button class="tap-btn triage-red" onclick="overrideSweepColor('red')">אדום</button>
+          <button class="tap-btn triage-yellow" onclick="overrideSweepColor('yellow')">צהוב</button>
+          <button class="tap-btn triage-green" onclick="overrideSweepColor('green')">ירוק</button>
+          <button class="tap-btn triage-black" onclick="overrideSweepColor('black')">שחור</button>
+        </div>
+      </div>
+      <div class="role-row-sub">יש לקחת מדדים: ${(p.assessmentDebt||[]).join(', ')}</div>
+      ${p.tourniquet?`<div style="margin-top:8px"><span class="tq-timer ${tourniquetTimerLabel(p)?.cls||'warn'}">${tourniquetTimerLabel(p)?.label||'חסם פעיל'}</span></div>`:''}
+      <button class="btn-primary" onclick="closeSweepMarker()" style="margin-top:14px;background:var(--green)">שמור וסמן פצוע הבא</button>
     </div>`;
 }
 function timeCodeToTodayMs(code){
@@ -3350,7 +3780,12 @@ function buildAlertObjects(pts=patients){
   if(conflicts>0) pushAlert(alerts,{id:`external-conflict-${cmdActiveSite}`,type:'EXTERNAL_REPORT_CONFLICT',severity:conflicts>2?'high':'medium',owner:'chamal',audience:['pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'verify_report',scope:'site',category:'integrity',siteId:cmdActiveSite,title:'פער דיווח חיצוני מול שדה',detail:`${conflicts} פערים בין דיווח חיצוני לספירה מאושרת`});
   const unsynced=pts.reduce((sum,p)=>sum+(p.unsyncedEvents||0),0)+localOutboxCount();
   if(unsynced>0) pushAlert(alerts,{id:`sync-backlog-${cmdActiveSite}`,type:'UNSYNCED_EVENT_BACKLOG',severity:unsynced>5?'high':'low',owner:'chamal',audience:unsynced>5?['pc','cc','chamal']:['medic','pc'],escalatesTo:unsynced>5?'cc':null,escalateAfterMin:unsynced>5?5:null,actionRequired:'review_sync',scope:'system',category:'integrity',siteId:cmdActiveSite,title:'אירועים מקומיים לא מסונכרנים',detail:`${unsynced} אירועים ממתינים בתור המקומי`});
-  reinforcementRequests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).forEach(r=>{
+  reinforcementRequests.filter(isRequestOpen).forEach(r=>{
+    if(r.type==='resupply'){
+      const escalated=['escalated_to_cc','unavailable_at_truck'].includes(r.status);
+      pushAlert(alerts,{id:`resupply-${r.id}`,type:escalated?'PC_TRUCK_SHORTAGE_ESCALATED':'MEDIC_RESUPPLY_REQUEST',severity:r.urgency==='immediate'||escalated?'high':'medium',owner:escalated?'cc':'pc',audience:escalated?['pc','cc','logistics','chamal']:['pc','logistics'],escalatesTo:escalated?'cc':null,escalateAfterMin:escalated?0:8,actionRequired:'dispatch_supply',scope:escalated?'company':'site',category:'forces',siteId:r.siteId,patientId:r.linkedPatientId,title:`בקשת השלמת ציוד — ${escalated?'נדרש תגבור פלוגתי':'זמינה ברכב חוג״ד'}`,detail:`${r.requestedByName} · ${r.zone||r.targetLocation} · ${resupplyItemsText(r)} · ${REINFORCEMENT_STATUS_LABELS[r.status]||r.status}`});
+      return;
+    }
     const isDeathCert=r.resourceType==='doctor_death_cert';
     const isDoctorTx=['doctor_treatment','paramedic'].includes(r.resourceType);
     pushAlert(alerts,{id:`reinforcement-${r.id}`,type:isDeathCert?'DOCTOR_DEATH_CERTIFICATION_REQUEST':'MEDICAL_REINFORCEMENT_REQUEST',severity:r.urgency==='immediate'?'high':'medium',owner:isDeathCert||isDoctorTx?'doctor':'cc',audience:isDeathCert?['pc','cc','doctor','chamal']:isDoctorTx?['pc','cc','doctor','chamal']:['pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:r.urgency==='immediate'?3:10,actionRequired:isDeathCert?'certify_death':'request_reinforcement',scope:isDeathCert?'patient':'company',category:isDeathCert?'forces':'forces',siteId:r.siteId,patientId:(r.linkedPatientIds||[])[0],title:`בקשת תגבור — ${REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType}`,detail:`${r.targetLocation} · ${REINFORCEMENT_STATUS_LABELS[r.status]||r.status} · ${(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')}`});
@@ -3424,7 +3859,8 @@ function startMedicTreatmentNow(){
 }
 function startMstartSweep(){
   if(!siteData.name || siteData.name.trim()===''){ goTo('enroute'); return; }
-  startNewPatient('quick');
+  activeSweepPatientId=null;
+  goTo('sweep');
 }
 function promptZoneUpdate(newZone=false){
   if(newZone) siteData.currentZone='';
@@ -3511,7 +3947,7 @@ function saveImmediateCasualtyAndContinue(){
   };
   actionLabels.forEach(text=>p.events.unshift({type:text.includes('חסם')?'TOURNIQUET_APPLIED':'LIFE_SAVING_ACTION_RECORDED',time:t,detail:text,warn:true}));
   patients.unshift(p);
-  if(isTq) reconcileSupplySource(`mstart:${id}:tq`, 'CAT_TOURNIQUET', 1);
+  if(isTq) reconcileSupplySource(`mstart:${id}:tq`, 'tourniquets', 1);
   if(triage==='black') createDeathCertificationRequest(p);
   saveLocalEvent({type:'IMMEDIATE_FIELD_ASSESSMENT',detail:`${id} נפתח בסריקת MSTART`,warn:['red','black'].includes(triage),payload_json:{patient_id:id,triage,site:siteData.name,zone:zoneLabel(),immediate:im,life_saving_actions:actions}});
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
@@ -3562,7 +3998,7 @@ function createImmediateInterventionPatient(kind='tourniquet'){
     ]
   };
   patients.unshift(p);
-  if(isTq) reconcileSupplySource(`immediate:${id}:tq`, 'CAT_TOURNIQUET', 1);
+  if(isTq) reconcileSupplySource(`immediate:${id}:tq`, 'tourniquets', 1);
   saveLocalEvent({type:isTq?'TOURNIQUET_APPLIED':'IMMEDIATE_INTERVENTION_RECORDED',detail:label,warn:true,payload_json:{patient_id:id,source:'medic_immediate_action',auto_triage:'red'}});
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   renderDashboard(); renderAlerts();
@@ -3698,7 +4134,7 @@ function arriveAtSite(){
   state=freshState();
   state.flowMode='quick';
   state.locFree=[siteData.address,siteData.floorHint,siteData.apartmentHint].filter(Boolean).join(' · ');
-  goTo('step1');
+  goTo('sweep');
 }
 function changeSiteInitialEvac(color, delta){
   changeInitialEvac(color, delta);
@@ -3796,6 +4232,7 @@ function openPatient(id){
         <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:${p.vitals.avpu==='A'?'var(--green)':p.vitals.avpu==='U'?'var(--red)':'var(--yellow)'}">${p.vitals.avpu||'—'}</div><div style="font-size:11px;color:var(--muted)">AVPU</div></div>
       </div>
       ${p.deterioration&&p.deterioration.length?`<div style="background:rgba(230,57,70,0.1);border:1px solid var(--red);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:700;font-size:12px;color:var(--red);margin-bottom:3px">⚠ הידרדרות זוהתה</div><div style="font-size:12px">${p.deterioration.join(' · ')}</div></div>`:''}
+      ${p.priorityRecommendation?`<div style="background:rgba(255,107,53,0.12);border:1px solid var(--orange);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:800;font-size:12px;color:var(--orange);margin-bottom:5px">הידרדרות במדדים — מומלץ לשקול שינוי קדימות</div><div style="font-size:12px;margin-bottom:8px">${TRIAGE_LABELS[p.priorityRecommendation.current]||p.priorityRecommendation.current} → ${TRIAGE_LABELS[p.priorityRecommendation.suggested]||p.priorityRecommendation.suggested}</div><div class="tap-grid tap-grid-2"><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','update')">עדכן קדימות</button><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','keep')">השאר קדימות</button><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','pc_review')">בקש חוג"ד</button><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','doctor')">בקש פראמדיק/רופא</button></div></div>`:''}
     </div>
     ${['evacuating','evacuated','handed_over'].includes(p.patientStatus)?`
     <div class="summary-card">
@@ -3877,6 +4314,28 @@ function speakMist(id){
   }catch(e){
     toast('לא ניתן להקריא כרגע');
   }
+}
+function confirmPriorityRecommendation(id, action){
+  const p=patients.find(x=>x.id===id); if(!p || !p.priorityRecommendation) return;
+  const rec=p.priorityRecommendation;
+  if(action==='update'){
+    const old=p.triage;
+    p.triage=rec.suggested;
+    p.events.unshift({type:'PRIORITY_UPDATED_AFTER_DETERIORATION',time:nowT(),detail:`קדימות עודכנה לאחר הידרדרות: ${TRIAGE_LABELS[old]||old} → ${TRIAGE_LABELS[p.triage]||p.triage}`,warn:['red','black'].includes(p.triage)});
+  }else if(action==='keep'){
+    p.events.unshift({type:'PRIORITY_RECOMMENDATION_DECLINED',time:nowT(),detail:'הידרדרות נצפתה אך הקדימות נשארה ללא שינוי',warn:false});
+  }else if(action==='pc_review'){
+    p.events.unshift({type:'PC_REVIEW_REQUESTED_FOR_DETERIORATION',time:nowT(),detail:'התבקשה סקירת חוג"ד בעקבות הידרדרות במדדים',warn:true});
+  }else if(action==='doctor'){
+    createMedicalResourceRequest({resourceType:'paramedic',reasonCodes:['red_patient'],urgency:'high',siteId:p.siteId||'SITE_A',targetLocation:p.location||siteData.name,linkedPatientIds:[p.id],requestedByRole:'medic',requestedByName:currentMedicName(),freeText:'בקשת פראמדיק/רופא בעקבות הידרדרות במדדים',auto:true});
+    p.events.unshift({type:'SENIOR_MEDICAL_REVIEW_REQUESTED',time:nowT(),detail:'בקשת פראמדיק/רופא בעקבות הידרדרות במדדים',warn:true});
+  }
+  delete p.priorityRecommendation;
+  p.lastModifiedAt=new Date().toISOString();
+  p.unsyncedEvents=(p.unsyncedEvents||0)+1;
+  saveDemoState();
+  renderDashboard();
+  openPatient(id);
 }
 function manualTriageOverride(id, triage){
   const p=patients.find(x=>x.id===id); if(!p) return;
@@ -4618,7 +5077,7 @@ function queueMedicationEventsBeforeSave(){
 }
 
 function queueInventoryBeforeSave(patientId){
-  reconcileSupplySource('quick:tq', 'CAT_TOURNIQUET', quickTqData.applied ? 1 : 0, patientId);
+  reconcileSupplySource('quick:tq', 'tourniquets', quickTqData.applied ? 1 : 0, patientId);
   ['tourniquet','bandage','morphine','atq','fluids'].forEach(key=>reconcileSupplyForIntervention(key, state.interventions.has(key)?null:0, patientId));
 }
 
@@ -4951,29 +5410,25 @@ function saveModalVitals(){
     }
   }
 
-  // ── Re-run MSTART ────────────────────────────
-  const newMstart = computeMstartTriage(next);
-  const triageChanged = newMstart && newMstart !== p.triage;
-  if(triageChanged){
-    // Keep old triage in history
-    if(!p.triageHistory) p.triageHistory = [];
-    p.triageHistory.push({
-      time: nowT(),
-      from: p.triage,
-      to: newMstart,
-      reason: `מדדים עודכנו — MSTART מחושב מחדש`,
-      medic: medicName
-    });
-    const oldTriage = p.triage;
-    p.triage = newMstart;
+  // ── Post-triage monitoring: recommend priority review, do not silently re-run MSTART ──
+  const suggestedPriority = computeMstartTriage(next);
+  const priorityRecommendation = suggestedPriority && suggestedPriority !== p.triage ? suggestedPriority : null;
+  if(priorityRecommendation){
+    p.priorityRecommendation={
+      suggested:priorityRecommendation,
+      current:p.triage,
+      reason:'הידרדרות במדדים — מומלץ לשקול שינוי קדימות',
+      at:new Date().toISOString(),
+      by:medicName
+    };
     p.events.unshift({
-      type:'TRIAGE_CHANGED',
+      type:'DETERIORATION_PRIORITY_RECOMMENDED',
       time:nowT(),
-      detail:`מיון שונה: ${TRIAGE_LABELS[oldTriage]} → ${TRIAGE_LABELS[newMstart]} (MSTART אוטומטי)`,
-      warn: newMstart === 'red' || newMstart === 'black'
+      detail:`הידרדרות במדדים — מומלץ לשקול שינוי קדימות: ${TRIAGE_LABELS[p.triage]||p.triage} → ${TRIAGE_LABELS[priorityRecommendation]||priorityRecommendation}`,
+      warn:['red','black'].includes(priorityRecommendation)
     });
   }
-  if(criticalEvent || (triageChanged && ['red','black'].includes(newMstart))){
+  if(criticalEvent || ['red','black'].includes(priorityRecommendation)){
     delete p.alertAcknowledgedAt;
     delete p.alertAcknowledgedBy;
   }
@@ -4986,7 +5441,7 @@ function saveModalVitals(){
   p.lastTouchedBy = medicName;
   p.lastModifiedAt = new Date().toISOString();
   p.unsyncedEvents=(p.unsyncedEvents||0)+1;
-  p.alert = flags.length > 0 || !!criticalEvent || triageChanged;
+  p.alert = flags.length > 0 || !!criticalEvent || !!priorityRecommendation;
   if(!p.vitalsHistory) p.vitalsHistory = [];
   p.vitalsHistory.push({t:Date.now(), pulse:next.pulse, spo2:next.spo2, rr:next.rr, avpu:next.avpu, bp_estimate:next.bp_estimate});
 
@@ -5154,7 +5609,7 @@ function logisticsCompanies(){
   return companyDefs.map(c=>{
     const pts=c.siteId==='ALL' ? patients : patients.filter(p=>(p.siteId||'SITE_A')===c.siteId);
     const inventory=inventoryReadModel(pts);
-    const lowItems=Object.entries(inventory).filter(([,count])=>count<=1);
+    const lowItems=Object.entries(inventory).filter(([item,count])=>count<=(SUPPLY_LOW_THRESHOLDS[item]??1)).map(([item,qty])=>({item,qty}));
     const consumed=(pts||[]).reduce((sum,p)=>sum+(p.txHistory?.length||0),0);
     return {...c, patients:pts.length, inventory, lowItems, consumed};
   });
@@ -5177,7 +5632,7 @@ function renderLogisticsOfficer(){
       const cls=count<=0?'empty':count<=1?'low':'';
       return `<span class="${cls}">${SUPPLY_LABELS[item]||item}: ${count}</span>`;
     }).join('');
-    const state=c.lowItems.some(([,count])=>count<=0)?'CRITICAL':c.lowItems.length?'LOW':'OK';
+    const state=c.lowItems.some(x=>x.qty<=0)?'CRITICAL':c.lowItems.length?'LOW':'OK';
     return `<div class="cmd-matrix-row ${state==='CRITICAL'?'critical':''}">
       <div>
         <div class="cmd-matrix-title">${c.name} · ${c.id}</div>
@@ -5295,6 +5750,150 @@ function defaultReinforcementLocation(){
   if(cmdActiveSite==='ALL') return siteData.name||'כל המוקדים';
   return `${site.name||siteData.name||cmdActiveSite}${siteData.address?' · '+siteData.address:''}`;
 }
+function defaultResupplyLocation(){
+  return `${siteData.name||siteData.address||'מוקד פעיל'} · ${zoneLabel()}`;
+}
+function resupplyRequestOpenStatuses(){
+  return ['pending_pc','approved_from_truck','sent_from_truck','collected_by_medic','unavailable_at_truck','escalated_to_cc','fulfilled_by_company'];
+}
+function isRequestOpen(r){
+  return !['arrived','resolved','cancelled','denied','delivered','closed'].includes(r.status);
+}
+function resupplyItemsText(req){
+  return (req.items||[]).map(x=>`${supplyLabel(x.item,true)} x${x.quantity==='unknown'?'כמה שאפשר':x.quantity}`).join(' · ');
+}
+function pcTruckAvailability(items=[]){
+  const stock={...PC_TRUCK_BASELINE, ...(pcTruckStock||{})};
+  const missing=items.filter(x=>x.item!=='other' && (stock[normalizeSupplyItem(x.item)]||0) < (Number(x.quantity)||1));
+  return {available:missing.length===0, missing, stock};
+}
+function createResupplyRequest({items, linkedPatientId=null, urgency='high', reason='manual_request', note='', status=null, auto=false}){
+  const normalized=(items||[]).map(x=>({item:normalizeSupplyItem(x.item), quantity:x.quantity||1})).filter(x=>x.item);
+  if(!normalized.length) return null;
+  const availability=pcTruckAvailability(normalized);
+  const nowIso=new Date().toISOString();
+  const req={
+    id:`REQ-SUP-${String(reinforcementRequests.filter(r=>r.type==='resupply').length+1).padStart(3,'0')}`,
+    type:'resupply',
+    requestedByRole:'medic',
+    requestedById:currentMedicId(),
+    requestedByName:currentMedicName(),
+    assignedPC:displayUser('USR-BARAK'),
+    siteId:currentSiteId(),
+    eventName:siteData.name||'אירוע ללא שם',
+    company:companyLabelForSite(currentSiteId()),
+    zone:zoneLabel(),
+    targetLocation:defaultResupplyLocation(),
+    linkedPatientId,
+    linkedPatientIds:linkedPatientId?[linkedPatientId]:[],
+    items:normalized,
+    resourceType:'resupply',
+    quantity:normalized.reduce((sum,x)=>sum+(Number(x.quantity)||1),0),
+    urgency,
+    reason,
+    reasonCodes:[reason],
+    sourcePreference:'pc_truck_first',
+    truckAvailability:availability.available?'available':'missing',
+    truckMissingItems:availability.missing.map(x=>x.item),
+    status:status || (availability.available?'pending_pc':'escalated_to_cc'),
+    createdAt:nowIso,
+    updatedAt:nowIso,
+    statusHistory:[{status:status || (availability.available?'pending_pc':'escalated_to_cc'), at:nowIso, by:getDeviceId()}],
+    freeText:note,
+    autoGenerated:!!auto
+  };
+  reinforcementRequests.unshift(req);
+  saveLocalEvent({
+    type:availability.available?'RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE':'RESUPPLY_REQUEST_ESCALATED_CC',
+    detail:`${req.requestedByName} · ${resupplyItemsText(req)} · ${availability.available?'זמין ברכב חוג״ד':'לא זמין ברכב חוג״ד'}`,
+    warn:!availability.available || urgency==='immediate',
+    payload_json:req
+  });
+  saveDemoState();
+  return req;
+}
+function createAutoResupplySuggestion(itemType, patientId=null, reason='stock_empty', urgency='high'){
+  itemType=normalizeSupplyItem(itemType);
+  const existing=reinforcementRequests.some(r=>r.type==='resupply' && resupplyRequestOpenStatuses().includes(r.status) && (r.items||[]).some(x=>x.item===itemType) && r.requestedById===currentMedicId());
+  if(existing) return null;
+  return createResupplyRequest({items:[{item:itemType, quantity:reason==='stock_empty'?3:2}], linkedPatientId:patientId, urgency, reason, note:reason==='stock_empty'?'מלאי אישי אזל בעקבות טיפול בשטח':'מלאי אישי נמוך בעקבות טיפול בשטח', auto:true});
+}
+function openMedicResupplySheet(patientId=null, reason='manual_request', preselectItem=null){
+  resupplyDraft={items:new Set(), quantity:1, note:'', linkedPatientId:patientId, urgency:reason==='stock_empty'?'immediate':'high', reason};
+  document.querySelectorAll('#resupply-item-grid .tap-btn,#resupply-qty-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  const firstQty=document.querySelector('#resupply-qty-grid .tap-btn');
+  if(firstQty) firstQty.classList.add('selected');
+  const note=document.getElementById('resupply-note');
+  if(note) note.value='';
+  if(preselectItem){
+    const item=normalizeSupplyItem(preselectItem);
+    resupplyDraft.items.add(item);
+    document.querySelectorAll('#resupply-item-grid .tap-btn').forEach(b=>{
+      if(b.getAttribute('onclick')?.includes(`'${item}'`)) b.classList.add('selected');
+    });
+  }
+  const modal=document.getElementById('resupply-modal');
+  if(modal) modal.classList.remove('hidden');
+}
+function hideResupplyModal(){
+  const modal=document.getElementById('resupply-modal');
+  if(modal) modal.classList.add('hidden');
+}
+function closeResupplyModal(e){ if(e.target.id==='resupply-modal') hideResupplyModal(); }
+function toggleResupplyItem(btn,item){
+  item=normalizeSupplyItem(item);
+  if(resupplyDraft.items.has(item)){
+    resupplyDraft.items.delete(item);
+    if(btn) btn.classList.remove('selected');
+  }else{
+    resupplyDraft.items.add(item);
+    if(btn) btn.classList.add('selected');
+  }
+}
+function selectResupplyQuantity(btn,qty){
+  resupplyDraft.quantity=qty;
+  document.querySelectorAll('#resupply-qty-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  if(btn) btn.classList.add('selected');
+}
+function submitMedicResupplyRequest(){
+  const note=document.getElementById('resupply-note')?.value.trim() || '';
+  const items=[...resupplyDraft.items].map(item=>({item, quantity:resupplyDraft.quantity}));
+  if(!items.length){ toast('בחר מה חסר'); return; }
+  const req=createResupplyRequest({items, linkedPatientId:resupplyDraft.linkedPatientId, urgency:resupplyDraft.urgency, reason:resupplyDraft.reason||'manual_request', note});
+  hideResupplyModal();
+  if(req?.status==='escalated_to_cc') toast('בקשת ציוד נפתחה והוסלמה למ״פ רפואה — לא זמין ברכב חוג״ד');
+  else toast('בקשת השלמת ציוד נשלחה לחוג״ד');
+  if(document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard(activeRoleDashboard);
+  renderCommander();
+}
+function updateResupplyStatus(id,status){
+  const req=reinforcementRequests.find(r=>r.id===id && r.type==='resupply'); if(!req) return;
+  const previous=req.status;
+  if(status==='approved_from_truck' && !req.truckDebited){
+    const availability=pcTruckAvailability(req.items||[]);
+    if(!availability.available){
+      status='unavailable_at_truck';
+    }else{
+      (req.items||[]).forEach(x=>{ if(x.item!=='other') pcTruckStock[x.item]=Math.max(0,(pcTruckStock[x.item]??PC_TRUCK_BASELINE[x.item]??0)-(Number(x.quantity)||1)); });
+      req.truckDebited=true;
+      saveLocalEvent({type:'RESUPPLY_APPROVED_FROM_PC_TRUCK',detail:`${req.id} · ${resupplyItemsText(req)}`,warn:false,payload_json:{request_id:req.id,items:req.items,pcTruckStock}});
+    }
+  }
+  if(status==='unavailable_at_truck'){
+    req.truckAvailability='missing';
+    saveLocalEvent({type:'PC_TRUCK_RESUPPLY_UNAVAILABLE_ESCALATED',detail:`חוסר ציוד ברכב חוג״ד — ${resupplyItemsText(req)}`,warn:true,payload_json:req});
+  }
+  if(status==='escalated_to_cc'){
+    saveLocalEvent({type:'RESUPPLY_ESCALATED_TO_CC',detail:`${req.id} · נדרש תגבור פלוגתי`,warn:true,payload_json:req});
+  }
+  req.status=status;
+  req.updatedAt=new Date().toISOString();
+  req.statusHistory=req.statusHistory||[];
+  req.statusHistory.push({status, previous, at:req.updatedAt, by:getDeviceId()});
+  saveDemoState();
+  renderCommander();
+  if(document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard(activeRoleDashboard);
+}
 function openReinforcementRequest(prefill={}){
   reinforcementDraft={
     resourceType:prefill.resourceType||null,
@@ -5363,12 +5962,12 @@ function createMedicalResourceRequest({resourceType, reasonCodes=[], urgency='hi
   return req;
 }
 function createDeathCertificationRequest(patient){
-  const exists=reinforcementRequests.some(r=>r.resourceType==='doctor_death_cert' && (r.linkedPatientIds||[]).includes(patient.id) && !['arrived','resolved','cancelled','denied'].includes(r.status));
+  const exists=reinforcementRequests.some(r=>r.resourceType==='doctor_death_cert' && (r.linkedPatientIds||[]).includes(patient.id) && isRequestOpen(r));
   if(exists) return null;
   const siteId=patient.siteId||'SITE_A';
   const blackAtSite=patients.filter(p=>(p.siteId||'SITE_A')===siteId && (p.triage==='black'||p.patientStatus==='deceased')).length;
   if(blackAtSite>=2){
-    reinforcementRequests.filter(r=>r.resourceType==='doctor_death_cert' && r.siteId===siteId && !['arrived','resolved','cancelled','denied'].includes(r.status)).forEach(r=>{
+    reinforcementRequests.filter(r=>r.resourceType==='doctor_death_cert' && r.siteId===siteId && isRequestOpen(r)).forEach(r=>{
       r.urgency='high';
       r.statusHistory=r.statusHistory||[];
       r.statusHistory.push({status:'urgency_escalated', at:new Date().toISOString(), by:'system', reason:'second_black_patient_same_site'});
@@ -5422,7 +6021,7 @@ function updateReinforcementStatus(id, status){
 function renderReinforcementPanel(){
   const body=document.getElementById('cmd-reinforcement-requests'); if(!body) return;
   const visible=reinforcementRequests.filter(r=>commandRole!=='cc' || r.siteId===ccCompanySite);
-  const open=visible.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status));
+  const open=visible.filter(isRequestOpen);
   setCmdPanelMeta('reinforcement', `${open.length} OPEN · ${visible.length} TOTAL`);
   const createButton=`<div style="padding:8px 16px 0"><button class="btn-primary" onclick="openReinforcementRequest()" style="background:var(--accent)">+ בקשת תגבור רפואי</button></div>`;
   if(!visible.length){
@@ -5430,18 +6029,20 @@ function renderReinforcementPanel(){
     return;
   }
   body.innerHTML=createButton+visible.map(r=>{
-    const reasons=(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')||'ללא סיבה מקודדת';
-    const statuses=['pending','acknowledged','assigned','en_route','arrived','denied','cancelled','resolved'];
+    const reasons=r.type==='resupply' ? resupplyItemsText(r) : ((r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')||'ללא סיבה מקודדת');
+    const statuses=r.type==='resupply'
+      ? ['pending_pc','approved_from_truck','sent_from_truck','collected_by_medic','delivered','unavailable_at_truck','escalated_to_cc','closed']
+      : ['pending','acknowledged','assigned','en_route','arrived','denied','cancelled','resolved'];
     return `<div class="reinforcement-card ${r.urgency}">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
         <div>
-          <div style="font-weight:900;font-size:14px">${r.id} · ${REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType}</div>
+          <div style="font-weight:900;font-size:14px">${r.id} · ${r.type==='resupply'?'השלמת ציוד':(REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType)}</div>
           <div style="font-size:12px;color:var(--muted);line-height:1.45;margin-top:3px">${r.company||''} · ${r.targetLocation} · ${reasons}</div>
           ${r.freeText?`<div style="font-size:12px;margin-top:5px">${r.freeText}</div>`:''}
         </div>
         <div class="watchdog-tag ${r.urgency==='immediate'?'red':r.urgency==='high'?'amber':'ok'}">${REINFORCEMENT_STATUS_LABELS[r.status]||r.status}</div>
       </div>
-      <div class="request-status-row">${statuses.map(s=>`<button class="request-status-btn ${r.status===s?'active':''}" onclick="updateReinforcementStatus('${r.id}','${s}')">${REINFORCEMENT_STATUS_LABELS[s]}</button>`).join('')}</div>
+      <div class="request-status-row">${statuses.map(s=>`<button class="request-status-btn ${r.status===s?'active':''}" onclick="${r.type==='resupply'?`updateResupplyStatus('${r.id}','${s}')`:`updateReinforcementStatus('${r.id}','${s}')`}">${REINFORCEMENT_STATUS_LABELS[s]}</button>`).join('')}</div>
     </div>`;
   }).join('');
 }
@@ -5465,7 +6066,7 @@ function renderCommandOperationalPanels(pts, site){
     {n:stale.length,l:'פצועים עם מידע ישן',c:stale.length?'critical':''},
     {n:trappedSilent.length,l:'לכודים ללא קשר חובש',c:trappedSilent.length?'critical':''},
     {n:evacBlocked.length,l:'פינויים חסומים / ממתינים',c:evacBlocked.length?'critical':''},
-    {n:reinforcementRequests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).length,l:'בקשות תגבור פתוחות',c:reinforcementRequests.some(r=>r.urgency==='immediate'&&r.status==='pending')?'critical':''},
+    {n:reinforcementRequests.filter(isRequestOpen).length,l:'בקשות תגבור / ציוד פתוחות',c:reinforcementRequests.some(r=>r.urgency==='immediate'&&isRequestOpen(r))?'critical':''},
     {n:unsynced,l:'אירועים מקומיים שלא סונכרנו',c:unsynced?'':''}
   ].map(x=>`<div class="cmd-priority-card ${x.c}"><div class="cmd-priority-num">${x.n}</div><div class="cmd-priority-label">${x.l}</div></div>`).join('');
   renderReinforcementPanel();
@@ -5651,7 +6252,7 @@ function generateSitrep(){
   const trapped=patients.filter(p=>normalizeTrapStatus(p)==='trapped').length;
   const evacuated=patients.filter(p=>['evacuating','evacuated','handed_over'].includes(p.patientStatus)).length + (siteData.initialEvacuation?.green||0) + (siteData.initialEvacuation?.yellow||0) + (siteData.initialEvacuation?.red||0);
   const tq=patients.filter(p=>p.tourniquet).map(p=>p.id).join(', ')||'אין';
-  const openReqs=reinforcementRequests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).length;
+  const openReqs=reinforcementRequests.filter(isRequestOpen).length;
   const text=`דיווח מצב ${siteData.name||siteData.address||'מוקד'}: ${red} אדום, ${yellow} צהוב, ${green} ירוק/קל, ${evacuated} פונו או הועברו, ${trapped} לכודים. חסמי עורקים על: ${tq}. בקשות תגבור פתוחות: ${openReqs}.`;
   navigator.clipboard?.writeText(text).catch(()=>{});
   toast('דיווח רדיו נוצר והועתק');
@@ -5738,7 +6339,7 @@ function renderAar(){
   document.getElementById('aar-timeline').innerHTML=timeline || '<div class="aar-note"><div class="aar-note-body">אין אירועים להצגה.</div></div>';
   const overdue=patients.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS);
   const pcRequests=reinforcementRequests.filter(r=>r.requestedByRole==='pc').length;
-  const ccOpenRequests=reinforcementRequests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).length;
+  const ccOpenRequests=reinforcementRequests.filter(isRequestOpen).length;
   const logisticsShortages=logisticsCompanies().reduce((sum,c)=>sum+c.lowItems.length,0);
   const insights=[
     {title:'חובש', body: overdue.length ? `${overdue.length} פצועים עברו את יעד עדכון המדדים; נדרש חזרה למדדים כשאפשר.` : 'כל הפצועים הפעילים בתוך חלון המדדים.'},
@@ -5768,11 +6369,11 @@ function toggleQuickTQ(btn, applied) {
   btn.classList.add('selected');
   document.getElementById('quick-tq-panel').style.display = applied ? 'block' : 'none';
   if (applied) {
-    reconcileSupplySource('quick:tq', 'CAT_TOURNIQUET', 1);
+    reconcileSupplySource('quick:tq', 'tourniquets', 1);
     projectPatientStatus('stabilizing','TOURNIQUET_APPLIED',{source:'quick_patient_flow'});
     if (!quickTqData.time) setQuickTQTimeNow();
   } else {
-    reconcileSupplySource('quick:tq', 'CAT_TOURNIQUET', 0);
+    reconcileSupplySource('quick:tq', 'tourniquets', 0);
   }
   document.getElementById('btn-step3').disabled = false;
   saveActiveRecoveryState('step3');
@@ -5856,51 +6457,90 @@ function activeScreenId(){
   const el=document.querySelector('.screen.active');
   return el?.id?.replace('screen-','')||null;
 }
+function normalizeSupplyItem(itemType){
+  return SUPPLY_ALIASES[itemType] || itemType;
+}
+function supplyLabel(itemType, short=false){
+  const key=normalizeSupplyItem(itemType);
+  return (short?SUPPLY_SHORT_LABELS[key]:SUPPLY_LABELS[key]) || key;
+}
 function localStock(itemType){
+  itemType=normalizeSupplyItem(itemType);
   state.localStockCache={...SUPPLY_BASELINE, ...(state.localStockCache||{})};
   return state.localStockCache[itemType] ?? 0;
+}
+function lowStockEntries(stock=state.localStockCache){
+  const merged={...SUPPLY_BASELINE, ...(stock||{})};
+  return Object.entries(SUPPLY_LABELS).map(([key,label])=>({key,label,value:merged[key]??0, threshold:SUPPLY_LOW_THRESHOLDS[key]??1}))
+    .filter(x=>x.value<=x.threshold);
 }
 function renderLocalStockPanel(){
   const el=document.getElementById('tx-stock-grid');
   if(!el) return;
   state.localStockCache={...SUPPLY_BASELINE, ...(state.localStockCache||{})};
-  el.innerHTML=Object.entries(SUPPLY_LABELS).map(([key,label])=>{
-    const value=localStock(key);
+  const entries=lowStockEntries(state.localStockCache);
+  el.innerHTML=(entries.length?entries:Object.entries(SUPPLY_LABELS).slice(0,3).map(([key,label])=>({key,label,value:localStock(key)}))).map(({key,label,value})=>{
     const cls=value<=0?'empty':value<=1?'low':'';
     return `<div class="stock-chip ${cls}"><span>${label}</span><strong>${value}</strong></div>`;
   }).join('');
+}
+function renderMedicStockWarnings(){
+  const entries=lowStockEntries(state.localStockCache);
+  if(!entries.length) return '';
+  return `<div class="chip-row" style="margin-top:10px">${entries.map(({key,value})=>`<button class="chip ${value<=0?'selected':''}" onclick="openMedicResupplySheet(null,'${value<=0?'stock_empty':'stock_low'}','${key}')">${supplyLabel(key,true)}: ${value}</button>`).join('')}</div>`;
 }
 function showOwnInventory(){
   const line=Object.entries(SUPPLY_LABELS).map(([key,label])=>`${label}: ${localStock(key)}`).join(' · ');
   toast(line || 'אין נתוני מלאי');
 }
-function consumeFieldSupply(itemType, quantityDelta, patientId=null, movementType='treatment_consumed'){
+function consumeFieldSupply(itemType, quantityDelta, patientId=null, movementType='treatment_consumed', meta={}){
+  itemType=normalizeSupplyItem(itemType);
   if(!state.localStockCache) state.localStockCache={};
   const delta=Number(quantityDelta)||0;
   state.localStockCache[itemType]=(state.localStockCache[itemType] ?? SUPPLY_BASELINE[itemType] ?? 0)+delta;
+  const after=state.localStockCache[itemType];
+  const lowThreshold=SUPPLY_LOW_THRESHOLDS[itemType] ?? 1;
+  const payload={
+    item:itemType,
+    item_type:itemType,
+    quantity_delta:delta,
+    linkedPatientId:patientId||state.patientDraftId,
+    patient_id:patientId||state.patientDraftId,
+    siteId:meta.siteId||currentSiteId(),
+    zone:meta.zone||zoneLabel(),
+    performedBy:meta.performedBy||currentMedicName(),
+    occurredAt:new Date().toISOString(),
+    medic_stock_after:after
+  };
+  if(delta<0){
+    saveLocalEvent({type:'SUPPLY_CONSUMED',detail:`${supplyLabel(itemType)} נצרך · נותר ${after}`,warn:after<=lowThreshold,payload_json:payload});
+  }
   saveLocalEvent({
     type:'INVENTORY_LEDGER_MOVEMENT',
     detail:`Inventory ledger: ${itemType} ${delta}`,
-    warn:state.localStockCache[itemType] <= 0,
+    warn:after <= 0,
     payload_json:{
       item_type:itemType,
       movement_type:movementType,
       quantity_delta:delta,
       patient_id:state.patientDraftId||patientId,
       patient_context:patientId||state.patientDraftId,
-      local_stock_after:state.localStockCache[itemType],
+      local_stock_after:after,
       battery_at_log:null
     }
   });
   renderLocalStockPanel();
-  if(state.localStockCache[itemType] <= 0){
-    toast(`מלאי ${SUPPLY_LABELS[itemType]||itemType} אזל מקומית — נרשמת התרעת דחף לחמ"ל`);
+  if(after <= 0){
+    toast(`ציוד אזל — בקש השלמה עכשיו · ${supplyLabel(itemType,true)}. נרשם טיפול למרות שמלאי מקומי 0`);
     saveLocalEvent({
       type:'LOCAL_STOCKOUT_WARNING',
-      detail:`Local stock depleted: ${itemType}`,
+      detail:`ציוד אזל אצל חובש: ${supplyLabel(itemType)}`,
       warn:true,
       payload_json:{item_type:itemType, local_stock_after:state.localStockCache[itemType], patient_id:patientId||state.patientDraftId}
     });
+    createAutoResupplySuggestion(itemType, patientId, 'stock_empty', itemType==='tourniquets'?'immediate':'high');
+  }else if(after <= lowThreshold){
+    toast(`ציוד נמוך — בקש השלמה מהחוג״ד · ${supplyLabel(itemType,true)}: ${after}`);
   }
 }
 function reconcileSupplyForIntervention(key, forcedQty=null, patientId=null){

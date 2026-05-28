@@ -16,10 +16,20 @@ Show the medic timeline as two tactical phases:
    The medic enters site, optional ETA, current zone, expected casualties, and initial evacuated counts while moving to the incident.
 
 2. `MSTART — סריקה מהירה`
-   The medic opens a new casualty in the current zone, taps any life-saving action, completes binary MSTART, saves, and moves to the next trapped person.
+   The medic opens a dedicated sweep screen, taps `פצוע נוסף באזור הזה`, creates TMP casualty markers, records AVPU/perfusion/breathing/trapped status and immediate life-saving actions, then moves to the next trapped person.
 
 3. `הפצועים שלי — מעקב מדדים`
-   The medic returns to the monitoring queue, takes full vitals, watches trend flags, and records treatment until rescue.
+   The medic presses `סיימתי סריקת MSTART באזור הזה`, then returns to the monitoring queue, takes full vitals, watches trend flags, and records treatment until rescue.
+
+4. Logistics/resupply by action
+   The medic applies a tourniquet. The app starts the tourniquet timer, records `SUPPLY_CONSUMED`, decrements the medic kit, and shows a low/empty warning without blocking care. The medic can tap `חסר לי ציוד` and request resupply in under 10 seconds.
+
+5. חוג"ד
+   Open חוג"ד and show `סריקות MSTART פעילות / הושלמו`: medic, zone, casualty counts, trapped, tourniquets, airway interventions, missing full vitals, and action buttons.
+   Then show `השלמות ציוד מהחובשים`: the PC truck is the first source, with approve/send/collected/delivered/escalate actions.
+
+6. מ״פ רפואה
+   Show that the company commander sees only truck shortages and escalated bottlenecks, not every small bandage request.
 
 Recommended demo path:
 
@@ -37,6 +47,17 @@ Advanced views:
 Suggested framing:
 
 > "This is not trying to replace doctrine or radio. It is a second layer of operational memory: every patient, every timer, every handover, and every alert in one shared picture."
+
+## Two-Minute Logistics Path
+
+1. חובש מזין מוקד/אזור בדרך.
+2. חובש מתחיל סריקת MSTART.
+3. חובש מסמן פצוע ומניח חסם.
+4. האפליקציה מתחילה טיימר חסם ומורידה מלאי חסמים מקומי.
+5. אם המלאי נמוך, החובש מקבל הצעה לבקש השלמה.
+6. חוג"ד רואה בקשת השלמה וזמינות ברכב.
+7. חוג"ד מאשר מהרכב או מסלים למ״פ רפואה.
+8. מ״פ רפואה רואה רק חוסר מחלקתי/פלוגתי.
 
 ## Storyline
 
