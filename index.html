@@ -546,8 +546,8 @@ textarea{resize:vertical;min-height:70px;}
     </div>
     <div class="demo-panel">
       <div class="demo-strip-title">איך לבדוק את הדמו ב־2 דקות</div>
-      <div class="demo-strip-sub">פתח חובש · הזן מוקד/אזור בדרך · הגעתי — התחל סריקת MSTART · סמן 2-3 פצועים באזור · הנח חסם באחד · סיים סריקה · פתח חוג"ד וראה סריקה/יש לקחת מדדים · עבור למעקב מדדים · פתח מ״פ רפואה · פתח סיכום אירוע חי.</div>
-      <div class="demo-strip-sub" style="margin-top:10px">מה לבדוק: האם הסריקה מרגישה מהירה? האם החוג"ד מבין מה חסר אחרי הסריקה? האם המעבר ממיון למעקב ברור? האם בקשת רופא/פראמדיק ומעקב הידרדרות מרגישים נכונים?</div>
+      <div class="demo-strip-sub">פתח חובש · הזן מוקד/אזור בדרך · התחל סריקת MSTART · סמן פצוע והנח חסם · האפליקציה מורידה מלאי חסמים ומתחילה טיימר · בקש השלמת ציוד · חוג"ד מאשר מהרכב או מסלים למ״פ רפואה · סיים סריקה · פתח סיכום אירוע חי.</div>
+      <div class="demo-strip-sub" style="margin-top:10px">מה לבדוק: האם הסריקה מרגישה מהירה? האם ציוד חסר לא מפריע לטיפול? האם חוג"ד רואה את רכב החוג"ד כמקור ראשון? האם מ״פ רפואה רואה רק חוסר מחלקתי/פלוגתי?</div>
     </div>
   </div>
 </div>
@@ -664,6 +664,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="flow-content">
     <button class="btn-primary" onclick="startSweepCasualtyMarker()" style="background:var(--red);margin-bottom:14px">פצוע נוסף באזור הזה</button>
+    <button class="btn-secondary" onclick="openMedicResupplySheet()" style="margin-bottom:14px">חסר לי ציוד</button>
     <div id="sweep-active-card"></div>
   </div>
   <div class="bottom-bar">
@@ -1324,7 +1325,7 @@ textarea{resize:vertical;min-height:70px;}
       <div class="tq-reminder-body" id="quick-tq-reminder-body"></div>
     </div>
     <div class="stock-panel">
-      <div class="stock-panel-title">המלאי האישי שלי — נגזר מאירועי ledger</div>
+      <div class="stock-panel-title">אזהרות ציוד אישי — לא חוסם טיפול</div>
       <div class="stock-grid" id="tx-stock-grid"></div>
     </div>
     <div class="field-label">טיפולים שניתנו עכשיו (ניתן לבחור מספר)</div>
@@ -1428,6 +1429,38 @@ textarea{resize:vertical;min-height:70px;}
       <button class="tap-btn" onclick="confirmTrapStatus('not_trapped')"><span class="icon">🚶</span><div style="font-weight:800">לא לכוד</div></button>
     </div>
     <button class="panic-cancel-btn" onclick="confirmTrapStatus(null)">שמור ללא סטטוס חילוץ</button>
+  </div>
+</div>
+
+<!-- ══════════════════════ MEDIC RESUPPLY REQUEST MODAL ══ -->
+<div class="modal-overlay hidden" id="resupply-modal" onclick="closeResupplyModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="field-label">מה חסר?</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.55;margin-bottom:14px">בקשה קצרה לחוג״ד. המיקום, האזור ושם החובש מתמלאים אוטומטית.</div>
+    <div class="tap-grid tap-grid-2" id="resupply-item-grid" style="margin-bottom:14px">
+      <button class="tap-btn" onclick="toggleResupplyItem(this,'tourniquets')">חסמי עורקים</button>
+      <button class="tap-btn" onclick="toggleResupplyItem(this,'pressureDressings')">תחבושות / חבישת לחץ</button>
+      <button class="tap-btn" onclick="toggleResupplyItem(this,'hemostaticGauze')">גזה המוסטטית</button>
+      <button class="tap-btn" onclick="toggleResupplyItem(this,'airwayEquipment')">ציוד נתיב אוויר</button>
+      <button class="tap-btn" onclick="toggleResupplyItem(this,'ivKits')">ציוד עירוי / נוזלים</button>
+      <button class="tap-btn" onclick="toggleResupplyItem(this,'blankets')">שמיכות / מניעת היפותרמיה</button>
+      <button class="tap-btn" onclick="toggleResupplyItem(this,'batteryPacks')">סוללה / טעינה</button>
+      <button class="tap-btn" onclick="toggleResupplyItem(this,'other')">אחר</button>
+    </div>
+    <div class="field-label">כמות</div>
+    <div class="tap-grid tap-grid-4" id="resupply-qty-grid" style="margin-bottom:14px">
+      <button class="tap-btn selected" onclick="selectResupplyQuantity(this,1)">1</button>
+      <button class="tap-btn" onclick="selectResupplyQuantity(this,2)">2</button>
+      <button class="tap-btn" onclick="selectResupplyQuantity(this,3)">3+</button>
+      <button class="tap-btn" onclick="selectResupplyQuantity(this,'unknown')">לא יודע / כמה שאפשר</button>
+    </div>
+    <div class="field-label">פרטים קצרים</div>
+    <textarea id="resupply-note" placeholder="אופציונלי: לדוגמה חסמים נגמרו באזור הצפוני"></textarea>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+      <button class="btn-primary" onclick="submitMedicResupplyRequest()">בקש השלמה מהחוג״ד</button>
+      <button class="btn-secondary" onclick="hideResupplyModal()">ביטול</button>
+    </div>
   </div>
 </div>
 
@@ -1919,14 +1952,28 @@ if(!C5Rules) throw new Error('C5 domain rules failed to load');
 // ═══════════════════════════════════════════════
 const VITALS_INTERVAL_MS = C5Rules.VITALS_INTERVAL_MS;
 const WARN_AT_MS = C5Rules.WARN_AT_MS;
-const APP_VERSION = '2.4.0';
+const APP_VERSION = '2.4.1';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
 const CONFLICT_LOG_KEY = 'c5-sentinel-sar-conflict-log-v1';
 const ACTIVE_RECOVERY_KEY = 'c5_active_recovery_state';
 const DEVICE_ID_KEY = 'c5-sentinel-sar-device-id';
-const SUPPLY_BASELINE = Object.freeze({CAT_TOURNIQUET:2,MORPHINE_10MG:4,FENTANYL_ACTIQ:2,IV_FLUID_500ML:3,BANDAGE_6INCH:8});
-const SUPPLY_LABELS = {CAT_TOURNIQUET:'CAT חסם',MORPHINE_10MG:'Morphine',FENTANYL_ACTIQ:'Actiq/Fentanyl',IV_FLUID_500ML:'נוזלים 500',BANDAGE_6INCH:'חבישה'};
+const SUPPLY_BASELINE = Object.freeze({tourniquets:3, pressureDressings:4, hemostaticGauze:2, airwayEquipment:2, ivKits:1, blankets:2, batteryPacks:1});
+const PC_TRUCK_BASELINE = Object.freeze({tourniquets:20, pressureDressings:30, hemostaticGauze:15, airwayEquipment:10, ivKits:8, blankets:25, batteryPacks:6});
+const COMPANY_STOCK_BASELINE = Object.freeze({tourniquets:80, pressureDressings:120, hemostaticGauze:50, airwayEquipment:35, ivKits:30, blankets:120, batteryPacks:20});
+const SUPPLY_LABELS = {
+  tourniquets:'חסמי עורקים',
+  pressureDressings:'תחבושות / חבישת לחץ',
+  hemostaticGauze:'גזה המוסטטית',
+  airwayEquipment:'ציוד נתיב אוויר',
+  ivKits:'ציוד עירוי / נוזלים',
+  blankets:'שמיכות / מניעת היפותרמיה',
+  batteryPacks:'סוללה / טעינה'
+};
+const SUPPLY_SHORT_LABELS = {tourniquets:'חסמים', pressureDressings:'חבישה', hemostaticGauze:'גזה', airwayEquipment:'נתיב אוויר', ivKits:'עירוי', blankets:'שמיכות', batteryPacks:'סוללה'};
+const SUPPLY_ALIASES = {CAT_TOURNIQUET:'tourniquets', BANDAGE_6INCH:'pressureDressings', IV_FLUID_500ML:'ivKits'};
+const SUPPLY_LOW_THRESHOLDS = {tourniquets:1, pressureDressings:1, hemostaticGauze:1, airwayEquipment:1, ivKits:0, blankets:1, batteryPacks:0};
+const PC_TRUCK_LOW_THRESHOLDS = {tourniquets:5, pressureDressings:8, hemostaticGauze:4, airwayEquipment:3, ivKits:2, blankets:8, batteryPacks:2};
 const ROLE_LABELS = {medic:'פעולת חובש', pc:'החלטת חוג"ד', cc:'סיכון מ״פ רפואה', logistics:'לוגיסטיקה', chamal:'מערכת'};
 const ACTION_LABELS = {
   update_vitals:'עדכן מדדים',
@@ -1985,7 +2032,16 @@ const REINFORCEMENT_STATUS_LABELS = {
   arrived:'הגיע',
   denied:'לא זמין',
   cancelled:'בוטל',
-  resolved:'נסגר'
+  resolved:'נסגר',
+  pending_pc:'ממתין לחוג״ד',
+  approved_from_truck:'אושר מהרכב',
+  sent_from_truck:'נשלח מהרכב',
+  collected_by_medic:'נאסף על ידי חובש',
+  delivered:'נמסר',
+  unavailable_at_truck:'לא זמין ברכב',
+  escalated_to_cc:'הוסלם למ״פ רפואה',
+  fulfilled_by_company:'הושלם מהפלוגה',
+  closed:'נסגר'
 };
 const DEMO_USERS = [
   {userId:'USR-COHEN', fullName:'סמ״ר נועם כהן', role:'medic', callsign:'חובש 1', platoonId:'PLT-A', companyId:'COMP-1', active:true},
@@ -2002,11 +2058,13 @@ const DEMO_PLATOONS = [
   {platoonId:'PLT-B', name:'מחלקה רפואית ב', pcId:'USR-BARAK', companyId:'COMP-1'}
 ];
 const INTERVENTION_SUPPLY = {
-  tourniquet:{item:'CAT_TOURNIQUET', qty:1},
-  bandage:{item:'BANDAGE_6INCH', qty:1},
-  morphine:{item:'MORPHINE_10MG', qty:1},
-  atq:{item:'FENTANYL_ACTIQ', qty:1},
-  fluids:{item:'IV_FLUID_500ML', qty:()=>Math.max(1, Math.ceil((doses.fluids||500)/500))}
+  tourniquet:{item:'tourniquets', qty:1},
+  bandage:{item:'pressureDressings', qty:1},
+  pressure_bandage:{item:'pressureDressings', qty:1},
+  hemostatic:{item:'hemostaticGauze', qty:1},
+  airway_mgmt:{item:'airwayEquipment', qty:1},
+  fluids:{item:'ivKits', qty:()=>Math.max(1, Math.ceil((doses.fluids||500)/500))},
+  blanket:{item:'blankets', qty:1}
 };
 const AVPU_RANK = C5Rules.AVPU_RANK;
 const COUNT_LIMITS = {
@@ -2183,6 +2241,9 @@ let modalOpenedLastModified = null;
 let vitalCountdowns = {};
 let reinforcementRequests = [];
 let reinforcementDraft = {resourceType:null, reasonCodes:new Set(), urgency:'high', targetLocation:'', freeText:''};
+let resupplyDraft = {items:new Set(), quantity:1, note:'', linkedPatientId:null, urgency:'high', reason:'manual_request'};
+let pcTruckStock = {...PC_TRUCK_BASELINE};
+let companyStock = {...COMPANY_STOCK_BASELINE};
 let activeRoleDashboard = 'medic';
 
 function serializeActiveDraft(screen=null){
@@ -2469,6 +2530,8 @@ function playDeathCertificationSequence(){
 function clearDemoScenario(){
   patients=[];
   reinforcementRequests=[];
+  pcTruckStock={...PC_TRUCK_BASELINE};
+  companyStock={...COMPANY_STOCK_BASELINE};
   siteData={name:'', address:'', eventType:null, buildingType:null, floorHint:'', apartmentHint:'', eta:'', currentZone:'', lastMechanism:'', likelyMechanisms:[], sweepSessions:[], description:'', externalReports:[], initialEvacuatedGreen:0, initialEvacuation:{green:0,yellow:0,red:0,summary:'',source:null}, expectedCasualties:{trapped:0,immobile:0,missing:0,severe:0}};
   allSites.forEach(s=>{ if(s.id!=='ALL') s.externalReports=[]; });
   demoSyncMode='fresh';
@@ -2494,7 +2557,8 @@ function clearDemoScenario(){
 }
 function clearDemoPatientsOnly(){
   patients=[];
-  reinforcementRequests=reinforcementRequests.filter(r=>r.type!=='death_certification_request' && r.type!=='medical_reinforcement');
+  reinforcementRequests=reinforcementRequests.filter(r=>r.type!=='death_certification_request' && r.type!=='medical_reinforcement' && r.type!=='resupply');
+  pcTruckStock={...PC_TRUCK_BASELINE};
   try{ localStorage.removeItem('c5_local_sqlite_outbox'); }catch(e){}
   lastSyncAt=Date.now();
   demoSyncMode='fresh';
@@ -2516,7 +2580,7 @@ function saveDemoState(){
       }
     }
     demoRevision += 1;
-    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:5,appVersion:APP_VERSION,revision:demoRevision,savedAt:new Date().toISOString(),experimentStartedAt,experimentPhase,siteData,patients,reinforcementRequests,demoSyncMode,lastSyncAt}));
+    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:6,appVersion:APP_VERSION,revision:demoRevision,savedAt:new Date().toISOString(),experimentStartedAt,experimentPhase,siteData,patients,reinforcementRequests,pcTruckStock,companyStock,demoSyncMode,lastSyncAt}));
   }catch(e){}
 }
 function loadStoredDemoState(){
@@ -2529,6 +2593,8 @@ function loadStoredDemoState(){
     ensureSiteReadiness();
     patients=saved.patients;
     reinforcementRequests=Array.isArray(saved.reinforcementRequests)?saved.reinforcementRequests:[];
+    pcTruckStock={...PC_TRUCK_BASELINE, ...(saved.pcTruckStock||{})};
+    companyStock={...COMPANY_STOCK_BASELINE, ...(saved.companyStock||{})};
     patients.forEach(p=>{
       if(!p.lastModifiedAt) p.lastModifiedAt=saved.savedAt||new Date().toISOString();
       if(!p.trapStatus) p.trapStatus=normalizeTrapStatus(p);
@@ -2573,7 +2639,7 @@ function updateDemoStatus(){
   });
   const openAlerts=patients.filter(p=>p.alert || (needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS)).length;
   const handed=patients.filter(p=>['evacuating','evacuated'].includes(p.patientStatus)).length;
-  const openRequests=reinforcementRequests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).length;
+  const openRequests=reinforcementRequests.filter(isRequestOpen).length;
   const line=`${patients.length} פצועים · ${openAlerts} התראות · ${openRequests} תגבור · ${handed} הועברו`;
   ['demo-status-line','cmd-demo-line'].forEach(id=>{const el=document.getElementById(id); if(el) el.textContent=line;});
   updateExperimentLine();
@@ -2617,7 +2683,7 @@ function roleScopedPatients(role){
 }
 function roleScopedRequests(role){
   if(role==='doctor') return reinforcementRequests.filter(r=>['doctor_treatment','doctor_death_cert','paramedic'].includes(r.resourceType));
-  if(role==='logistics') return reinforcementRequests.filter(r=>['cat_tourniquets','hemostatic_gauze','airway_equipment','iv_fluids','hypothermia_blankets','medical_equipment'].includes(r.resourceType));
+  if(role==='logistics') return reinforcementRequests.filter(r=>r.type==='resupply' || ['cat_tourniquets','hemostatic_gauze','airway_equipment','iv_fluids','hypothermia_blankets','medical_equipment'].includes(r.resourceType));
   if(role==='medic') return reinforcementRequests.filter(r=>(r.linkedPatientIds||[]).some(pid=>roleScopedPatients('medic').some(p=>p.id===pid)));
   if(role==='cc') return reinforcementRequests;
   return reinforcementRequests.filter(r=>['SITE_A','SITE_B'].includes(r.siteId||'SITE_A'));
@@ -2650,6 +2716,8 @@ function renderMedicActionPanel(){
         <button class="demo-mini-btn" onclick="goTo('dashboard')">הפצועים שלי — מעקב מדדים</button>
         <button class="demo-mini-btn" onclick="promptZoneUpdate(true)">מוקד / אזור</button>
       </div>
+      ${renderMedicStockWarnings()}
+      <button class="demo-mini-btn" onclick="openMedicResupplySheet()" style="margin-top:10px;background:var(--surface2);border-color:var(--border);color:var(--muted)">חסר לי ציוד</button>
       <div class="role-row" style="margin-top:10px">
         <div class="role-row-title">עדכון מוקד / צפי נפגעים</div>
         <div class="role-row-sub">כתובת, סוג מבנה, ETA, מחולצים לפני הגעה ומקור דיווח. ניתן לתקן מאוחר יותר.</div>
@@ -2687,13 +2755,36 @@ function renderExtractedCounterBoard(){
       <div class="role-row-sub" style="margin-top:10px">מונה מוקד בלבד: נחשב בתמונת חוג"ד ומ״פ רפואה בלי לפתוח רשומות פצוע ירוקות.</div>
     </div>`;
 }
+function renderPcTruckStockChips(){
+  const entries=Object.entries(SUPPLY_LABELS).map(([key,label])=>({key,label,value:pcTruckStock[key]??PC_TRUCK_BASELINE[key]??0, threshold:PC_TRUCK_LOW_THRESHOLDS[key]??1}));
+  return `<div class="chip-row">${entries.map(({key,value})=>`<span class="identity-chip ${value<=0?'selected':''}">${supplyLabel(key,true)}: ${value}</span>`).join('')}</div>`;
+}
+function renderPcResupplyBoard(){
+  const requests=reinforcementRequests.filter(r=>r.type==='resupply' && ['pending_pc','approved_from_truck','sent_from_truck','collected_by_medic','unavailable_at_truck','escalated_to_cc'].includes(r.status));
+  const rows=requests.map(r=>{
+    const availability=r.truckAvailability==='available'?'זמין ברכב':'לא זמין / חסר ברכב';
+    const status=REINFORCEMENT_STATUS_LABELS[r.status]||r.status;
+    const actions=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+        <button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','approved_from_truck')">אשר מהרכב</button>
+        <button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','sent_from_truck')">שלח ציוד</button>
+        <button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','collected_by_medic')">סמן נאסף</button>
+        <button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','delivered')">סמן נמסר</button>
+        <button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','escalated_to_cc')">לא זמין ברכב — הסלם למ״פ רפואה</button>
+        <button class="demo-mini-btn" onclick="toast('נשלחה בקשת הבהרה לחובש')">בקש הבהרה</button>
+      </div>`;
+    return roleRow(`${r.requestedByName} · ${resupplyItemsText(r)}`,`${r.zone||zoneLabel()} · ${REINFORCEMENT_URGENCY_LABELS[r.urgency]||r.urgency} · ${availability} · ${status}${r.linkedPatientId?' · '+r.linkedPatientId:''}`,actions);
+  }).join('');
+  const truckWarnings=Object.entries(pcTruckStock).filter(([key,value])=>value<=(PC_TRUCK_LOW_THRESHOLDS[key]??1)).map(([key,value])=>roleRow(`רכב חוג״ד · ${supplyLabel(key)}`,`${value} נותרו · אם יש טיפול פעיל יוסלם למ״פ רפואה`)).join('');
+  return roleSection('השלמות ציוד מהחובשים', `${renderPcTruckStockChips()}${rows}${truckWarnings}` || roleRow('אין בקשות השלמת ציוד פתוחות','רכב חוג״ד הוא מקור ההשלמה הראשון לפני מ״פ רפואה / לוגיסטיקה.'));
+}
 function renderPcResponsibilityBoard(){
   const medics=DEMO_USERS.filter(u=>u.role==='medic' && u.platoonId==='PLT-A');
   const myPts=roleScopedPatients('pc');
   const redYellow=myPts.filter(p=>['red','yellow'].includes(p.triage)).length;
   const trapped=myPts.filter(p=>normalizeTrapStatus(p)==='trapped').length;
   const stale=myPts.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS).length;
-  const openReqs=roleScopedRequests('pc').filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).length;
+  const openReqs=roleScopedRequests('pc').filter(isRequestOpen).length;
   const buttons=[
     ['medics',`חובשים בקריסה`,`${medics.length} חובשים · עומס לפי פצועים ועדכון אחרון`],
     ['patients',`הפצועים שלי`,`${myPts.length} פצועים · ${redYellow} אדום/צהוב · ${trapped} לכודים`],
@@ -2701,7 +2792,7 @@ function renderPcResponsibilityBoard(){
     ['requests',`בקשות ומשאבים`,`${openReqs} בקשות פתוחות`],
     ['alerts',`התראות החלטה`,`${roleAlertRows('pc').length} התראות מנותבות לחוג"ד`]
   ].map(([key,title,sub])=>`<button class="role-row" onclick="showRoleDrilldown('${key}')" style="width:100%;text-align:right;cursor:pointer"><div class="role-row-title">${title}</div><div class="role-row-sub">${sub}</div></button>`).join('');
-  return `${renderSweepBoardForPc()}${renderExtractedCounterBoard()}${roleSection('האחריות שלי — לחיץ', buttons)}<div id="role-drilldown-body">${pcDrilldownHtml('medics')}</div>`;
+  return `${renderSweepBoardForPc()}${renderExtractedCounterBoard()}${renderPcResupplyBoard()}${roleSection('האחריות שלי — לחיץ', buttons)}<div id="role-drilldown-body">${pcDrilldownHtml('medics')}</div>`;
 }
 function renderSweepBoardForPc(){
   ensureSiteReadiness();
@@ -2769,7 +2860,7 @@ function companyEvacuationPriorityRows(pts=patients){
   }).join('');
 }
 function renderDeathCertificationChain(){
-  const deathReqs=reinforcementRequests.filter(r=>r.resourceType==='doctor_death_cert' && !['arrived','resolved','cancelled','denied'].includes(r.status));
+  const deathReqs=reinforcementRequests.filter(r=>r.resourceType==='doctor_death_cert' && isRequestOpen(r));
   const latest=deathReqs[0];
   const linked=latest?.linkedPatientIds?.[0] || patients.find(p=>p.triage==='black' || p.patientStatus==='deceased')?.id || 'P---';
   const chain=[
@@ -2797,8 +2888,24 @@ function renderCompanyResourceCenter(openReqs, doctorReqs, deathReqs, blockedEva
     ${roleSection('משאבים רפואיים זמינים לשיוך', seniorResources)}
   `;
 }
+function renderCcResupplyCommandBoard(){
+  const escalated=reinforcementRequests.filter(r=>r.type==='resupply' && ['escalated_to_cc','unavailable_at_truck','fulfilled_by_company'].includes(r.status));
+  const activeCritical=patients.filter(p=>['red','yellow'].includes(p.triage)).length;
+  const truckRows=DEMO_PLATOONS.map(pl=>{
+    const criticalItems=Object.entries(pcTruckStock).filter(([key,value])=>value<=(PC_TRUCK_LOW_THRESHOLDS[key]??1));
+    const text=criticalItems.length?criticalItems.map(([key,value])=>`${supplyLabel(key,true)} ${value}`).join(' · '):'מלאי רכב תקין';
+    return roleRow(`${pl.name} · רכב חוג״ד`,`${text} · ${activeCritical} אדום/צהוב פעילים בחברה`);
+  }).join('');
+  const reqRows=escalated.map(r=>roleRow(
+    `${r.id} · ${resupplyItemsText(r)}`,
+    `${r.requestedByName} · ${r.zone||r.targetLocation} · ${REINFORCEMENT_STATUS_LABELS[r.status]||r.status}`,
+    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','fulfilled_by_company')">אשר השלמה פלוגתית</button><button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','closed')">סגור</button><button class="demo-mini-btn" onclick="toast('ציוד נותב מרכב חוג״ד אחר')">נתב בין רכבים</button><button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','unavailable_at_truck')">סמן לא זמין</button></div>`
+  )).join('');
+  const impact=escalated.length?roleRow('השפעת חוסר על טיפול',`${escalated.length} בקשות ציוד הוסלמו · ${activeCritical} פצועים אדום/צהוב עשויים להיות מושפעים`):'';
+  return `${roleSection('סטטוס רכב חוג״ד לפי מחלקה', truckRows)}${roleSection('חוסרי ציוד שהוסלמו למ״פ רפואה', reqRows || roleRow('אין חוסר ציוד מחלקתי פתוח','מ״פ רפואה רואה כאן רק חוסרים שלא נפתרו ברכב חוג״ד.'))}${roleSection('השפעת חוסר על טיפול', impact)}`;
+}
 function renderCcCommandBoard(){
-  const openReqs=reinforcementRequests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status));
+  const openReqs=reinforcementRequests.filter(isRequestOpen);
   const doctorReqs=openReqs.filter(r=>['doctor_treatment','doctor_death_cert','paramedic'].includes(r.resourceType));
   const deathReqs=openReqs.filter(r=>r.resourceType==='doctor_death_cert');
   const blockedEvac=patients.filter(p=>['red','yellow'].includes(p.triage) && !['evacuating','evacuated','handed_over'].includes(p.patientStatus)).length;
@@ -2822,8 +2929,8 @@ function renderCcCommandBoard(){
     roleMetric(blockedEvac,'פינוי לא סגור')
   ].join('');
   const reqQueue=openReqs.slice(0,6).map(r=>roleRow(
-    `${REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType} · ${REINFORCEMENT_URGENCY_LABELS[r.urgency]||r.urgency}`,
-    `${r.eventName||siteNameById(r.siteId)} · ${r.targetLocation} · פתוח ${minutesSinceIso(r.createdAt)} דק׳`,
+    `${r.type==='resupply'?'השלמת ציוד':(REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType)} · ${REINFORCEMENT_URGENCY_LABELS[r.urgency]||r.urgency}`,
+    `${r.type==='resupply'?resupplyItemsText(r):r.targetLocation} · ${r.eventName||siteNameById(r.siteId)} · פתוח ${minutesSinceIso(r.createdAt)} דק׳`,
     `<span class="identity-chip">פעולות: שייך משאב · אשר · נתקב מחדש · בקש הבהרה</span>`
   )).join('');
   const deathQueue=deathReqs.map(r=>roleRow(
@@ -2839,6 +2946,7 @@ function renderCcCommandBoard(){
   return `
     <div class="role-top-grid">${snapshot}</div>
     ${renderCompanyResourceCenter(openReqs, doctorReqs, deathReqs, blockedEvac, overloaded)}
+    ${renderCcResupplyCommandBoard()}
     ${roleSection('עומס מחלקות — אדום/צהוב לפי מחלקה', platoonRows)}
     ${roleSection('תעדוף פינוי פלוגתי', companyEvacuationPriorityRows(patients))}
     ${roleSection('בקשות משאב רפואי פתוחות', reqQueue)}
@@ -2864,7 +2972,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
   const metrics=[
     roleMetric(pts.length, role==='medic'?'הפצועים שלי':role==='pc'?'פצועי המחלקה':'פצועים גלויים'),
     roleMetric(alerts.length, 'התראות לפעולה'),
-    roleMetric(requests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).length, 'בקשות פתוחות'),
+    roleMetric(requests.filter(isRequestOpen).length, 'בקשות פתוחות'),
     roleMetric(role==='cc'?DEMO_PLATOONS.length:allSites.filter(s=>s.id!=='ALL').length, role==='cc'?'מחלקות':'מוקדים')
   ].join('');
   const responsibilities=cfg.responsibilities.map(x=>roleRow(x,'אחריות תפקיד')).join('');
@@ -2890,7 +2998,10 @@ function renderRoleDashboard(role=activeRoleDashboard){
   }else{
     objects=allSites.filter(s=>s.id!=='ALL').map(s=>roleRow(s.name,`${getSitePatients(s.id).length} פצועים · ${externalConflictCount(getSitePatients(s.id), s.externalReports||[])} פערי דיווח`)).join('');
   }
-  const reqHtml=requests.slice(0,8).map(r=>roleRow(`${r.id} · ${REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType}`,`${r.targetLocation} · ${REINFORCEMENT_STATUS_LABELS[r.status]||r.status} · ${(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')}`)).join('');
+  const reqHtml=requests.slice(0,8).map(r=>roleRow(
+    `${r.id} · ${r.type==='resupply'?'השלמת ציוד':(REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType)}`,
+    `${r.type==='resupply'?resupplyItemsText(r):r.targetLocation} · ${REINFORCEMENT_STATUS_LABELS[r.status]||r.status} · ${r.type==='resupply'?(r.truckAvailability==='available'?'זמין ברכב חוג״ד':'דורש מ״פ רפואה'):(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')}`
+  )).join('');
   const actions=[
     `<button class="demo-mini-btn" onclick="openLegacyForRole('${role}')">פתח מסך עבודה מלא</button>`,
     role==='medic'?`<button class="demo-mini-btn" onclick="startMedicTreatmentNow()">התחל טיפול עכשיו</button><button class="demo-mini-btn" onclick="goTo('enroute')">טיוטת מוקד בדרך</button>`:'',
@@ -3034,7 +3145,7 @@ function exportExperimentLog(){
     unsynced_events:patients.reduce((s,p)=>s+(p.unsyncedEvents||0),0)+localOutboxCount(),
     commander_open_alerts:alertRows.filter(a=>a.audience.includes('pc')||a.audience.includes('chamal')).length,
     acknowledged_alerts:patients.filter(p=>p.alertAcknowledgedAt).length,
-    reinforcement_requests_open:reinforcementRequests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).length,
+    reinforcement_requests_open:reinforcementRequests.filter(isRequestOpen).length,
     conflict_count:conflictLog().length
   };
   const observer=observerNotes();
@@ -3225,6 +3336,7 @@ function renderDashboard(){
           <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${p.time}</span>
         </div>
         <div style="font-size:11px;color:var(--muted);margin-top:3px">${trend.detail}</div>
+        <button class="demo-mini-btn" onclick="event.stopPropagation();openMedicResupplySheet('${p.id}','manual_request')" style="margin-top:8px;background:var(--surface2);border-color:var(--border);color:var(--muted)">חסר לי ציוד</button>
       </div>
       ${p.alert?'<div class="alert-dot"></div>':''}
     </div>`;
@@ -3442,7 +3554,7 @@ function recordSweepTreatment(type){
     event.payload={limb:'unknown_limb',tourniquetTime:new Date().toISOString()};
     p.tourniquet={limb:'לא צוין — להשלים',appliedAt:Date.now(),timeCode:nowT().replace(':','')};
     if(!p.assessmentDebt.includes('tourniquet_limb')) p.assessmentDebt.push('tourniquet_limb');
-    reconcileSupplySource(`sweep:${p.id}:tq`, 'CAT_TOURNIQUET', 1, p.id);
+    reconcileSupplySource(`sweep:${p.id}:tq`, 'tourniquets', 1, p.id);
     p.triage='red';
     p.mstart.color='red';
     p.patientStatus='stabilizing';
@@ -3450,6 +3562,10 @@ function recordSweepTreatment(type){
   if(type==='airway'){
     event.payload={airway_opened:true,breathing_after:p.mstart?.breathing||'unknown'};
     p.patientStatus='stabilizing';
+    reconcileSupplySource(`sweep:${p.id}:airway`, 'airwayEquipment', 1, p.id);
+  }
+  if(type==='pressure_bandage'){
+    reconcileSupplySource(`sweep:${p.id}:pressure`, 'pressureDressings', 1, p.id);
   }
   p.lifeSavingTreatments=p.lifeSavingTreatments||[];
   p.lifeSavingTreatments.unshift(event);
@@ -3472,6 +3588,11 @@ function completeMstartSweep(){
   ensureSiteReadiness();
   const list=sweepPatientsForCurrentZone();
   const c=sweepCounts(list);
+  const consumed={
+    tourniquets:list.reduce((sum,p)=>sum+(p.lifeSavingTreatments||[]).filter(t=>t.treatmentType==='tourniquet').length,0),
+    pressureDressings:list.reduce((sum,p)=>sum+(p.lifeSavingTreatments||[]).filter(t=>t.treatmentType==='pressure_bandage').length,0),
+    airwayEquipment:list.reduce((sum,p)=>sum+(p.lifeSavingTreatments||[]).filter(t=>t.treatmentType==='airway').length,0)
+  };
   const session={
     id:`SWEEP-${String((siteData.sweepSessions||[]).length+1).padStart(3,'0')}`,
     medicId:currentMedicId(),
@@ -3483,6 +3604,7 @@ function completeMstartSweep(){
     trapped:c.trapped,
     tourniquets:c.tourniquets,
     airwayInterventions:c.airway,
+    consumedSupplies:consumed,
     missingFullVitals:c.missingVitals,
     status:'completed',
     createdAt:new Date().toISOString(),
@@ -3490,11 +3612,13 @@ function completeMstartSweep(){
   };
   siteData.sweepSessions=siteData.sweepSessions||[];
   siteData.sweepSessions.unshift(session);
-  saveLocalEvent({type:'MSTART_SWEEP_COMPLETED',detail:`${session.medicName} סיים סריקת MSTART באזור ${session.zone}: ${c.total} פצועים, ${c.red} אדום, ${c.trapped} לכודים, ${c.tourniquets} חסמים`,warn:c.red>0||c.tourniquets>0,payload_json:session});
+  const consumedText=Object.entries(consumed).filter(([,v])=>v>0).map(([k,v])=>`${supplyLabel(k,true)} x${v}`).join(' · ')||'לא נצרך ציוד';
+  saveLocalEvent({type:'MSTART_SWEEP_COMPLETED',detail:`${session.medicName} סיים סריקת MSTART באזור ${session.zone}: ${c.total} פצועים, ${c.red} אדום, ${c.trapped} לכודים, ${c.tourniquets} חסמים · נצרך: ${consumedText}`,warn:c.red>0||c.tourniquets>0,payload_json:session});
   activeSweepPatientId=null;
   activeRoleDashboard='medic';
   saveDemoState();
-  toast('סריקת MSTART הסתיימה. עבור למעקב הפצועים שלי למדדים מלאים וניטור הידרדרות.');
+  const low=lowStockEntries(state.localStockCache);
+  toast(`סריקת MSTART הסתיימה. נצרכו בסריקה: ${consumedText}${low.length?' · ציוד נמוך — מומלץ לבקש השלמה מהרכב':''}`);
   goTo('role-dashboard');
 }
 function renderMstartSweep(){
@@ -3656,7 +3780,12 @@ function buildAlertObjects(pts=patients){
   if(conflicts>0) pushAlert(alerts,{id:`external-conflict-${cmdActiveSite}`,type:'EXTERNAL_REPORT_CONFLICT',severity:conflicts>2?'high':'medium',owner:'chamal',audience:['pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'verify_report',scope:'site',category:'integrity',siteId:cmdActiveSite,title:'פער דיווח חיצוני מול שדה',detail:`${conflicts} פערים בין דיווח חיצוני לספירה מאושרת`});
   const unsynced=pts.reduce((sum,p)=>sum+(p.unsyncedEvents||0),0)+localOutboxCount();
   if(unsynced>0) pushAlert(alerts,{id:`sync-backlog-${cmdActiveSite}`,type:'UNSYNCED_EVENT_BACKLOG',severity:unsynced>5?'high':'low',owner:'chamal',audience:unsynced>5?['pc','cc','chamal']:['medic','pc'],escalatesTo:unsynced>5?'cc':null,escalateAfterMin:unsynced>5?5:null,actionRequired:'review_sync',scope:'system',category:'integrity',siteId:cmdActiveSite,title:'אירועים מקומיים לא מסונכרנים',detail:`${unsynced} אירועים ממתינים בתור המקומי`});
-  reinforcementRequests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).forEach(r=>{
+  reinforcementRequests.filter(isRequestOpen).forEach(r=>{
+    if(r.type==='resupply'){
+      const escalated=['escalated_to_cc','unavailable_at_truck'].includes(r.status);
+      pushAlert(alerts,{id:`resupply-${r.id}`,type:escalated?'PC_TRUCK_SHORTAGE_ESCALATED':'MEDIC_RESUPPLY_REQUEST',severity:r.urgency==='immediate'||escalated?'high':'medium',owner:escalated?'cc':'pc',audience:escalated?['pc','cc','logistics','chamal']:['pc','logistics'],escalatesTo:escalated?'cc':null,escalateAfterMin:escalated?0:8,actionRequired:'dispatch_supply',scope:escalated?'company':'site',category:'forces',siteId:r.siteId,patientId:r.linkedPatientId,title:`בקשת השלמת ציוד — ${escalated?'נדרש תגבור פלוגתי':'זמינה ברכב חוג״ד'}`,detail:`${r.requestedByName} · ${r.zone||r.targetLocation} · ${resupplyItemsText(r)} · ${REINFORCEMENT_STATUS_LABELS[r.status]||r.status}`});
+      return;
+    }
     const isDeathCert=r.resourceType==='doctor_death_cert';
     const isDoctorTx=['doctor_treatment','paramedic'].includes(r.resourceType);
     pushAlert(alerts,{id:`reinforcement-${r.id}`,type:isDeathCert?'DOCTOR_DEATH_CERTIFICATION_REQUEST':'MEDICAL_REINFORCEMENT_REQUEST',severity:r.urgency==='immediate'?'high':'medium',owner:isDeathCert||isDoctorTx?'doctor':'cc',audience:isDeathCert?['pc','cc','doctor','chamal']:isDoctorTx?['pc','cc','doctor','chamal']:['pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:r.urgency==='immediate'?3:10,actionRequired:isDeathCert?'certify_death':'request_reinforcement',scope:isDeathCert?'patient':'company',category:isDeathCert?'forces':'forces',siteId:r.siteId,patientId:(r.linkedPatientIds||[])[0],title:`בקשת תגבור — ${REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType}`,detail:`${r.targetLocation} · ${REINFORCEMENT_STATUS_LABELS[r.status]||r.status} · ${(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')}`});
@@ -3818,7 +3947,7 @@ function saveImmediateCasualtyAndContinue(){
   };
   actionLabels.forEach(text=>p.events.unshift({type:text.includes('חסם')?'TOURNIQUET_APPLIED':'LIFE_SAVING_ACTION_RECORDED',time:t,detail:text,warn:true}));
   patients.unshift(p);
-  if(isTq) reconcileSupplySource(`mstart:${id}:tq`, 'CAT_TOURNIQUET', 1);
+  if(isTq) reconcileSupplySource(`mstart:${id}:tq`, 'tourniquets', 1);
   if(triage==='black') createDeathCertificationRequest(p);
   saveLocalEvent({type:'IMMEDIATE_FIELD_ASSESSMENT',detail:`${id} נפתח בסריקת MSTART`,warn:['red','black'].includes(triage),payload_json:{patient_id:id,triage,site:siteData.name,zone:zoneLabel(),immediate:im,life_saving_actions:actions}});
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
@@ -3869,7 +3998,7 @@ function createImmediateInterventionPatient(kind='tourniquet'){
     ]
   };
   patients.unshift(p);
-  if(isTq) reconcileSupplySource(`immediate:${id}:tq`, 'CAT_TOURNIQUET', 1);
+  if(isTq) reconcileSupplySource(`immediate:${id}:tq`, 'tourniquets', 1);
   saveLocalEvent({type:isTq?'TOURNIQUET_APPLIED':'IMMEDIATE_INTERVENTION_RECORDED',detail:label,warn:true,payload_json:{patient_id:id,source:'medic_immediate_action',auto_triage:'red'}});
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   renderDashboard(); renderAlerts();
@@ -4948,7 +5077,7 @@ function queueMedicationEventsBeforeSave(){
 }
 
 function queueInventoryBeforeSave(patientId){
-  reconcileSupplySource('quick:tq', 'CAT_TOURNIQUET', quickTqData.applied ? 1 : 0, patientId);
+  reconcileSupplySource('quick:tq', 'tourniquets', quickTqData.applied ? 1 : 0, patientId);
   ['tourniquet','bandage','morphine','atq','fluids'].forEach(key=>reconcileSupplyForIntervention(key, state.interventions.has(key)?null:0, patientId));
 }
 
@@ -5480,7 +5609,7 @@ function logisticsCompanies(){
   return companyDefs.map(c=>{
     const pts=c.siteId==='ALL' ? patients : patients.filter(p=>(p.siteId||'SITE_A')===c.siteId);
     const inventory=inventoryReadModel(pts);
-    const lowItems=Object.entries(inventory).filter(([,count])=>count<=1);
+    const lowItems=Object.entries(inventory).filter(([item,count])=>count<=(SUPPLY_LOW_THRESHOLDS[item]??1)).map(([item,qty])=>({item,qty}));
     const consumed=(pts||[]).reduce((sum,p)=>sum+(p.txHistory?.length||0),0);
     return {...c, patients:pts.length, inventory, lowItems, consumed};
   });
@@ -5503,7 +5632,7 @@ function renderLogisticsOfficer(){
       const cls=count<=0?'empty':count<=1?'low':'';
       return `<span class="${cls}">${SUPPLY_LABELS[item]||item}: ${count}</span>`;
     }).join('');
-    const state=c.lowItems.some(([,count])=>count<=0)?'CRITICAL':c.lowItems.length?'LOW':'OK';
+    const state=c.lowItems.some(x=>x.qty<=0)?'CRITICAL':c.lowItems.length?'LOW':'OK';
     return `<div class="cmd-matrix-row ${state==='CRITICAL'?'critical':''}">
       <div>
         <div class="cmd-matrix-title">${c.name} · ${c.id}</div>
@@ -5621,6 +5750,150 @@ function defaultReinforcementLocation(){
   if(cmdActiveSite==='ALL') return siteData.name||'כל המוקדים';
   return `${site.name||siteData.name||cmdActiveSite}${siteData.address?' · '+siteData.address:''}`;
 }
+function defaultResupplyLocation(){
+  return `${siteData.name||siteData.address||'מוקד פעיל'} · ${zoneLabel()}`;
+}
+function resupplyRequestOpenStatuses(){
+  return ['pending_pc','approved_from_truck','sent_from_truck','collected_by_medic','unavailable_at_truck','escalated_to_cc','fulfilled_by_company'];
+}
+function isRequestOpen(r){
+  return !['arrived','resolved','cancelled','denied','delivered','closed'].includes(r.status);
+}
+function resupplyItemsText(req){
+  return (req.items||[]).map(x=>`${supplyLabel(x.item,true)} x${x.quantity==='unknown'?'כמה שאפשר':x.quantity}`).join(' · ');
+}
+function pcTruckAvailability(items=[]){
+  const stock={...PC_TRUCK_BASELINE, ...(pcTruckStock||{})};
+  const missing=items.filter(x=>x.item!=='other' && (stock[normalizeSupplyItem(x.item)]||0) < (Number(x.quantity)||1));
+  return {available:missing.length===0, missing, stock};
+}
+function createResupplyRequest({items, linkedPatientId=null, urgency='high', reason='manual_request', note='', status=null, auto=false}){
+  const normalized=(items||[]).map(x=>({item:normalizeSupplyItem(x.item), quantity:x.quantity||1})).filter(x=>x.item);
+  if(!normalized.length) return null;
+  const availability=pcTruckAvailability(normalized);
+  const nowIso=new Date().toISOString();
+  const req={
+    id:`REQ-SUP-${String(reinforcementRequests.filter(r=>r.type==='resupply').length+1).padStart(3,'0')}`,
+    type:'resupply',
+    requestedByRole:'medic',
+    requestedById:currentMedicId(),
+    requestedByName:currentMedicName(),
+    assignedPC:displayUser('USR-BARAK'),
+    siteId:currentSiteId(),
+    eventName:siteData.name||'אירוע ללא שם',
+    company:companyLabelForSite(currentSiteId()),
+    zone:zoneLabel(),
+    targetLocation:defaultResupplyLocation(),
+    linkedPatientId,
+    linkedPatientIds:linkedPatientId?[linkedPatientId]:[],
+    items:normalized,
+    resourceType:'resupply',
+    quantity:normalized.reduce((sum,x)=>sum+(Number(x.quantity)||1),0),
+    urgency,
+    reason,
+    reasonCodes:[reason],
+    sourcePreference:'pc_truck_first',
+    truckAvailability:availability.available?'available':'missing',
+    truckMissingItems:availability.missing.map(x=>x.item),
+    status:status || (availability.available?'pending_pc':'escalated_to_cc'),
+    createdAt:nowIso,
+    updatedAt:nowIso,
+    statusHistory:[{status:status || (availability.available?'pending_pc':'escalated_to_cc'), at:nowIso, by:getDeviceId()}],
+    freeText:note,
+    autoGenerated:!!auto
+  };
+  reinforcementRequests.unshift(req);
+  saveLocalEvent({
+    type:availability.available?'RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE':'RESUPPLY_REQUEST_ESCALATED_CC',
+    detail:`${req.requestedByName} · ${resupplyItemsText(req)} · ${availability.available?'זמין ברכב חוג״ד':'לא זמין ברכב חוג״ד'}`,
+    warn:!availability.available || urgency==='immediate',
+    payload_json:req
+  });
+  saveDemoState();
+  return req;
+}
+function createAutoResupplySuggestion(itemType, patientId=null, reason='stock_empty', urgency='high'){
+  itemType=normalizeSupplyItem(itemType);
+  const existing=reinforcementRequests.some(r=>r.type==='resupply' && resupplyRequestOpenStatuses().includes(r.status) && (r.items||[]).some(x=>x.item===itemType) && r.requestedById===currentMedicId());
+  if(existing) return null;
+  return createResupplyRequest({items:[{item:itemType, quantity:reason==='stock_empty'?3:2}], linkedPatientId:patientId, urgency, reason, note:reason==='stock_empty'?'מלאי אישי אזל בעקבות טיפול בשטח':'מלאי אישי נמוך בעקבות טיפול בשטח', auto:true});
+}
+function openMedicResupplySheet(patientId=null, reason='manual_request', preselectItem=null){
+  resupplyDraft={items:new Set(), quantity:1, note:'', linkedPatientId:patientId, urgency:reason==='stock_empty'?'immediate':'high', reason};
+  document.querySelectorAll('#resupply-item-grid .tap-btn,#resupply-qty-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  const firstQty=document.querySelector('#resupply-qty-grid .tap-btn');
+  if(firstQty) firstQty.classList.add('selected');
+  const note=document.getElementById('resupply-note');
+  if(note) note.value='';
+  if(preselectItem){
+    const item=normalizeSupplyItem(preselectItem);
+    resupplyDraft.items.add(item);
+    document.querySelectorAll('#resupply-item-grid .tap-btn').forEach(b=>{
+      if(b.getAttribute('onclick')?.includes(`'${item}'`)) b.classList.add('selected');
+    });
+  }
+  const modal=document.getElementById('resupply-modal');
+  if(modal) modal.classList.remove('hidden');
+}
+function hideResupplyModal(){
+  const modal=document.getElementById('resupply-modal');
+  if(modal) modal.classList.add('hidden');
+}
+function closeResupplyModal(e){ if(e.target.id==='resupply-modal') hideResupplyModal(); }
+function toggleResupplyItem(btn,item){
+  item=normalizeSupplyItem(item);
+  if(resupplyDraft.items.has(item)){
+    resupplyDraft.items.delete(item);
+    if(btn) btn.classList.remove('selected');
+  }else{
+    resupplyDraft.items.add(item);
+    if(btn) btn.classList.add('selected');
+  }
+}
+function selectResupplyQuantity(btn,qty){
+  resupplyDraft.quantity=qty;
+  document.querySelectorAll('#resupply-qty-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
+  if(btn) btn.classList.add('selected');
+}
+function submitMedicResupplyRequest(){
+  const note=document.getElementById('resupply-note')?.value.trim() || '';
+  const items=[...resupplyDraft.items].map(item=>({item, quantity:resupplyDraft.quantity}));
+  if(!items.length){ toast('בחר מה חסר'); return; }
+  const req=createResupplyRequest({items, linkedPatientId:resupplyDraft.linkedPatientId, urgency:resupplyDraft.urgency, reason:resupplyDraft.reason||'manual_request', note});
+  hideResupplyModal();
+  if(req?.status==='escalated_to_cc') toast('בקשת ציוד נפתחה והוסלמה למ״פ רפואה — לא זמין ברכב חוג״ד');
+  else toast('בקשת השלמת ציוד נשלחה לחוג״ד');
+  if(document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard(activeRoleDashboard);
+  renderCommander();
+}
+function updateResupplyStatus(id,status){
+  const req=reinforcementRequests.find(r=>r.id===id && r.type==='resupply'); if(!req) return;
+  const previous=req.status;
+  if(status==='approved_from_truck' && !req.truckDebited){
+    const availability=pcTruckAvailability(req.items||[]);
+    if(!availability.available){
+      status='unavailable_at_truck';
+    }else{
+      (req.items||[]).forEach(x=>{ if(x.item!=='other') pcTruckStock[x.item]=Math.max(0,(pcTruckStock[x.item]??PC_TRUCK_BASELINE[x.item]??0)-(Number(x.quantity)||1)); });
+      req.truckDebited=true;
+      saveLocalEvent({type:'RESUPPLY_APPROVED_FROM_PC_TRUCK',detail:`${req.id} · ${resupplyItemsText(req)}`,warn:false,payload_json:{request_id:req.id,items:req.items,pcTruckStock}});
+    }
+  }
+  if(status==='unavailable_at_truck'){
+    req.truckAvailability='missing';
+    saveLocalEvent({type:'PC_TRUCK_RESUPPLY_UNAVAILABLE_ESCALATED',detail:`חוסר ציוד ברכב חוג״ד — ${resupplyItemsText(req)}`,warn:true,payload_json:req});
+  }
+  if(status==='escalated_to_cc'){
+    saveLocalEvent({type:'RESUPPLY_ESCALATED_TO_CC',detail:`${req.id} · נדרש תגבור פלוגתי`,warn:true,payload_json:req});
+  }
+  req.status=status;
+  req.updatedAt=new Date().toISOString();
+  req.statusHistory=req.statusHistory||[];
+  req.statusHistory.push({status, previous, at:req.updatedAt, by:getDeviceId()});
+  saveDemoState();
+  renderCommander();
+  if(document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard(activeRoleDashboard);
+}
 function openReinforcementRequest(prefill={}){
   reinforcementDraft={
     resourceType:prefill.resourceType||null,
@@ -5689,12 +5962,12 @@ function createMedicalResourceRequest({resourceType, reasonCodes=[], urgency='hi
   return req;
 }
 function createDeathCertificationRequest(patient){
-  const exists=reinforcementRequests.some(r=>r.resourceType==='doctor_death_cert' && (r.linkedPatientIds||[]).includes(patient.id) && !['arrived','resolved','cancelled','denied'].includes(r.status));
+  const exists=reinforcementRequests.some(r=>r.resourceType==='doctor_death_cert' && (r.linkedPatientIds||[]).includes(patient.id) && isRequestOpen(r));
   if(exists) return null;
   const siteId=patient.siteId||'SITE_A';
   const blackAtSite=patients.filter(p=>(p.siteId||'SITE_A')===siteId && (p.triage==='black'||p.patientStatus==='deceased')).length;
   if(blackAtSite>=2){
-    reinforcementRequests.filter(r=>r.resourceType==='doctor_death_cert' && r.siteId===siteId && !['arrived','resolved','cancelled','denied'].includes(r.status)).forEach(r=>{
+    reinforcementRequests.filter(r=>r.resourceType==='doctor_death_cert' && r.siteId===siteId && isRequestOpen(r)).forEach(r=>{
       r.urgency='high';
       r.statusHistory=r.statusHistory||[];
       r.statusHistory.push({status:'urgency_escalated', at:new Date().toISOString(), by:'system', reason:'second_black_patient_same_site'});
@@ -5748,7 +6021,7 @@ function updateReinforcementStatus(id, status){
 function renderReinforcementPanel(){
   const body=document.getElementById('cmd-reinforcement-requests'); if(!body) return;
   const visible=reinforcementRequests.filter(r=>commandRole!=='cc' || r.siteId===ccCompanySite);
-  const open=visible.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status));
+  const open=visible.filter(isRequestOpen);
   setCmdPanelMeta('reinforcement', `${open.length} OPEN · ${visible.length} TOTAL`);
   const createButton=`<div style="padding:8px 16px 0"><button class="btn-primary" onclick="openReinforcementRequest()" style="background:var(--accent)">+ בקשת תגבור רפואי</button></div>`;
   if(!visible.length){
@@ -5756,18 +6029,20 @@ function renderReinforcementPanel(){
     return;
   }
   body.innerHTML=createButton+visible.map(r=>{
-    const reasons=(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')||'ללא סיבה מקודדת';
-    const statuses=['pending','acknowledged','assigned','en_route','arrived','denied','cancelled','resolved'];
+    const reasons=r.type==='resupply' ? resupplyItemsText(r) : ((r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')||'ללא סיבה מקודדת');
+    const statuses=r.type==='resupply'
+      ? ['pending_pc','approved_from_truck','sent_from_truck','collected_by_medic','delivered','unavailable_at_truck','escalated_to_cc','closed']
+      : ['pending','acknowledged','assigned','en_route','arrived','denied','cancelled','resolved'];
     return `<div class="reinforcement-card ${r.urgency}">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
         <div>
-          <div style="font-weight:900;font-size:14px">${r.id} · ${REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType}</div>
+          <div style="font-weight:900;font-size:14px">${r.id} · ${r.type==='resupply'?'השלמת ציוד':(REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType)}</div>
           <div style="font-size:12px;color:var(--muted);line-height:1.45;margin-top:3px">${r.company||''} · ${r.targetLocation} · ${reasons}</div>
           ${r.freeText?`<div style="font-size:12px;margin-top:5px">${r.freeText}</div>`:''}
         </div>
         <div class="watchdog-tag ${r.urgency==='immediate'?'red':r.urgency==='high'?'amber':'ok'}">${REINFORCEMENT_STATUS_LABELS[r.status]||r.status}</div>
       </div>
-      <div class="request-status-row">${statuses.map(s=>`<button class="request-status-btn ${r.status===s?'active':''}" onclick="updateReinforcementStatus('${r.id}','${s}')">${REINFORCEMENT_STATUS_LABELS[s]}</button>`).join('')}</div>
+      <div class="request-status-row">${statuses.map(s=>`<button class="request-status-btn ${r.status===s?'active':''}" onclick="${r.type==='resupply'?`updateResupplyStatus('${r.id}','${s}')`:`updateReinforcementStatus('${r.id}','${s}')`}">${REINFORCEMENT_STATUS_LABELS[s]}</button>`).join('')}</div>
     </div>`;
   }).join('');
 }
@@ -5791,7 +6066,7 @@ function renderCommandOperationalPanels(pts, site){
     {n:stale.length,l:'פצועים עם מידע ישן',c:stale.length?'critical':''},
     {n:trappedSilent.length,l:'לכודים ללא קשר חובש',c:trappedSilent.length?'critical':''},
     {n:evacBlocked.length,l:'פינויים חסומים / ממתינים',c:evacBlocked.length?'critical':''},
-    {n:reinforcementRequests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).length,l:'בקשות תגבור פתוחות',c:reinforcementRequests.some(r=>r.urgency==='immediate'&&r.status==='pending')?'critical':''},
+    {n:reinforcementRequests.filter(isRequestOpen).length,l:'בקשות תגבור / ציוד פתוחות',c:reinforcementRequests.some(r=>r.urgency==='immediate'&&isRequestOpen(r))?'critical':''},
     {n:unsynced,l:'אירועים מקומיים שלא סונכרנו',c:unsynced?'':''}
   ].map(x=>`<div class="cmd-priority-card ${x.c}"><div class="cmd-priority-num">${x.n}</div><div class="cmd-priority-label">${x.l}</div></div>`).join('');
   renderReinforcementPanel();
@@ -5977,7 +6252,7 @@ function generateSitrep(){
   const trapped=patients.filter(p=>normalizeTrapStatus(p)==='trapped').length;
   const evacuated=patients.filter(p=>['evacuating','evacuated','handed_over'].includes(p.patientStatus)).length + (siteData.initialEvacuation?.green||0) + (siteData.initialEvacuation?.yellow||0) + (siteData.initialEvacuation?.red||0);
   const tq=patients.filter(p=>p.tourniquet).map(p=>p.id).join(', ')||'אין';
-  const openReqs=reinforcementRequests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).length;
+  const openReqs=reinforcementRequests.filter(isRequestOpen).length;
   const text=`דיווח מצב ${siteData.name||siteData.address||'מוקד'}: ${red} אדום, ${yellow} צהוב, ${green} ירוק/קל, ${evacuated} פונו או הועברו, ${trapped} לכודים. חסמי עורקים על: ${tq}. בקשות תגבור פתוחות: ${openReqs}.`;
   navigator.clipboard?.writeText(text).catch(()=>{});
   toast('דיווח רדיו נוצר והועתק');
@@ -6064,7 +6339,7 @@ function renderAar(){
   document.getElementById('aar-timeline').innerHTML=timeline || '<div class="aar-note"><div class="aar-note-body">אין אירועים להצגה.</div></div>';
   const overdue=patients.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS);
   const pcRequests=reinforcementRequests.filter(r=>r.requestedByRole==='pc').length;
-  const ccOpenRequests=reinforcementRequests.filter(r=>!['arrived','resolved','cancelled','denied'].includes(r.status)).length;
+  const ccOpenRequests=reinforcementRequests.filter(isRequestOpen).length;
   const logisticsShortages=logisticsCompanies().reduce((sum,c)=>sum+c.lowItems.length,0);
   const insights=[
     {title:'חובש', body: overdue.length ? `${overdue.length} פצועים עברו את יעד עדכון המדדים; נדרש חזרה למדדים כשאפשר.` : 'כל הפצועים הפעילים בתוך חלון המדדים.'},
@@ -6094,11 +6369,11 @@ function toggleQuickTQ(btn, applied) {
   btn.classList.add('selected');
   document.getElementById('quick-tq-panel').style.display = applied ? 'block' : 'none';
   if (applied) {
-    reconcileSupplySource('quick:tq', 'CAT_TOURNIQUET', 1);
+    reconcileSupplySource('quick:tq', 'tourniquets', 1);
     projectPatientStatus('stabilizing','TOURNIQUET_APPLIED',{source:'quick_patient_flow'});
     if (!quickTqData.time) setQuickTQTimeNow();
   } else {
-    reconcileSupplySource('quick:tq', 'CAT_TOURNIQUET', 0);
+    reconcileSupplySource('quick:tq', 'tourniquets', 0);
   }
   document.getElementById('btn-step3').disabled = false;
   saveActiveRecoveryState('step3');
@@ -6182,51 +6457,90 @@ function activeScreenId(){
   const el=document.querySelector('.screen.active');
   return el?.id?.replace('screen-','')||null;
 }
+function normalizeSupplyItem(itemType){
+  return SUPPLY_ALIASES[itemType] || itemType;
+}
+function supplyLabel(itemType, short=false){
+  const key=normalizeSupplyItem(itemType);
+  return (short?SUPPLY_SHORT_LABELS[key]:SUPPLY_LABELS[key]) || key;
+}
 function localStock(itemType){
+  itemType=normalizeSupplyItem(itemType);
   state.localStockCache={...SUPPLY_BASELINE, ...(state.localStockCache||{})};
   return state.localStockCache[itemType] ?? 0;
+}
+function lowStockEntries(stock=state.localStockCache){
+  const merged={...SUPPLY_BASELINE, ...(stock||{})};
+  return Object.entries(SUPPLY_LABELS).map(([key,label])=>({key,label,value:merged[key]??0, threshold:SUPPLY_LOW_THRESHOLDS[key]??1}))
+    .filter(x=>x.value<=x.threshold);
 }
 function renderLocalStockPanel(){
   const el=document.getElementById('tx-stock-grid');
   if(!el) return;
   state.localStockCache={...SUPPLY_BASELINE, ...(state.localStockCache||{})};
-  el.innerHTML=Object.entries(SUPPLY_LABELS).map(([key,label])=>{
-    const value=localStock(key);
+  const entries=lowStockEntries(state.localStockCache);
+  el.innerHTML=(entries.length?entries:Object.entries(SUPPLY_LABELS).slice(0,3).map(([key,label])=>({key,label,value:localStock(key)}))).map(({key,label,value})=>{
     const cls=value<=0?'empty':value<=1?'low':'';
     return `<div class="stock-chip ${cls}"><span>${label}</span><strong>${value}</strong></div>`;
   }).join('');
+}
+function renderMedicStockWarnings(){
+  const entries=lowStockEntries(state.localStockCache);
+  if(!entries.length) return '';
+  return `<div class="chip-row" style="margin-top:10px">${entries.map(({key,value})=>`<button class="chip ${value<=0?'selected':''}" onclick="openMedicResupplySheet(null,'${value<=0?'stock_empty':'stock_low'}','${key}')">${supplyLabel(key,true)}: ${value}</button>`).join('')}</div>`;
 }
 function showOwnInventory(){
   const line=Object.entries(SUPPLY_LABELS).map(([key,label])=>`${label}: ${localStock(key)}`).join(' · ');
   toast(line || 'אין נתוני מלאי');
 }
-function consumeFieldSupply(itemType, quantityDelta, patientId=null, movementType='treatment_consumed'){
+function consumeFieldSupply(itemType, quantityDelta, patientId=null, movementType='treatment_consumed', meta={}){
+  itemType=normalizeSupplyItem(itemType);
   if(!state.localStockCache) state.localStockCache={};
   const delta=Number(quantityDelta)||0;
   state.localStockCache[itemType]=(state.localStockCache[itemType] ?? SUPPLY_BASELINE[itemType] ?? 0)+delta;
+  const after=state.localStockCache[itemType];
+  const lowThreshold=SUPPLY_LOW_THRESHOLDS[itemType] ?? 1;
+  const payload={
+    item:itemType,
+    item_type:itemType,
+    quantity_delta:delta,
+    linkedPatientId:patientId||state.patientDraftId,
+    patient_id:patientId||state.patientDraftId,
+    siteId:meta.siteId||currentSiteId(),
+    zone:meta.zone||zoneLabel(),
+    performedBy:meta.performedBy||currentMedicName(),
+    occurredAt:new Date().toISOString(),
+    medic_stock_after:after
+  };
+  if(delta<0){
+    saveLocalEvent({type:'SUPPLY_CONSUMED',detail:`${supplyLabel(itemType)} נצרך · נותר ${after}`,warn:after<=lowThreshold,payload_json:payload});
+  }
   saveLocalEvent({
     type:'INVENTORY_LEDGER_MOVEMENT',
     detail:`Inventory ledger: ${itemType} ${delta}`,
-    warn:state.localStockCache[itemType] <= 0,
+    warn:after <= 0,
     payload_json:{
       item_type:itemType,
       movement_type:movementType,
       quantity_delta:delta,
       patient_id:state.patientDraftId||patientId,
       patient_context:patientId||state.patientDraftId,
-      local_stock_after:state.localStockCache[itemType],
+      local_stock_after:after,
       battery_at_log:null
     }
   });
   renderLocalStockPanel();
-  if(state.localStockCache[itemType] <= 0){
-    toast(`מלאי ${SUPPLY_LABELS[itemType]||itemType} אזל מקומית — נרשמת התרעת דחף לחמ"ל`);
+  if(after <= 0){
+    toast(`ציוד אזל — בקש השלמה עכשיו · ${supplyLabel(itemType,true)}. נרשם טיפול למרות שמלאי מקומי 0`);
     saveLocalEvent({
       type:'LOCAL_STOCKOUT_WARNING',
-      detail:`Local stock depleted: ${itemType}`,
+      detail:`ציוד אזל אצל חובש: ${supplyLabel(itemType)}`,
       warn:true,
       payload_json:{item_type:itemType, local_stock_after:state.localStockCache[itemType], patient_id:patientId||state.patientDraftId}
     });
+    createAutoResupplySuggestion(itemType, patientId, 'stock_empty', itemType==='tourniquets'?'immediate':'high');
+  }else if(after <= lowThreshold){
+    toast(`ציוד נמוך — בקש השלמה מהחוג״ד · ${supplyLabel(itemType,true)}: ${after}`);
   }
 }
 function reconcileSupplyForIntervention(key, forcedQty=null, patientId=null){

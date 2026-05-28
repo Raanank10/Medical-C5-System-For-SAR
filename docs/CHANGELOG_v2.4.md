@@ -26,6 +26,10 @@ Demo V2.4 reshapes the product around the tactical timeline of a collapsed-build
 - En-route site data is treated as command-visible context for חוג"ד, חמ"ל, and מ״פ רפואה.
 - Initial evacuated counts remain editable later.
 - Added חוג"ד board section for active/completed MSTART sweeps, severity counts, trapped count, tourniquets, airway interventions, and missing full vitals.
+- Added a truck-first logistics model: medic supply use creates `SUPPLY_CONSUMED` events, חוג"ד sees whether the request is available in the truck, and shortages escalate to מ״פ רפואה / logistics.
+- Added a medic-only `חסר לי ציוד` sheet instead of a logistics dashboard, plus low/empty stock warning chips that never block treatment.
+- Added PC truck stock, resupply statuses, and חוג"ד actions for approving from truck, sending, marking collected/delivered, or escalating unavailable stock.
+- Added מ״פ רפואה visibility for truck shortages, escalated equipment requests, and shortage impact on active red/yellow treatment.
 - Added a demo button to clear patient data while keeping the board/site context.
 - Added a stale-vitals reminder action from command to medic.
 - Added a one-tap radio SITREP generator.

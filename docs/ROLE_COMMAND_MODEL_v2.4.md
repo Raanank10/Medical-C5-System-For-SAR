@@ -73,7 +73,49 @@ All demo names are synthetic.
 | Site / מוקד | Medic may draft. חוג״ד confirms/edits/assigns. מ״פ רפואה sees confirmed sites and severe draft sites. |
 | Patient / פצוע | Medic creates and updates. חוג״ד reallocates inside platoon. מ״פ רפואה reallocates across platoons. Duplicate merges must preserve event history. |
 | Resource request / בקשת תגבור | חוג״ד creates. מ״פ רפואה commands medical resources directly and can approve, deny, redirect, assign, or resolve. |
+| Resupply request / בקשת השלמת ציוד | Medic can request missing equipment only. חוג״ד handles PC truck stock first. מ״פ רפואה/logistics see escalated shortages and bottlenecks. |
 | Alert / התראה | Alert has owner role, audience, severity, required action, escalation rule, and linked object. |
+
+## Logistics / Resupply Model
+
+Medics do not manage logistics. They only document supply use through treatment actions or tap `חסר לי ציוד`.
+
+Local medic kit demo state:
+
+```js
+{
+  tourniquets: 3,
+  pressureDressings: 4,
+  hemostaticGauze: 2,
+  airwayEquipment: 2,
+  ivKits: 1,
+  blankets: 2,
+  batteryPacks: 1
+}
+```
+
+PC truck stock is the first resupply node before company escalation:
+
+```js
+{
+  tourniquets: 20,
+  pressureDressings: 30,
+  hemostaticGauze: 15,
+  airwayEquipment: 10,
+  ivKits: 8,
+  blankets: 25,
+  batteryPacks: 6
+}
+```
+
+Rules:
+
+- Treatment never blocks because stock is zero.
+- Life-saving actions create `SUPPLY_CONSUMED` and append-only inventory ledger events.
+- Low/empty medic stock creates a warning chip and a fast request path to חוג״ד.
+- חוג״ד can approve/send/mark collected/delivered from the truck.
+- If the truck lacks stock, the request escalates to מ״פ רפואה / logistics.
+- מ״פ רפואה sees shortages affecting active care and cross-platoon bottlenecks, not every small request.
 
 ## Roles
 
