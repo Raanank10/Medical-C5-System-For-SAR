@@ -14,16 +14,49 @@ The medic workflow is split into two operational phases:
    - Data is visible to חוג״ד, חמ״ל, and מ״פ רפואה and remains editable later.
 
 2. `MSTART — סריקה מהירה`
-   - New casualty in current zone.
+   - Dedicated sweep screen, not a full patient form.
+   - New temporary casualty marker in current zone.
    - Life-saving actions stay inside the binary triage screen.
    - A/V/P implies the casualty is breathing.
    - The casualty is saved and the medic returns to the current-zone loop.
+   - End-of-zone sweep creates `MSTART_SWEEP_COMPLETED` for חוג"ד.
 
 3. `הפצועים שלי — מעקב מדדים`
    - Medic sees assigned casualties sorted by urgency.
    - Full vitals are taken during monitoring and treatment hold.
    - Blood pressure is field-estimated by radial/carotid/absent pulse plus strong/weak quality.
    - Deterioration index is shown on patient tiles.
+   - Later vitals create deterioration/priority recommendations; they do not silently redo MSTART.
+
+## Sweep Marker Data
+
+Sweep casualties are intentionally incomplete:
+
+```js
+{
+  id: "TMP-014",
+  siteId: "SITE-A",
+  zone: siteData.currentZone,
+  phase: "mstart_sweep",
+  identityStatus: "unknown",
+  assignedMedicId: currentUser.id,
+  mstart: {
+    walking: null,
+    breathing: null,
+    perfusion: null,
+    avpu: null,
+    trapped: null,
+    color: null
+  },
+  lifeSavingTreatments: [],
+  assessmentDebt: [
+    "full_vitals",
+    "identity",
+    "evacuation_status",
+    "full_injury_assessment"
+  ]
+}
+```
 
 - What is my situation?
 - What am I responsible for?
