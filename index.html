@@ -71,6 +71,11 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .patient-card.black::before{background:var(--triage-black-border);width:8px;}
 .patient-card.pending{border-style:dashed;}
 .patient-card.pending::before{background:transparent;border-right:4px dashed var(--muted);}
+.patient-card.active-alert,.cmd-row.active-alert{box-shadow:0 0 0 2px var(--red),0 0 16px rgba(255,59,48,0.35);animation:alertGlow 2s ease-in-out infinite;}
+@keyframes alertGlow{
+  0%,100%{box-shadow:0 0 0 2px var(--red),0 0 16px rgba(255,59,48,0.35);}
+  50%{box-shadow:0 0 0 2px var(--red),0 0 28px rgba(255,59,48,0.6);}
+}
 .patient-id{font-family:var(--mono);font-weight:700;font-size:16px;min-width:46px;}
 .patient-info{flex:1;}
 .patient-badges{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;align-items:center;}
@@ -152,6 +157,14 @@ body.field-mode .patient-card{padding:16px 15px;margin-top:8px;margin-bottom:8px
 .autofill-chip{display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(76,201,240,.45);background:rgba(76,201,240,.1);color:var(--accent);border-radius:999px;padding:5px 8px;font-size:11px;font-weight:800;margin:3px;}
 .sweep-warning{background:rgba(255,107,53,.12);border:1px solid var(--orange);border-radius:12px;padding:10px 12px;color:var(--text);font-size:12px;line-height:1.45;margin-bottom:12px;}
 .supply-sheet{border-color:var(--accent);box-shadow:0 -16px 60px rgba(76,201,240,.18);}
+.vital-range-warn{display:block;font-size:11px;font-weight:800;margin-top:4px;padding:4px 8px;border-radius:8px;}
+.vital-range-warn.orange{color:var(--orange);background:rgba(255,107,53,0.12);}
+.vital-range-warn.red{color:var(--red);background:rgba(255,59,48,0.12);}
+.cc-action-chip{min-height:56px;touch-action:manipulation;border:1px solid var(--accent);background:rgba(67,97,238,.12);color:var(--text);border-radius:999px;padding:9px 12px;font-size:13px;font-weight:900;white-space:nowrap;cursor:pointer;}
+.pc-board-section{padding:0 16px 14px;}
+.pc-board-title{font-size:13px;font-weight:900;margin:12px 0 8px;color:var(--text);}
+.battle-rhythm{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin:0 16px 16px;}
+.battle-rhythm summary{cursor:pointer;font-weight:900;color:var(--orange);}
 
 /* ── BP BUTTONS ── */
 .bp-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:4px;}
@@ -281,11 +294,27 @@ body.field-mode .patient-card{padding:16px 15px;margin-top:8px;margin-bottom:8px
 .summary-key{color:var(--muted);font-size:13px;}
 .summary-val{font-weight:600;font-size:13px;text-align:left;max-width:60%;}
 .triage-pill{display:inline-block;padding:2px 12px;border-radius:20px;font-size:12px;font-weight:700;}
-.triage-pill.red{background:rgba(230,57,70,0.2);color:var(--red);}
-.triage-pill.yellow{background:rgba(244,162,97,0.2);color:var(--yellow);}
-.triage-pill.green{background:rgba(42,157,143,0.2);color:var(--green);}
-.triage-pill.black{background:rgba(74,74,74,0.15);color:#aaa;}
+.triage-pill.red{background:rgba(255,59,48,0.2);color:var(--red);}
+.triage-pill.yellow{background:rgba(255,204,0,0.2);color:var(--yellow);}
+.triage-pill.green{background:rgba(52,199,89,0.2);color:var(--green);}
+.triage-pill.black{background:rgba(34,34,38,0.85);color:#ccc;border:1px solid var(--triage-black-border);}
 .triage-pill.pending{background:transparent;color:var(--muted);border:1.5px dashed var(--muted);}
+.ticket-triage-band{border-radius:12px 12px 8px 8px;padding:10px 12px;margin:-4px -2px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;border:2px solid transparent;}
+.ticket-triage-band.red{background:rgba(255,59,48,.24);border-color:var(--red);color:#fff;}
+.ticket-triage-band.yellow{background:rgba(255,204,0,.18);border-color:var(--yellow);color:#fff4b0;}
+.ticket-triage-band.green{background:rgba(52,199,89,.18);border-color:var(--green);color:#d8ffe3;}
+.ticket-triage-band.black{background:var(--triage-black-bg);border-color:var(--triage-black-border);color:#ddd;}
+.ticket-triage-band.pending{background:transparent;border-style:dashed;border-color:var(--muted);color:var(--muted);}
+.ticket-triage-label{font-size:18px;font-weight:950;letter-spacing:.2px;}
+.ticket-triage-source{font-size:11px;font-weight:900;border:1px solid currentColor;border-radius:999px;padding:4px 8px;opacity:.95;}
+.ticket-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0;}
+.ticket-meta{background:rgba(255,255,255,.035);border:1px solid var(--border);border-radius:9px;padding:7px 8px;font-size:11px;color:var(--muted);}
+.ticket-meta strong{display:block;color:var(--text);font-size:12px;margin-top:2px;}
+.debt-chip{display:inline-block;border:1px solid var(--yellow);background:rgba(255,204,0,.11);color:var(--yellow);border-radius:999px;padding:4px 8px;font-size:11px;font-weight:900;margin:2px;}
+.debt-chip.overdue{border-color:var(--orange);background:rgba(255,107,53,.12);color:var(--orange);}
+.debt-chip.critical{border-color:var(--red);background:rgba(255,59,48,.12);color:var(--red);}
+.next-action-box{background:rgba(67,97,238,.1);border:1px solid rgba(67,97,238,.45);border-radius:12px;padding:10px 12px;font-size:13px;font-weight:900;margin-top:10px;color:var(--text);}
+body.field-mode .ticket-triage-label{font-size:21px;}
 
 /* ── TIMELINE ── */
 .timeline-entry{display:flex;gap:12px;padding:0 16px 14px;}
@@ -494,7 +523,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen active">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.6</div>
+      <div class="demo-kicker">Demo V2.7</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -563,8 +592,12 @@ textarea{resize:vertical;min-height:70px;}
       </div>
     </div>
     <div class="demo-panel">
+      <div class="demo-strip-title">מה המחברת הייתה מפספסת?</div>
+      <div class="demo-strip-sub">2 פצועים ללא מדדים מלאים אחרי סריקה · פצוע אדום עם חסם פעיל 08:40 · חובש השתמש בחסם האחרון שלו · פצוע הולך סווג ירוק אוטומטית · חוג"ד אישר סיום סריקה אחרי 01:20 · בקשת ציוד ממתינה 04:10 · פצוע אחד ללא סטטוס פינוי · חשד לנפטר ממתין לאישור רופא.</div>
+    </div>
+    <div class="demo-panel">
       <div class="demo-strip-title">איך לבדוק את הדמו ב־2 דקות</div>
-      <div class="demo-strip-sub">פתח חובש · הזן מוקד/אזור בדרך · התחל סריקת MSTART · סמן פצוע הולך ותראה מילוי אוטומטי ירוק · סמן פצוע נוסף והנח חסם · נפתח ״ציוד נצרך״ · בקש השלמת חסמים · חוג"ד רואה סריקה/חסם/ציוד · סיים סריקה · עבור למעקב · פתח מ״פ רפואה וסיכום אירוע חי.</div>
+      <div class="demo-strip-sub">פתח חובש · הזן מוקד/אזור בדרך · התחל סריקת MSTART · סמן פצוע הולך ותראה כרטיס ירוק גדול עם מילוי אוטומטי · סמן פצוע נוסף והנח חסם · הכרטיס הופך אדום עם טיימר חסם ונפתח ״ציוד נצרך״ · חוג"ד רואה כרטיס סריקה עם ספירות צבע · סיים סריקה · עבור למעקב · פתח מ״פ רפואה וסיכום אירוע חי.</div>
       <div class="demo-strip-sub" style="margin-top:10px">מה לבדוק: האם הסריקה מרגישה מהירה? האם ציוד חסר לא מפריע לטיפול? האם חוג"ד רואה את רכב החוג"ד כמקור ראשון? האם מ״פ רפואה רואה רק חוסר מחלקתי/פלוגתי?</div>
     </div>
   </div>
@@ -574,7 +607,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.6</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.7</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -584,7 +617,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System v2.6</div>
+      <div class="demo-strip-title">Role-Based Medical Command System v2.7</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -897,30 +930,30 @@ textarea{resize:vertical;min-height:70px;}
       זהו סבב MSTART מהיר: פעולה מצילת חיים, מדדים בינאריים, מיקום אזור, ואז מעבר לפצוע הבא. מדדים מלאים יילקחו בשלב מעקב עד חילוץ.
     </div>
     <div class="field-label">פעולות מצילות חיים מיידיות</div>
-    <div class="tap-grid tap-grid-3" style="margin-bottom:16px">
+    <div class="tap-grid tap-grid-3" id="immediate-actions-grid" style="margin-bottom:16px">
       <button class="tap-btn triage-red" onclick="markImmediateLifeSavingAction(this,'tourniquet')">הנחת חסם עורקים CAT</button>
       <button class="tap-btn triage-red" onclick="markImmediateLifeSavingAction(this,'airway')">פתיחת נתיב אוויר / AW</button>
       <button class="tap-btn triage-yellow" onclick="markImmediateLifeSavingAction(this,'pressure_bandage')">חבישת לחץ</button>
     </div>
-    <div class="field-label">דימום מסיבי?</div>
-    <div class="tap-grid tap-grid-2" id="immediate-bleeding-grid" style="margin-bottom:12px">
-      <button class="tap-btn triage-red" onclick="setImmediateField(this,'bleeding',true)">כן</button>
-      <button class="tap-btn" onclick="setImmediateField(this,'bleeding',false)">לא / לא ידוע</button>
+    <div class="field-label">הולך?</div>
+    <div class="tap-grid tap-grid-2" id="immediate-walking-grid" style="margin-bottom:12px">
+      <button class="tap-btn triage-green" onclick="setImmediateField(this,'walking',true)">הולך</button>
+      <button class="tap-btn" onclick="setImmediateField(this,'walking',false)">לא הולך</button>
     </div>
     <div class="field-label">נושם?</div>
     <div class="tap-grid tap-grid-2" id="immediate-breathing-grid" style="margin-bottom:12px">
       <button class="tap-btn" onclick="setImmediateField(this,'breathing',true)">נושם</button>
       <button class="tap-btn triage-black" onclick="setImmediateField(this,'breathing',false)">לא נושם</button>
     </div>
+    <div class="field-label">דימום מסיבי?</div>
+    <div class="tap-grid tap-grid-2" id="immediate-bleeding-grid" style="margin-bottom:12px">
+      <button class="tap-btn triage-red" onclick="setImmediateField(this,'bleeding',true)">כן</button>
+      <button class="tap-btn" onclick="setImmediateField(this,'bleeding',false)">לא / לא ידוע</button>
+    </div>
     <div class="field-label">הכרה?</div>
     <div class="tap-grid tap-grid-2" id="immediate-conscious-grid" style="margin-bottom:12px">
       <button class="tap-btn" onclick="setImmediateField(this,'conscious',true)">מגיב / ער</button>
       <button class="tap-btn triage-red" onclick="setImmediateField(this,'conscious',false)">לא מגיב טוב</button>
-    </div>
-    <div class="field-label">הולך?</div>
-    <div class="tap-grid tap-grid-2" id="immediate-walking-grid" style="margin-bottom:12px">
-      <button class="tap-btn triage-green" onclick="setImmediateField(this,'walking',true)">הולך</button>
-      <button class="tap-btn" onclick="setImmediateField(this,'walking',false)">לא הולך</button>
     </div>
     <div class="field-label">לכוד?</div>
     <div class="tap-grid tap-grid-3" id="immediate-trap-grid" style="margin-bottom:14px">
@@ -928,7 +961,7 @@ textarea{resize:vertical;min-height:70px;}
       <button class="tap-btn" onclick="setImmediateField(this,'trapStatus','not_trapped')">לא לכוד</button>
       <button class="tap-btn" onclick="setImmediateField(this,'trapStatus',null)">לא ידוע</button>
     </div>
-    <button class="btn-primary" onclick="saveImmediateCasualtyAndContinue()" style="margin-bottom:18px;background:var(--green)">שמור ועבור לפצוע הבא באזור הזה</button>
+    <button class="btn-primary" id="immediate-save-next-btn" onclick="saveImmediateCasualtyAndContinue()" style="margin-bottom:18px;background:var(--green)">שמור ועבור לפצוע הבא</button>
 
     <div class="field-label">מסלול רישום</div>
     <div class="tap-grid tap-grid-2" id="flow-mode-grid" style="margin-bottom:16px">
@@ -1519,7 +1552,6 @@ textarea{resize:vertical;min-height:70px;}
       <button class="tap-btn" onclick="setSweepTourniquetLimb('יד שמאל')">יד שמאל</button>
       <button class="tap-btn" onclick="setSweepTourniquetLimb('רגל ימין')">רגל ימין</button>
       <button class="tap-btn" onclick="setSweepTourniquetLimb('רגל שמאל')">רגל שמאל</button>
-      <button class="tap-btn triage-yellow" onclick="setSweepTourniquetLimb('לא ידוע / להשלים אחר כך')">לא ידוע / להשלים אחר כך</button>
     </div>
   </div>
 </div>
@@ -1887,6 +1919,19 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 
+<div id="sitrep-modal" class="modal-overlay hidden" onclick="if(event.target===this) this.classList.add('hidden')">
+  <div class="modal-sheet" style="max-height:72dvh">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📋 דיווח רדיו</div>
+    <div id="sitrep-text" style="font-family:var(--mono);font-size:15px;line-height:1.7;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0;white-space:pre-wrap;direction:rtl;text-align:right"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <button class="btn-primary" style="background:var(--surface2);border:1px solid var(--border);color:var(--text)" onclick="navigator.clipboard?.writeText(document.getElementById('sitrep-text').textContent);toast('הועתק ללוח')">📋 העתק</button>
+      <button class="btn-primary" onclick="const u=new SpeechSynthesisUtterance(document.getElementById('sitrep-text').textContent);u.lang='he-IL';u.rate=0.82;u.pitch=1;window.speechSynthesis.cancel();window.speechSynthesis.speak(u);toast('קורא בקול...')">🔊 קרא בקול</button>
+    </div>
+    <button class="btn-secondary" style="margin-top:10px" onclick="document.getElementById('sitrep-modal').classList.add('hidden');window.speechSynthesis?.cancel()">סגור</button>
+  </div>
+</div>
+
 <script>
 (function initDomainRules(root, factory) {
   root.C5DomainRules = factory();
@@ -2002,7 +2047,7 @@ textarea{resize:vertical;min-height:70px;}
 const C5Rules = window.C5DomainRules;
 if(!C5Rules) throw new Error('C5 domain rules failed to load');
 
-// v2.6 field-flow map:
+// v2.7 field-flow map:
 // Transit: medic enters site/zone/ETA and initial evacuated counts while moving to the incident.
 // MSTART sprint: current zone -> binary life-saving triage -> save casualty -> next casualty in same zone.
 // Monitoring hold: patient queue -> precise repeated vitals/trends/treatment until rescue and handover.
@@ -2012,7 +2057,7 @@ if(!C5Rules) throw new Error('C5 domain rules failed to load');
 // ═══════════════════════════════════════════════
 const VITALS_INTERVAL_MS = C5Rules.VITALS_INTERVAL_MS;
 const WARN_AT_MS = C5Rules.WARN_AT_MS;
-const APP_VERSION = '2.6.0';
+const APP_VERSION = '2.7.0';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
 const CONFLICT_LOG_KEY = 'c5-sentinel-sar-conflict-log-v1';
@@ -2204,6 +2249,96 @@ function triageKey(value){ return TRIAGE_LABELS[value] ? value : 'pending'; }
 function triagePill(value){
   const key=triageKey(value);
   return `<span class="triage-pill ${key}">${TRIAGE_LABELS[key]}</span>`;
+}
+const TRIAGE_BAND_LABELS = {
+  red:'אדום / RED',
+  yellow:'צהוב / YELLOW',
+  green:'ירוק / GREEN',
+  black:'שחור / BLACK / חשד לנפטר',
+  pending:'ממתין סיווג / PENDING'
+};
+const DEBT_LABELS = {
+  full_vitals:'אין מדדים מלאים',
+  identity:'זהות לא ידועה',
+  evacuation_status:'סטטוס פינוי חסר',
+  evacuation_destination:'חסר יעד פינוי',
+  full_injury_assessment:'הערכת פציעות חסרה',
+  tourniquet_limb_missing:'חסר איבר חסם',
+  no_reassessment:'אין מדידה חוזרת',
+  no_monitoring_medic:'לא שויך למעקב',
+  pending_handover:'מסירה חסרה'
+};
+function triageSourceInfo(p={}){
+  if(p.priorityRecommendation) return {label:'עדכון קדימות', detail:'עודכן בעקבות הידרדרות'};
+  if(p.mstart?.overrideReason) return {label:'חריגה', detail:`חריגה: ${p.mstart.overrideReason}`};
+  if((p.events||[]).some(e=>String(e.type).includes('OVERRIDE'))) return {label:'חריגה', detail:'חריגה ידנית נרשמה'};
+  if(p.mstart?.color || p.phase==='mstart_sweep') return {label:'MSTART אוטומטי', detail:'AUTO — נגזר מ־MSTART'};
+  if(p.confirmedClinical===false) return {label:'ידני', detail:'MANUAL — דיווח שדה'};
+  return {label:'ידני', detail:'MANUAL — עודכן ידנית'};
+}
+function triageBand(value, p={}){
+  const key=triageKey(value);
+  const src=triageSourceInfo(p);
+  return `<div class="ticket-triage-band ${key}">
+    <div><div class="ticket-triage-label">${TRIAGE_BAND_LABELS[key]}</div><div style="font-size:11px;font-weight:800;opacity:.9;margin-top:2px">${src.detail}</div></div>
+    <div class="ticket-triage-source" title="${src.detail}">${src.label}</div>
+  </div>`;
+}
+function assessmentDebtList(p={}){
+  const debt=[...(p.assessmentDebt||[]), ...assessmentDebtForPatient(p)].filter(Boolean);
+  return [...new Set(debt)].filter(x=>x!=='pending_handover' || !['deceased','handed_over'].includes(p.patientStatus));
+}
+function assessmentDebtHtml(p={}, compact=false){
+  const debt=assessmentDebtList(p);
+  if(!debt.length) return compact?'':'<div class="chip-row"><span class="identity-chip">חוב הערכה: אין</span></div>';
+  return `<div class="chip-row" style="margin-top:6px">${debt.map(d=>{
+    const cls=(p.triage==='red' && ['full_vitals','evacuation_status','no_reassessment'].includes(d))?'critical':needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS?'overdue':'';
+    return `<span class="debt-chip ${cls}">${DEBT_LABELS[d]||d}</span>`;
+  }).join('')}</div>`;
+}
+function lifeSavingSummary(p={}){
+  const items=[];
+  if(p.tourniquet) items.push('חסם');
+  (p.lifeSavingTreatments||[]).forEach(t=>items.push({tourniquet:'חסם',airway:'נתיב אוויר',pressure_bandage:'חבישת לחץ',other:'אחר'}[t.treatmentType]||t.treatmentType));
+  (p.txHistory||[]).forEach(t=>{
+    const text=String(t.text||'');
+    if(text.includes('נתיב')) items.push('נתיב אוויר');
+    if(text.includes('חביש') || text.includes('חסם')) items.push(text.includes('חסם')?'חסם':'חבישת לחץ');
+  });
+  return [...new Set(items)].join(' · ') || 'לא נרשם טיפול מציל חיים';
+}
+function nextActionForPatient(p={}, role='medic'){
+  if(role==='cc'){
+    if(p.triage==='red' && p.tourniquet) return 'הקצה פינוי / פראמדיק';
+    if(normalizeTrapStatus(p)==='trapped') return 'העבר משאב חילוץ / חובש';
+    return 'עקוב אחר עומס ומשאבים';
+  }
+  if(role==='pc'){
+    if(p.triage==='red' && !['evacuating','evacuated','handed_over'].includes(p.patientStatus)) return 'בקשת פינוי';
+    if(p.assessmentDebt?.includes('full_vitals') || p.needsFullAssessment) return 'שייך חובש למעקב';
+    if(p.tourniquet) return 'בדוק חסם / בקש פראמדיק';
+    return 'אשר / עדכן קדימות';
+  }
+  if(p.tourniquet) return 'בדוק חסם ומדדים מלאים';
+  if(p.needsFullAssessment || assessmentDebtList(p).includes('full_vitals')) return 'מדדים מלאים עכשיו';
+  if(p.identityStatus==='unknown') return 'השלם זהות';
+  if(needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS) return 'מדידה חוזרת עכשיו';
+  return 'המשך מעקב';
+}
+function ticketMetaHtml(p={}, role='medic'){
+  const timer=tourniquetTimerLabel(p);
+  const last=p.lastVitalsAt ? timeAgoLabel(p.lastVitalsAt) : 'אין מדדים מלאים';
+  return `
+    <div class="ticket-meta-grid">
+      <div class="ticket-meta">אזור<strong>${p.zone||p.locDetail||zoneLabel()}</strong></div>
+      <div class="ticket-meta">חובש<strong>${displayUser(p.assignedMedicId)||p.medic||currentMedicName()}</strong></div>
+      <div class="ticket-meta">שלב<strong>${p.phase==='mstart_sweep'?'סריקה':STATUS_LABELS[p.patientStatus]||'מעקב'}</strong></div>
+      <div class="ticket-meta">ניידות<strong>${TRAP_LABELS[normalizeTrapStatus(p)]||'לא ידוע'}</strong></div>
+      <div class="ticket-meta">טיפול מציל חיים<strong>${lifeSavingSummary(p)}</strong></div>
+      <div class="ticket-meta">מדדים<strong>${last}${timer?` · ${timer.label}`:''}</strong></div>
+    </div>
+    ${assessmentDebtHtml(p,true)}
+    <div class="next-action-box">פעולה: ${nextActionForPatient(p,role)}</div>`;
 }
 function getDeviceId(){
   let id=localStorage.getItem(DEVICE_ID_KEY);
@@ -2856,18 +2991,70 @@ function renderPcResupplyBoard(){
 function renderPcResponsibilityBoard(){
   const medics=DEMO_USERS.filter(u=>u.role==='medic' && u.platoonId==='PLT-A');
   const myPts=roleScopedPatients('pc');
-  const redYellow=myPts.filter(p=>['red','yellow'].includes(p.triage)).length;
-  const trapped=myPts.filter(p=>normalizeTrapStatus(p)==='trapped').length;
-  const stale=myPts.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS).length;
-  const openReqs=roleScopedRequests('pc').filter(isRequestOpen).length;
   const buttons=[
     ['medics',`חובשים בקריסה`,`${medics.length} חובשים · עומס לפי פצועים ועדכון אחרון`],
-    ['patients',`הפצועים שלי`,`${myPts.length} פצועים · ${redYellow} אדום/צהוב · ${trapped} לכודים`],
-    ['status',`סטטוס פצועים`,`${stale} מדדים ישנים · פינוי/חסם/לכוד`],
-    ['requests',`בקשות ומשאבים`,`${openReqs} בקשות פתוחות`],
+    ['patients',`הפצועים שלי`,`${myPts.length} פצועים · ${myPts.filter(p=>['red','yellow'].includes(p.triage)).length} אדום/צהוב · ${myPts.filter(p=>normalizeTrapStatus(p)==='trapped').length} לכודים`],
+    ['status',`סטטוס פצועים`,`${myPts.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS).length} מדדים ישנים · פינוי/חסם/לכוד`],
+    ['requests',`בקשות ומשאבים`,`${roleScopedRequests('pc').filter(isRequestOpen).length} בקשות פתוחות`],
     ['alerts',`התראות החלטה`,`${roleAlertRows('pc').length} התראות מנותבות לחוג"ד`]
   ].map(([key,title,sub])=>`<button class="role-row" onclick="showRoleDrilldown('${key}')" style="width:100%;text-align:right;cursor:pointer"><div class="role-row-title">${title}</div><div class="role-row-sub">${sub}</div></button>`).join('');
-  return `${renderSweepBoardForPc()}${renderPcAssessmentDebtBoard()}${renderExtractedCounterBoard()}${renderPcResupplyBoard()}${roleSection('האחריות שלי — לחיץ', buttons)}<div id="role-drilldown-body">${pcDrilldownHtml('medics')}</div>`;
+  return `${renderDedicatedPcCommandBoard(myPts)}${renderSweepBoardForPc()}${renderPcAssessmentDebtBoard()}${renderExtractedCounterBoard()}${renderPcResupplyBoard()}${roleSection('האחריות שלי — לחיץ', buttons)}<div id="role-drilldown-body">${pcDrilldownHtml('medics')}</div>`;
+}
+function renderDedicatedPcCommandBoard(myPts){
+  const red=myPts.filter(p=>p.triage==='red').length;
+  const yellow=myPts.filter(p=>p.triage==='yellow').length;
+  const green=myPts.filter(p=>p.triage==='green').length;
+  const trapped=myPts.filter(p=>normalizeTrapStatus(p)==='trapped').length;
+  const activeAlerts=myPts.filter(p=>p.alert===true && !p.alertAcknowledgedAt);
+  const tqPts=myPts.filter(p=>p.tourniquet);
+  const stale=myPts.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS);
+  const alertStrip=activeAlerts.length ? activeAlerts.map(p=>`
+    <div class="alert-banner ${triageKey(p.triage)}" style="border-color:var(--${triageKey(p.triage)==='black'?'muted':triageKey(p.triage)});margin:6px 0">
+      <span style="font-family:var(--mono);font-weight:900">${p.id}</span>
+      <div style="flex:1">${triagePill(p.triage)}<div class="alert-banner-sub">${(p.deterioration||[]).join(' · ') || p.injury || 'התראה פעילה'}</div></div>
+      <button class="ack-btn" onclick="acknowledgeAlert('${p.id}')">בטיפול</button>
+    </div>`).join('') : `<div class="alert-banner muted" style="margin:6px 0;border-color:var(--green)"><span>✓</span><div><div class="alert-banner-title" style="color:var(--green)">אין התראות פעילות כרגע</div></div></div>`;
+  const tqRows=tqPts.length ? tqPts.map(p=>{
+    const timer=tourniquetTimerLabel(p);
+    return `<div class="cmd-row ${triageKey(p.triage)} ${p.alert&&!p.alertAcknowledgedAt?'active-alert':''}" onclick="openPatient('${p.id}')">
+      <div style="font-family:var(--mono);font-weight:900;color:var(--${triageKey(p.triage)==='black'?'muted':triageKey(p.triage)})">${p.id}</div>
+      <div><div style="font-weight:800">${p.tourniquet.limb||'גפה לא צוינה'}</div><div style="margin-top:4px"><span class="tq-timer ${timer?.cls||''}">${timer?.label||'חסם פעיל'}</span></div></div>
+      <button class="demo-mini-btn" onclick="event.stopPropagation();openQuickVitals('${p.id}')">עדכן</button>
+    </div>`;
+  }).join('') : `<div class="cmd-matrix-row"><div class="cmd-matrix-sub">אין חסמי עורקים פעילים</div></div>`;
+  const cards=sortedPatients(myPts).map(p=>renderPcPatientTile(p)).join('');
+  const rhythm=stale.map(p=>`<div class="cmd-matrix-row"><div><div class="cmd-matrix-title">${p.id}</div><div class="cmd-matrix-sub">לא עודכן ${Math.floor(vitalsAgeMs(p)/60000)} דקות</div></div><button class="demo-mini-btn" onclick="remindMedicVitals('${p.id}')">תזכר לחובש</button></div>`).join('') || `<div class="cmd-matrix-row"><div class="cmd-matrix-sub">אין מדדים ישנים כרגע.</div></div>`;
+  return `
+    <div class="stat-grid">
+      <div class="stat-card red"><div class="stat-num">${red}</div><div class="stat-label">אדום</div></div>
+      <div class="stat-card yellow"><div class="stat-num">${yellow}</div><div class="stat-label">צהוב</div></div>
+      <div class="stat-card green"><div class="stat-num">${green}</div><div class="stat-label">ירוק</div></div>
+      <div class="stat-card grey"><div class="stat-num">${trapped}</div><div class="stat-label">לכודים</div></div>
+    </div>
+    <div class="pc-board-section"><div class="pc-board-title">התראות פעילות</div>${alertStrip}</div>
+    <div class="pc-board-section"><div class="pc-board-title">⏱ חסמי עורקים פעילים</div>${tqRows}</div>
+    <div class="pc-board-section"><div class="pc-board-title">לוח פצועים מחלקתי</div>${cards}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px 14px">
+      <button class="btn-primary" onclick="openReinforcementRequest()" style="background:var(--accent)">בקשת תגבור</button>
+      <button class="btn-primary" onclick="generateSitrep()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text)">דיווח רדיו</button>
+    </div>
+    <details class="battle-rhythm"><summary>סטטוס מעקב — מדדים ישנים</summary><div style="margin-top:10px">${rhythm}</div></details>`;
+}
+function renderPcPatientTile(p){
+  const timer=vitalsTimerLabel(p);
+  const tq=tourniquetTimerLabel(p);
+  const triage=triageKey(p.triage);
+  const activeAlert=p.alert===true && !p.alertAcknowledgedAt;
+  return `<div class="patient-card ${triage} ${activeAlert?'active-alert':''}" onclick="openPatient('${p.id}')">
+    <div class="patient-id">${p.id}</div>
+    <div class="patient-info">
+      ${triageBand(p.triage,p)}
+      <div style="font-weight:800">${p.injury||'פגיעה לא צוינה'}</div>
+      <div class="patient-badges">${timer?`<span class="vitals-timer ${timer.cls}">${timer.label}</span>`:''}${tq?`<span class="tq-timer ${tq.cls}">${tq.label}</span>`:''}</div>
+      ${ticketMetaHtml(p,'pc')}
+    </div>
+    ${activeAlert?'<div class="alert-dot"></div>':''}
+  </div>`;
 }
 function renderPcAssessmentDebtBoard(){
   const pts=roleScopedPatients('pc');
@@ -2883,17 +3070,18 @@ function renderPcAssessmentDebtBoard(){
 }
 function renderSweepBoardForPc(){
   ensureSiteReadiness();
+  const supplyGaps=lowStockEntries(state.localStockCache).map(x=>supplyLabel(x.key||x.item||x[0],true)).join(' · ') || 'אין חוסר ציוד אישי מדווח';
   const activeZones=[...new Set(patients.filter(p=>p.phase==='mstart_sweep').map(p=>p.zone||p.locDetail||'אזור לא צוין'))];
   const activeRows=activeZones.map(zone=>{
     const list=patients.filter(p=>p.phase==='mstart_sweep' && (p.zone||p.locDetail||'אזור לא צוין')===zone);
     const c=sweepCounts(list);
     const last=list.map(p=>Date.parse(p.lastModifiedAt||p.createdAt||0)).filter(Boolean).sort((a,b)=>b-a)[0];
     const mins=last?Math.max(0,Math.floor((Date.now()-last)/60000)):'—';
-    return roleRow(`סריקה פעילה · ${zone}`,`${currentMedicName()} · ${c.total} פצועים · אדום ${c.red} · צהוב ${c.yellow} · ירוק ${c.green} · שחור ${c.black} · לכודים ${c.trapped} · לא ניידים ${c.immobile} · חסמים ${c.tourniquets} · נתיבי אוויר ${c.airway} · חסר מדדים ${c.missingVitals} · זהות לא ידועה ${c.unknownIdentity} · עדכון אחרון ${mins} דק׳`, `<span class="identity-chip">פעולות: שייך חובש למעקב · בקש תגבור רפואי · בקש פראמדיק · בקש פינוי</span>`);
+    return roleRow(`סריקה פעילה · ${zone}`,`${currentMedicName()} · ${c.total} פצועים · אדום ${c.red} · צהוב ${c.yellow} · ירוק ${c.green} · שחור ${c.black} · לכודים ${c.trapped} · לא ניידים ${c.immobile} · חסמים ${c.tourniquets} · נתיבי אוויר ${c.airway} · חסר מדדים ${c.missingVitals} · זהות לא ידועה ${c.unknownIdentity} · ציוד: ${supplyGaps} · עדכון אחרון ${mins} דק׳`, `<span class="identity-chip">פעולה הבאה: שייך חובש למעקב / בקש תגבור / טפל בבקשת ציוד</span>`);
   }).join('');
   const completed=(siteData.sweepSessions||[]).map(s=>roleRow(
     `הושלמה · ${s.zone}`,
-    `${s.medicName} · ${s.casualtyCountInSweep} פצועים · אדום ${s.counts?.red||0} · צהוב ${s.counts?.yellow||0} · ירוק ${s.counts?.green||0} · שחור ${s.counts?.black||0} · לכודים ${s.trapped} · לא ניידים ${s.immobile||0} · חסמים ${s.tourniquets} · נתיבי אוויר ${s.airwayInterventions||0} · חסר מדדים ${s.missingFullVitals} · זהות לא ידועה ${s.unknownIdentity||0}${s.arrivalToSweepCompletionMinutes!==null&&s.arrivalToSweepCompletionMinutes!==undefined?' · זמן מהגעה '+s.arrivalToSweepCompletionMinutes+' דק׳':''}`,
+    `${s.medicName} · ${s.casualtyCountInSweep} פצועים · אדום ${s.counts?.red||0} · צהוב ${s.counts?.yellow||0} · ירוק ${s.counts?.green||0} · שחור ${s.counts?.black||0} · לכודים ${s.trapped} · לא ניידים ${s.immobile||0} · חסמים ${s.tourniquets} · נתיבי אוויר ${s.airwayInterventions||0} · חסר מדדים ${s.missingFullVitals} · זהות לא ידועה ${s.unknownIdentity||0} · ציוד: ${supplyGaps}${s.arrivalToSweepCompletionMinutes!==null&&s.arrivalToSweepCompletionMinutes!==undefined?' · זמן מהגעה '+s.arrivalToSweepCompletionMinutes+' דק׳':''}`,
     `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><button class="demo-mini-btn" onclick="demoReassignWithinPlatoon()">שייך חובש למעקב</button><button class="demo-mini-btn" onclick="openReinforcementRequest()">בקש תגבור רפואי</button><button class="demo-mini-btn" onclick="openReinforcementRequest()">בקש פראמדיק</button><button class="demo-mini-btn" onclick="toast('בקשת פינוי נרשמה לחמ״ל')">בקש פינוי</button><button class="demo-mini-btn" onclick="toast('מעבר לשלב מעקב אושר')">אשר מעבר לשלב מעקב</button><button class="demo-mini-btn" onclick="showRoleDrilldown('patients')">פתח רשימת פצועים באזור</button></div>`
   )).join('');
   return roleSection('סריקות MSTART פעילות / הושלמו', activeRows + completed || roleRow('אין סריקות MSTART פעילות','כאשר חובש יסיים סריקה, תופיע כאן תמונת הסריקה וחוב ההערכה.'));
@@ -2934,15 +3122,17 @@ function showRoleDrilldown(key){
 function companyEvacuationPriorityRows(pts=patients){
   const rows=pts.map(p=>{
     const tqMin=p.tourniquet?.appliedAt ? Math.floor((Date.now()-p.tourniquet.appliedAt)/60000) : null;
+    const tqRemaining=tqMin!==null ? Math.max(0,120-tqMin) : null;
     let rank=4, reason='מעקב רגיל';
-    if(tqMin!==null){ rank=1; reason=`חסם פעיל · ${tqMin} דק׳ מתוך 120`; }
-    else if(['P','U'].includes(p.vitals?.avpu) || (p.txHistory||[]).some(tx=>String(tx.text||'').includes('נתיב אוויר'))){ rank=2; reason='הכרה ירודה / חשד נתיב אוויר'; }
+    if(tqMin!==null && tqRemaining<45){ rank=0; reason=`חסם פעיל · נותרו ${tqRemaining} דק׳ לחלון 120`; }
+    else if(tqMin!==null){ rank=1; reason=`חסם פעיל · ${tqMin} דק׳ מתוך 120`; }
+    else if(p.triage==='red' && (['P','U'].includes(p.vitals?.avpu) || (p.txHistory||[]).some(tx=>String(tx.text||'').includes('נתיב אוויר')) || Number(p.vitals?.rr||16)>30 || Number(p.vitals?.rr||16)<8)){ rank=2; reason='אדום · הכרה/נשימה/נתיב אוויר בסיכון'; }
     else if(p.triage==='yellow' && ['observing','stabilizing'].includes(p.patientStatus)){ rank=3; reason='צהוב מיוצב'; }
-    return {...p, evacRank:rank, evacReason:reason, tqMin};
+    return {...p, evacRank:rank, evacReason:reason, tqMin, tqRemaining};
   }).filter(p=>p.evacRank<4 && !['evacuating','evacuated','handed_over','deceased'].includes(p.patientStatus));
   rows.sort((a,b)=>a.evacRank-b.evacRank || ((b.tqMin||0)-(a.tqMin||0)));
   return rows.slice(0,8).map(p=>{
-    const label=p.evacRank===1?'עדיפות 1 — חסם מתקרב לסף':p.evacRank===2?'עדיפות 2 — הכרה / נתיב אוויר':'עדיפות 3 — צהוב מיוצב';
+    const label=p.evacRank===0?'עדיפות עליונה — חסם פחות מ־45 דק׳ לחלון':p.evacRank===1?'עדיפות 1 — חסם פעיל':p.evacRank===2?'עדיפות 2 — אדום הכרה / נשימה':'עדיפות 3 — צהוב מיוצב';
     return roleRow(`${label} · ${p.id}`,`${p.evacReason} · ${p.location} · ${TRIAGE_LABELS[p.triage]||p.triage}`,`<span class="identity-chip">פעולה: שייך אמבולנס / אשר עיכוב / העבר למוקד פינוי</span>`);
   }).join('');
 }
@@ -3001,8 +3191,18 @@ function renderCcCommandBoard(){
     const pts=patients.filter(p=>(p.assignedPlatoonId||'PLT-A')===pl.platoonId);
     const red=pts.filter(p=>p.triage==='red').length;
     const yellow=pts.filter(p=>p.triage==='yellow').length;
+    const green=pts.filter(p=>p.triage==='green').length;
     const trapped=pts.filter(p=>normalizeTrapStatus(p)==='trapped').length;
-    return roleRow(pl.name,`${red} אדומים · ${yellow} בינוניים · ${trapped} לכודים · ${pts.length>=3?'עומס גבוה':'עומס תקין'}`);
+    const maxLoad=6;
+    const redPct=Math.min(100,Math.round((red/maxLoad)*100));
+    const yellowPct=Math.min(100,Math.round((yellow/maxLoad)*100));
+    const greenPct=Math.min(100,Math.round((green/maxLoad)*100));
+    const bar=`<div style="height:6px;background:var(--border);border-radius:3px;margin-top:8px;overflow:hidden;display:flex">
+      <div style="width:${redPct}%;background:var(--red)"></div>
+      <div style="width:${yellowPct}%;background:var(--yellow)"></div>
+      <div style="width:${greenPct}%;background:var(--green)"></div>
+    </div>`;
+    return roleRow(pl.name,`${red} אדומים · ${yellow} בינוניים · ${trapped} לכודים · ${pts.length>=3?'עומס גבוה':'עומס תקין'}`,bar);
   }).join('');
   const shortageRows=logisticsCompanies().flatMap(c=>c.lowItems.map(item=>roleRow(`${c.name} · ${SUPPLY_LABELS[item.item]||item.item}`,`${item.qty} נותרו · משפיע על טיפול פעיל אם יש אדום/צהוב במוקד`))).join('');
   const snapshot=[
@@ -3013,7 +3213,10 @@ function renderCcCommandBoard(){
     roleMetric(doctorReqs.length,'רופא / פראמדיק'),
     roleMetric(deathReqs.length,'קביעת מוות'),
     roleMetric(overloaded,'מחלקות עמוסות'),
-    roleMetric(blockedEvac,'פינוי לא סגור')
+    roleMetric(blockedEvac,'פינוי לא סגור'),
+    roleMetric(patients.filter(p=>p.triage==='red'&&p.tourniquet).length,'אדום + חסם'),
+    roleMetric(patients.filter(p=>p.triage==='red'&&normalizeTrapStatus(p)==='trapped').length,'אדום לכוד'),
+    roleMetric(patients.filter(p=>p.triage==='red'&&assessmentDebtList(p).includes('full_vitals')).length,'אדום ללא מדדים')
   ].join('');
   const reqQueue=openReqs.slice(0,6).map(r=>roleRow(
     `${r.type==='resupply'?'השלמת ציוד':(REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType)} · ${REINFORCEMENT_URGENCY_LABELS[r.urgency]||r.urgency}`,
@@ -3034,8 +3237,11 @@ function renderCcCommandBoard(){
     roleRow('בדוק צוואר בקבוק פינוי', `${blockedEvac} פצועים אדום/צהוב ללא סטטוס פינוי סגור`)
   ].join('');
   return `
+    ${renderCcQuickActions()}
     <div class="role-top-grid">${snapshot}</div>
     ${renderCompanyResourceCenter(openReqs, doctorReqs, deathReqs, blockedEvac, overloaded)}
+    ${renderCcEvacuationFunnel()}
+    ${renderCcActiveSitesSnapshot()}
     ${renderCcResupplyCommandBoard()}
     ${roleSection('עומס מחלקות — אדום/צהוב לפי מחלקה', platoonRows)}
     ${roleSection('תעדוף פינוי פלוגתי', companyEvacuationPriorityRows(patients))}
@@ -3045,6 +3251,42 @@ function renderCcCommandBoard(){
     ${roleSection('חוסר ציוד שמשפיע על טיפול', shortageRows)}
     ${roleSection('הצעות הקצאה בין מחלקות', suggestions)}
   `;
+}
+function renderCcQuickActions(){
+  return `<div style="display:flex;gap:8px;overflow-x:auto;padding:0 0 12px;margin-bottom:8px">
+    <button class="cc-action-chip" onclick="generateSitrep()">📋 דיווח רדיו</button>
+    <button class="cc-action-chip" onclick="openReinforcementRequest({resourceType:'doctor_treatment'})">🏥 בקש רופא</button>
+    <button class="cc-action-chip" onclick="openReinforcementRequest({resourceType:'urgent_evac'})">🚑 בקש פינוי</button>
+    <button class="cc-action-chip" onclick="demoReassignBetweenPlatoons()">🔁 העבר פצוע בין מחלקות</button>
+  </div>`;
+}
+function renderCcEvacuationFunnel(){
+  const total=patients.length||1;
+  const stages=[
+    ['זוהה',patients.length],
+    ['מטופל',patients.filter(p=>['in_treatment','stabilizing'].includes(p.patientStatus)).length],
+    ['מפונה',patients.filter(p=>p.patientStatus==='evacuating').length],
+    ['הועבר',patients.filter(p=>['evacuated','handed_over'].includes(p.patientStatus)).length]
+  ];
+  const html=stages.map(([label,count])=>{
+    const pct=Math.round((count/total)*100);
+    return `<div class="cmd-stat-card"><div class="cmd-stat-num">${count}</div><div class="cmd-stat-label">${label}</div><div class="cmd-progress"><div class="cmd-progress-fill" style="width:${pct}%"></div></div></div>`;
+  }).join('');
+  return roleSection('משפך פינוי פלוגתי', `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">${html}</div>`);
+}
+function renderCcActiveSitesSnapshot(){
+  const sites=allSites.filter(s=>s.id!=='ALL' && getSitePatients(s.id).length);
+  if(sites.length<=1) return '';
+  const rows=sites.map(s=>{
+    const pts=getSitePatients(s.id);
+    const red=pts.filter(p=>p.triage==='red').length;
+    const yellow=pts.filter(p=>p.triage==='yellow').length;
+    const green=pts.filter(p=>p.triage==='green').length;
+    const trapped=pts.filter(p=>normalizeTrapStatus(p)==='trapped').length;
+    const sync=pts.reduce((sum,p)=>sum+(p.unsyncedEvents||0),0)+localOutboxCount();
+    return roleRow(s.name,`אדום ${red} · צהוב ${yellow} · ירוק ${green} · לכודים ${trapped} · ${sync?'אירועים מקומיים '+sync:'מסונכרן מקומית'}`);
+  }).join('');
+  return roleSection('מוקדים פעילים', rows);
 }
 function renderRoleDashboard(role=activeRoleDashboard){
   activeRoleDashboard=role;
@@ -3058,7 +3300,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
   if(header) header.textContent=cfg.title;
   if(sub) sub.textContent=cfg.actor;
   const ctx=document.getElementById('role-context-line');
-  if(ctx) ctx.textContent='כל השמות בדמו פיקטיביים. זהו v2.6: חובש עובד בסריקה / הפצועים שלי / מוקד-אזור, וכל פעולה בונה תמונת פיקוד בלי להפוך לטופס בית-חולים.';
+  if(ctx) ctx.textContent='כל השמות בדמו פיקטיביים. זהו v2.7: כל פצוע הוא כרטיס פיקודי צבעוני עם מקור סיווג, חוב הערכה ופעולה הבאה.';
   const metrics=[
     roleMetric(pts.length, role==='medic'?'הפצועים שלי':role==='pc'?'פצועי המחלקה':'פצועים גלויים'),
     roleMetric(alerts.length, 'התראות לפעולה'),
@@ -3405,13 +3647,14 @@ function renderDashboard(){
     const det=p.deterioration&&p.deterioration.length;
     const trend=deteriorationIndex(p);
     const triage=triageKey(p.triage);
-    return `<div class="patient-card ${triage}" onclick="openPatient('${p.id}')">
+    const activeAlert=p.alert===true && !p.alertAcknowledgedAt;
+    return `<div class="patient-card ${triage} ${activeAlert?'active-alert':''}" onclick="openPatient('${p.id}')">
       <div class="patient-id">${p.id}</div>
       <div class="patient-info">
-        <div style="font-weight:600">${p.location}${p.locDetail?' · '+p.locDetail:''}</div>
+        ${triageBand(p.triage,p)}
+        <div style="font-weight:900">${p.location}${p.locDetail?' · '+p.locDetail:''}</div>
         <div style="font-size:12px;color:var(--muted);margin-top:2px">${p.injury} · ${STATUS_LABELS[p.patientStatus]||''}</div>
         <div class="patient-badges">
-          ${triagePill(p.triage)}
           <span class="badge ${['stabilizing','in_treatment'].includes(p.patientStatus)?'badge-green':['evacuating','evacuated'].includes(p.patientStatus)?'badge-accent':p.patientStatus==='deceased'?'badge-red':'badge-muted'}">${STATUS_LABELS[p.patientStatus]||''}</span>
           <span class="badge badge-muted">${TRAP_LABELS[normalizeTrapStatus(p)]||'לא תועד'}</span>
           ${p.needsFullAssessment?'<span class="badge badge-orange">חסר הערכה</span>':''}
@@ -3426,6 +3669,7 @@ function renderDashboard(){
           <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${p.time}</span>
         </div>
         <div style="font-size:11px;color:var(--muted);margin-top:3px">${trend.detail}</div>
+        ${ticketMetaHtml(p,'medic')}
         <button class="demo-mini-btn" onclick="event.stopPropagation();openMedicResupplySheet('${p.id}','manual_request')" style="margin-top:8px;background:var(--surface2);border-color:var(--border);color:var(--muted)">חסר לי ציוד</button>
       </div>
       ${p.alert?'<div class="alert-dot"></div>':''}
@@ -3467,16 +3711,26 @@ function avpuSeverity(v){
   return {A:0,V:1,P:2,U:3}[v] ?? 1;
 }
 function patientPriorityScore(p){
-  const stale=needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS;
-  if(p.triage==='red') return 0;
-  if(p.tourniquet) return 10;
-  if(normalizeTrapStatus(p)==='trapped') return 20;
-  if(p.assessmentDebt?.includes('full_vitals') || p.needsFullAssessment) return 30;
-  if(stale) return 40;
-  if(p.triage==='yellow') return 50;
-  if(p.triage==='green') return 60;
-  if(p.triage==='black') return 70;
-  return 80;
+  const activeAlert = p.alert===true && !p.alertAcknowledgedAt;
+  const hasDeter   = p.deterioration && p.deterioration.length > 0;
+  const hasTq      = !!p.tourniquet;
+  const isTrapped  = normalizeTrapStatus(p)==='trapped';
+  const stale      = needsVitals(p) && vitalsAgeMs(p)>=VITALS_INTERVAL_MS;
+  const unconfBlack = p.triage==='black' && !p.confirmedClinical;
+
+  if(p.triage==='red' && activeAlert && hasDeter)  return 0;
+  if(p.triage==='red' && activeAlert)               return 1;
+  if(p.triage==='red' && hasTq)                     return 2;
+  if(p.triage==='red')                              return 3;
+  if(unconfBlack)                                   return 4;
+  if(p.triage==='yellow' && hasTq)                  return 5;
+  if(isTrapped)                                     return 6;
+  if(p.triage==='yellow' && stale)                  return 7;
+  if(p.triage==='yellow')                           return 8;
+  if(p.needsFullAssessment)                         return 9;
+  if(p.triage==='green')                            return 10;
+  if(p.triage==='black' && p.confirmedClinical)     return 11;
+  return 99;
 }
 function sortedPatients(list=patients){
   return [...list].sort((a,b)=>patientPriorityScore(a)-patientPriorityScore(b) || String(a.id).localeCompare(String(b.id)));
@@ -3700,8 +3954,9 @@ function recordSweepTreatment(type){
   const label={tourniquet:'חסם עורקים',airway:'פתיחת נתיב אוויר',pressure_bandage:'חבישת לחץ / עצירת דימום',other:'אחר / הערה קצרה'}[type]||type;
   const event={treatmentType:type,patientId:p.id,siteId:p.siteId,zone:p.zone,performedBy:currentMedicName(),occurredAt:new Date().toISOString(),payload:{}};
   if(type==='tourniquet'){
-    event.payload={limb:'unknown_limb',tourniquetTime:new Date().toISOString()};
-    p.tourniquet={limb:'לא צוין — להשלים',appliedAt:Date.now(),timeCode:nowT().replace(':','')};
+    clearWalkingBecause(p, 'הנתון החדש סותר ״הולך״. הסיווג הירוק בוטל — בדוק MSTART.');
+    event.payload={limb:'pending_limb',tourniquetTime:new Date().toISOString()};
+    p.tourniquet={limb:'חובה לבחור גפה',appliedAt:Date.now(),timeCode:nowT().replace(':','')};
     if(!p.assessmentDebt.includes('tourniquet_limb_missing')) p.assessmentDebt.push('tourniquet_limb_missing');
     reconcileSupplySource(`sweep:${p.id}:tq`, 'tourniquets', 1, p.id);
     p.triage='red';
@@ -3711,6 +3966,7 @@ function recordSweepTreatment(type){
     setTimeout(()=>document.getElementById('tourniquet-limb-modal')?.classList.remove('hidden'),0);
   }
   if(type==='airway'){
+    clearWalkingBecause(p, 'פתיחת נתיב אוויר סותרת סיווג ירוק אוטומטי — בדוק MSTART.');
     event.payload={airway_opened:true,breathing_after:p.mstart?.breathing||'unknown'};
     p.mstart.airwayOpened=true;
     p.mstart.airwayPrompt='check_breathing';
@@ -3739,10 +3995,10 @@ function setSweepTourniquetLimb(limb){
   p.tourniquet=p.tourniquet||{appliedAt:Date.now()};
   p.tourniquet.limb=limb;
   const debt=p.assessmentDebt||[];
-  p.assessmentDebt=limb.includes('לא ידוע') ? [...new Set([...debt,'tourniquet_limb_missing'])] : debt.filter(x=>x!=='tourniquet_limb_missing' && x!=='tourniquet_limb');
+  p.assessmentDebt=debt.filter(x=>x!=='tourniquet_limb_missing' && x!=='tourniquet_limb');
   p.events=p.events||[];
-  p.events.unshift({type:'TOURNIQUET_LIMB_RECORDED',time:nowT(),detail:`חסם: ${limb}`,warn:limb.includes('לא ידוע')});
-  saveLocalEvent({type:'TOURNIQUET_LIMB_RECORDED',detail:`${p.id} · ${limb}`,warn:limb.includes('לא ידוע'),payload_json:{patient_id:p.id,limb}});
+  p.events.unshift({type:'TOURNIQUET_LIMB_RECORDED',time:nowT(),detail:`חסם: ${limb}`,warn:false});
+  saveLocalEvent({type:'TOURNIQUET_LIMB_RECORDED',detail:`${p.id} · ${limb}`,warn:false,payload_json:{patient_id:p.id,limb}});
   pendingTourniquetLimbPatientId=null;
   hideTourniquetLimbModal();
   saveDemoState();
@@ -3822,7 +4078,17 @@ function renderMstartSweep(){
   if(!card) return;
   const p=activeSweepPatient();
   if(!p){
-    const rows=sweepPatientsForCurrentZone().slice(0,6).map(x=>roleRow(`${x.id} · ${TRIAGE_LABELS[x.triage]||'טרם סווג'}`,`${x.zone} · ${TRAP_LABELS[normalizeTrapStatus(x)]||'לא ידוע'} · ${x.assessmentDebt?.includes('full_vitals')?'מדדים מלאים חסרים':'מדדים קיימים'}`,`<button class="demo-mini-btn" onclick="activeSweepPatientId='${x.id}';renderMstartSweep()" style="margin-top:8px">עדכן בסריקה</button>`)).join('');
+    const rows=sweepPatientsForCurrentZone().slice(0,6).map(x=>`
+      <div class="patient-card ${triageKey(x.triage)} ${x.alert&&!x.alertAcknowledgedAt?'active-alert':''}" onclick="activeSweepPatientId='${x.id}';renderMstartSweep()">
+        <div class="patient-id">${x.id}</div>
+        <div class="patient-info">
+          ${triageBand(x.triage,x)}
+          <div style="font-weight:800">${x.zone}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${TRAP_LABELS[normalizeTrapStatus(x)]||'לא ידוע'} · ${lifeSavingSummary(x)}</div>
+          ${assessmentDebtHtml(x,true)}
+          <div class="next-action-box">פעולה: ${nextActionForPatient(x,'medic')}</div>
+        </div>
+      </div>`).join('');
     card.innerHTML=roleSection('סומנו באזור הזה', rows || roleRow('אין פצועים מסומנים באזור','לחץ "פצוע נוסף באזור הזה" כדי להתחיל. אין צורך בשם, תעודה או מדדים מלאים בשלב הסריקה.'));
     return;
   }
@@ -3861,8 +4127,9 @@ function renderMstartSweep(){
     <div class="summary-card" style="border-color:var(--accent)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div><div style="font-family:var(--mono);font-size:22px;font-weight:900">${p.id}</div><div style="font-size:12px;color:var(--muted)">${p.zone}</div></div>
-        ${triagePill(p.triage)}
       </div>
+      ${triageBand(p.triage,p)}
+      ${ticketMetaHtml(p,'medic')}
       <div class="field-label">פעולות מצילות חיים בסריקה</div>
       <div class="tap-grid tap-grid-2" style="margin-bottom:14px">
         <button class="tap-btn triage-red" onclick="recordSweepTreatment('tourniquet')">חסם עורקים</button>
@@ -4079,19 +4346,133 @@ function exitEventView(){
   toast('יציאה מהאירוע · התצוגה נשמרה מקומית');
   goHome();
 }
+function autoSelectGrid(gridId, value){
+  const grid=document.getElementById(gridId);
+  if(!grid) return;
+  const buttons=[...grid.querySelectorAll('button')];
+  buttons.forEach(b=>b.classList.remove('selected'));
+  let target=null;
+  if(typeof value==='boolean') target=buttons[value===true?0:1]||null;
+  else target=buttons.find(b=>(b.getAttribute('onclick')||'').includes(String(value)))||null;
+  if(target) target.classList.add('selected');
+}
+function showAutofillNote(afterGridId, text){
+  const grid=document.getElementById(afterGridId);
+  if(!grid) return;
+  let note=document.querySelector(`.autofill-note[data-for="${afterGridId}"]`);
+  if(!note){
+    note=document.createElement('div');
+    note.className='autofill-note';
+    note.dataset.for=afterGridId;
+    note.style.cssText='font-size:11px;color:var(--green);margin:-4px 0 10px;font-weight:700;';
+    grid.insertAdjacentElement('afterend', note);
+  }
+  note.textContent=text;
+}
+function immediateGridLabel(gridId){
+  const grid=document.getElementById(gridId);
+  let node=grid?.previousElementSibling;
+  while(node && !node.classList?.contains('field-label')) node=node.previousElementSibling;
+  return node || null;
+}
+function setImmediateGridCollapsed(gridId, collapsed){
+  const grid=document.getElementById(gridId);
+  const label=immediateGridLabel(gridId);
+  if(grid) grid.style.display=collapsed?'none':'';
+  if(label) label.style.display=collapsed?'none':'';
+}
+function setImmediateBreathingCollapse(collapsed){
+  setImmediateGridCollapsed('immediate-conscious-grid', collapsed);
+  setImmediateGridCollapsed('immediate-trap-grid', collapsed);
+  const btn=document.getElementById('immediate-save-next-btn');
+  if(btn){
+    btn.textContent=collapsed?'סמן שחור — עבור לפצוע הבא':'שמור ועבור לפצוע הבא';
+    btn.style.background=collapsed?'var(--triage-black-bg)':'var(--green)';
+    btn.style.border=collapsed?'2px solid var(--triage-black-border)':'';
+    btn.style.color=collapsed?'#ccc':'';
+  }
+  let panel=document.getElementById('immediate-collapse-warning');
+  if(collapsed && !panel && btn){
+    panel=document.createElement('div');
+    panel.id='immediate-collapse-warning';
+    panel.className='sweep-warning';
+    panel.textContent='לא נושם → מיון שחור לפי MSTART. אין צורך בהמשך הערכה. עבור לפצוע הבא.';
+    btn.insertAdjacentElement('beforebegin', panel);
+  }
+  if(!collapsed && panel) panel.remove();
+}
+function clearImmediateWalkingAuto(message){
+  state.immediate=state.immediate||{};
+  if(state.immediate.walking===true){
+    state.immediate.walking=false;
+    autoSelectGrid('immediate-walking-grid', false);
+    showAutofillNote('immediate-walking-grid', message || 'הנתון החדש סותר ״הולך״. הסיווג הירוק בוטל — בדוק MSTART.');
+    if(state.triage==='green') state.triage='pending';
+  }
+}
+function setTqLimb(btn, limb){
+  state.immediate=state.immediate||{};
+  state.immediate.tqLimb=limb;
+  btn?.parentElement?.querySelectorAll('.tap-btn').forEach(b=>b.classList.remove('selected'));
+  btn?.classList.add('selected');
+  saveActiveRecoveryState(activeScreenId());
+}
+function renderInlineTqLimbPrompt(){
+  if(document.getElementById('tq-limb-inline')) return;
+  const grid=document.getElementById('immediate-actions-grid');
+  if(!grid) return;
+  grid.insertAdjacentHTML('afterend', `
+    <div id="tq-limb-inline" style="background:rgba(255,59,48,0.1);border:1px solid var(--red);border-radius:12px;padding:12px;margin-bottom:12px;">
+      <div class="field-label" style="color:var(--red);margin-bottom:8px">איזו גפה? (חובה לרשום זמן מאוחר יותר)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button class="tap-btn triage-red" onclick="setTqLimb(this,'right_upper')">ימין עליון</button>
+        <button class="tap-btn triage-red" onclick="setTqLimb(this,'left_upper')">שמאל עליון</button>
+        <button class="tap-btn triage-red" onclick="setTqLimb(this,'right_lower')">ימין תחתון</button>
+        <button class="tap-btn triage-red" onclick="setTqLimb(this,'left_lower')">שמאל תחתון</button>
+      </div>
+    </div>`);
+}
+function removeInlineTqLimbPrompt(){
+  document.getElementById('tq-limb-inline')?.remove();
+  if(state.immediate) delete state.immediate.tqLimb;
+}
 function markImmediateLifeSavingAction(btn, kind){
   state.immediate=state.immediate||{};
   state.immediate.actions=state.immediate.actions||{};
   state.immediate.actions[kind]=!state.immediate.actions[kind];
   btn?.classList.toggle('selected', !!state.immediate.actions[kind]);
-  if(kind==='tourniquet' && state.immediate.actions[kind]) state.immediate.bleeding=true;
-  if(kind==='airway' && state.immediate.actions[kind]) state.immediate.breathing=true;
+  if(kind==='tourniquet' && state.immediate.actions[kind]){
+    state.immediate.bleeding=true;
+    clearImmediateWalkingAuto('הנחת חסם סותרת ״הולך״. הסיווג הירוק בוטל — בדוק MSTART.');
+    renderInlineTqLimbPrompt();
+  }
+  if(kind==='tourniquet' && !state.immediate.actions[kind]) removeInlineTqLimbPrompt();
+  if(kind==='airway' && state.immediate.actions[kind]){
+    clearImmediateWalkingAuto('פתיחת נתיב אוויר סותרת ״הולך״. הסיווג הירוק בוטל — בדוק MSTART.');
+    state.immediate.breathing=true;
+  }
   state.triage='red';
   saveActiveRecoveryState(activeScreenId());
 }
 function setImmediateField(btn, key, value){
   state.immediate=state.immediate||{};
+  if(key==='walking' && value===true){
+    state.immediate.breathing=true;
+    state.immediate.conscious=true;
+    state.immediate.trapStatus='not_trapped';
+    autoSelectGrid('immediate-breathing-grid', true);
+    autoSelectGrid('immediate-conscious-grid', true);
+    autoSelectGrid('immediate-trap-grid', 'not_trapped');
+    showAutofillNote('immediate-walking-grid','הולך = נושם + מגיב + לא לכוד — מולא אוטומטית');
+    setImmediateBreathingCollapse(false);
+  }
   state.immediate[key]=value;
+  if(key==='breathing' && value===false) setImmediateBreathingCollapse(true);
+  if(key==='breathing' && value===true) setImmediateBreathingCollapse(false);
+  if(key==='breathing' && value===false) clearImmediateWalkingAuto('לא נושם סותר הולך — הסיווג האוטומטי בוטל.');
+  if(key==='conscious' && value===false) clearImmediateWalkingAuto('הכרה לא תקינה סותרת הולך — הסיווג האוטומטי בוטל.');
+  if(key==='trapStatus' && ['trapped',null].includes(value)) clearImmediateWalkingAuto('לכוד/לא ידוע סותר הולך — הסיווג האוטומטי בוטל.');
+  if(key==='bleeding' && value===true) clearImmediateWalkingAuto('דימום מסיבי סותר סיווג ירוק אוטומטי — בדוק MSTART.');
   if(key==='conscious' && ['A','V','P','U',true,false].includes(value) && state.immediate.breathing!==false){
     state.immediate.breathing=true;
   }
@@ -4118,6 +4499,7 @@ function saveImmediateCasualtyAndContinue(){
   const actions=Object.entries(im.actions||{}).filter(([,on])=>on).map(([key])=>key);
   const actionLabels=actions.map(k=>({tourniquet:'חסם עורקים CAT',airway:'פתיחת נתיב אוויר',pressure_bandage:'חבישת לחץ'}[k]||k));
   const isTq=actions.includes('tourniquet');
+  const tqLimbLabel={right_upper:'ימין עליון',left_upper:'שמאל עליון',right_lower:'ימין תחתון',left_lower:'שמאל תחתון'}[im.tqLimb] || 'לא צוין';
   const mechanism=siteData.lastMechanism || (siteData.likelyMechanisms||[]).join(' / ') || 'פגיעת קריסה / לכידה';
   const p={
     id, triage, accessibility:trap==='trapped'?'trapped':trap==='not_trapped'?'full':null, trapStatus:trap,
@@ -4131,7 +4513,7 @@ function saveImmediateCasualtyAndContinue(){
     deterioration:[],
     lastVitalsAt:Date.now(),
     vitalsHistory:[],
-    tourniquet:isTq?{limb:'לא צוין',appliedAt:Date.now()}:null,
+    tourniquet:isTq?{limb:tqLimbLabel,appliedAt:Date.now()}:null,
     medic:'חובש כהן',
     lastTouchedBy:getDeviceId(),
     lastModifiedAt:new Date().toISOString(),
@@ -4157,7 +4539,7 @@ function saveImmediateCasualtyAndContinue(){
   patients.unshift(p);
   if(isTq) reconcileSupplySource(`mstart:${id}:tq`, 'tourniquets', 1);
   if(triage==='black') createDeathCertificationRequest(p);
-  saveLocalEvent({type:'IMMEDIATE_FIELD_ASSESSMENT',detail:`${id} נפתח בסריקת MSTART`,warn:['red','black'].includes(triage),payload_json:{patient_id:id,triage,site:siteData.name,zone:zoneLabel(),immediate:im,life_saving_actions:actions}});
+  saveLocalEvent({type:'IMMEDIATE_FIELD_ASSESSMENT',detail:`${id} נפתח בסריקת MSTART`,warn:['red','black'].includes(triage),payload_json:{patient_id:id,triage,site:siteData.name,zone:zoneLabel(),immediate:im,life_saving_actions:actions,tourniquet_limb:isTq?tqLimbLabel:null}});
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   state=freshState(); state.flowMode='quick';
   renderDashboard(); renderAlerts();
@@ -4225,6 +4607,7 @@ function setNoBreathing(){
   document.getElementById('v-rr-rate').textContent='0';
   const calc=document.getElementById('v-rr-calc');
   if(calc) calc.textContent='0 נשימות ב-30 שניות = 0 / דקה';
+  setVitalWarningAfterValue('v-rr30', 'vital-warn-rr30', 'rr', 0);
   // Style the button as active
   const btn=document.getElementById('no-breathing-btn');
   if(btn){ btn.style.background='rgba(230,57,70,0.25)'; btn.style.fontWeight='900'; }
@@ -4235,6 +4618,7 @@ function setModalNoBreathing(){
   document.getElementById('mv-rr-rate').textContent='0';
   const calc=document.getElementById('mv-rr-calc');
   if(calc) calc.textContent='0 נשימות ב-30 שניות = 0 / דקה';
+  setVitalWarningAfterValue('mv-rr30', 'vital-warn-mrr30', 'rr', 0);
 }
 
 function startCountTimer(kind, seconds){
@@ -4260,6 +4644,8 @@ function stopCountTimer(kind, buzz=true){
   }
   if(buzz) haptic(45);
   updateCountDisplay(kind);
+  if(kind==='pulse15'||kind==='mpulse15') setVitalWarningAfterValue((kind.startsWith('m')?'mv':'v')+'-pulse15', `vital-warn-${kind}`, 'pulse', (counts[kind]||0)*4);
+  if(kind==='rr30'||kind==='mrr30') setVitalWarningAfterValue((kind.startsWith('m')?'mv':'v')+'-rr30', `vital-warn-${kind}`, 'rr', (counts[kind]||0)*2);
   const el=document.getElementById(`timer-${kind}`);
   if(el && el.textContent!=='DONE') el.textContent='STOP';
 }
@@ -5152,6 +5538,28 @@ function showMstartSuggestion(){
 // ═══════════════════════════════════════════════
 //  COUNT-BASED VITALS
 // ═══════════════════════════════════════════════
+function vitalRangeWarning(key, value){
+  const v=Number(value);
+  if(!Number.isFinite(v)) return '';
+  if(key==='pulse' && v<50) return '<span class="vital-range-warn orange">⚠ ברדיקרדיה — פחות מ-50</span>';
+  if(key==='pulse' && v>130) return '<span class="vital-range-warn orange">⚠ טכיקרדיה — מעל 130</span>';
+  if(key==='rr' && v<8) return '<span class="vital-range-warn red">⚠ נשימה איטית מאד — פחות מ-8</span>';
+  if(key==='rr' && v>30) return '<span class="vital-range-warn red">⚠ טכיפנאה — מעל 30</span>';
+  if(key==='spo2' && v<90) return '<span class="vital-range-warn red">⚠ SpO₂ קריטית — שקול O₂ מיידי</span>';
+  if(key==='spo2' && v<94) return '<span class="vital-range-warn orange">⚠ SpO₂ נמוכה</span>';
+  return '';
+}
+function setVitalWarningAfterValue(valueElId, warnId, warnKey, value){
+  const valueEl=document.getElementById(valueElId);
+  if(!valueEl) return;
+  let warn=document.getElementById(warnId);
+  if(!warn){
+    warn=document.createElement('div');
+    warn.id=warnId;
+    valueEl.insertAdjacentElement('afterend', warn);
+  }
+  warn.innerHTML=vitalRangeWarning(warnKey, value);
+}
 function changeCount(key, delta){
   const lim=COUNT_LIMITS[key]; if(!lim) return;
   counts[key]=Math.min(lim.max,Math.max(lim.min,(counts[key]||lim.min)+delta));
@@ -5170,6 +5578,7 @@ function updateCountDisplay(key){
     if(elR)  elR.textContent=rate;
     if(elC)  elC.textContent=`${counts[key]} פעימות ב-15 שניות = ${rate} BPM`;
     if(isM) modalVitals.pulse=rate; else flowVitals.pulse=rate;
+    setVitalWarningAfterValue(pfx+'-pulse15', `vital-warn-${key}`, 'pulse', rate);
   }
   if(key==='rr30'||key==='mrr30'){
     const rate=counts[key]*2;
@@ -5180,6 +5589,7 @@ function updateCountDisplay(key){
     if(elR)  elR.textContent=rate;
     if(elC)  elC.textContent=`${counts[key]} נשימות ב-30 שניות = ${rate} / דקה`;
     if(isM) modalVitals.rr=rate; else flowVitals.rr=rate;
+    setVitalWarningAfterValue(pfx+'-rr30', `vital-warn-${key}`, 'rr', rate);
   }
 }
 function markBracketSelected(gridId, btn){
@@ -5190,6 +5600,7 @@ function setVitalPulseBracket(btn, rate){
   flowVitals.pulse=rate;
   counts.pulse15=Math.max(1, Math.round(rate/4));
   updateCountDisplay('pulse15');
+  setVitalWarningAfterValue('v-pulse15', 'vital-warn-pulse15', 'pulse', rate);
   markBracketSelected('pulse-bracket-grid', btn);
   saveActiveRecoveryState(activeScreenId());
 }
@@ -5202,6 +5613,7 @@ function setVitalRR(btn, rate){
   if(el30) el30.textContent=counts.rr30;
   if(elR) elR.textContent=rate;
   if(elC) elC.textContent=`${counts.rr30} נשימות ב-30 שניות = ${rate} / דקה`;
+  setVitalWarningAfterValue('v-rr30', 'vital-warn-rr30', 'rr', rate);
   markBracketSelected('rr-bracket-grid', btn);
   saveActiveRecoveryState(activeScreenId());
 }
@@ -5212,8 +5624,11 @@ function changeVital(key, delta){
     if(!modalSpo2Active){ toast('הוסף SpO₂ לפני שינוי ערך'); return; }
     modalVitals.spo2=Math.min(b.max,Math.max(b.min,(modalVitals.spo2??98)+delta)); document.getElementById('mv-spo2').textContent=modalVitals.spo2;
   }
+  if(key==='spo2') setVitalWarningAfterValue('v-spo2', 'vital-warn-spo2', 'spo2', flowVitals.spo2);
+  if(key==='mspo2') setVitalWarningAfterValue('mv-spo2', 'vital-warn-mspo2', 'spo2', modalVitals.spo2);
   saveActiveRecoveryState(activeScreenId());
 }
+function changeModalVital(key, delta){ changeVital(key, delta); }
 function startHold(key, delta, isCount=false){
   stopHold();
   holdTimer=setTimeout(()=>{ holdInterval=setInterval(()=>{ if(isCount) changeCount(key,delta); else changeVital(key,delta); },100); },400);
@@ -6138,6 +6553,11 @@ function openReinforcementRequest(prefill={}){
   const note=document.getElementById('reinforcement-note');
   if(loc) loc.value=reinforcementDraft.targetLocation;
   if(note) note.value=reinforcementDraft.freeText;
+  if(reinforcementDraft.resourceType){
+    document.querySelectorAll('#reinforcement-resource-grid .tap-btn').forEach(b=>{
+      if((b.getAttribute('onclick')||'').includes(`'${reinforcementDraft.resourceType}'`)) b.classList.add('selected');
+    });
+  }
   const modal=document.getElementById('reinforcement-modal');
   if(modal) modal.classList.remove('hidden');
 }
@@ -6386,7 +6806,7 @@ function renderCmdContent(){
     <button class="alert-slice ${cmdAlertFilter==='all'?'active':''}" onclick="setCmdAlertFilter('all',this)">הכל ${commandAlerts.length}</button>
   </div>`;
   if(!cmdAlertList.length){
-    ah+=`<div class="alert-banner muted" style="margin:6px 16px 0"><span style="font-size:18px">✓</span><div><div class="alert-banner-title" style="color:var(--muted)">אין התראות בסינון זה</div><div class="alert-banner-sub">התראות v2.6 ממוינות לפי בעלים, פעולה נדרשת והסלמה.</div></div></div>`;
+    ah+=`<div class="alert-banner muted" style="margin:6px 16px 0"><span style="font-size:18px">✓</span><div><div class="alert-banner-title" style="color:var(--muted)">אין התראות בסינון זה</div><div class="alert-banner-sub">התראות v2.7 ממוינות לפי בעלים, פעולה נדרשת והסלמה.</div></div></div>`;
   }
   cmdAlertList.forEach(a=>{ ah+=renderAlertCard(a,'commander'); });
   if(cmdActiveSite==='ALL'){
@@ -6421,14 +6841,7 @@ function renderCmdContent(){
 function renderCmdPatients(){
   const pts=getSitePatients(cmdActiveSite);
   if(commandRole==='pc'){
-    document.getElementById('cmd-patient-table').innerHTML=`
-      <div class="cmd-matrix-row">
-        <div>
-          <div class="cmd-matrix-title">תצוגת חוג"ד ממוקדת אחריות</div>
-          <div class="cmd-matrix-sub">רשימת "כל הפצועים" הוסרה מהחוג"ד. השתמש בכרטיסי חובשים, סטטוס פצועים, פינוי ובקשות כדי לקבל החלטה.</div>
-        </div>
-        <div class="cmd-matrix-counts"><span style="color:var(--red)">${pts.filter(p=>p.triage==='red').length} אדום</span><span style="color:var(--yellow)">${pts.filter(p=>p.triage==='yellow').length} צהוב</span></div>
-      </div>`;
+    document.getElementById('cmd-patient-table').innerHTML=sortedPatients(pts).map(p=>renderPcPatientTile(p)).join('') || '<div style="color:var(--muted);font-size:13px;text-align:center;padding:14px">אין פצועים בסינון זה</div>';
     return;
   }
   const pri={red:0,yellow:1,green:2,black:3};
@@ -6446,17 +6859,18 @@ function renderCmdPatients(){
   const trapIcon={trapped:'⛓️',not_trapped:'🚶'};
   const sCol=s=>!s?'var(--muted)':s<94?'var(--red)':s<97?'var(--yellow)':'var(--green)';
   document.getElementById('cmd-patient-table').innerHTML=list.map(p=>`
-    <div class="cmd-row ${triageKey(p.triage)}" onclick="openPatient('${p.id}');goTo('patient')">
+    <div class="cmd-row ${triageKey(p.triage)} ${p.alert&&!p.alertAcknowledgedAt?'active-alert':''}" onclick="openPatient('${p.id}');goTo('patient')">
       <div><div style="font-family:var(--mono);font-weight:700;font-size:15px">${p.id}</div><div style="font-size:16px;margin-top:2px">${trapIcon[normalizeTrapStatus(p)]||'?'}</div></div>
       <div>
         <div style="font-weight:600;font-size:13px">${p.location}</div>
-        <div style="margin-top:3px">${triagePill(p.triage)}</div>
+        <div style="margin-top:3px">${triageBand(p.triage,p)}</div>
         <div style="font-size:12px;color:var(--muted)">${p.injury} · ${STATUS_LABELS[p.patientStatus]||''}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">נגע אחרון: ${p.lastTouchedBy||p.medic||'—'} · ${p.confirmedClinical===false?'מדווח':'מאושר שדה'}</div>
         ${assessmentDebtForPatient(p).length?`<div style="font-size:11px;color:var(--orange);font-weight:700;margin-top:2px">יש לקחת מדדים: ${assessmentDebtForPatient(p).join(', ')}</div>`:''}
         ${tourniquetTimerLabel(p)?`<div style="margin-top:4px"><span class="tq-timer ${tourniquetTimerLabel(p).cls}">${tourniquetTimerLabel(p).label}</span></div>`:''}
         ${p.deterioration&&p.deterioration.length?`<div style="font-size:11px;color:var(--red);font-weight:700;margin-top:2px">⚠ ${p.deterioration.join(' · ')}</div>`:''}
         ${!(p.deterioration&&p.deterioration.length)&&needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS?`<div style="font-size:11px;color:var(--orange);margin-top:2px">⏱ מדדים נדרשים</div><button class="demo-mini-btn" onclick="event.stopPropagation();remindMedicVitals('${p.id}')" style="margin-top:6px">תזכר לחובש</button>`:''}
+        <div class="next-action-box">פעולה: ${nextActionForPatient(p,commandRole==='cc'?'cc':'pc')}</div>
       </div>
       <div class="cmd-vitals">
         <div style="color:var(--accent);font-weight:700">${p.vitals.pulse}♥</div>
@@ -6485,9 +6899,29 @@ function generateSitrep(){
   const tq=patients.filter(p=>p.tourniquet).map(p=>p.id).join(', ')||'אין';
   const openReqs=reinforcementRequests.filter(isRequestOpen).length;
   const text=`דיווח מצב ${siteData.name||siteData.address||'מוקד'}: ${red} אדום, ${yellow} צהוב, ${green} ירוק/קל, ${evacuated} פונו או הועברו, ${trapped} לכודים. חסמי עורקים על: ${tq}. בקשות תגבור פתוחות: ${openReqs}.`;
-  navigator.clipboard?.writeText(text).catch(()=>{});
-  toast('דיווח רדיו נוצר והועתק');
+  const modal=document.getElementById('sitrep-modal') || createSitrepModal();
+  document.getElementById('sitrep-text').textContent=text;
+  modal.classList.remove('hidden');
+  saveLocalEvent({type:'SITREP_GENERATED', detail:text.substring(0,120)});
   return text;
+}
+function createSitrepModal(){
+  const wrap=document.createElement('div');
+  wrap.id='sitrep-modal';
+  wrap.className='modal-overlay hidden';
+  wrap.onclick=function(event){ if(event.target===this) this.classList.add('hidden'); };
+  wrap.innerHTML=`<div class="modal-sheet" style="max-height:72dvh">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📋 דיווח רדיו</div>
+    <div id="sitrep-text" style="font-family:var(--mono);font-size:15px;line-height:1.7;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0;white-space:pre-wrap;direction:rtl;text-align:right"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <button class="btn-primary" style="background:var(--surface2);border:1px solid var(--border);color:var(--text)" onclick="navigator.clipboard?.writeText(document.getElementById('sitrep-text').textContent);toast('הועתק ללוח')">📋 העתק</button>
+      <button class="btn-primary" onclick="const u=new SpeechSynthesisUtterance(document.getElementById('sitrep-text').textContent);u.lang='he-IL';u.rate=0.82;u.pitch=1;window.speechSynthesis.cancel();window.speechSynthesis.speak(u);toast('קורא בקול...')">🔊 קרא בקול</button>
+    </div>
+    <button class="btn-secondary" style="margin-top:10px" onclick="document.getElementById('sitrep-modal').classList.add('hidden');window.speechSynthesis?.cancel()">סגור</button>
+  </div>`;
+  document.body.appendChild(wrap);
+  return wrap;
 }
 setInterval(()=>{ if(document.getElementById('screen-commander').classList.contains('active')) renderCommander(); },30000);
 
@@ -6553,6 +6987,11 @@ function renderAar(){
   const firstTq=patients.some(p=>p.tourniquet)||outbox.some(e=>String(e.type).includes('TOURNIQUET'));
   const firstAirway=patients.some(p=>(p.lifeSavingTreatments||[]).some(t=>t.treatmentType==='airway'))||outbox.some(e=>String(e.detail||'').includes('נתיב אוויר'));
   const sweepDone=outbox.find(e=>e.type==='MSTART_SWEEP_COMPLETED');
+  const firstGreen=patients.some(p=>p.triage==='green')||outbox.some(e=>String(e.detail||'').includes('ירוק'));
+  const autofillCount=patients.filter(p=>(p.mstartAuto||[]).length).length + outbox.filter(e=>String(e.detail||'').includes('נגזר מהליכה')).length;
+  const manualOverrideCount=patients.filter(p=>p.mstart?.overrideReason).length + outbox.filter(e=>String(e.type||'').includes('OVERRIDE')).length;
+  const pcAckCount=patients.filter(p=>p.alertAcknowledgedAt).length;
+  const ccAssignedCount=reinforcementRequests.filter(r=>(r.statusHistory||[]).some(h=>['assigned','en_route','fulfilled_by_company'].includes(h.status))).length;
   document.getElementById('aar-kpis').innerHTML=`
     <div class="aar-card"><div class="aar-num">${total}</div><div class="aar-label">סה״כ פצועים</div></div>
     <div class="aar-card"><div class="aar-num" style="color:var(--red)">${red}</div><div class="aar-label">אדומים פעילים</div></div>
@@ -6565,11 +7004,16 @@ function renderAar(){
     <div class="aar-card"><div class="aar-num">${busiest[1]}</div><div class="aar-label">פצועים למכשיר מוביל</div></div>
     <div class="aar-card"><div class="aar-num" style="color:${extDelta?'var(--orange)':'var(--green)'}">${extDelta}</div><div class="aar-label">פער דיווח חיצוני/שדה</div></div>
     <div class="aar-card"><div class="aar-num" style="color:var(--red)">${firstTq?'✓':'—'}</div><div class="aar-label">זמן לחסם ראשון</div></div>
+    <div class="aar-card"><div class="aar-num" style="color:var(--green)">${firstGreen?'✓':'—'}</div><div class="aar-label">ירוק ראשון</div></div>
     <div class="aar-card"><div class="aar-num" style="color:var(--orange)">${firstAirway?'✓':'—'}</div><div class="aar-label">נתיב אוויר ראשון</div></div>
     <div class="aar-card"><div class="aar-num">${sweepDone?'✓':'—'}</div><div class="aar-label">סיום סריקת MSTART</div></div>
     <div class="aar-card"><div class="aar-num" style="color:var(--yellow)">${unresolvedDebt}</div><div class="aar-label">פערי השלמה פתוחים</div></div>
     <div class="aar-card"><div class="aar-num">${supplyConsumed}</div><div class="aar-label">צריכות ציוד</div></div>
     <div class="aar-card"><div class="aar-num" style="color:${resupplyOpen?'var(--orange)':'var(--green)'}">${resupplyOpen}</div><div class="aar-label">עיכובי השלמת ציוד</div></div>
+    <div class="aar-card"><div class="aar-num">${autofillCount}</div><div class="aar-label">שדות שמולאו אוטומטית</div></div>
+    <div class="aar-card"><div class="aar-num">${manualOverrideCount}</div><div class="aar-label">חריגות / עקיפות ידניות</div></div>
+    <div class="aar-card"><div class="aar-num">${pcAckCount}</div><div class="aar-label">אישורי חוג"ד להתראות</div></div>
+    <div class="aar-card"><div class="aar-num">${ccAssignedCount}</div><div class="aar-label">שיוכי משאב מ״פ</div></div>
   `;
   const patientEvents=patients.flatMap(p=>(p.events||[]).map(e=>({...e,pid:p.id,triage:p.triage,loc:p.location,_ts:eventTimestampMs(e,p)})));
   const localEvents=outbox.map(e=>({type:e.type,pid:e.payload_json?.patient_id||e.payload_json?.patientId||'SYSTEM',detail:e.detail,time:new Date(e.local_timestamp||e.createdAt||Date.now()).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}),loc:e.payload_json?.zone||'',warn:!!e.warn,_ts:Date.parse(e.local_timestamp||e.createdAt||'')||Date.now()}));
@@ -6578,7 +7022,7 @@ function renderAar(){
     <div class="timeline-entry">
       <div class="tl-line"><div class="tl-dot${e.warn?' warn':''}"></div></div>
       <div class="tl-body">
-        <div class="tl-type">${e.pid} · ${e.type}</div>
+        <div class="tl-type">${e.pid} · ${TRIAGE_BAND_LABELS[triageKey(e.triage)]||''} · ${e.type}</div>
         <div class="tl-detail${e.warn?' warn':''}">${e.detail}</div>
         <div class="tl-time">${e.time} · ${e.loc||''}</div>
       </div>
@@ -6589,6 +7033,7 @@ function renderAar(){
   const ccOpenRequests=reinforcementRequests.filter(isRequestOpen).length;
   const logisticsShortages=logisticsCompanies().reduce((sum,c)=>sum+c.lowItems.length,0);
   const insights=[
+    {title:'מה המחברת הייתה מפספסת?', body:`${patients.filter(p=>assessmentDebtList(p).includes('full_vitals')).length} פצועים ללא מדדים מלאים אחרי סריקה · ${patients.filter(p=>p.tourniquet).length} חסמים פעילים · ${resupplyOpen} בקשות ציוד ממתינות · ${patients.filter(p=>!['evacuating','evacuated','handed_over','deceased'].includes(p.patientStatus)).length} ללא סטטוס פינוי סגור · ${reinforcementRequests.filter(r=>r.resourceType==='doctor_death_cert'&&isRequestOpen(r)).length} חשד לנפטר ממתין לאישור רופא.`},
     {title:'חובש', body: overdue.length ? `${overdue.length} פצועים עברו את יעד עדכון המדדים; נדרש חזרה למדדים כשאפשר.` : 'כל הפצועים הפעילים בתוך חלון המדדים.'},
     {title:'חוג"ד', body:`${openAlerts} התראות פתוחות דורשות החלטת חוג"ד או חובש. נפתחו ${pcRequests} בקשות תגבור.`},
     {title:'מ״פ רפואה', body:`${ccOpenRequests} בקשות משאב פתוחות ברמת פלוגה; בדוק רופא/פראמדיק וצווארי בקבוק פינוי.`},
@@ -6745,7 +7190,9 @@ function showSupplyUsedSheet(data){
   const body=document.getElementById('supply-used-body');
   const truck=pcTruckStock[data.item]??PC_TRUCK_BASELINE[data.item]??0;
   const low=data.after<=0?'מלאי אזל — בקש השלמה עכשיו.':data.after<=(SUPPLY_LOW_THRESHOLDS[data.item]??1)?'מלאי נמוך — מומלץ לבקש השלמה מהחוג״ד.':'';
+  const linked=patients.find(p=>p.id===data.patientId);
   if(body) body.innerHTML=`
+    ${linked?triageBand(linked.triage,linked):''}
     <div><strong>נרשם שימוש:</strong> ${supplyLabel(data.item)} · ${data.patientId||'ללא פצוע'} · ${data.zone||zoneLabel()}</div>
     <div style="margin-top:8px">נותר בערכת חובש: <strong>${data.after}</strong> · רכב חוג״ד: <strong>${truck}</strong></div>
     ${data.before<=0?'<div class="sweep-warning" style="margin-top:10px">נרשם טיפול למרות שמלאי מקומי 0 — עדכן מלאי או בקש השלמה.</div>':''}
