@@ -33,8 +33,8 @@ for (const file of files) {
   assert(treatmentBody.includes('syncLegacyTourniquetAlias(p)'), `${rel}: legacy tourniquet alias is not synchronized`);
   assert(treatmentBody.includes('silentPopup:true,silentWarnings:true,suppressAutoResupply:true'), `${rel}: MSTART tourniquet supply logging must stay silent`);
   assert(!treatmentBody.includes("classList.remove('hidden')"), `${rel}: blocking modal reintroduced during tourniquet application`);
-  assert(sweepRender.includes('חסם נוסף — אותו איבר / דימום ממשיך'), `${rel}: missing same-limb add-another-tourniquet action`);
-  assert(sweepRender.includes('חסם נוסף — גפה אחרת'), `${rel}: missing different-limb add-another-tourniquet action`);
+  assert(sweepRender.includes('חסם שני מעליו — אותו איבר'), `${rel}: missing same-limb add-another-tourniquet action`);
+  assert(sweepRender.includes('חסם בגפה אחרת'), `${rel}: missing different-limb add-another-tourniquet action`);
   assert(html.includes('בטל רישום — טעות הקלדה'), `${rel}: missing safe tourniquet correction language`);
   assert(html.includes('הארוך +${timer.minutes}'), `${rel}: ticket does not show multiple-tourniquet longest timer`);
   assert(html.includes("type:'TOURNIQUET_ENTRY_CANCELLED'"), `${rel}: correction audit event missing`);

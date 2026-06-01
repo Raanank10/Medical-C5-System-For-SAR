@@ -3946,10 +3946,56 @@ function ensureTourniquetArray(p={}){
       note:p.tourniquet.note||''
     });
   }
+  const sequenceByLimb={};
+  p.tourniquets.forEach(tq=>{
+    const meta=tourniquetLimbMeta(tq.limb);
+    tq.limb=meta.key;
+    tq.limbLabel=tq.limbLabel||meta.label;
+    tq.side=tq.side||meta.side;
+    tq.bodyPart=tq.bodyPart||meta.bodyPart;
+    tq.status=tq.status||'active';
+    tq.effectiveness=tq.effectiveness||'unknown';
+    tq.reasonForAdditional=tq.reasonForAdditional||null;
+    tq.sourceTourniquetId=tq.sourceTourniquetId||null;
+    sequenceByLimb[meta.key]=(sequenceByLimb[meta.key]||0)+1;
+    tq.sequenceOnLimb=Number(tq.sequenceOnLimb)||sequenceByLimb[meta.key];
+    tq.placementRelation=tq.placementRelation||null;
+    tq.bleedingStatusAtApplication=tq.bleedingStatusAtApplication||'unknown';
+    tq.effectiveAt=tq.effectiveAt||null;
+    tq.ineffectiveAt=tq.ineffectiveAt||null;
+    tq.note=tq.note||'';
+  });
   return p.tourniquets;
 }
 function activeTourniquets(p={}){
   return ensureTourniquetArray(p).filter(t=>!['removed','removed_error','replaced'].includes(t.status));
+}
+function hemorrhageControlStatus(p={}){
+  if(p.hemorrhageControl?.status) return p.hemorrhageControl.status;
+  const active=activeTourniquets(p);
+  if(active.some(t=>t.status==='ineffective' || t.effectiveness==='bleeding_continues')) return 'bleeding_continues';
+  if(active.some(t=>t.effectiveness==='effective')) return 'controlled';
+  return 'unknown';
+}
+function ensureHemorrhageControl(p={}){
+  const current=p.hemorrhageControl||{};
+  p.hemorrhageControl={
+    status:current.status||hemorrhageControlStatus({...p,hemorrhageControl:null}),
+    lastCheckedAt:current.lastCheckedAt||null,
+    sourceTourniquetId:current.sourceTourniquetId||null,
+    note:current.note||''
+  };
+  return p.hemorrhageControl;
+}
+function refreshHemorrhageControl(p={}, source=null){
+  const control=ensureHemorrhageControl(p);
+  control.status=source?.effectiveness==='bleeding_continues' || source?.status==='ineffective'
+    ? 'bleeding_continues'
+    : source?.effectiveness==='effective' ? 'controlled' : hemorrhageControlStatus(p);
+  control.lastCheckedAt=Date.now();
+  control.sourceTourniquetId=source?.id||null;
+  p.activeBleeding=control.status==='bleeding_continues';
+  return control;
 }
 function longestActiveTourniquet(p={}){
   return activeTourniquets(p).sort((a,b)=>(a.appliedAt||0)-(b.appliedAt||0))[0]||null;
@@ -4137,6 +4183,8 @@ function startSweepCasualtyMarker(){
     alert:false,
     tourniquets:[],
     tourniquet:null,
+    hemorrhageControl:{status:'unknown',lastCheckedAt:null,sourceTourniquetId:null,note:''},
+    activeBleeding:false,
     lastTouchedBy:getDeviceId(),
     lastModifiedAt:new Date().toISOString(),
     confirmedClinical:false,
@@ -4275,8 +4323,20 @@ function recordSweepTreatment(type, meta={}){
     p.tourniquetTriageNote='חסם הונח — סומן אדום/דחוף בגלל חשד לדימום מסכן חיים. ניתן לשינוי ידני.';
     const tqList=ensureTourniquetArray(p);
     const limbMeta=tourniquetLimbMeta(meta.limb);
-    const tq={id:`TQ-${String(tqList.length+1).padStart(3,'0')}`,limb:limbMeta.key,limbLabel:limbMeta.label,side:limbMeta.side,bodyPart:limbMeta.bodyPart,appliedAt:Date.now(),timeCode:nowT().replace(':',''),appliedBy:currentMedicName(),source:'mstart_sweep',status:'active',effectiveness:'unknown',reasonForAdditional:meta.reasonForAdditional||null,note:meta.note||''};
+    const sequenceOnLimb=tqList.filter(x=>x.status!=='removed_error' && tourniquetLimbKey(x.limb)===limbMeta.key).length+1;
+    const tq={id:`TQ-${String(tqList.length+1).padStart(3,'0')}`,limb:limbMeta.key,limbLabel:limbMeta.label,side:limbMeta.side,bodyPart:limbMeta.bodyPart,appliedAt:Date.now(),timeCode:nowT().replace(':',''),appliedBy:currentMedicName(),source:'mstart_sweep',status:'active',effectiveness:'unknown',reasonForAdditional:meta.reasonForAdditional||null,sourceTourniquetId:meta.sourceTourniquetId||null,sequenceOnLimb,placementRelation:meta.placementRelation||null,bleedingStatusAtApplication:meta.bleedingStatusAtApplication||'unknown',effectiveAt:null,ineffectiveAt:null,note:meta.note||''};
     tqList.push(tq);
+    const control=ensureHemorrhageControl(p);
+    if(tqList.length===1){
+      control.status='unknown';
+      control.lastCheckedAt=null;
+      control.sourceTourniquetId=tq.id;
+    }else if(tq.bleedingStatusAtApplication==='bleeding_continues'){
+      control.status='bleeding_continues';
+      control.lastCheckedAt=Date.now();
+      control.sourceTourniquetId=tq.sourceTourniquetId;
+      p.activeBleeding=true;
+    }
     syncLegacyTourniquetAlias(p);
     event.payload={tourniquetId:tq.id,limb:tq.limb,tourniquetTime:new Date(tq.appliedAt).toISOString(),reasonForAdditional:tq.reasonForAdditional};
     if(tq.limb==='unknown' && !p.assessmentDebt.includes('tourniquet_limb_missing')) p.assessmentDebt.push('tourniquet_limb_missing');
@@ -4374,7 +4434,9 @@ function markSweepTourniquetEffectiveness(tourniquetId, effectiveness){
   tq.effectiveness=effectiveness;
   tq.status=effectiveness==='bleeding_continues'?'ineffective':'active';
   tq.effectivenessUpdatedAt=Date.now();
-  p.activeBleeding=effectiveness==='bleeding_continues';
+  tq.effectiveAt=effectiveness==='effective'?tq.effectivenessUpdatedAt:tq.effectiveAt||null;
+  tq.ineffectiveAt=effectiveness==='bleeding_continues'?tq.effectivenessUpdatedAt:tq.ineffectiveAt||null;
+  refreshHemorrhageControl(p,tq);
   p.alert=true;
   syncLegacyTourniquetAlias(p);
   const type=effectiveness==='bleeding_continues'?'TOURNIQUET_MARKED_INEFFECTIVE':'TOURNIQUET_MARKED_EFFECTIVE';
@@ -4388,23 +4450,23 @@ function markSweepTourniquetEffectiveness(tourniquetId, effectiveness){
 function addSweepTourniquetSameLimb(sourceId){
   const p=activeSweepPatient(); if(!p) return;
   const source=ensureTourniquetArray(p).find(x=>x.id===sourceId) || activeTourniquets(p).slice(-1)[0];
-  recordSweepTreatment('tourniquet',{reasonForAdditional:'same_limb_bleeding_continues',limb:source?.limb||'unknown'});
+  recordSweepTreatment('tourniquet',{reasonForAdditional:'same_limb_bleeding_continues',limb:source?.limb||'unknown',sourceTourniquetId:source?.id||null,placementRelation:'above_previous',bleedingStatusAtApplication:'bleeding_continues'});
 }
 function addSweepTourniquetDifferentLimb(){
-  recordSweepTreatment('tourniquet',{reasonForAdditional:'different_limb'});
+  recordSweepTreatment('tourniquet',{reasonForAdditional:'different_limb',placementRelation:'different_limb'});
 }
 function renderSweepTourniquetCard(tq){
   const limb=tq.limbLabel||tourniquetLimbMeta(tq.limb).label;
   const ineffective=tq.status==='ineffective' || tq.effectiveness==='bleeding_continues';
   return `<div class="sweep-tq-card ${ineffective?'ineffective':''}">
-    <div class="sweep-tq-title">${tq.id} · ${limb} · +${elapsedMinutes(tq.appliedAt)} דק׳</div>
-    <div class="sweep-tq-sub">סטטוס: ${tourniquetStatusLabel(tq)}${tq.reasonForAdditional==='same_limb_bleeding_continues'?'<br>נוסף באותו איבר בגלל דימום ממשיך / חסם קודם לא יעיל.':tq.reasonForAdditional==='different_limb'?'<br>נוסף עבור גפה אחרת.':''}</div>
+    <div class="sweep-tq-title">${tq.id} · ${limb} · חסם ${tq.sequenceOnLimb||1} בגפה · +${elapsedMinutes(tq.appliedAt)} דק׳</div>
+    <div class="sweep-tq-sub">סטטוס: ${tourniquetStatusLabel(tq)}${tq.placementRelation==='above_previous'?`<br>נוסף מעל ${tq.sourceTourniquetId||'החסם הקודם'} בגלל דימום ממשיך.`:tq.placementRelation==='different_limb'?'<br>נוסף עבור גפה אחרת.':''}</div>
     <div class="sweep-tq-actions">
       <button class="demo-mini-btn" onclick="markSweepTourniquetEffectiveness('${tq.id}','effective')">יעיל · דימום נשלט</button>
       <button class="demo-mini-btn" style="border-color:var(--red);color:var(--red)" onclick="markSweepTourniquetEffectiveness('${tq.id}','bleeding_continues')">דימום ממשיך / חסם לא יעיל</button>
     </div>
-    ${ineffective?`<button class="tap-btn triage-red" style="margin-top:8px;width:100%" onclick="addSweepTourniquetSameLimb('${tq.id}')">הוסף חסם נוסף באותו איבר</button>`:''}
-    <details style="margin-top:8px">
+    ${ineffective?`<button class="tap-btn triage-red" style="margin-top:8px;width:100%" onclick="addSweepTourniquetSameLimb('${tq.id}')">הוסף חסם שני מעליו</button>`:''}
+    <details style="margin-top:8px" ${tourniquetLimbKey(tq.limb)==='unknown'?'open':''}>
       <summary style="cursor:pointer;font-size:12px;font-weight:800">ערוך גפה / תקן רישום</summary>
       <div class="tap-grid tap-grid-2" style="margin-top:8px">
         ${Object.entries(TOURNIQUET_LIMBS).map(([key,meta])=>`<button class="demo-mini-btn ${tourniquetLimbKey(tq.limb)===key?'selected':''}" onclick="setSweepTourniquetLimb('${key}','${tq.id}')">${meta.label}</button>`).join('')}
@@ -4571,8 +4633,8 @@ function renderMstartSweep(){
         <div style="margin-bottom:12px"><span class="tq-timer ${tourniquetTimerLabel(p)?.cls||'warn'}">${tourniquetTimerLabel(p)?.label||'חסם פעיל'}</span></div>
         <div style="margin-bottom:10px">${tqRows}</div>
         <div class="tap-grid tap-grid-2" style="margin-bottom:12px">
-          <button class="tap-btn triage-red" onclick="addSweepTourniquetSameLimb('${activeTqs[activeTqs.length-1]?.id||''}')">חסם נוסף — אותו איבר / דימום ממשיך</button>
-          <button class="tap-btn" onclick="addSweepTourniquetDifferentLimb()">חסם נוסף — גפה אחרת</button>
+          <button class="tap-btn triage-red" onclick="addSweepTourniquetSameLimb('${activeTqs[activeTqs.length-1]?.id||''}')">חסם שני מעליו — אותו איבר</button>
+          <button class="tap-btn" onclick="addSweepTourniquetDifferentLimb()">חסם בגפה אחרת</button>
         </div>`:''}
       <div class="field-label">הולך?</div>
       <div class="tap-grid tap-grid-3" style="margin-bottom:12px">${btn('walking','yes','הולך','triage-green')}${btn('walking','no','לא הולך')}${btn('walking','trapped_unknown','לא ניתן להעריך / לכוד','triage-yellow')}</div>
