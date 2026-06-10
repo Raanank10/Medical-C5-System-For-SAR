@@ -36,10 +36,10 @@ for (const file of files) {
   assert(html.includes('function receiveLogisticsSupply('), `${rel}: logistics receive helper missing`);
   assert(html.includes("pcTruckStock[itemType]=(pcTruckStock[itemType]??PC_TRUCK_BASELINE[itemType]??0)+received;"), `${rel}: logistics receive helper must replenish the PC truck`);
   assert(html.includes("movement_type:'logistics_manual_received'"), `${rel}: logistics receive helper must append a receipt ledger movement`);
-  assert(html.includes("const APP_VERSION = '2.98.0';"), `${rel}: APP_VERSION must be V2.98`);
-  assert(html.includes('Demo V2.98'), `${rel}: launcher version label must be V2.98`);
-  assert(html.includes('ROLE // V2.98'), `${rel}: role header version label must be V2.98`);
-  assert(html.includes('Role-Based Medical Command System v2.98'), `${rel}: role system strip must be V2.98`);
+  assert(html.includes("const APP_VERSION = '2.99.2';"), `${rel}: APP_VERSION must be 2.992V`);
+  assert(html.includes('Demo 2.992V'), `${rel}: launcher version label must be 2.992V`);
+  assert(html.includes('ROLE // 2.992V'), `${rel}: role header version label must be 2.992V`);
+  assert(html.includes('Role-Based Medical Command System 2.992V'), `${rel}: role system strip must be 2.992V`);
   assert(!html.includes('Role-Based Medical Command System v2.91'), `${rel}: stale role strip version remains`);
   assert(!html.includes('ונפתח ״ציוד נצרך״'), `${rel}: launcher still promises a supply popup during sweep`);
   assert(!/<script\s+src=/i.test(html), `${rel}: external script introduced`);

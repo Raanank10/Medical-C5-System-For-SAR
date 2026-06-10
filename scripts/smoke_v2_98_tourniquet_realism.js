@@ -24,8 +24,8 @@ for (const file of files) {
   const blackEnd = html.indexOf('function overrideSweepColor', blackStart);
   const blackBody = html.slice(blackStart, blackEnd);
 
-  assert(html.includes("const APP_VERSION = '2.98.0';"), `${rel}: APP_VERSION must be V2.98`);
-  assert(html.includes('Demo V2.98'), `${rel}: launcher label must be V2.98`);
+  assert(html.includes("const APP_VERSION = '2.99.2';"), `${rel}: APP_VERSION must be 2.992V`);
+  assert(html.includes('Demo 2.992V'), `${rel}: launcher label must be 2.992V`);
   assert(html.includes('function ensureTourniquetArray('), `${rel}: legacy-compatible TQ normalizer missing`);
   assert(html.includes("status:p.tourniquet.status||'active'"), `${rel}: legacy TQ alias migration missing`);
   assert(html.includes("effectiveness:p.tourniquet.effectiveness||'unknown'"), `${rel}: legacy TQ effectiveness default missing`);
@@ -64,5 +64,5 @@ for (const file of files) {
   assert(sweepBody.includes("continueSweepAfterBlack('finish')"), `${rel}: black finish-sweep action broken`);
   assert(html.includes('function startNewPatient('), `${rel}: legacy patient fallback removed`);
 
-  console.log(`${rel}: V2.98 tourniquet realism static smoke passed`);
+  console.log(`${rel}: V2.992 tourniquet realism static smoke passed`);
 }

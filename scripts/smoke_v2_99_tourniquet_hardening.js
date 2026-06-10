@@ -26,12 +26,26 @@ for (const file of files) {
     html.indexOf('function addSweepTourniquetSameLimb'),
     html.indexOf('function addSweepTourniquetDifferentLimb')
   );
-  const sweep = html.slice(
-    html.indexOf('function renderMstartSweep'),
-    html.indexOf('function timeCodeToTodayMs')
+  const sweepStart = html.indexOf('const limbLabels=');
+  const sweepEnd = html.indexOf('function timeCodeToTodayMs', sweepStart);
+  const sweep = html.slice(sweepStart, sweepEnd);
+  const updateSweep = html.slice(
+    html.indexOf('function updateSweepField'),
+    html.indexOf('function setBreathingAfterAirway')
   );
 
-  assert(html.includes("const APP_VERSION = '2.98.0';"), `${rel}: hardening patch must not bump version`);
+  assert(html.includes("const APP_VERSION = '2.99.2';"), `${rel}: APP_VERSION must be 2.992V`);
+  assert(!html.includes('Demo V3.0') && !html.includes("const APP_VERSION = '3.0.0';"), `${rel}: V3.0 label/version must not be present`);
+  assert(sweep.includes('M — דימום מסכן חיים') || sweep.includes('דימום מסכן חיים'), `${rel}: corrected hemorrhage block title missing`);
+  assert(sweep.includes("right_arm:'יד ימין'") && sweep.includes("left_arm:'יד שמאל'") && sweep.includes("right_leg:'רגל ימין'") && sweep.includes("left_leg:'רגל שמאל'"), `${rel}: sweep TQ block must use current limb vocabulary`);
+  assert(!sweep.includes('right_upper') && !sweep.includes('left_upper'), `${rel}: sweep TQ block must not introduce legacy limb keys`);
+  assert(sweep.includes('${triageBand(p.triage,p)}'), `${rel}: top triage band must remain visible`);
+  assert(sweep.indexOf('${triageControlBlock}') > sweep.indexOf('פציעות / מיקום בגוף / הערכה מורחבת'), `${rel}: detailed MSTART override block should be rendered at bottom`);
+  assert(updateSweep.includes("p.mstart.breathing='assumed_yes'"), `${rel}: AVPU A/V should mark assumed breathing, not plain yes`);
+  assert(updateSweep.includes('סתירה: AVPU') && updateSweep.includes("p.mstart.breathing==='no'"), `${rel}: AVPU vs breathing=no contradiction warning missing`);
+  assert(!updateSweep.includes("p.mstart.breathing='yes';"), `${rel}: AVPU handler must not auto-overwrite breathing to plain yes`);
+  assert(html.includes('function assignReinforcementRequest(') && html.includes('function fulfillReinforcementRequest('), `${rel}: reinforcement actions must be named functions`);
+  assert(html.includes('function showSameZoneFab(') && html.includes("activeRoleDashboard!=='medic' || activeScreenId()!=='sweep'"), `${rel}: same-zone FAB must be guarded to medic sweep context`);
   assert(html.includes("hemorrhageControl:{status:'unknown',lastCheckedAt:null,sourceTourniquetId:null,note:''}"), `${rel}: marker hemorrhage control default missing`);
   assert(html.includes('function ensureHemorrhageControl('), `${rel}: hemorrhage control normalizer missing`);
   assert(html.includes('function refreshHemorrhageControl('), `${rel}: hemorrhage control refresh missing`);
@@ -56,5 +70,5 @@ for (const file of files) {
   assert(html.includes("continueSweepAfterBlack('finish')"), `${rel}: black finish action removed`);
   assert(html.includes('function startNewPatient('), `${rel}: legacy fallback removed`);
 
-  console.log(`${rel}: V2.99 TQ hardening static smoke passed`);
+  console.log(`${rel}: V2.992 TQ hardening static smoke passed`);
 }
