@@ -23,12 +23,22 @@ for (const rel of files) {
   const ccHero = sliceBetween(html, 'function renderCcHeroDashboard', 'function renderCcCommandBoard', rel);
   const logistics = sliceBetween(html, 'function renderLogisticsTaskBoard', 'function patientMatchesBoardFilter', rel);
   const commanderBrief = sliceBetween(html, 'function playMedicCommanderSequence', 'function playDeathCertificationSequence', rel);
+  const tqWithLimb = sliceBetween(html, 'function recordSweepTourniquetWithLimb', 'function renderSweepTourniquetCard', rel);
 
   assert(html.includes("const APP_VERSION = '2.99.3';"), `${rel}: APP_VERSION must be 2.99.3`);
   assert(html.includes('Demo V2.993'), `${rel}: launcher label must be Demo V2.993`);
   assert(html.includes('ROLE // V2.993'), `${rel}: role header must be V2.993`);
   assert(html.includes('Role-Based Medical Command System V2.993'), `${rel}: role strip must be V2.993`);
   assert(!html.includes('2.992V') && !html.includes("const APP_VERSION = '2.99.2';"), `${rel}: stale V2.992 label remains`);
+  assert(!html.includes('localStorage.clear('), `${rel}: must not use localStorage.clear()`);
+  assert(html.includes('const DEMO_KEYS_TO_PURGE = Object.freeze'), `${rel}: scoped demo reset key list missing`);
+  assert(html.includes('function safeScopedDemoReset'), `${rel}: safe scoped demo reset helper missing`);
+  assert(html.includes('rescue_field_mode'), `${rel}: reset must preserve field-mode preference`);
+  assert(html.includes('פעולה זו תנקה את נתוני הדמו בלבד. להמשיך?'), `${rel}: scoped reset confirmation text missing`);
+  assert(html.includes('const DEMO_SUPPLY_THRESHOLDS = Object.freeze'), `${rel}: demo logistics thresholds missing`);
+  assert(html.includes('tourniquets:{critical:2, warning:5, recommendedMin:12}'), `${rel}: tourniquet demo thresholds missing`);
+  assert(html.includes('pressureDressings:{critical:4, warning:8'), `${rel}: pressure dressing demo thresholds missing`);
+  assert(html.includes('hemostaticGauze:{critical:2, warning:5'), `${rel}: hemostatic gauze demo thresholds missing`);
 
   assert(sweep.includes('${triageBand(p.triage,p)}'), `${rel}: top triage band must remain visible`);
   assert(sweep.includes('M — דימום מסכן חיים'), `${rel}: hemorrhage block title missing`);
@@ -46,8 +56,10 @@ for (const rel of files) {
 
   assert(html.includes('bottom:148px') && html.includes("fab.textContent='+ פצוע | אותו אזור'"), `${rel}: same-zone FAB must sit above sticky actions with fixed label`);
   assert(html.includes("if(activeRoleDashboard!=='medic' || activeScreenId()!=='sweep') return;"), `${rel}: same-zone FAB must be sweep/medic scoped`);
+  assert(!tqWithLimb.includes('reconcileSupplySource'), `${rel}: recordSweepTourniquetWithLimb must not double-count tourniquet supply`);
 
   assert(roleDashboard.includes("${role==='cc'?renderCcCommandBoard():`<div class=\"role-top-grid\">"), `${rel}: CC hero must render before generic metrics`);
+  assert(roleDashboard.includes('${dashboardFocusBanner()}'), `${rel}: dashboard focus banner missing from role dashboard`);
   assert(roleDashboard.includes('פירוט נוסף / אחריות ותורים'), `${rel}: CC generic lower sections must be collapsed`);
   assert(ccHero.includes('מ״פ רפואה — החלטות עכשיו'), `${rel}: CC hero title missing`);
   assert(ccHero.includes('מה להזיז, לאן, ולמה'), `${rel}: CC hero subtitle missing`);
@@ -57,7 +69,12 @@ for (const rel of files) {
   assert(logistics.includes('משימות לוגיסטיקה עכשיו'), `${rel}: logistics task board missing`);
   assert(logistics.includes('חסמים נמוכים ברכב חוג״ד א׳'), `${rel}: logistics TQ shortage task missing`);
   assert(logistics.includes('סיבה קלינית'), `${rel}: logistics cards must include clinical reason`);
+  assert(logistics.includes('setDashboardFocus'), `${rel}: logistics task focus action missing`);
   assert(html.includes('id="logistics-task-board"'), `${rel}: logistics task board mount missing`);
+  assert(html.includes('function setDashboardFocus') && html.includes('function focusedRecommendations'), `${rel}: lightweight focus filtering helpers missing`);
+  assert(html.includes('function loadOmniRoleScenario'), `${rel}: Omni-Role scenario loader missing`);
+  assert(html.includes('טען תרחיש Omni-Role'), `${rel}: Omni-Role launcher label missing`);
+  assert(html.includes('TOURNIQUET_MARKED_INEFFECTIVE') && html.includes('REQ-OMNI-EVAC-001') && html.includes('REQ-OMNI-SUP-001'), `${rel}: Omni scenario must trigger TQ failure, evacuation, and supply pressure`);
 
   assert(html.includes('הצג תדריך מ״פ / חוג״ד ב־60 שניות'), `${rel}: commander 60-second launcher button missing`);
   assert(commanderBrief.includes("renderRoleDashboard('pc')"), `${rel}: commander brief must show PC board`);
