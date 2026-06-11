@@ -107,10 +107,12 @@ function checkFile(file) {
 
   const treatmentStart = html.indexOf('function recordSweepTreatment');
   assert(treatmentStart >= 0, `${rel}: missing sweep treatment recorder`);
-  const treatmentBody = html.slice(treatmentStart, treatmentStart + 3400);
-  ['tourniquet', 'reconcileSupplySource', 'LIFE_SAVING_TREATMENT_RECORDED', 'tourniquet-limb-modal'].forEach(s => {
+  const treatmentBody = html.slice(treatmentStart, html.indexOf('function setSweepTourniquetLimb', treatmentStart));
+  ['tourniquet', 'reconcileSupplySource', 'LIFE_SAVING_TREATMENT_RECORDED'].forEach(s => {
     assert(treatmentBody.includes(s), `${rel}: treatment recorder missing ${s}`);
   });
+  assert(!treatmentBody.includes("classList.remove('hidden')"), `${rel}: dedicated sweep tourniquet action must not open the legacy limb modal`);
+  assert(html.includes('tourniquet-limb-modal'), `${rel}: legacy limb modal fallback removed`);
   assert(countMatches(treatmentBody, /silentPopup:true/g) >= 3, `${rel}: sweep supply use must stay silent for tourniquet, airway, and pressure dressing`);
   assert(countMatches(treatmentBody, /suppressAutoResupply:true/g) >= 3, `${rel}: sweep supply use must not auto-open resupply workflow`);
   assert(html.includes('עוד · חסר ציוד'), `${rel}: missing demoted manual sweep resupply link`);
