@@ -1,4 +1,4 @@
-const fs = require('fs');
+﻿const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
@@ -25,10 +25,10 @@ for (const rel of files) {
   const commanderBrief = sliceBetween(html, 'function playMedicCommanderSequence', 'function playDeathCertificationSequence', rel);
   const tqWithLimb = sliceBetween(html, 'function recordSweepTourniquetWithLimb', 'function renderSweepTourniquetCard', rel);
 
-  assert(html.includes("const APP_VERSION = '2.99.3';"), `${rel}: APP_VERSION must be 2.99.3`);
-  assert(html.includes('Demo V2.993'), `${rel}: launcher label must be Demo V2.993`);
-  assert(html.includes('ROLE // V2.993'), `${rel}: role header must be V2.993`);
-  assert(html.includes('Role-Based Medical Command System V2.993'), `${rel}: role strip must be V2.993`);
+  assert(html.includes("const APP_VERSION = '2.99.4';"), `${rel}: APP_VERSION must be 2.99.4`);
+  assert(html.includes('Demo V2.994'), `${rel}: launcher label must be Demo V2.994`);
+  assert(html.includes('ROLE // V2.994'), `${rel}: role header must be V2.994`);
+  assert(html.includes('Role-Based Medical Command System V2.994'), `${rel}: role strip must be V2.994`);
   assert(!html.includes('2.992V') && !html.includes("const APP_VERSION = '2.99.2';"), `${rel}: stale V2.992 label remains`);
   assert(!html.includes('localStorage.clear('), `${rel}: must not use localStorage.clear()`);
   assert(html.includes('const DEMO_KEYS_TO_PURGE = Object.freeze'), `${rel}: scoped demo reset key list missing`);
@@ -60,6 +60,15 @@ for (const rel of files) {
 
   assert(roleDashboard.includes("${role==='cc'?renderCcCommandBoard():`<div class=\"role-top-grid\">"), `${rel}: CC hero must render before generic metrics`);
   assert(roleDashboard.includes('${dashboardFocusBanner()}'), `${rel}: dashboard focus banner missing from role dashboard`);
+  assert(html.includes('let dashboardCollapsedSections = {}'), `${rel}: collapse state missing`);
+  assert(html.includes('function normalizeDashboardFocus'), `${rel}: normalized dashboard focus helper missing`);
+  assert(html.includes('function focusMatchesPatient') && html.includes('function focusMatchesRequest') && html.includes('function focusMatchesLogisticsTask'), `${rel}: safe focus matcher helpers missing`);
+  assert(html.includes('function renderCollapsibleSection'), `${rel}: collapsible section helper missing`);
+  assert(html.includes('function renderOperationalEmptyState'), `${rel}: operational empty-state helper missing`);
+  assert(html.includes('return true;') && html.includes('if(!supported) return true;'), `${rel}: focus fallback must be safe by default`);
+  assert(html.includes('אין פצועים במיקוד הנוכחי'), `${rel}: focused patient empty state missing`);
+  assert(html.includes('אין בקשות במיקוד הנוכחי'), `${rel}: focused request empty state missing`);
+  assert(html.includes('אין משימות לוגיסטיקה במיקוד הנוכחי'), `${rel}: focused logistics empty state missing`);
   assert(roleDashboard.includes('פירוט נוסף / אחריות ותורים'), `${rel}: CC generic lower sections must be collapsed`);
   assert(ccHero.includes('מ״פ רפואה — החלטות עכשיו'), `${rel}: CC hero title missing`);
   assert(ccHero.includes('מה להזיז, לאן, ולמה'), `${rel}: CC hero subtitle missing`);
@@ -70,6 +79,8 @@ for (const rel of files) {
   assert(logistics.includes('חסמים נמוכים ברכב חוג״ד א׳'), `${rel}: logistics TQ shortage task missing`);
   assert(logistics.includes('סיבה קלינית'), `${rel}: logistics cards must include clinical reason`);
   assert(logistics.includes('setDashboardFocus'), `${rel}: logistics task focus action missing`);
+  assert(logistics.includes('itemTypes') && logistics.includes('patientIds') && logistics.includes('requestIds'), `${rel}: logistics tasks must carry structured focus fields`);
+  assert(logistics.includes('focusFilteredList(tasks, focusMatchesLogisticsTask)'), `${rel}: logistics task filtering must use structured matcher`);
   assert(html.includes('id="logistics-task-board"'), `${rel}: logistics task board mount missing`);
   assert(html.includes('function setDashboardFocus') && html.includes('function focusedRecommendations'), `${rel}: lightweight focus filtering helpers missing`);
   assert(html.includes('function loadOmniRoleScenario'), `${rel}: Omni-Role scenario loader missing`);
@@ -89,5 +100,5 @@ for (const rel of files) {
   assert(roleDashboard.includes("role==='medic'?'הערכה מורחבת':'פתח מסך עבודה מלא'"), `${rel}: medic legacy action must be demoted as extended assessment`);
   assert(!roleDashboard.includes('startMedicTreatmentNow()">התחל טיפול עכשיו'), `${rel}: old primary medic wizard action still visible`);
 
-  console.log(`${rel}: V2.993 demo polish static smoke passed`);
+  console.log(`${rel}: V2.994 demo polish static smoke passed`);
 }
