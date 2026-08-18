@@ -1986,25 +1986,39 @@ textarea{resize:vertical;min-height:70px;}
   root.C5DomainRules = factory();
 })(typeof globalThis !== "undefined" ? globalThis : window, function buildDomainRules() {
   "use strict";
+
   const VITALS_INTERVAL_MS = 5 * 60 * 1000;
   const WARN_AT_MS = 4 * 60 * 1000;
   const TOURNIQUET_WARN_MS = 40 * 60 * 1000;
   const TOURNIQUET_CRITICAL_MS = 60 * 60 * 1000;
   const AVPU_RANK = { A: 0, V: 1, P: 2, U: 3 };
   const PEDIATRIC_AGE_CUTOFF = 8;
-  const PEDIATRIC_HIGH_RISK_DOSE_LIMITS = {morphine: { max: 4, unit: "mg" }, fentanyl: { max: 50, unit: "mcg" }};
-  const VITALS_CLOSED_STATUSES = new Set(["closed","deceased","evacuated","evacuating","handed_over","self_evacuated"]);
+  const PEDIATRIC_HIGH_RISK_DOSE_LIMITS = {
+    morphine: { max: 4, unit: "mg" },
+    fentanyl: { max: 50, unit: "mcg" },
+  };
+  const VITALS_CLOSED_STATUSES = new Set([
+    "closed",
+    "deceased",
+    "evacuated",
+    "evacuating",
+    "handed_over",
+    "self_evacuated",
+  ]);
+
   function needsVitals(patient) {
     if (!patient) return false;
     if (VITALS_CLOSED_STATUSES.has(patient.patientStatus)) return false;
     if (patient.triage === "black") return false;
     return true;
   }
+
   function isPediatricPatient(patient = {}) {
     if (patient.patientAge == null || patient.patientAge === "") return patient.patientAgeGroup === "pediatric";
     const age = Number(patient.patientAge);
     return patient.patientAgeGroup === "pediatric" || (Number.isFinite(age) && age < PEDIATRIC_AGE_CUTOFF);
   }
+
   function isHighRiskDose(medicationName, selectedDose, patient = {}) {
     if (!isPediatricPatient(patient)) return false;
     const key = String(medicationName || "").toLowerCase();
@@ -2014,26 +2028,35 @@ textarea{resize:vertical;min-height:70px;}
     const hasAge = patient.patientAge != null && patient.patientAge !== "";
     const age = Number(patient.patientAge);
     const kg = hasAge && Number.isFinite(age) ? Math.max(4, Math.round(age * 2 + 8)) : 4;
-    const dynamicMax = key === "morphine"
-      ? Math.min(4, Math.max(0.5, kg * 0.1))
-      : key === "fentanyl"
-        ? Math.min(50, kg)
-        : limit.max;
+    const dynamicMax =
+      key === "morphine" ? Math.min(4, Math.max(0.5, kg * 0.1))
+      : key === "fentanyl" ? Math.min(50, kg)
+      : limit.max;
     return dose > dynamicMax;
   }
-  function vitalsAgeMs(patient, nowMs = Date.now()) { return nowMs - (patient?.lastVitalsAt || 0); }
+
+  function vitalsAgeMs(patient, nowMs = Date.now()) {
+    return nowMs - (patient?.lastVitalsAt || 0);
+  }
+
   function vitalsTimer(patient, nowMs = Date.now()) {
     if (!needsVitals(patient)) return null;
     const age = vitalsAgeMs(patient, nowMs);
-    if (age >= VITALS_INTERVAL_MS) return { cls: "overdue", minutes: Math.floor(age / 60000), remainingMinutes: 0 };
+    if (age >= VITALS_INTERVAL_MS) {
+      return { cls: "overdue", minutes: Math.floor(age / 60000), remainingMinutes: 0 };
+    }
     const remainingMinutes = Math.ceil((VITALS_INTERVAL_MS - age) / 60000);
-    if (age >= WARN_AT_MS) return { cls: "warn", minutes: Math.floor(age / 60000), remainingMinutes };
+    if (age >= WARN_AT_MS) {
+      return { cls: "warn", minutes: Math.floor(age / 60000), remainingMinutes };
+    }
     return { cls: "ok", minutes: Math.floor(age / 60000), remainingMinutes };
   }
+
   function elapsedMinutes(timestamp, nowMs = Date.now()) {
     const parsed = typeof timestamp === "string" ? Date.parse(timestamp) : timestamp;
     return Number.isFinite(parsed) ? Math.max(0, Math.floor((nowMs - parsed) / 60000)) : 0;
   }
+
   function tourniquetTimer(patient, nowMs = Date.now()) {
     const tourniquet = patient?.tourniquet;
     if (!tourniquet || !tourniquet.appliedAt) return null;
@@ -2042,6 +2065,7 @@ textarea{resize:vertical;min-height:70px;}
     const cls = elapsedMs >= TOURNIQUET_CRITICAL_MS ? "critical" : elapsedMs >= TOURNIQUET_WARN_MS ? "warn" : "";
     return { cls, minutes, limb: tourniquet.limb || "לא צוין" };
   }
+
   function timeCodeToTodayMs(code, nowMs = Date.now()) {
     if (!code || !/^\d{4}$/.test(code)) return nowMs;
     const now = new Date(nowMs);
@@ -2050,6 +2074,7 @@ textarea{resize:vertical;min-height:70px;}
     if (day.getTime() > now.getTime() + 60000) day.setDate(day.getDate() - 1);
     return day.getTime();
   }
+
   function computeMstartTriage(vitals) {
     if (!vitals) return null;
     if (vitals.rr === 0) return "black";
@@ -2065,30 +2090,85 @@ textarea{resize:vertical;min-height:70px;}
     if (vitals.avpu === "A" && hasPerfusion && normalRR) return "green";
     return "yellow";
   }
+
   function suggestMstartTriage({ vitals } = {}) {
     const v = vitals || {};
-    if (v.rr === 0) return { triage: "black", reason: "MCI: לא נושם — מסווג שחור", reasons: [] };
-    // SABCDE airway path removed — use breathing field in MSTART sweep (step1) for non-breathing → black.
+    if (v.rr === 0) {
+      return { triage: "black", reason: "MCI: לא נושם — מסווג שחור", reasons: [] };
+    }
+
     const reasons = [];
     if (v.rr > 30 || (v.rr > 0 && v.rr < 10)) reasons.push(`נשימות ${v.rr}/דקה`);
     if (v.bp_estimate === "absent" || v.bp_estimate === "carotid" || v.bp_estimate === "carotid_strong" || v.bp_estimate === "carotid_weak") reasons.push("לחץ דם ירוד");
     if (v.avpu && v.avpu !== "A") reasons.push(`AVPU ${v.avpu}`);
     if (v.spo2 && v.spo2 < 94) reasons.push(`SpO₂ ${v.spo2}%`);
+
     if (reasons.length) return { triage: "red", reason: reasons.join(" · "), reasons };
     if (v.bp_estimate === "weak" || v.bp_estimate === "radial_weak") return { triage: "yellow", reason: "דופק רדיאלי חלש", reasons: ["פרפוזיה גבולית"] };
-    if (v.avpu === "A" && (v.bp_estimate === "radial" || v.bp_estimate === "radial_strong") && v.rr >= 10 && v.rr <= 30) return { triage: "green", reason: "מדדים תקינים · AVPU A", reasons: [] };
+    if (v.avpu === "A" && (v.bp_estimate === "radial" || v.bp_estimate === "radial_strong") && v.rr >= 10 && v.rr <= 30) {
+      return { triage: "green", reason: "מדדים תקינים · AVPU A", reasons: [] };
+    }
     return { triage: "yellow", reason: "מידע חלקי / מדדים בינוניים — לא מסווג אוטומטית כירוק", reasons: [] };
   }
+
+  function suggestedSweepColor(m = {}) {
+    if (m.overrideReason && m.color) return m.color;
+    if (m.lifeThreateningHemorrhage) return "red";
+    if (m.walking === "yes") return "green";
+    if (m.breathing === "no") return m.airwayOpened && m.breathingAfterAirway === "no" ? "black" : "red";
+    if (m.perfusion === "absent") return "black";
+    if (["carotid_only", "radial_weak"].includes(m.perfusion)) return "red";
+    if (["V", "P", "U"].includes(m.avpu)) return "red";
+    if (["trapped", "immobile"].includes(m.trapped)) return "yellow";
+    if (m.breathing === "yes" && m.perfusion === "radial_strong" && m.avpu === "A") return "yellow";
+    return "yellow";
+  }
+
   function detectDeterioration(prev = {}, next = {}) {
     const flags = [];
-    if (next.spo2 && prev.spo2 && next.spo2 <= prev.spo2 - 5) flags.push(`⬇ SpO₂ ${prev.spo2}→${next.spo2}%`);
-    if (next.avpu && prev.avpu && AVPU_RANK[next.avpu] > AVPU_RANK[prev.avpu]) flags.push(`⬇ AVPU ${prev.avpu}→${next.avpu}`);
-    if (Number.isFinite(next.pulse) && Number.isFinite(prev.pulse) && Math.abs(next.pulse - prev.pulse) >= 25) flags.push(`⚡ דופק ${prev.pulse}→${next.pulse}`);
+    if (next.spo2 && prev.spo2 && next.spo2 <= prev.spo2 - 5) {
+      flags.push(`⬇ SpO₂ ${prev.spo2}→${next.spo2}%`);
+    }
+    if (next.avpu && prev.avpu && AVPU_RANK[next.avpu] > AVPU_RANK[prev.avpu]) {
+      flags.push(`⬇ AVPU ${prev.avpu}→${next.avpu}`);
+    }
+    if (Number.isFinite(next.pulse) && Number.isFinite(prev.pulse) && Math.abs(next.pulse - prev.pulse) >= 25) {
+      flags.push(`⚡ דופק ${prev.pulse}→${next.pulse}`);
+    }
     return flags;
   }
-  function isRoutineAlert(patient, nowMs = Date.now()) { return needsVitals(patient) && vitalsAgeMs(patient, nowMs) >= VITALS_INTERVAL_MS; }
-  function isCriticalAlert(patient) { return !!(patient && (patient.alert || (patient.deterioration && patient.deterioration.length))); }
-  return {AVPU_RANK, TOURNIQUET_CRITICAL_MS, TOURNIQUET_WARN_MS, VITALS_INTERVAL_MS, WARN_AT_MS, computeMstartTriage, detectDeterioration, elapsedMinutes, isCriticalAlert, isHighRiskDose, isPediatricPatient, isRoutineAlert, needsVitals, PEDIATRIC_AGE_CUTOFF, PEDIATRIC_HIGH_RISK_DOSE_LIMITS, suggestMstartTriage, timeCodeToTodayMs, tourniquetTimer, vitalsAgeMs, vitalsTimer};
+
+  function isRoutineAlert(patient, nowMs = Date.now()) {
+    return needsVitals(patient) && vitalsAgeMs(patient, nowMs) >= VITALS_INTERVAL_MS;
+  }
+
+  function isCriticalAlert(patient) {
+    return !!(patient && (patient.alert || (patient.deterioration && patient.deterioration.length)));
+  }
+
+  return {
+    AVPU_RANK,
+    TOURNIQUET_CRITICAL_MS,
+    TOURNIQUET_WARN_MS,
+    VITALS_INTERVAL_MS,
+    WARN_AT_MS,
+    computeMstartTriage,
+    detectDeterioration,
+    elapsedMinutes,
+    isCriticalAlert,
+    isHighRiskDose,
+    isPediatricPatient,
+    isRoutineAlert,
+    needsVitals,
+    PEDIATRIC_AGE_CUTOFF,
+    PEDIATRIC_HIGH_RISK_DOSE_LIMITS,
+    suggestedSweepColor,
+    suggestMstartTriage,
+    timeCodeToTodayMs,
+    tourniquetTimer,
+    vitalsAgeMs,
+    vitalsTimer,
+  };
 });
 </script>
 <script>
@@ -5090,16 +5170,7 @@ function createTmpCasualtyId(){
   return `TMP-${String(n).padStart(3,'0')}`;
 }
 function suggestedSweepColor(m={}){
-  if(m.overrideReason && m.color) return m.color;
-  if(m.lifeThreateningHemorrhage) return 'red';
-  if(m.walking==='yes') return 'green';
-  if(m.breathing==='no') return m.airwayOpened && m.breathingAfterAirway==='no' ? 'black' : 'red';
-  if(m.perfusion==='absent') return 'black';
-  if(['carotid_only','radial_weak'].includes(m.perfusion)) return 'red';
-  if(['V','P','U'].includes(m.avpu)) return 'red';
-  if(['trapped','immobile'].includes(m.trapped)) return 'yellow';
-  if(m.breathing==='yes' && m.perfusion==='radial_strong' && m.avpu==='A') return 'yellow';
-  return 'yellow';
+  return C5Rules.suggestedSweepColor(m);
 }
 function applyWalkingAutofill(p){
   p.mstart={...(p.mstart||{}), walking:'yes', breathing:'yes', perfusion:'radial_strong', avpu:'A', trapped:'not_trapped'};
