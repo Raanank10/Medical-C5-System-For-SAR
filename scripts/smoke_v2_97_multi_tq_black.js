@@ -50,5 +50,5 @@ for (const file of files) {
   assert(html.includes('function skipToSummaryBlack('), `${rel}: legacy black skip flow removed`);
   assert(html.includes('function savePatient('), `${rel}: legacy patient save removed`);
 
-  console.log(`${rel}: V2.994 multi-TQ and fast-black static smoke passed`);
+  console.log(`${rel}: V2.995 multi-TQ and fast-black static smoke passed`);
 }
