@@ -1,4 +1,4 @@
-const fs = require('fs');
+﻿const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
@@ -25,10 +25,10 @@ for (const rel of files) {
   const ccHero = section(html, 'function renderCcHeroDashboard', 'function renderCcCommandBoard');
   const demoScenario = section(html, 'function loadDemoScenario', 'function activateSignedDemoScenario');
 
-  assert(html.includes("const APP_VERSION = '2.99.2';"), `${rel}: APP_VERSION must be Demo 2.992V`);
-  assert(html.includes('Demo 2.992V'), `${rel}: launcher label must be Demo 2.992V`);
-  assert(html.includes('ROLE // 2.992V'), `${rel}: role header must be Demo 2.992V`);
-  assert(html.includes('Role-Based Medical Command System 2.992V'), `${rel}: role system strip must be Demo 2.992V`);
+  assert(html.includes("const APP_VERSION = '2.99.5';"), `${rel}: APP_VERSION must be Demo V2.995`);
+  assert(html.includes('Demo V2.995'), `${rel}: launcher label must be Demo V2.995`);
+  assert(html.includes('ROLE // V2.995'), `${rel}: role header must be Demo V2.995`);
+  assert(html.includes('Role-Based Medical Command System V2.995'), `${rel}: role system strip must be Demo V2.995`);
   assert(!html.includes('Demo V3.0') && !html.includes("const APP_VERSION = '3.0.0';"), `${rel}: V3.0 must not be present`);
 
   assert(html.includes('const RECOMMENDATION_ACK_KEY'), `${rel}: recommendation ACK storage key missing`);
@@ -86,5 +86,5 @@ for (const rel of files) {
   assert(html.includes('function renderMstartSweep('), `${rel}: MSTART sweep missing`);
   assert(html.includes('function renderCommander('), `${rel}: commander renderer missing`);
 
-  console.log(`${rel}: Demo 2.992V decision-support static smoke passed`);
+  console.log(`${rel}: Demo V2.995 decision-support static smoke passed`);
 }

@@ -1,4 +1,4 @@
-const fs = require('fs');
+﻿const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
@@ -21,8 +21,8 @@ for (const file of files) {
   const treatmentEnd = html.indexOf('function setSweepTourniquetLimb', treatmentStart);
   const treatmentBody = html.slice(treatmentStart, treatmentEnd);
 
-  assert(html.includes("const APP_VERSION = '2.99.2';"), `${rel}: APP_VERSION must be 2.992V`);
-  assert(html.includes('Demo 2.992V'), `${rel}: launcher label must be 2.992V`);
+  assert(html.includes("const APP_VERSION = '2.99.5';"), `${rel}: APP_VERSION must be V2.995`);
+  assert(html.includes('Demo V2.995'), `${rel}: launcher label must be V2.995`);
   assert(renderBody.includes('M — דימום מסכן חיים'), `${rel}: missing immediate hemorrhage section`);
   assert(renderBody.indexOf('M — דימום מסכן חיים') < renderBody.indexOf('הולך?'), `${rel}: hemorrhage section must precede walking`);
   const breathingLabel = '<div class="field-label">נשימה</div>';
@@ -52,5 +52,5 @@ for (const file of files) {
   assert(html.includes('function renderCcCommandBoard'), `${rel}: CC board removed`);
   assert(html.includes('function renderAar'), `${rel}: AAR removed`);
 
-  console.log(`${rel}: V2.992 MSTART card static smoke passed`);
+  console.log(`${rel}: V2.995 MSTART card static smoke passed`);
 }
