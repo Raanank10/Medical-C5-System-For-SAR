@@ -512,17 +512,50 @@ input[type=range]{width:100%;accent-color:var(--orange);}
 }
 
 /* ── INPUTS ── */
-input[type=text],input[type=number],textarea{width:100%;padding:13px;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--text);font-family:var(--sans);font-size:15px;outline:none;direction:rtl;}
-input[type=text]:focus,textarea:focus{border-color:var(--accent);}
+input[type=text],input[type=email],input[type=password],input[type=number],textarea{width:100%;padding:13px;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--text);font-family:var(--sans);font-size:15px;outline:none;direction:rtl;}
+input[type=text]:focus,input[type=email]:focus,input[type=password]:focus,textarea:focus{border-color:var(--accent);}
 textarea{resize:vertical;min-height:70px;}
+/* ── AUTH ── */
+.auth-status-strip{display:none;align-items:center;justify-content:space-between;gap:8px;background:var(--surface2);border-bottom:1px solid var(--border);padding:8px 16px;font-size:12px;color:var(--muted);position:sticky;top:0;z-index:101;}
+.auth-status-strip button{background:none;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer;}
+.login-error{color:var(--red);font-size:13px;min-height:18px;margin-top:4px;}
 </style>
 </head>
 <body>
+<!-- Pinned version: bump deliberately, never float @2, since this loads on field devices. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.min.js"></script>
 <button class="field-mode-toggle" id="field-mode-toggle" onclick="toggleFieldMode()">מצב שטח</button>
 <button id="global-home-btn" class="home-btn" onclick="goHome()">ראשי</button>
+<div id="auth-status-strip" class="auth-status-strip">
+  <span class="auth-status-text"></span>
+  <button onclick="signOut()">התנתק</button>
+</div>
+
+<!-- ══════════════════════ LOGIN ══ -->
+<div id="screen-login" class="screen active">
+  <div class="header">
+    <div class="header-left">
+      <div class="header-subtitle">C5 SENTINEL-SAR // AUTH</div>
+      <div class="header-title">כניסה למערכת</div>
+    </div>
+  </div>
+  <div class="demo-panel" style="margin:16px">
+    <div class="demo-strip-title">התחברות עם משתמש אמיתי</div>
+    <div class="demo-strip-sub" style="margin-bottom:12px">התפקיד וההרשאות נקבעים אוטומטית מהחשבון שלך בשרת.</div>
+    <input type="email" id="login-email" placeholder="אימייל" style="margin-bottom:10px" autocomplete="username">
+    <input type="password" id="login-password" placeholder="סיסמה" style="margin-bottom:10px" autocomplete="current-password" onkeydown="if(event.key==='Enter') attemptLogin()">
+    <div class="login-error" id="login-error"></div>
+    <button class="btn-primary" id="login-submit-btn" onclick="attemptLogin()">התחבר</button>
+  </div>
+  <div class="demo-panel" style="margin:16px">
+    <div class="demo-strip-title">מצב דמו מקומי</div>
+    <div class="demo-strip-sub" style="margin-bottom:12px">המשך ללא התחברות — עובד גם ללא אינטרנט, אך נתונים לא יסונכרנו לשרת.</div>
+    <button class="demo-mini-btn" onclick="goTo('demo')">המשך כדמו מקומי (ללא Sync)</button>
+  </div>
+</div>
 
 <!-- ══════════════════════ MEDICAL COMMAND DEMO LAUNCHER ══ -->
-<div id="screen-demo" class="screen active">
+<div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
       <div class="demo-kicker">Demo V2.995</div>
@@ -2193,6 +2226,42 @@ const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
 const CONFLICT_LOG_KEY = 'c5-sentinel-sar-conflict-log-v1';
 const ACTIVE_RECOVERY_KEY = 'c5_active_recovery_state';
 const DEVICE_ID_KEY = 'c5-sentinel-sar-device-id';
+// ── Supabase / sync config ──
+const SUPABASE_URL = 'https://btvvjmuwdzirjyauyijx.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dnZqbXV3ZHppcmp5YXV5aWp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxMTYzNjUsImV4cCI6MjEwMjY5MjM2NX0.bKWklZKs8xEtMqXUvNBDEn0AIPOps0N1ycjc9idLAVE';
+const SYNC_FUNCTION_URL = SUPABASE_URL + '/functions/v1/sync-log';
+// No real incident-lifecycle UI yet (Command Dashboard, spec sections 5-7, is future work) —
+// map the existing demo site ids to the two seeded test incidents so push/pull have a valid
+// incident_id target. Replace with real incident selection once that work lands.
+const SITE_TO_INCIDENT_ID = {
+  SITE_A: '00000000-0000-0000-0000-0000000000a1',
+  SITE_B: '00000000-0000-0000-0000-0000000000b2'
+};
+// Server user_role enum uses 'logistics_officer'; client's internal role key is 'logistics'.
+const SERVER_ROLE_TO_CLIENT_ROLE = { logistics_officer: 'logistics' };
+function mapServerRole(role){ return SERVER_ROLE_TO_CLIENT_ROLE[role] || role; }
+// Exact vocabulary the deployed sync-log Edge Function accepts (supabase/functions/sync-log/index.ts,
+// ROLE_ALLOWED_EVENT_TYPES categories). Local event types outside this set are demo/UI-only and are
+// never pushed — keeps the outbox from filling sync_ingestion_errors with expected rejections.
+const SYNC_ELIGIBLE_EVENT_TYPES = new Set([
+  'PATIENT_CREATED','QUICK_PATIENT_CREATED','PATIENT_IDENTIFIED','PATIENT_INJURY_UPDATED',
+  'PATIENT_LOCATION_UPDATED','PATIENT_ACCESS_UPDATED','PATIENT_TRIAGE_UPDATED','PATIENT_STATUS_UPDATED',
+  'PATIENT_T_INJURY_UPDATED','PATIENT_HANDED_OVER','PATIENT_TRIAGED_EXPECTANT','VITALS_RECORDED',
+  'MINIMAL_TRIAGE_RECORDED','SABCDE_RECORDED','MSTART_SUGGESTED','JUMPSTART_SUGGESTED','MSTART_OVERRIDE',
+  'JUMPSTART_OVERRIDE','TOURNIQUET_APPLIED','TOURNIQUET_REASSESSMENT','TOURNIQUET_RELEASED',
+  'TOURNIQUET_CONTEXT_UPDATED','INTERVENTION_RECORDED','MEDICATION_ADMINISTERED','AIRWAY_MANAGED',
+  'HIGH_RISK_OVERRIDE_CONFIRMED','FIRST_RESPONDER_REPORT','OFFICIAL_INCIDENT_OPENED_BY_RESCUE',
+  'INCIDENT_CLOSE_TOGGLED','BUILDING_STATUS_UPDATED','SITE_CLEAR_CONFIRMED','INCIDENT_DRAFT_CREATED',
+  'INCIDENT_OPENED','INCIDENT_CONFIRMED','INCIDENT_DRAFT_MERGED','INCIDENT_DRAFT_REJECTED',
+  'INCIDENT_CLOSED','INCIDENT_REOPENED','MEDIC_SITE_CLOSE_REQUESTED','SUPPLY_REQUEST_CREATED',
+  'SUPPLY_REQUEST_DISPATCHED','SUPPLY_REQUEST_IN_TRANSIT','SUPPLY_REQUEST_RECEIVED',
+  'INVENTORY_LEDGER_ENTRY','INVENTORY_INITIALIZED','INVENTORY_TRANSFER_OUT','INVENTORY_TRANSFER_IN',
+  'PLATOON_STOCK_INITIALIZED','PLATOON_STOCK_REFILLED','DIRECT_LOGO_TO_MEDIC_REFILL',
+  'EXTERNAL_REPORT_CREATED','EXTERNAL_REPORT_LINKED','WATCHDOG_ALERT','WATCHDOG_ACKNOWLEDGED',
+  'WATCHDOG_RESOLVED','DEAD_MAN_SWITCH_ESCALATED','SYNC_CONFLICT','CONFLICT_LOG_ENTRY',
+  'TREATMENT_SAFETY_WARNING','COMMAND_CONTEXT_NOTE_ADDED','VOICE_MEMO_ADDED',
+  'HIGH_RISK_CLINICAL_VIOLATION','NOTE_ADDED','AAR_CONTEXT_NOTE_ADDED'
+]);
 const SUPPLY_BASELINE = Object.freeze({tourniquets:3, pressureDressings:4, hemostaticGauze:2, airwayEquipment:2, ivKits:1, blankets:2, batteryPacks:1});
 const PC_TRUCK_BASELINE = Object.freeze({tourniquets:20, pressureDressings:30, hemostaticGauze:15, airwayEquipment:10, ivKits:8, blankets:25, batteryPacks:6});
 const COMPANY_STOCK_BASELINE = Object.freeze({tourniquets:80, pressureDressings:120, hemostaticGauze:50, airwayEquipment:35, ivKits:30, blankets:120, batteryPacks:20});
@@ -2533,6 +2602,105 @@ function setDeviceLabels(){
     const el=document.getElementById(elId);
     if(el) el.textContent=id;
   });
+}
+
+// ═══════════════════════════════════════════════
+//  AUTH (Supabase Auth — real login, mapped to server profiles.role)
+// ═══════════════════════════════════════════════
+let currentUser=null; // {id, email, role} once signed in via Supabase Auth; null in local-demo mode
+let _supabaseClient=null;
+function getSupabaseClient(){
+  if(_supabaseClient) return _supabaseClient;
+  if(!window.supabase || !window.supabase.createClient) return null;
+  _supabaseClient=window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth:{persistSession:true, autoRefreshToken:true}
+  });
+  return _supabaseClient;
+}
+function showLoginError(msg){
+  const el=document.getElementById('login-error');
+  if(el) el.textContent=msg||'';
+}
+function setLoginBusy(busy){
+  const btn=document.getElementById('login-submit-btn');
+  if(btn){ btn.disabled=busy; btn.textContent=busy?'מתחבר...':'התחבר'; }
+}
+async function attemptLogin(){
+  const email=(document.getElementById('login-email')?.value||'').trim();
+  const password=document.getElementById('login-password')?.value||'';
+  if(!email || !password){ showLoginError('נא למלא אימייל וסיסמה'); return; }
+  await signIn(email, password);
+}
+async function signIn(email, password){
+  const client=getSupabaseClient();
+  if(!client){ showLoginError('שירות ההתחברות לא זמין כרגע (בדוק חיבור אינטרנט)'); return; }
+  showLoginError('');
+  setLoginBusy(true);
+  let result;
+  try{
+    result=await client.auth.signInWithPassword({email, password});
+  }catch(e){
+    setLoginBusy(false);
+    showLoginError('שגיאת רשת בהתחברות');
+    return;
+  }
+  if(result.error || !result.data?.user){
+    setLoginBusy(false);
+    showLoginError('התחברות נכשלה — פרטים שגויים');
+    return;
+  }
+  const ok=await loadProfileAndEnter(client, result.data.user.id);
+  setLoginBusy(false);
+  if(!ok) showLoginError('המשתמש מחובר אך אין פרופיל פעיל במערכת');
+}
+async function loadProfileAndEnter(client, userId){
+  let profileResult;
+  try{
+    profileResult=await client.from('profiles').select('role,is_active').eq('id',userId).single();
+  }catch(e){ return false; }
+  const profile=profileResult.data;
+  if(profileResult.error || !profile || !profile.is_active) return false;
+  const {data:userData}=await client.auth.getUser();
+  currentUser={id:userId, email:userData?.user?.email||'', role:profile.role};
+  renderAuthStatus();
+  enterAuthenticatedRole(profile.role);
+  scheduleSyncPush();
+  return true;
+}
+function enterAuthenticatedRole(serverRole){
+  const clientRole=mapServerRole(serverRole);
+  if(['medic','pc','cc','chamal','rpc','rcc','logistics'].includes(clientRole)){
+    startRoleDashboard(clientRole);
+  }else{
+    goTo('demo');
+  }
+}
+async function signOut(){
+  const client=getSupabaseClient();
+  if(client){ try{ await client.auth.signOut(); }catch(e){} }
+  currentUser=null;
+  renderAuthStatus();
+  goTo('login');
+}
+async function restoreSession(){
+  const client=getSupabaseClient();
+  if(!client) return;
+  let sessionResult;
+  try{ sessionResult=await client.auth.getSession(); }catch(e){ return; }
+  const session=sessionResult?.data?.session;
+  if(!session) return;
+  await loadProfileAndEnter(client, session.user.id);
+}
+function renderAuthStatus(){
+  const strip=document.getElementById('auth-status-strip');
+  if(!strip) return;
+  if(currentUser){
+    strip.style.display='flex';
+    const label=strip.querySelector('.auth-status-text');
+    if(label) label.textContent=`מחובר: ${currentUser.email} · ${ROLE_LABELS[mapServerRole(currentUser.role)]||currentUser.role}`;
+  }else{
+    strip.style.display='none';
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -3282,7 +3450,9 @@ function setDemoSyncMode(){
   updateDemoStatus();
 }
 function updateDemoStatus(){
-  const label = demoSyncMode==='fresh' ? `Fresh · ${timeAgoLabel(lastSyncAt)}` : demoSyncMode==='stale' ? `Stale · ${timeAgoLabel(lastSyncAt)}` : `Offline · ${timeAgoLabel(lastSyncAt)}`;
+  let label = demoSyncMode==='fresh' ? `Fresh · ${timeAgoLabel(lastSyncAt)}` : demoSyncMode==='stale' ? `Stale · ${timeAgoLabel(lastSyncAt)}` : `Offline · ${timeAgoLabel(lastSyncAt)}`;
+  const rejected=rejectedOutboxCount();
+  if(rejected) label += ` · ${rejected} נדחו`;
   ['sync-pill-dashboard','sync-pill-command','sync-pill-aar','sync-pill-logistics','sync-pill-roles'].forEach(id=>{
     const el=document.getElementById(id); if(!el) return;
     el.textContent=label;
@@ -6535,7 +6705,7 @@ function handoverPatient(id){
   p.lastModifiedAt=new Date().toISOString();
   p.unsyncedEvents=(p.unsyncedEvents||0)+1;
   const event={
-    type:'PATIENT_HANDED_TO_MDA',
+    type:'PATIENT_HANDED_OVER',
     time:nowT(),
     detail:'הועבר למד״א — עכשיו · מסירת מצב רפואי לפינוי נרשמה',
     warn:false,
@@ -6546,11 +6716,7 @@ function handoverPatient(id){
     }
   };
   p.events.push(event);
-  try{
-    const outbox=JSON.parse(localStorage.getItem('c5_local_sqlite_outbox')||'[]');
-    outbox.push({local_event_id:`local-${Date.now()}-${uid()}`, local_timestamp:new Date().toISOString(), patient_id:p.id, ...event});
-    localStorage.setItem('c5_local_sqlite_outbox', JSON.stringify(outbox.slice(-500)));
-  }catch(e){}
+  saveLocalEvent({...event, patient_id:p.id});
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   toast('הועבר למד״א · הוסר מהלוח הפעיל');
   goTo('dashboard');
@@ -7832,7 +7998,10 @@ function switchCmdSite(id){
   renderCmdTabs(); renderCmdContent();
 }
 function localOutboxCount(){
-  try{return JSON.parse(localStorage.getItem('c5_local_sqlite_outbox')||'[]').length;}catch(e){return 0;}
+  try{return JSON.parse(localStorage.getItem('c5_local_sqlite_outbox')||'[]').filter(e=>!e.synced).length;}catch(e){return 0;}
+}
+function rejectedOutboxCount(){
+  try{return JSON.parse(localStorage.getItem('c5_local_sqlite_outbox')||'[]').filter(e=>e.syncRejected).length;}catch(e){return 0;}
 }
 function sectorFromLocation(location=''){
   const building=(location.match(/בניין\s*([^,]+)/)||[])[1] || (location.includes('חצר')?'חצר':'לא ידוע');
@@ -8991,6 +9160,9 @@ function saveLocalEvent(event){
     local_timestamp:new Date().toISOString(),
     ...event
   };
+  // Events outside the server's known vocabulary are demo/UI-only — mark synced immediately
+  // so they never sit in the "pending sync" count (see SYNC_ELIGIBLE_EVENT_TYPES).
+  entry.synced=!SYNC_ELIGIBLE_EVENT_TYPES.has(entry.type);
   state.localEvents.push(entry);
   saveActiveRecoveryState(activeScreenId());
   try{
@@ -8999,7 +9171,69 @@ function saveLocalEvent(event){
     outbox.push(entry);
     localStorage.setItem(key, JSON.stringify(outbox.slice(-500)));
   }catch(e){}
+  if(!entry.synced) scheduleSyncPush();
 }
+
+// ── Sync push: outbox → deployed /sync/log Edge Function ──
+// Pull (server → client) and full event-sourced state projection are deliberately out of
+// scope for this pass — see plan doc. This only pushes locally-created events outward.
+let _syncPushTimer=null;
+function scheduleSyncPush(){
+  if(_syncPushTimer) return;
+  _syncPushTimer=setTimeout(()=>{ _syncPushTimer=null; syncPush(); }, 1500);
+}
+function currentIncidentId(){
+  return SITE_TO_INCIDENT_ID.SITE_A;
+}
+async function syncPush(){
+  if(!currentUser) return; // local-demo mode: never touches the network
+  const client=getSupabaseClient();
+  if(!client) return;
+  const key='c5_local_sqlite_outbox';
+  let outbox;
+  try{ outbox=JSON.parse(localStorage.getItem(key)||'[]'); }catch(e){ return; }
+  const pending=outbox.filter(e=>!e.synced && SYNC_ELIGIBLE_EVENT_TYPES.has(e.type));
+  if(!pending.length) return;
+  let sessionResult;
+  try{ sessionResult=await client.auth.getSession(); }catch(e){ return; }
+  const token=sessionResult?.data?.session?.access_token;
+  if(!token) return;
+  let resp;
+  try{
+    resp=await fetch(SYNC_FUNCTION_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({
+        device_id:getDeviceId(),
+        incident_id:currentIncidentId(),
+        events:pending.map(e=>({
+          local_event_id:e.local_event_id,
+          type:e.type,
+          patient_id:e.patient_id||null,
+          local_timestamp:e.local_timestamp,
+          payload_json:e.payload_json||{}
+        }))
+      })
+    });
+  }catch(e){
+    return; // offline/network failure — next scheduled push or saveLocalEvent call retries
+  }
+  if(!resp.ok) return;
+  let result;
+  try{ result=await resp.json(); }catch(e){ return; }
+  const doneIds=new Set([...(result.accepted||[]),...(result.duplicates||[])].map(x=>x.local_event_id));
+  const rejectedIds=new Set((result.rejected||[]).map(x=>x.local_event_id));
+  outbox.forEach(e=>{
+    if(doneIds.has(e.local_event_id)) e.synced=true;
+    if(rejectedIds.has(e.local_event_id)){ e.synced=true; e.syncRejected=true; }
+    // blocked_dependency entries are left as-is (unsynced) for retry on the next push.
+  });
+  try{ localStorage.setItem(key, JSON.stringify(outbox)); }catch(e){}
+  lastSyncAt=Date.now();
+  if(!rejectedIds.size) demoSyncMode='fresh';
+  updateDemoStatus();
+}
+setInterval(()=>{ if(currentUser) syncPush(); }, 45000);
 
 function activeScreenId(){
   const el=document.querySelector('.screen.active');
@@ -9354,6 +9588,7 @@ updateCountDisplay('rr30');
 renderDashboard();
 renderAlerts();
 updateDemoStatus();
+restoreSession(); // async; if a session is already persisted, jumps straight past screen-login
 </script>
 </body>
 </html>

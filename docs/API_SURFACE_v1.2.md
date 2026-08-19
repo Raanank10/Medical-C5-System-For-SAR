@@ -82,12 +82,15 @@ Purpose:
 - quarantine poison events without blocking the rest of the queue
 - return server cursors for pull continuation
 
+## Authentication
+
+Deployed as a Supabase Edge Function at `/functions/v1/sync-log`, routed by HTTP method (`POST` = push, `GET` = pull). Requires `Authorization: Bearer <user JWT>` from a real Supabase Auth session — not a service-role key. The server looks up the caller's `profiles.role`/`is_active` from the JWT itself; it does **not** accept a client-supplied `actor_id` or `actor_role` — any such fields in the request body are ignored.
+
 ## Request
 
 ```json
 {
   "device_id": "device-cohen",
-  "actor_id": "00000000-0000-0000-0000-000000000001",
   "incident_id": "10000000-0000-0000-0000-000000000001",
   "last_known_server_cursor": 1842,
   "events": [
@@ -95,7 +98,6 @@ Purpose:
       "local_event_id": "local-evt-001",
       "type": "VITALS_RECORDED",
       "patient_id": "30000000-0000-0000-0000-000000000001",
-      "actor_role": "medic",
       "local_timestamp": "2026-05-13T10:35:00Z",
       "payload_json": {
         "heart_rate": {
@@ -242,14 +244,12 @@ Example payload:
 ```json
 {
   "device_id": "device-cohen",
-  "actor_id": "00000000-0000-0000-0000-000000000001",
   "incident_id": "10000000-0000-0000-0000-000000000001",
   "events": [
     {
       "local_event_id": "evt-mstart-mist-8812",
       "type": "PATIENT_HANDED_OVER",
       "patient_id": "30000000-0000-0000-0000-000000000099",
-      "actor_role": "medic",
       "local_timestamp": "2026-05-19T21:30:15.123Z",
       "payload_json": {
         "handover_method": "secure_qr_token",
@@ -523,7 +523,6 @@ The sync endpoint processes events individually, but not blindly. Events may dec
 ```json
 {
   "device_id": "demo-device-cohen",
-  "actor_id": "00000000-0000-0000-0000-000000000001",
   "battery_percent": 78,
   "power_mode": "normal",
   "last_pull_cursor": 12345,
