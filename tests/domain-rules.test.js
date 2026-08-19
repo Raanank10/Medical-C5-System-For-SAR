@@ -121,4 +121,25 @@ assert.deepEqual(
   ["⬇ SpO₂ 98→92%", "⬇ AVPU A→P", "⚡ דופק 100→70"],
 );
 
+// FINAL_PATIENT_STATUSES / canChangePatientStatus: once a patient reaches deceased,
+// handed_over, evacuated, closed, or self_evacuated, mutation sites (handover, manual
+// triage override, sweep color override) must refuse to overwrite them. "evacuating" is
+// deliberately not final - a patient waiting at the company collection point under the
+// platoon commander's supervision must still be able to reach handed_over.
+assert.equal(rules.isFinalPatientStatus("deceased"), true);
+assert.equal(rules.isFinalPatientStatus("handed_over"), true);
+assert.equal(rules.isFinalPatientStatus("evacuated"), true);
+assert.equal(rules.isFinalPatientStatus("closed"), true);
+assert.equal(rules.isFinalPatientStatus("self_evacuated"), true);
+assert.equal(rules.isFinalPatientStatus("evacuating"), false);
+assert.equal(rules.isFinalPatientStatus("stabilizing"), false);
+assert.equal(rules.isFinalPatientStatus(undefined), false);
+
+assert.equal(rules.canChangePatientStatus(patient({ patientStatus: "observing" })), true);
+assert.equal(rules.canChangePatientStatus(patient({ patientStatus: "evacuating" })), true);
+assert.equal(rules.canChangePatientStatus(patient({ patientStatus: "deceased" })), false);
+assert.equal(rules.canChangePatientStatus(patient({ patientStatus: "handed_over" })), false);
+assert.equal(rules.canChangePatientStatus(patient({ patientStatus: "evacuated" })), false);
+assert.equal(rules.canChangePatientStatus(null), true);
+
 console.log("Domain rule tests passed.");
