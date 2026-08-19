@@ -166,16 +166,45 @@
     return !!(patient && (patient.alert || (patient.deterioration && patient.deterioration.length)));
   }
 
+  // Statuses a patient's record must not be silently overwritten out of once reached.
+  // Deliberately excludes "evacuating": a patient who has left the site for the company
+  // collection point is still under the platoon commander's supervision awaiting final
+  // handover to MDA, so status must still be able to advance from there to "handed_over".
+  const FINAL_PATIENT_STATUSES = new Set([
+    "closed",
+    "deceased",
+    "evacuated",
+    "handed_over",
+    "self_evacuated",
+  ]);
+
+  function isFinalPatientStatus(status) {
+    return FINAL_PATIENT_STATUSES.has(status);
+  }
+
+  // Guard for anything that mutates an already-saved patient's triage/status/handover
+  // fields (handover, manual triage override, sweep color override, life-saving-treatment
+  // logging). Once a patient is in a final status, those actions must no-op rather than
+  // silently overwrite it. The one sanctioned exception (undoing a suspected-not-salvageable
+  // black call) is deliberately not routed through this guard - it checks its own
+  // narrower condition instead.
+  function canChangePatientStatus(patient) {
+    return !isFinalPatientStatus(patient?.patientStatus);
+  }
+
   return {
     AVPU_RANK,
+    FINAL_PATIENT_STATUSES,
     TOURNIQUET_CRITICAL_MS,
     TOURNIQUET_WARN_MS,
     VITALS_INTERVAL_MS,
     WARN_AT_MS,
+    canChangePatientStatus,
     computeMstartTriage,
     detectDeterioration,
     elapsedMinutes,
     isCriticalAlert,
+    isFinalPatientStatus,
     isHighRiskDose,
     isPediatricPatient,
     isRoutineAlert,
