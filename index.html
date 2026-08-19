@@ -546,11 +546,35 @@ textarea{resize:vertical;min-height:70px;}
     <input type="password" id="login-password" placeholder="סיסמה" style="margin-bottom:10px" autocomplete="current-password" onkeydown="if(event.key==='Enter') attemptLogin()">
     <div class="login-error" id="login-error"></div>
     <button class="btn-primary" id="login-submit-btn" onclick="attemptLogin()">התחבר</button>
+    <button class="demo-mini-btn" style="margin-top:10px;width:100%" onclick="requestPasswordReset()">שכחתי סיסמה</button>
   </div>
   <div class="demo-panel" style="margin:16px">
     <div class="demo-strip-title">מצב דמו מקומי</div>
     <div class="demo-strip-sub" style="margin-bottom:12px">המשך ללא התחברות — עובד גם ללא אינטרנט, אך נתונים לא יסונכרנו לשרת.</div>
     <button class="demo-mini-btn" onclick="goTo('demo')">המשך כדמו מקומי (ללא Sync)</button>
+  </div>
+</div>
+
+<!-- ══════════════════════ SET PASSWORD (invite / recovery) ══ -->
+<div id="screen-set-password" class="screen">
+  <div class="header">
+    <div class="header-left">
+      <div class="header-subtitle">C5 SENTINEL-SAR // AUTH</div>
+      <div class="header-title" id="set-password-title">קביעת סיסמה</div>
+    </div>
+  </div>
+  <div class="demo-panel" id="set-password-panel" style="margin:16px">
+    <div class="demo-strip-title">השלמת הצטרפות</div>
+    <div class="demo-strip-sub" id="set-password-account-sub" style="margin-bottom:12px"></div>
+    <input type="password" id="set-password-new" placeholder="סיסמה חדשה (לפחות 6 תווים)" style="margin-bottom:10px" autocomplete="new-password">
+    <input type="password" id="set-password-confirm" placeholder="אימות סיסמה" style="margin-bottom:10px" autocomplete="new-password" onkeydown="if(event.key==='Enter') attemptSetPassword()">
+    <div class="login-error" id="set-password-error"></div>
+    <button class="btn-primary" id="set-password-submit-btn" onclick="attemptSetPassword()">שמור סיסמה והמשך</button>
+  </div>
+  <div class="demo-panel" id="set-password-expired-panel" style="margin:16px;display:none">
+    <div class="demo-strip-title">הקישור פג תוקף או כבר נוצל</div>
+    <div class="demo-strip-sub" style="margin-bottom:12px">בקש/י קישור הזמנה או איפוס סיסמה חדש מהמנהל שלך.</div>
+    <button class="demo-mini-btn" onclick="goTo('login')">חזרה למסך התחברות</button>
   </div>
 </div>
 
@@ -2209,6 +2233,36 @@ textarea{resize:vertical;min-height:70px;}
 const C5Rules = window.C5DomainRules;
 if(!C5Rules) throw new Error('C5 domain rules failed to load');
 
+// ── Invite/recovery link detection ──
+// Must run here, before getSupabaseClient()/createClient() is ever called (that only happens
+// inside restoreSession(), invoked from the INIT block at the very end of this file, or on user
+// action via attemptLogin()/requestPasswordReset()) — supabase-js's detectSessionInUrl consumes
+// and clears the #access_token hash on its own schedule once the client exists, so this signal
+// must be captured independently and early, not read lazily later.
+const AUTH_LINK_SIGNAL = captureAuthLinkSignal();
+function captureAuthLinkSignal(){
+  try{
+    const hash = window.location.hash.length>1 ? new URLSearchParams(window.location.hash.slice(1)) : null;
+    const search = window.location.search.length>1 ? new URLSearchParams(window.location.search.slice(1)) : null;
+    const hashType = hash?.get('type');
+    const searchType = search?.get('type');
+    // Custom/PKCE-style template: ?token_hash=...&type=invite|recovery, no session established yet.
+    if(search?.get('token_hash') && (searchType==='invite' || searchType==='recovery')){
+      return {mode:'pkce', type:searchType, tokenHash:search.get('token_hash')};
+    }
+    // Default template: GoTrue's own /verify endpoint already redirected here with a live
+    // session in the hash (supabase-js auto-detects and establishes it).
+    if(hash?.get('access_token') && (hashType==='invite' || hashType==='recovery')){
+      return {mode:'implicit', type:hashType};
+    }
+    // Expired/already-used link: GoTrue redirects with #error=...&error_code=otp_expired&... instead.
+    if(hash?.get('error')){
+      return {mode:'error', type: hashType || 'invite', errorCode: hash.get('error_code')||hash.get('error')};
+    }
+  }catch(e){}
+  return null;
+}
+
 // V2.993 field-flow map:
 // Transit: medic enters site/zone/ETA and initial evacuated counts while moving to the incident.
 // MSTART sprint: current zone -> binary life-saving triage -> save casualty -> next casualty in same zone.
@@ -2615,6 +2669,14 @@ function getSupabaseClient(){
   _supabaseClient=window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth:{persistSession:true, autoRefreshToken:true}
   });
+  // Secondary safety net only — primary invite/recovery detection is AUTH_LINK_SIGNAL, captured
+  // synchronously at load before this client ever existed. This event is documented as
+  // unreliable (ordering issues, doesn't always fire), so it must never be the sole detector.
+  _supabaseClient.auth.onAuthStateChange((event, session)=>{
+    if(event==='PASSWORD_RECOVERY' && session && !document.getElementById('screen-set-password')?.classList.contains('active')){
+      enterSetPasswordFlow(_supabaseClient, session, 'recovery');
+    }
+  });
   return _supabaseClient;
 }
 function showLoginError(msg){
@@ -2685,10 +2747,42 @@ async function signOut(){
 async function restoreSession(){
   const client=getSupabaseClient();
   if(!client) return;
+
+  // Link already failed server-side before any session existed (expired/reused token).
+  if(AUTH_LINK_SIGNAL?.mode==='error'){
+    setSetPasswordTitle(AUTH_LINK_SIGNAL.type);
+    goTo('set-password');
+    showSetPasswordExpired();
+    return;
+  }
+
+  // Custom/PKCE-style link — exchange token_hash for a session ourselves.
+  if(AUTH_LINK_SIGNAL?.mode==='pkce'){
+    let otpResult;
+    try{ otpResult=await client.auth.verifyOtp({token_hash:AUTH_LINK_SIGNAL.tokenHash, type:AUTH_LINK_SIGNAL.type}); }
+    catch(e){ otpResult={error:e}; }
+    if(otpResult.error || !otpResult.data?.session){
+      setSetPasswordTitle(AUTH_LINK_SIGNAL.type);
+      goTo('set-password');
+      showSetPasswordExpired();
+      return;
+    }
+    await enterSetPasswordFlow(client, otpResult.data.session, AUTH_LINK_SIGNAL.type);
+    return;
+  }
+
   let sessionResult;
   try{ sessionResult=await client.auth.getSession(); }catch(e){ return; }
   const session=sessionResult?.data?.session;
   if(!session) return;
+
+  // Default-template invite/recovery — supabase-js already auto-established this session from
+  // the #access_token hash. Route to set-password instead of straight into the dashboard.
+  if(AUTH_LINK_SIGNAL?.mode==='implicit'){
+    await enterSetPasswordFlow(client, session, AUTH_LINK_SIGNAL.type);
+    return;
+  }
+
   await loadProfileAndEnter(client, session.user.id);
 }
 function renderAuthStatus(){
@@ -2701,6 +2795,75 @@ function renderAuthStatus(){
   }else{
     strip.style.display='none';
   }
+}
+
+// ── Invite / recovery: complete account setup by setting a real password ──
+function setSetPasswordTitle(type){
+  const el=document.getElementById('set-password-title');
+  if(el) el.textContent = type==='recovery' ? 'איפוס סיסמה' : 'קביעת סיסמה — השלמת הצטרפות';
+}
+function showSetPasswordError(msg){
+  const el=document.getElementById('set-password-error');
+  if(el) el.textContent = msg||'';
+}
+function setSetPasswordBusy(busy){
+  const btn=document.getElementById('set-password-submit-btn');
+  if(btn){ btn.disabled=busy; btn.textContent = busy?'שומר...':'שמור סיסמה והמשך'; }
+}
+function showSetPasswordExpired(){
+  const panel=document.getElementById('set-password-panel');
+  if(panel) panel.style.display='none';
+  const expired=document.getElementById('set-password-expired-panel');
+  if(expired) expired.style.display='';
+}
+function describePendingAccount(profile, email){
+  const el=document.getElementById('set-password-account-sub');
+  if(!el) return;
+  const roleLabel = profile ? (ROLE_LABELS[mapServerRole(profile.role)]||profile.role) : '';
+  el.textContent = profile
+    ? `החשבון עבור ${email} מוגדר בתפקיד ${roleLabel}. קבע/י סיסמה כדי להשלים את הכניסה.`
+    : `החשבון עבור ${email} מוכן. קבע/י סיסמה כדי להשלים את הכניסה.`;
+}
+// Trimmed-down profile lookup — shows "who is this for" WITHOUT calling enterAuthenticatedRole()/
+// startRoleDashboard(). Deliberately doesn't reuse loadProfileAndEnter() as-is, since that
+// function's whole job is to fully enter the app — which must not happen before password is set.
+async function enterSetPasswordFlow(client, session, type){
+  setSetPasswordTitle(type);
+  goTo('set-password');
+  let profileResult=null;
+  try{ profileResult=await client.from('profiles').select('role,is_active').eq('id', session.user.id).single(); }catch(e){}
+  describePendingAccount(profileResult?.data||null, session.user.email||'');
+}
+async function attemptSetPassword(){
+  const pw=document.getElementById('set-password-new')?.value||'';
+  const confirmPw=document.getElementById('set-password-confirm')?.value||'';
+  showSetPasswordError('');
+  if(pw.length<6){ showSetPasswordError('הסיסמה חייבת להכיל לפחות 6 תווים'); return; }
+  if(pw!==confirmPw){ showSetPasswordError('הסיסמאות אינן תואמות'); return; }
+  const client=getSupabaseClient();
+  if(!client){ showSetPasswordError('שירות ההתחברות לא זמין כרגע (בדוק חיבור אינטרנט)'); return; }
+  setSetPasswordBusy(true);
+  let result;
+  try{ result=await client.auth.updateUser({password:pw}); }
+  catch(e){ setSetPasswordBusy(false); showSetPasswordError('שגיאת רשת בשמירת הסיסמה'); return; }
+  setSetPasswordBusy(false);
+  if(result.error || !result.data?.user){
+    showSetPasswordError('שמירת הסיסמה נכשלה — ייתכן שהקישור פג תוקף. בקש/י קישור חדש מהמנהל שלך.');
+    return;
+  }
+  const ok=await loadProfileAndEnter(client, result.data.user.id);
+  if(!ok) showSetPasswordError('הסיסמה נשמרה, אך אין פרופיל פעיל במערכת. פנה/י למנהל המערכת.');
+}
+async function requestPasswordReset(){
+  const email=(document.getElementById('login-email')?.value||'').trim();
+  if(!email){ showLoginError('הזן/י אימייל לפני בקשת איפוס סיסמה'); return; }
+  const client=getSupabaseClient();
+  if(!client){ showLoginError('שירות ההתחברות לא זמין כרגע'); return; }
+  showLoginError('שולח קישור לאיפוס סיסמה...');
+  try{
+    const {error}=await client.auth.resetPasswordForEmail(email);
+    showLoginError(error ? 'שליחת הקישור נכשלה — נסה/י שוב' : 'אם קיים חשבון עם כתובת זו, נשלח אליו קישור לאיפוס סיסמה');
+  }catch(e){ showLoginError('שגיאת רשת בשליחת הקישור'); }
 }
 
 // ═══════════════════════════════════════════════
