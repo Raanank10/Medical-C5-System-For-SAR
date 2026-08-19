@@ -59,6 +59,12 @@ const CLINICAL_EVENTS = [
   "AIRWAY_MANAGED", "HIGH_RISK_OVERRIDE_CONFIRMED",
 ];
 const FIRST_RESPONDER_EVENTS = ["FIRST_RESPONDER_REPORT"];
+// Event types that create a new patients row on first sight (idempotent — see handlePush).
+// FIRST_RESPONDER_REPORT is included because it's rpc/rcc's only patient-creating event type;
+// they're never allowed to write PATIENT_CREATED/QUICK_PATIENT_CREATED (see
+// ROLE_ALLOWED_EVENT_TYPES below), so without this they could never create a patient at all
+// despite patients_insert RLS explicitly granting them that.
+const PATIENT_CREATE_EVENT_TYPES = ["PATIENT_CREATED", "QUICK_PATIENT_CREATED", "FIRST_RESPONDER_REPORT"];
 const SITE_AUTHORITY_EVENTS = [
   "OFFICIAL_INCIDENT_OPENED_BY_RESCUE", "INCIDENT_CLOSE_TOGGLED",
   "BUILDING_STATUS_UPDATED", "SITE_CLEAR_CONFIRMED",
@@ -252,6 +258,38 @@ async function handlePush(
         });
         await quarantine(evt, "BLOCKED_DEPENDENCY", `Depends on ${blocked.device_id}/${blocked.local_event_id}, not present.`, blocked);
         continue;
+      }
+    }
+
+    // events.patient_id is a uuid FK to patients(id), enforced immediately (not deferred) - if
+    // this event is one of the ones that's supposed to create a patient, the row must exist
+    // BEFORE the events insert below, or the FK fails. Runs via userClient (never serviceClient)
+    // so the real patients_insert RLS policy is what actually gates this, not duplicated logic
+    // here - matches this file's existing pattern for the events insert itself.
+    if (PATIENT_CREATE_EVENT_TYPES.includes(type) && patient_id) {
+      const visualId = (payload_json?.visual_id as string | undefined)
+        ?? (payload_json?.visualId as string | undefined)
+        ?? local_event_id;
+      const { error: patientErr } = await userClient.from("patients").insert({
+        id: patient_id,
+        incident_id: incident_id ?? null,
+        visual_id: visualId,
+        // No real injury-time capture client-side yet - falling back to this event's own
+        // timestamp is a known, documented gap (see docs/API_SURFACE_v1.2.md), not a silent one.
+        t_injury: local_timestamp,
+        created_by: callerId,
+      });
+      // 23505 = unique violation - same patient_id (or incident_id+visual_id) already created,
+      // e.g. a retried push. Treat as idempotent success, not an error.
+      if (patientErr && patientErr.code !== "23505") {
+        rejected.push({
+          local_event_id,
+          terminal: false,
+          error_code: "PATIENT_CREATE_FAILED",
+          message: patientErr.message,
+        });
+        await quarantine(evt, "PATIENT_CREATE_FAILED", patientErr.message);
+        continue; // skip this event's insert below - the FK would fail anyway
       }
     }
 
