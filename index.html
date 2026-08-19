@@ -528,7 +528,10 @@ textarea{resize:vertical;min-height:70px;}
 <button id="global-home-btn" class="home-btn" onclick="goHome()">ראשי</button>
 <div id="auth-status-strip" class="auth-status-strip">
   <span class="auth-status-text"></span>
-  <button onclick="signOut()">התנתק</button>
+  <div style="display:flex;gap:6px">
+    <button onclick="openFeedbackModal()">🐞 דווח על תקלה</button>
+    <button onclick="signOut()">התנתק</button>
+  </div>
 </div>
 
 <!-- ══════════════════════ LOGIN ══ -->
@@ -2038,6 +2041,21 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 
+<div id="feedback-modal" class="modal-overlay hidden" onclick="if(event.target===this) closeFeedbackModal()">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🐞 דיווח על תקלה</div>
+    <div class="modal-sub">התיאור מגיע ישירות לצוות הפיתוח. זו מערכת הדגמה — נא לא לתאר פרטי מטופלים אמיתיים.</div>
+    <label style="font-size:13px;font-weight:700;display:block;margin:10px 0 6px">מה קרה?</label>
+    <textarea id="feedback-summary" placeholder="לדוגמה: לחצתי על &quot;שמור&quot; במסך הוספת פצוע וכלום לא קרה"></textarea>
+    <label style="font-size:13px;font-weight:700;display:block;margin:14px 0 6px">למה ציפית שיקרה? (רשות)</label>
+    <textarea id="feedback-expected" placeholder="לדוגמה: ציפיתי שהפצוע יופיע ברשימה"></textarea>
+    <div id="feedback-error" class="login-error"></div>
+    <button id="feedback-submit-btn" class="btn-primary" style="margin-top:8px" onclick="submitFeedbackReport()">שלח דיווח</button>
+    <button class="btn-secondary" style="margin-top:8px" onclick="closeFeedbackModal()">ביטול</button>
+  </div>
+</div>
+
 <script>
 (function initDomainRules(root, factory) {
   root.C5DomainRules = factory();
@@ -2824,6 +2842,53 @@ function renderAuthStatus(){
   }else{
     strip.style.display='none';
   }
+}
+
+// ── In-app bug/feedback reporting — for testers with no GitHub account ──
+function openFeedbackModal(){
+  if(!currentUser){ toast('יש להתחבר כדי לדווח על תקלה'); return; }
+  const summaryEl=document.getElementById('feedback-summary');
+  const expectedEl=document.getElementById('feedback-expected');
+  const errorEl=document.getElementById('feedback-error');
+  if(summaryEl) summaryEl.value='';
+  if(expectedEl) expectedEl.value='';
+  if(errorEl) errorEl.textContent='';
+  document.getElementById('feedback-modal')?.classList.remove('hidden');
+}
+function closeFeedbackModal(){
+  document.getElementById('feedback-modal')?.classList.add('hidden');
+}
+async function submitFeedbackReport(){
+  const summary=(document.getElementById('feedback-summary')?.value||'').trim();
+  const expected=(document.getElementById('feedback-expected')?.value||'').trim();
+  const errorEl=document.getElementById('feedback-error');
+  if(errorEl) errorEl.textContent='';
+  if(!summary){ if(errorEl) errorEl.textContent='נא לתאר מה קרה'; return; }
+  const client=getSupabaseClient();
+  if(!client || !currentUser){ if(errorEl) errorEl.textContent='שירות הדיווח לא זמין כרגע (בדוק חיבור אינטרנט)'; return; }
+  const btn=document.getElementById('feedback-submit-btn');
+  if(btn){ btn.disabled=true; btn.textContent='שולח...'; }
+  const screen=document.querySelector('.screen.active')?.id?.replace('screen-','') || activeRoleDashboard || 'unknown';
+  let result;
+  try{
+    result=await client.from('tester_feedback_reports').insert({
+      reporter_id:currentUser.id,
+      reporter_role:currentUser.role,
+      reporter_display_name:currentUser.email,
+      screen,
+      summary,
+      expected:expected||null,
+      device_info:navigator.userAgent,
+      app_version:APP_VERSION
+    });
+  }catch(e){ result={error:e}; }
+  if(btn){ btn.disabled=false; btn.textContent='שלח דיווח'; }
+  if(result.error){
+    if(errorEl) errorEl.textContent='שליחת הדיווח נכשלה — נסה/י שוב';
+    return;
+  }
+  closeFeedbackModal();
+  toast('תודה! הדיווח נשלח לצוות הפיתוח');
 }
 
 // ── Invite / recovery: complete account setup by setting a real password ──
