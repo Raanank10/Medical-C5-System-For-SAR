@@ -375,6 +375,10 @@ Rules:
 }
 ```
 
+## Client cursor behavior
+
+The web client persists `since_cursor` per-incident in `localStorage` (`c5_sync_cursor_<incidentId>`), not globally — `sync_cursor` is a single shared sequence across all incidents server-side, but each incident's "how far this device has pulled" is tracked separately. A successful push also advances the stored cursor from the response's `next_pull_cursor`, so a device doesn't immediately re-pull events it just pushed itself. Pull runs on a 45s interval plus opportunistically right after a successful push, paginating via `has_more`/`next_cursor` until exhausted. Events whose `device_id` matches the pulling device are filtered out of the client's pulled-event feed (they're already represented locally via the outbox) — this is a client-side display choice, not a server-side filter.
+
 ---
 
 # 4. Immediate Sync Triggers
@@ -518,6 +522,10 @@ Direct table access is scoped by `incident_memberships`. Mobile clients should n
 
 The sync endpoint processes events individually, but not blindly. Events may declare dependencies.
 
+### Patient row creation
+
+`PATIENT_CREATED`, `QUICK_PATIENT_CREATED`, and `FIRST_RESPONDER_REPORT` (rpc/rcc's only patient-creating event type — they're never allowed to write the other two) create the `patients` row on first sight, keyed by the event's top-level `patient_id` (must be a real UUID, generated client-side) and `payload_json.visual_id` (the human-readable display id, e.g. `P-004`). This runs via the caller's own JWT, so the `patients_insert` RLS policy is the real gate, not duplicated logic in the function. A retried push with the same `patient_id` is idempotent (treated as success, not an error). `t_injury` (required by the schema) currently falls back to the event's own `local_timestamp` — there's no real injury-time capture client-side yet; this is a known, deliberate gap, not a silent one. Any event referencing a `patient_id` before its creating event has been accepted will fail its foreign key and land in `sync_ingestion_errors` like any other malformed event.
+
 ### Request envelope
 
 ```json
@@ -531,6 +539,7 @@ The sync endpoint processes events individually, but not blindly. Events may dec
       "local_event_id": "evt-001",
       "type": "PATIENT_CREATED",
       "incident_id": "10000000-0000-0000-0000-000000000001",
+      "patient_id": "30000000-0000-0000-0000-000000000099",
       "local_timestamp": "2026-05-13T10:00:00Z",
       "payload_json": { "visual_id": "P-004" },
       "depends_on": []

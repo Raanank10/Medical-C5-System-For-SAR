@@ -2280,6 +2280,11 @@ const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
 const CONFLICT_LOG_KEY = 'c5-sentinel-sar-conflict-log-v1';
 const ACTIVE_RECOVERY_KEY = 'c5_active_recovery_state';
 const DEVICE_ID_KEY = 'c5-sentinel-sar-device-id';
+// Pull cursor, persisted per-incident (sync_cursor is a shared, strictly-increasing sequence
+// across all incidents server-side, but each incident's "how far have I pulled" is separate).
+function pullCursorKey(incidentId){ return `c5_sync_cursor_${incidentId}`; }
+function getPullCursor(incidentId){ return Number(localStorage.getItem(pullCursorKey(incidentId))||'0'); }
+function setPullCursor(incidentId, cursor){ try{ localStorage.setItem(pullCursorKey(incidentId), String(cursor)); }catch(e){} }
 // ── Supabase / sync config ──
 const SUPABASE_URL = 'https://btvvjmuwdzirjyauyijx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dnZqbXV3ZHppcmp5YXV5aWp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxMTYzNjUsImV4cCI6MjEwMjY5MjM2NX0.bKWklZKs8xEtMqXUvNBDEn0AIPOps0N1ycjc9idLAVE';
@@ -2522,6 +2527,17 @@ const BODY_ZONE_LABELS = {
 
 function nowT(){ const n=new Date(); return n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0'); }
 function uid(){ return Math.random().toString(36).slice(2,7); }
+// Real UUID for anything that must match server-side patients.id (uuid PK). getRandomValues
+// has no secure-context requirement, unlike crypto.randomUUID(), so it's kept as a fallback.
+function newUuid(){
+  if(window.crypto && typeof crypto.randomUUID==='function') return crypto.randomUUID();
+  const b=crypto.getRandomValues(new Uint8Array(16));
+  b[6]=(b[6]&0x0f)|0x40; b[8]=(b[8]&0x3f)|0x80;
+  const h=[...b].map(x=>x.toString(16).padStart(2,'0'));
+  return `${h.slice(0,4).join('')}-${h.slice(4,6).join('')}-${h.slice(6,8).join('')}-${h.slice(8,10).join('')}-${h.slice(10,16).join('')}`;
+}
+// Human-readable display id (server's patients.visual_id). Distinct from the real UUID p.id.
+function nextVisualId(){ return 'P'+String(patients.length+1).padStart(3,'0'); }
 function triageKey(value){ return TRIAGE_LABELS[value] ? value : 'pending'; }
 function triagePill(value){
   const key=triageKey(value);
@@ -2727,6 +2743,7 @@ async function loadProfileAndEnter(client, userId){
   renderAuthStatus();
   enterAuthenticatedRole(profile.role);
   scheduleSyncPush();
+  syncPullAll(); // don't wait for the 45s interval on a fresh login with an empty outbox
   return true;
 }
 function enterAuthenticatedRole(serverRole){
@@ -3104,7 +3121,7 @@ function minutesSinceIso(value){
 function displayPatientIdentity(p){
   const status=p.identityStatus==='confirmed'?'שם מאומת':p.identityStatus==='reported'?'שם מדווח':'לא מזוהה';
   const name=p.fullName&&p.fullName!=='לא מזוהה'?p.fullName:'לא מזוהה';
-  return `${p.id} — ${name} · ${status}`;
+  return `${p.visualId||p.id} — ${name} · ${status}`;
 }
 // Rescue-chain (rpc/rcc) redacted view: tag + callsign only. Never route fullName,
 // vitals, txHistory, or temporaryDescription/locDetail (mechanism narrative) through here.
@@ -3117,7 +3134,7 @@ function tacticalPatientRow(p){
   const evac=STATUS_LABELS[p.patientStatus]||p.patientStatus||'—';
   const medic=medicCallsign(p.assignedMedicId||userIdFromMedic(p.medic||p.lastTouchedBy));
   return roleRow(
-    `${p.id} · ${TRIAGE_LABELS[p.triage]||p.triage}`,
+    `${p.visualId||p.id} · ${TRIAGE_LABELS[p.triage]||p.triage}`,
     `${p.location||'אזור לא תועד'} · ${trap} · ${evac} · ${p.time||''} מהאיתור`,
     `<span class="identity-chip">חובש אחראי: ${medic}</span>`
   );
@@ -4027,7 +4044,7 @@ const DecisionSupportEngine=(()=>{
           id:`REC_PATIENT_DETERIORATION_${p.id}`,
           category:'Patient Deterioration',
           priority:p.triage==='red'?'CRITICAL':'HIGH',
-          title:`${p.id} דורש הערכה חוזרת`,
+          title:`${p.visualId||p.id} דורש הערכה חוזרת`,
           explanation:`${p.triage==='red'?'פצוע אדום':TRIAGE_LABELS[p.triage]||'פצוע'} ${stale?`לא הוערך ${ageMin} דקות`:''}${deteriorating?` · הידרדרות: ${(p.deterioration||[]).join(' / ')}`:''}`,
           suggestedAction:'מדדים חוזרים עכשיו, בדיקת התערבויות קריטיות והחלטת פינוי',
           responsibleRole:'PC',
@@ -4042,7 +4059,7 @@ const DecisionSupportEngine=(()=>{
           id:`REC_PATIENT_EVAC_REVIEW_${p.id}`,
           category:'Patient Deterioration',
           priority:'HIGH',
-          title:`${p.id} אדום ללא פינוי סגור`,
+          title:`${p.visualId||p.id} אדום ללא פינוי סגור`,
           explanation:'פצוע אדום נשאר בטיפול/מעקב ללא סטטוס פינוי סגור.',
           suggestedAction:'בדוק יעד פינוי, בקש פינוי או הסלם לחפ״ק/גורם פינוי',
           responsibleRole:'PC',
@@ -4069,7 +4086,7 @@ const DecisionSupportEngine=(()=>{
           id:`REC_TQ_OVERDUE_${p.id}`,
           category:'Tourniquet Management',
           priority:longestMin>=60?'CRITICAL':'HIGH',
-          title:`${p.id} חסם פעיל ${longestMin} דקות`,
+          title:`${p.visualId||p.id} חסם פעיל ${longestMin} דקות`,
           explanation:`חסם x${tqs.length} · הארוך ${longestMin} דק׳${limbMissing?' · חסרה גפה מתועדת':''}.`,
           suggestedAction:'בדוק חסם, מדדים מלאים ופינוי/פראמדיק',
           responsibleRole:'PC',
@@ -4084,7 +4101,7 @@ const DecisionSupportEngine=(()=>{
           id:`REC_TQ_BLEEDING_CONTINUES_${p.id}`,
           category:'Tourniquet Management',
           priority:'CRITICAL',
-          title:`${p.id} דימום ממשיך אחרי חסם`,
+          title:`${p.visualId||p.id} דימום ממשיך אחרי חסם`,
           explanation:`${ineffective.length||1} חסם לא יעיל/דימום ממשיך · נדרש מעקב חוג״ד.`,
           suggestedAction:'בדוק דימום, שקול חסם נוסף/פראמדיק/פינוי דחוף',
           responsibleRole:'PC',
@@ -4099,7 +4116,7 @@ const DecisionSupportEngine=(()=>{
           id:`REC_TQ_DOC_GAP_${p.id}`,
           category:'Tourniquet Management',
           priority:'MEDIUM',
-          title:`${p.id} חסר תיעוד גפת חסם`,
+          title:`${p.visualId||p.id} חסר תיעוד גפת חסם`,
           explanation:'החסם פעיל אבל מיקום הגפה לא הושלם.',
           suggestedAction:'השלים גפה כשאפשר בלי לעכב טיפול',
           responsibleRole:'Medic',
@@ -4441,7 +4458,7 @@ function renderDedicatedPcCommandBoard(myPts){
   const stale=myPts.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS);
   const alertStrip=activeAlerts.length ? activeAlerts.map(p=>`
     <div class="alert-banner ${triageKey(p.triage)}" style="border-color:var(--${triageKey(p.triage)==='black'?'muted':triageKey(p.triage)});margin:6px 0">
-      <span style="font-family:var(--mono);font-weight:900">${p.id}</span>
+      <span style="font-family:var(--mono);font-weight:900">${p.visualId||p.id}</span>
       <div style="flex:1">${triagePill(p.triage)}<div class="alert-banner-sub">${(p.deterioration||[]).join(' · ') || p.injury || 'התראה פעילה'}</div></div>
       <button class="ack-btn" onclick="acknowledgeAlert('${p.id}')">בטיפול</button>
     </div>`).join('') : `<div class="alert-banner muted" style="margin:6px 0;border-color:var(--green)"><span>✓</span><div><div class="alert-banner-title" style="color:var(--green)">אין התראות פעילות כרגע</div></div></div>`;
@@ -4450,13 +4467,13 @@ function renderDedicatedPcCommandBoard(myPts){
     const tqs=activeTourniquets(p);
     const ineffective=tqs.filter(t=>t.status==='ineffective' || t.effectiveness==='bleeding_continues').length;
     return `<div class="cmd-row ${triageKey(p.triage)} ${p.alert&&!p.alertAcknowledgedAt?'active-alert':''}" onclick="openPatient('${p.id}')">
-      <div style="font-family:var(--mono);font-weight:900;color:var(--${triageKey(p.triage)==='black'?'muted':triageKey(p.triage)})">${p.id}</div>
+      <div style="font-family:var(--mono);font-weight:900;color:var(--${triageKey(p.triage)==='black'?'muted':triageKey(p.triage)})">${p.visualId||p.id}</div>
       <div><div style="font-weight:800">חסם x${tqs.length} · ${tqs.map(t=>t.limbLabel||tourniquetLimbMeta(t.limb).label).join(' · ')}${ineffective?` · ${ineffective} לא יעיל`:''}</div><div style="margin-top:4px"><span class="tq-timer ${timer?.cls||''}">${timer?.label||'חסם פעיל'}</span></div></div>
       <button class="demo-mini-btn" onclick="event.stopPropagation();openQuickVitals('${p.id}')">עדכן</button>
     </div>`;
   }).join('') : `<div class="cmd-matrix-row"><div class="cmd-matrix-sub">אין חסמי עורקים פעילים</div></div>`;
   const cards=sortedPatients(myPts).map(p=>renderPcPatientTile(p)).join('') || renderOperationalEmptyState('אין פצועים במיקוד הנוכחי');
-  const rhythm=stale.map(p=>`<div class="cmd-matrix-row"><div><div class="cmd-matrix-title">${p.id}</div><div class="cmd-matrix-sub">לא עודכן ${Math.floor(vitalsAgeMs(p)/60000)} דקות</div></div><button class="demo-mini-btn" onclick="remindMedicVitals('${p.id}')">תזכר לחובש</button></div>`).join('') || `<div class="cmd-matrix-row"><div class="cmd-matrix-sub">אין מדדים ישנים כרגע.</div></div>`;
+  const rhythm=stale.map(p=>`<div class="cmd-matrix-row"><div><div class="cmd-matrix-title">${p.visualId||p.id}</div><div class="cmd-matrix-sub">לא עודכן ${Math.floor(vitalsAgeMs(p)/60000)} דקות</div></div><button class="demo-mini-btn" onclick="remindMedicVitals('${p.id}')">תזכר לחובש</button></div>`).join('') || `<div class="cmd-matrix-row"><div class="cmd-matrix-sub">אין מדדים ישנים כרגע.</div></div>`;
   return `
     <div class="stat-grid">
       <div class="stat-card red"><div class="stat-num">${red}</div><div class="stat-label">אדום</div></div>
@@ -4479,7 +4496,7 @@ function renderPcPatientTile(p){
   const triage=triageKey(p.triage);
   const activeAlert=p.alert===true && !p.alertAcknowledgedAt;
   return `<div class="patient-card ${triage} ${activeAlert?'active-alert':''}" onclick="openPatient('${p.id}')">
-    <div class="patient-id">${p.id}</div>
+    <div class="patient-id">${p.visualId||p.id}</div>
     <div class="patient-info">
       ${triageBand(p.triage,p)}
       <div style="font-weight:800">${p.injury||'פגיעה לא צוינה'}</div>
@@ -4500,7 +4517,7 @@ function renderPcAssessmentDebtBoard(){
     ['אין הערכה חוזרת אחרי 10 דק׳', pts.filter(p=>['red','yellow'].includes(p.triage) && needsVitals(p) && vitalsAgeMs(p)>=10*60*1000)],
     ['שימוש בציוד לא אושר', pts.filter(p=>(p.events||[]).some(e=>e.type==='SUPPLY_CONSUMED' && !e.confirmed))],
     ['סריקה הסתיימה, אין שיוך מעקב', pts.filter(p=>p.phase==='mstart_sweep' && p.assessmentDebt?.includes('full_vitals'))]
-  ].map(([label,list])=>roleRow(label,`${list.length} פצועים`, list.slice(0,5).map(p=>`<span class="identity-chip">${p.id} · ${p.zone||p.locDetail||zoneLabel()}</span>`).join(''))).join('');
+  ].map(([label,list])=>roleRow(label,`${list.length} פצועים`, list.slice(0,5).map(p=>`<span class="identity-chip">${p.visualId||p.id} · ${p.zone||p.locDetail||zoneLabel()}</span>`).join(''))).join('');
   return renderCollapsibleSection('pc-assessment-debt','חוב הערכה אחרי סריקה', rows || renderOperationalEmptyState('אין פצועים במיקוד הנוכחי'), pts.length, {criticalCount:pts.filter(p=>p.triage==='red'&&assessmentDebtList(p).includes('full_vitals')).length, emptyMessage:'אין פצועים במיקוד הנוכחי'});
 }
 function renderSweepBoardForPc(){
@@ -4535,12 +4552,12 @@ function pcDrilldownHtml(key){
   if(key==='patients'){
     const rows=['red','yellow','green','black'].map(t=>{
       const pts=myPts.filter(p=>p.triage===t);
-      return roleRow(TRIAGE_LABELS[t],`${pts.length} פצועים`, pts.map(p=>`<span class="identity-chip">${p.id} · ${STATUS_LABELS[p.patientStatus]||''} · ${TRAP_LABELS[normalizeTrapStatus(p)]||'לא תועד'}</span>`).join(''));
+      return roleRow(TRIAGE_LABELS[t],`${pts.length} פצועים`, pts.map(p=>`<span class="identity-chip">${p.visualId||p.id} · ${STATUS_LABELS[p.patientStatus]||''} · ${TRAP_LABELS[normalizeTrapStatus(p)]||'לא תועד'}</span>`).join(''));
     }).join('');
     return roleSection('הפצועים שלי לפי סטטוס', rows);
   }
   if(key==='status'){
-    const rows=myPts.map(p=>roleRow(`${p.id} · ${TRIAGE_LABELS[p.triage]||p.triage}`,`${STATUS_LABELS[p.patientStatus]||''} · ${TRAP_LABELS[normalizeTrapStatus(p)]||'לא תועד'} · ${p.tourniquet?'חסם פעיל':'ללא חסם'} · ${needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS?'מדדים באיחור':'מדדים תקינים/לא נדרשים'}`)).join('');
+    const rows=myPts.map(p=>roleRow(`${p.visualId||p.id} · ${TRIAGE_LABELS[p.triage]||p.triage}`,`${STATUS_LABELS[p.patientStatus]||''} · ${TRAP_LABELS[normalizeTrapStatus(p)]||'לא תועד'} · ${p.tourniquet?'חסם פעיל':'ללא חסם'} · ${needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS?'מדדים באיחור':'מדדים תקינים/לא נדרשים'}`)).join('');
     return roleSection('סטטוס פצועים', rows);
   }
   if(key==='requests'){
@@ -4568,7 +4585,7 @@ function companyEvacuationPriorityRows(pts=patients){
   rows.sort((a,b)=>a.evacRank-b.evacRank || ((b.tqMin||0)-(a.tqMin||0)));
   return rows.slice(0,8).map(p=>{
     const label=p.evacRank===0?'עדיפות עליונה — חסם פחות מ־45 דק׳ לחלון':p.evacRank===1?'עדיפות 1 — חסם פעיל':p.evacRank===2?'עדיפות 2 — אדום הכרה / נשימה':'עדיפות 3 — צהוב מיוצב';
-    return roleRow(`${label} · ${p.id}`,`${p.evacReason} · ${p.location} · ${TRIAGE_LABELS[p.triage]||p.triage}`,`<span class="identity-chip">פעולה: שייך אמבולנס / אשר עיכוב / העבר למוקד פינוי</span>`);
+    return roleRow(`${label} · ${p.visualId||p.id}`,`${p.evacReason} · ${p.location} · ${TRIAGE_LABELS[p.triage]||p.triage}`,`<span class="identity-chip">פעולה: שייך אמבולנס / אשר עיכוב / העבר למוקד פינוי</span>`);
   }).join('');
 }
 function renderDeathCertificationChain(){
@@ -5247,7 +5264,7 @@ function renderDashboard(){
     const triage=triageKey(p.triage);
     const activeAlert=p.alert===true && !p.alertAcknowledgedAt;
     return `<div class="patient-card ${triage} ${activeAlert?'active-alert':''}" onclick="openPatient('${p.id}')">
-      <div class="patient-id">${p.id}</div>
+      <div class="patient-id">${p.visualId||p.id}</div>
       <div class="patient-info">
         ${triageBand(p.triage,p)}
         <div style="font-weight:900">${p.location}${p.locDetail?' · '+p.locDetail:''}</div>
@@ -5530,10 +5547,11 @@ function syncPatientFromSweep(p){
 }
 function startSweepCasualtyMarker(){
   ensureSiteReadiness();
-  const id=createTmpCasualtyId();
+  const visualId=createTmpCasualtyId();
+  const id=newUuid();
   const t=nowT();
   const marker={
-    id,
+    id, visualId,
     siteId:currentSiteId(),
     zone:zoneLabel(),
     phase:'mstart_sweep',
@@ -5570,11 +5588,15 @@ function startSweepCasualtyMarker(){
     lastModifiedAt:new Date().toISOString(),
     confirmedClinical:false,
     unsyncedEvents:1,
-    events:[{type:'CASUALTY_MARKER_CREATED',time:t,detail:`${id} סומן בסריקת MSTART · אזור ${zoneLabel()}`,warn:false}]
+    events:[{type:'CASUALTY_MARKER_CREATED',time:t,detail:`${visualId} סומן בסריקת MSTART · אזור ${zoneLabel()}`,warn:false}]
   };
   patients.unshift(marker);
   activeSweepPatientId=id;
-  saveLocalEvent({type:'CASUALTY_MARKER_CREATED',detail:`${id} · ${zoneLabel()}`,warn:false,payload_json:{patient_id:id,siteId:marker.siteId,zone:marker.zone,phase:'mstart_sweep',assessmentDebt:marker.assessmentDebt}});
+  // QUICK_PATIENT_CREATED is what actually creates the server-side patients row (server-recognized
+  // type; CASUALTY_MARKER_CREATED below is local-UI-only) — must be queued before any later event
+  // that references this patient_id, or those would fail their FK server-side.
+  saveLocalEvent({type:'QUICK_PATIENT_CREATED',detail:`${visualId} נפתח בסריקת MSTART`,warn:false,patient_id:id,payload_json:{visual_id:visualId,siteId:marker.siteId,zone:marker.zone,phase:'mstart_sweep'}});
+  saveLocalEvent({type:'CASUALTY_MARKER_CREATED',detail:`${visualId} · ${zoneLabel()}`,warn:false,patient_id:id,payload_json:{siteId:marker.siteId,zone:marker.zone,phase:'mstart_sweep',assessmentDebt:marker.assessmentDebt}});
   saveDemoState();
   renderMstartSweep();
   if(document.getElementById('screen-commander')?.classList.contains('active')) renderCommander();
@@ -6010,7 +6032,7 @@ function renderMstartSweep(){
   if(!p){
     const rows=sweepPatientsForCurrentZone().slice(0,6).map(x=>`
       <div class="patient-card ${triageKey(x.triage)} ${x.alert&&!x.alertAcknowledgedAt?'active-alert':''}" onclick="activeSweepPatientId='${x.id}';renderMstartSweep()">
-        <div class="patient-id">${x.id}</div>
+        <div class="patient-id">${x.visualId||x.id}</div>
         <div class="patient-info">
           ${triageBand(x.triage,x)}
           <div style="font-weight:800">${x.zone}</div>
@@ -6077,7 +6099,7 @@ function renderMstartSweep(){
   const blackContinuation=m.blackContinuationOpen?`
     <div class="sweep-warning" style="border-color:var(--triage-black-border);background:var(--triage-black-bg)">
       <strong>נפתחה בקשת רופא</strong>
-      <div style="font-size:13px;margin-top:6px">${p.id} סומן כחשד לנפטר / לא בר הצלה. נפתחה בקשה לא דחופה לרופא לקביעת מוות רשמית.</div>
+      <div style="font-size:13px;margin-top:6px">${p.visualId||p.id} סומן כחשד לנפטר / לא בר הצלה. נפתחה בקשה לא דחופה לרופא לקביעת מוות רשמית.</div>
       <div style="font-size:12px;color:#ccc;margin-top:6px">סימון חובש אינו קביעת מוות רשמית.</div>
       <div class="tap-grid tap-grid-2" style="margin-top:10px">
         <button class="tap-btn triage-green" onclick="continueSweepAfterBlack('next')">פצוע הבא</button>
@@ -6107,7 +6129,7 @@ function renderMstartSweep(){
   card.innerHTML=`
     <div class="summary-card" style="border-color:var(--accent)">
       ${triageBand(p.triage,p)}
-      <div class="ticket-id-line">${p.id} · ${TRIAGE_BAND_LABELS[triageKey(p.triage)]||TRIAGE_BAND_LABELS.pending}</div>
+      <div class="ticket-id-line">${p.visualId||p.id} · ${TRIAGE_BAND_LABELS[triageKey(p.triage)]||TRIAGE_BAND_LABELS.pending}</div>
       <div class="ticket-meta-grid">
         <div class="ticket-meta">אזור<strong>${p.zone||zoneLabel()}</strong></div>
         <div class="ticket-meta">שלב<strong>סריקת MSTART</strong></div>
@@ -6210,31 +6232,31 @@ function buildAlertObjects(pts=patients){
     const redOrYellow=['red','yellow'].includes(p.triage);
     if(isCriticalAlert(p)){
       const reason=(p.deterioration&&p.deterioration.length)?p.deterioration.join(' · '):TRIAGE_LABELS[p.triage]||'שינוי קריטי';
-      pushAlert(alerts,{...base,id:`clinical-${p.id}`,type:'CRITICAL_CLINICAL_ACTION',severity:'critical',owner:'medic',audience:['medic','pc'],escalatesTo:'pc',escalateAfterMin:5,actionRequired:'update_vitals',scope:'patient',category:'urgent',title:`${p.id} — הידרדרות / מיון קריטי`,detail:reason});
+      pushAlert(alerts,{...base,id:`clinical-${p.id}`,type:'CRITICAL_CLINICAL_ACTION',severity:'critical',owner:'medic',audience:['medic','pc'],escalatesTo:'pc',escalateAfterMin:5,actionRequired:'update_vitals',scope:'patient',category:'urgent',title:`${p.visualId||p.id} — הידרדרות / מיון קריטי`,detail:reason});
     }
     if(p.triage==='red'){
-      pushAlert(alerts,{...base,id:`pc-red-${p.id}`,type:'RED_CASUALTY_CREATED',severity:'high',owner:'pc',audience:['pc','chamal','cc'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'request_evac',scope:'patient',category:'urgent',title:`${p.id} — פצוע אדום`,detail:`${p.location} · ${p.injury||'פציעה לא צוינה'}`});
+      pushAlert(alerts,{...base,id:`pc-red-${p.id}`,type:'RED_CASUALTY_CREATED',severity:'high',owner:'pc',audience:['pc','chamal','cc'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'request_evac',scope:'patient',category:'urgent',title:`${p.visualId||p.id} — פצוע אדום`,detail:`${p.location} · ${p.injury||'פציעה לא צוינה'}`});
     }
     if(p.triage==='red' && !['evacuating','evacuated','handed_over'].includes(p.patientStatus)){
-      pushAlert(alerts,{...base,id:`evac-${p.id}`,type:'RED_WITHOUT_EVAC_STATUS',severity:'high',owner:'pc',audience:['pc','cc'],escalatesTo:'cc',escalateAfterMin:5,actionRequired:'request_evac',scope:'patient',category:'evac',title:`${p.id} — אדום ללא סטטוס פינוי`,detail:'נדרש תעדוף / הקצאת פינוי או אישור עיכוב'});
+      pushAlert(alerts,{...base,id:`evac-${p.id}`,type:'RED_WITHOUT_EVAC_STATUS',severity:'high',owner:'pc',audience:['pc','cc'],escalatesTo:'cc',escalateAfterMin:5,actionRequired:'request_evac',scope:'patient',category:'evac',title:`${p.visualId||p.id} — אדום ללא סטטוס פינוי`,detail:'נדרש תעדוף / הקצאת פינוי או אישור עיכוב'});
     }
     if(needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS){
-      pushAlert(alerts,{...base,id:`vitals-${p.id}`,type:redOrYellow?'STALE_VITALS_PRIORITY':'STALE_VITALS_GREEN',severity:redOrYellow?'high':'medium',owner:'medic',audience:redOrYellow?['medic','pc']:['medic'],escalatesTo:redOrYellow?'pc':null,escalateAfterMin:redOrYellow?5:null,actionRequired:'update_vitals',scope:'patient',category:redOrYellow?'data':'complete',title:`${p.id} — מדדים באיחור`,detail:`עדכון אחרון: ${timeAgoLabel(p.lastVitalsAt||patientClockStart(p))}`});
+      pushAlert(alerts,{...base,id:`vitals-${p.id}`,type:redOrYellow?'STALE_VITALS_PRIORITY':'STALE_VITALS_GREEN',severity:redOrYellow?'high':'medium',owner:'medic',audience:redOrYellow?['medic','pc']:['medic'],escalatesTo:redOrYellow?'pc':null,escalateAfterMin:redOrYellow?5:null,actionRequired:'update_vitals',scope:'patient',category:redOrYellow?'data':'complete',title:`${p.visualId||p.id} — מדדים באיחור`,detail:`עדכון אחרון: ${timeAgoLabel(p.lastVitalsAt||patientClockStart(p))}`});
     }
     const debt=assessmentDebtForPatient(p).filter(x=>!['pending_handover'].includes(x));
     if(debt.length && p.triage!=='black'){
-      pushAlert(alerts,{...base,id:`debt-${p.id}`,type:'ASSESSMENT_DEBT',severity:redOrYellow?'medium':'low',owner:'medic',audience:redOrYellow?['medic','pc']:['medic'],escalatesTo:redOrYellow?'pc':null,escalateAfterMin:redOrYellow?8:null,actionRequired:'update_vitals',scope:'patient',category:redOrYellow?'data':'complete',title:`${p.id} — יש לקחת מדדים`,detail:debt.join(' · ')});
+      pushAlert(alerts,{...base,id:`debt-${p.id}`,type:'ASSESSMENT_DEBT',severity:redOrYellow?'medium':'low',owner:'medic',audience:redOrYellow?['medic','pc']:['medic'],escalatesTo:redOrYellow?'pc':null,escalateAfterMin:redOrYellow?8:null,actionRequired:'update_vitals',scope:'patient',category:redOrYellow?'data':'complete',title:`${p.visualId||p.id} — יש לקחת מדדים`,detail:debt.join(' · ')});
     }
     if(!normalizeTrapStatus(p) && p.triage!=='black'){
-      pushAlert(alerts,{...base,id:`trap-missing-${p.id}`,type:'MISSING_TRAP_STATUS',severity:'medium',owner:'medic',audience:['medic','pc'],escalatesTo:'pc',escalateAfterMin:5,actionRequired:'update_vitals',scope:'patient',category:'rescue',title:`${p.id} — חסר לכוד / לא לכוד`,detail:'סטטוס חילוץ בינארי חסר ומשפיע על תמונת החילוץ'});
+      pushAlert(alerts,{...base,id:`trap-missing-${p.id}`,type:'MISSING_TRAP_STATUS',severity:'medium',owner:'medic',audience:['medic','pc'],escalatesTo:'pc',escalateAfterMin:5,actionRequired:'update_vitals',scope:'patient',category:'rescue',title:`${p.visualId||p.id} — חסר לכוד / לא לכוד`,detail:'סטטוס חילוץ בינארי חסר ומשפיע על תמונת החילוץ'});
     }
     if(normalizeTrapStatus(p)==='trapped' && vitalsAgeMs(p)>=10*60*1000){
-      pushAlert(alerts,{...base,id:`trapped-silent-${p.id}`,type:'TRAPPED_NO_MEDIC_CONTACT',severity:'high',owner:'pc',audience:['pc','cc'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'assign_medic',scope:'patient',category:'rescue',title:`${p.id} — לכוד ללא קשר חובש`,detail:`${p.location} · ${timeAgoLabel(p.lastVitalsAt||patientClockStart(p))}`});
+      pushAlert(alerts,{...base,id:`trapped-silent-${p.id}`,type:'TRAPPED_NO_MEDIC_CONTACT',severity:'high',owner:'pc',audience:['pc','cc'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'assign_medic',scope:'patient',category:'rescue',title:`${p.visualId||p.id} — לכוד ללא קשר חובש`,detail:`${p.location} · ${timeAgoLabel(p.lastVitalsAt||patientClockStart(p))}`});
     }
     if(p.tourniquet?.appliedAt){
       const tqMin=Math.floor((Date.now()-p.tourniquet.appliedAt)/60000);
       if(tqMin>=60){
-        pushAlert(alerts,{...base,id:`tq-${p.id}`,type:tqMin>=120?'TOURNIQUET_CRITICAL':'TOURNIQUET_WARNING',severity:tqMin>=120?'critical':'high',owner:'medic',audience:tqMin>=120?['medic','pc','cc']:['medic','pc'],escalatesTo:tqMin>=120?'cc':'pc',escalateAfterMin:tqMin>=120?0:10,actionRequired:'update_vitals',scope:'patient',category:'urgent',title:`${p.id} — חסם עורקים ${tqMin>=120?'קריטי':'אזהרה'}`,detail:`${p.tourniquet.limb||'גפה לא צוינה'} · ${tqMin} דק׳`});
+        pushAlert(alerts,{...base,id:`tq-${p.id}`,type:tqMin>=120?'TOURNIQUET_CRITICAL':'TOURNIQUET_WARNING',severity:tqMin>=120?'critical':'high',owner:'medic',audience:tqMin>=120?['medic','pc','cc']:['medic','pc'],escalatesTo:tqMin>=120?'cc':'pc',escalateAfterMin:tqMin>=120?0:10,actionRequired:'update_vitals',scope:'patient',category:'urgent',title:`${p.visualId||p.id} — חסם עורקים ${tqMin>=120?'קריטי':'אזהרה'}`,detail:`${p.tourniquet.limb||'גפה לא צוינה'} · ${tqMin} דק׳`});
       }
     }
   });
@@ -6495,7 +6517,8 @@ function immediateTriageFromState(){
 function saveImmediateCasualtyAndContinue(){
   if(!siteData.name || siteData.name.trim()===''){ goTo('enroute'); return; }
   const im=state.immediate||{};
-  const id='P'+String(patients.length+1).padStart(3,'0');
+  const visualId=nextVisualId();
+  const id=newUuid();
   const triage=immediateTriageFromState();
   const t=nowT();
   const trap=im.trapStatus||null;
@@ -6505,7 +6528,7 @@ function saveImmediateCasualtyAndContinue(){
   const tqLimbLabel={right_upper:'ימין עליון',left_upper:'שמאל עליון',right_lower:'ימין תחתון',left_lower:'שמאל תחתון'}[im.tqLimb] || 'לא צוין';
   const mechanism=siteData.lastMechanism || (siteData.likelyMechanisms||[]).join(' / ') || 'פגיעת קריסה / לכידה';
   const p={
-    id, triage, accessibility:trap==='trapped'?'trapped':trap==='not_trapped'?'full':null, trapStatus:trap,
+    id, visualId, triage, accessibility:trap==='trapped'?'trapped':trap==='not_trapped'?'full':null, trapStatus:trap,
     location:siteData.address||siteData.name||'מוקד פעיל', locDetail:zoneLabel(),
     injury:actionLabels.length?actionLabels.join(' + '):(im.bleeding?'דימום מסיבי מדווח':mechanism),
     patientStatus:triage==='black'?'deceased':(im.bleeding||actions.length)?'stabilizing':'identified',
@@ -6542,21 +6565,25 @@ function saveImmediateCasualtyAndContinue(){
   patients.unshift(p);
   if(isTq) reconcileSupplySource(`mstart:${id}:tq`, 'tourniquets', 1);
   if(triage==='black') createDeathCertificationRequest(p);
-  saveLocalEvent({type:'IMMEDIATE_FIELD_ASSESSMENT',detail:`${id} נפתח בסריקת MSTART`,warn:['red','black'].includes(triage),payload_json:{patient_id:id,triage,site:siteData.name,zone:zoneLabel(),immediate:im,life_saving_actions:actions,tourniquet_limb:isTq?tqLimbLabel:null}});
+  // QUICK_PATIENT_CREATED actually creates the server-side patients row; queue it before the
+  // IMMEDIATE_FIELD_ASSESSMENT event below, which references the same patient_id.
+  saveLocalEvent({type:'QUICK_PATIENT_CREATED',detail:`${visualId} נפתח בסריקת MSTART`,warn:false,patient_id:id,payload_json:{visual_id:visualId,triage}});
+  saveLocalEvent({type:'IMMEDIATE_FIELD_ASSESSMENT',detail:`${visualId} נפתח בסריקת MSTART`,warn:['red','black'].includes(triage),patient_id:id,payload_json:{triage,site:siteData.name,zone:zoneLabel(),immediate:im,life_saving_actions:actions,tourniquet_limb:isTq?tqLimbLabel:null}});
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   state=freshState(); state.flowMode='quick';
   renderDashboard(); renderAlerts();
-  toast(`${id} נשמר · אפשר לעבור לפצוע הבא`);
+  toast(`${visualId} נשמר · אפשר לעבור לפצוע הבא`);
   goTo('dashboard');
 }
 function createImmediateInterventionPatient(kind='tourniquet'){
   if(!siteData.name || siteData.name.trim()===''){ goTo('enroute'); return; }
-  const id='P'+String(patients.length+1).padStart(3,'0');
+  const visualId=nextVisualId();
+  const id=newUuid();
   const t=nowT();
   const label={tourniquet:'הנחת חסם עורקים',airway:'פתיחת נתיב אוויר',pressure_bandage:'חבישת לחץ'}[kind]||'פעולה מצילת חיים';
   const isTq=kind==='tourniquet';
   const p={
-    id, triage:'red', accessibility:'trapped', trapStatus:'trapped',
+    id, visualId, triage:'red', accessibility:'trapped', trapStatus:'trapped',
     location:siteData.address||siteData.name||'מוקד פעיל', locDetail:zoneLabel(),
     injury:isTq?'דימום מסיבי — פעולה מצילת חיים':(siteData.lastMechanism||'פעולה מצילת חיים בשטח'),
     patientStatus:'stabilizing',
@@ -6592,10 +6619,13 @@ function createImmediateInterventionPatient(kind='tourniquet'){
   };
   patients.unshift(p);
   if(isTq) reconcileSupplySource(`immediate:${id}:tq`, 'tourniquets', 1);
-  saveLocalEvent({type:isTq?'TOURNIQUET_APPLIED':'IMMEDIATE_INTERVENTION_RECORDED',detail:label,warn:true,payload_json:{patient_id:id,source:'medic_immediate_action',auto_triage:'red'}});
+  // QUICK_PATIENT_CREATED actually creates the server-side patients row; queue it before the
+  // treatment event below, which references the same patient_id.
+  saveLocalEvent({type:'QUICK_PATIENT_CREATED',detail:`${visualId} נפתח מפעולה מצילת חיים`,warn:false,patient_id:id,payload_json:{visual_id:visualId,triage:'red'}});
+  saveLocalEvent({type:isTq?'TOURNIQUET_APPLIED':'IMMEDIATE_INTERVENTION_RECORDED',detail:label,warn:true,patient_id:id,payload_json:{source:'medic_immediate_action',auto_triage:'red'}});
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   renderDashboard(); renderAlerts();
-  toast(`${label} · ${id} נפתח והופיע לחוג"ד`);
+  toast(`${label} · ${visualId} נפתח והופיע לחוג"ד`);
   openPatient(id);
 }
 // ── Fix 4: no-breathing button ────────────────────────────
@@ -6885,7 +6915,7 @@ function handoverPatient(id){
   goTo('dashboard');
 }
 function mistTextForPatient(p){
-  return `פצוע ${p.id}. מנגנון: ${p.injury||'לא ידוע'}. פציעות: ${p.injury||'לא תועד'}. סימנים: דופק ${p.vitals?.pulse||'לא נמדד'}, נשימות ${p.vitals?.rr??'לא נמדד'}, הכרה ${p.vitals?.avpu||'לא נמדד'}, לחץ דם ${BP_LABELS[p.vitals?.bp_estimate]||'לא נמדד'}. טיפול: ${(p.txHistory||[]).map(tx=>tx.text).join(', ')||'לא תועד'}. מיקום: ${p.location||''} ${p.locDetail||''}.`;
+  return `פצוע ${p.visualId||p.id}. מנגנון: ${p.injury||'לא ידוע'}. פציעות: ${p.injury||'לא תועד'}. סימנים: דופק ${p.vitals?.pulse||'לא נמדד'}, נשימות ${p.vitals?.rr??'לא נמדד'}, הכרה ${p.vitals?.avpu||'לא נמדד'}, לחץ דם ${BP_LABELS[p.vitals?.bp_estimate]||'לא נמדד'}. טיפול: ${(p.txHistory||[]).map(tx=>tx.text).join(', ')||'לא תועד'}. מיקום: ${p.location||''} ${p.locDetail||''}.`;
 }
 function speakMist(id){
   const p=patients.find(x=>x.id===id); if(!p) return;
@@ -7717,7 +7747,7 @@ function copyTacticalDataString(){
 }
 
 function renderSummary(){
-  const newId='P'+String(patients.length+1).padStart(3,'0');
+  const newId=nextVisualId();
   const intStr=buildIntStr();
   const locStr=buildLocStr()==='—' ? `${siteData.address||siteData.name||'מוקד פעיל'} · ${zoneLabel()}` : buildLocStr();
   const deviceId=getDeviceId();
@@ -7756,7 +7786,8 @@ function renderSummary(){
 
 // LEGACY_FULL_ASSESSMENT_DO_NOT_DELETE_WITHOUT_TESTS
 function savePatient(){
-  const newId='P'+String(patients.length+1).padStart(3,'0');
+  const newId=nextVisualId();
+  const patientUuid=newUuid();
   const draftId=state.patientDraftId;
   const intStr=buildIntStr();
   const locStr=buildLocStr();
@@ -7796,7 +7827,7 @@ function savePatient(){
     warn:e.warn !== false
   }));
   patients.push({
-    id:newId, triage:state.triage, accessibility:state.accessibility, trapStatus:state.trapStatus,
+    id:patientUuid, visualId:newId, triage:state.triage, accessibility:state.accessibility, trapStatus:state.trapStatus,
     location:siteData.address||siteData.name||locStr, locDetail:[zoneLabel(), state.wearingDesc].filter(Boolean).join(' · '),
     injury:effectiveInjury, injuryZones:[...state.injuryZones], patientStatus:effectiveStatus,
     needsFullAssessment:state.needsFullAssessment,
@@ -7831,6 +7862,9 @@ function savePatient(){
       ...(intStr?[{type:'INTERVENTION_LOGGED',time:t,detail:`${intStr} — מכשיר: ${deviceId}`}]:[]),
     ]
   });
+  // PATIENT_CREATED is what actually creates the server-side patients row — must be queued
+  // before any later event (e.g. vitals) referencing this patient_id, or those fail their FK.
+  saveLocalEvent({type:'PATIENT_CREATED',detail:`${newId} נפתח — הערכה מלאה`,warn:false,patient_id:patientUuid,payload_json:{visual_id:newId,triage:state.triage}});
   const savedPatient=patients[patients.length-1];
   if(savedPatient.triage==='black' || savedPatient.patientStatus==='deceased'){
     createDeathCertificationRequest(savedPatient);
@@ -7871,7 +7905,7 @@ function openQuickVitals(pid){
   modalTreatments=new Set();
   counts.mpulse15=Math.round(p.vitals.pulse/4);
   counts.mrr30=Math.round(p.vitals.rr/2);
-  document.getElementById('modal-pid-title').textContent=`עדכון מדדים — ${p.id}`;
+  document.getElementById('modal-pid-title').textContent=`עדכון מדדים — ${p.visualId||p.id}`;
   document.getElementById('modal-last-vitals').textContent=`אחרון: דופק ${p.vitals.pulse} · נשימות ${p.vitals.rr ?? '—'} · SpO₂ ${p.vitals.spo2||'—'} · AVPU ${p.vitals.avpu||'—'}`;
   document.getElementById('mv-spo2').textContent=p.vitals.spo2 ?? '—';
   document.getElementById('modal-spo2-ctrl').style.display=modalSpo2Active?'flex':'none';
@@ -8038,6 +8072,10 @@ function saveModalVitals(){
 
   const detail = `דופק ${next.pulse} / נשימות ${next.rr} / SpO₂ ${next.spo2||'לא נמדד'} / ${BP_LABELS[next.bp_estimate]||'—'} / AVPU: ${next.avpu||'—'} — ${vitalsCaptureLabel('modal')} — מכשיר: ${medicName}`;
   p.events.unshift({type:'VITALS_UPDATED', time:nowT(), detail, warn:flags.length>0});
+  // Previously this only wrote to p.events (local UI timeline) and never reached the outbox at
+  // all — vitals recorded through this modal never synced. VITALS_RECORDED is the server's
+  // actual recognized type (client-only VITALS_UPDATED above is kept for the in-app timeline).
+  saveLocalEvent({type:'VITALS_RECORDED', detail, warn:flags.length>0, patient_id:p.id, payload_json:{...next, siteId:p.siteId}});
   const treatmentText=modalTreatmentText();
   queueModalTreatmentEvents(p, treatmentText, medicName);
   if(modalTreatmentNeeded===false){
@@ -8691,12 +8729,13 @@ function submitFrReport(){
   if(frDraft.trapped===null){ toast('נדרש לציין לכוד / לא לכוד'); return; }
   if(frDraftRole==='rcc' && !frDraft.platoonId){ toast('נדרש לבחור מחלקה'); return; }
   const platoonId=frDraftRole==='rpc'?'PLT-A':frDraft.platoonId;
-  const id='P'+String(patients.length+1).padStart(3,'0');
+  const visualId=nextVisualId();
+  const id=newUuid();
   const t=nowT();
   const tqLimbLabel={right_upper:'ימין עליון',left_upper:'שמאל עליון',right_lower:'ימין תחתון',left_lower:'שמאל תחתון'}[frDraft.tqLimb]||'לא צוין';
   const reporterLabel=frDraftRole==='rpc'?'מ״מ':'מ״פ חילוץ';
   const p={
-    id, triage:'pending', accessibility:frDraft.trapped?'trapped':'full', trapStatus:frDraft.trapped?'trapped':'not_trapped',
+    id, visualId, triage:'pending', accessibility:frDraft.trapped?'trapped':'full', trapStatus:frDraft.trapped?'trapped':'not_trapped',
     location:siteData.address||siteData.name||'מוקד פעיל', locDetail:location, siteId:'SITE_A',
     injury:frDraft.tourniquet?'חסם עורקים הונח (דיווח שדה ראשוני)':'דיווח שדה ראשוני — לא הוערך קלינית',
     patientStatus:'identified', time:t,
@@ -8714,7 +8753,10 @@ function submitFrReport(){
     createdByRole:frDraftRole
   };
   patients.push(p);
-  saveLocalEvent({type:'FIRST_RESPONDER_REPORT',detail:`${id} reported by ${frDraftRole}`,payload_json:{patientId:id,reporterRole:frDraftRole,location,trapped:frDraft.trapped,tourniquetApplied:frDraft.tourniquet,tqLimb:frDraft.tqLimb||null,timestamp:new Date().toISOString()}});
+  // FIRST_RESPONDER_REPORT is rpc/rcc's only patient-creating event type (they can't send
+  // PATIENT_CREATED/QUICK_PATIENT_CREATED) — the server creates the patients row from this
+  // event directly, keyed by visual_id in payload_json.
+  saveLocalEvent({type:'FIRST_RESPONDER_REPORT',detail:`${visualId} דווח ע"י ${frDraftRole}`,patient_id:id,payload_json:{visual_id:visualId,reporterRole:frDraftRole,location,trapped:frDraft.trapped,tourniquetApplied:frDraft.tourniquet,tqLimb:frDraft.tqLimb||null,timestamp:new Date().toISOString()}});
   saveDemoState();
   hideFrReportModal();
   renderRoleDashboard(frDraftRole);
@@ -9014,7 +9056,7 @@ function renderCmdPatients(){
   const sCol=s=>!s?'var(--muted)':s<94?'var(--red)':s<97?'var(--yellow)':'var(--green)';
   document.getElementById('cmd-patient-table').innerHTML=list.map(p=>`
     <div class="cmd-row ${triageKey(p.triage)} ${p.alert&&!p.alertAcknowledgedAt?'active-alert':''}" onclick="openPatient('${p.id}');goTo('patient')">
-      <div><div style="font-family:var(--mono);font-weight:700;font-size:15px">${p.id}</div><div style="font-size:16px;margin-top:2px">${trapIcon[normalizeTrapStatus(p)]||'?'}</div></div>
+      <div><div style="font-family:var(--mono);font-weight:700;font-size:15px">${p.visualId||p.id}</div><div style="font-size:16px;margin-top:2px">${trapIcon[normalizeTrapStatus(p)]||'?'}</div></div>
       <div>
         <div style="font-weight:600;font-size:13px">${p.location}</div>
         <div style="margin-top:3px">${triageBand(p.triage,p)}</div>
@@ -9035,7 +9077,7 @@ function renderCmdPatients(){
 }
 function remindMedicVitals(id){
   const p=patients.find(x=>x.id===id); if(!p) return;
-  p.medicReminder=`מדדים ישנים — ${p.id} מחכה לעדכון`;
+  p.medicReminder=`מדדים ישנים — ${p.visualId||p.id} מחכה לעדכון`;
   p.events=p.events||[];
   p.events.unshift({type:'MEDIC_VITALS_REMINDER_SENT',time:nowT(),detail:p.medicReminder,warn:false});
   saveLocalEvent({type:'MEDIC_VITALS_REMINDER_SENT',detail:p.medicReminder,warn:false,payload_json:{patient_id:id,to_medic:p.assignedMedicId||'USR-COHEN'}});
@@ -9202,9 +9244,28 @@ function renderAar(){
     <div class="aar-card"><div class="aar-num">${pcAckCount}</div><div class="aar-label">אישורי חוג"ד להתראות</div></div>
     <div class="aar-card"><div class="aar-num">${ccAssignedCount}</div><div class="aar-label">שיוכי משאב מ״פ</div></div>
   `;
-  const patientEvents=patients.flatMap(p=>(p.events||[]).map(e=>({...e,pid:p.id,triage:p.triage,loc:p.location,_ts:eventTimestampMs(e,p)})));
-  const localEvents=outbox.map(e=>({type:e.type,pid:e.payload_json?.patient_id||e.payload_json?.patientId||'SYSTEM',detail:e.detail,time:new Date(e.local_timestamp||e.createdAt||Date.now()).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}),loc:e.payload_json?.zone||'',warn:!!e.warn,_ts:Date.parse(e.local_timestamp||e.createdAt||'')||Date.now()}));
-  const events=[...patientEvents,...localEvents];
+  const patientEvents=patients.flatMap(p=>(p.events||[]).map(e=>({...e,pid:p.visualId||p.id,triage:p.triage,loc:p.location,_ts:eventTimestampMs(e,p)})));
+  const localEvents=outbox.map(e=>{
+    const pid=e.patient_id||e.payload_json?.patient_id||e.payload_json?.patientId||null;
+    const localP=pid?patients.find(x=>x.id===pid):null;
+    return {type:e.type,pid:localP?.visualId||pid||'SYSTEM',detail:e.detail,time:new Date(e.local_timestamp||e.createdAt||Date.now()).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}),loc:e.payload_json?.zone||'',warn:!!e.warn,_ts:Date.parse(e.local_timestamp||e.createdAt||'')||Date.now()};
+  });
+  // Server-pulled events (from other devices/roles) — read-only, doesn't project into patients[].
+  // pid resolves to this device's local visualId for that patient if it knows it, else a
+  // truncated UUID (never a raw 36-char string cluttering the timeline).
+  const pulledEvents=_pulledEvents.map(e=>{
+    const localP=e.patient_id?patients.find(x=>x.id===e.patient_id):null;
+    return {
+      type:e.type,
+      pid:localP?.visualId || (e.patient_id?e.patient_id.slice(0,8)+'…':'SYSTEM'),
+      detail:e.payload_json?.detail || e.type,
+      time:new Date(e.server_timestamp||Date.now()).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}),
+      loc:e.payload_json?.zone||'',
+      warn:false,
+      _ts:Date.parse(e.server_timestamp||'')||Date.now()
+    };
+  });
+  const events=[...patientEvents,...localEvents,...pulledEvents];
   const timeline=events.sort((a,b)=>(b._ts||0)-(a._ts||0)).slice(0,10).map(e=>`
     <div class="timeline-entry">
       <div class="tl-line"><div class="tl-dot${e.warn?' warn':''}"></div></div>
@@ -9323,6 +9384,14 @@ function saveLocalEvent(event){
     local_timestamp:new Date().toISOString(),
     ...event
   };
+  // Callers are inconsistent about where patient_id lives (top-level vs nested in payload_json,
+  // under either key) — normalize once here so syncPush's `e.patient_id` read always works,
+  // regardless of which convention the caller used.
+  entry.patient_id = entry.patient_id || entry.payload_json?.patient_id || entry.payload_json?.patientId || null;
+  if(entry.patient_id) entry.payload_json = {...(entry.payload_json||{}), patient_id:entry.patient_id};
+  // Tag which site/incident this event belongs to, resolved at creation time (prefer the
+  // relevant patient's own siteId when the caller passed one, else the active site context).
+  entry.siteId = entry.siteId || entry.payload_json?.siteId || currentSiteId();
   // Events outside the server's known vocabulary are demo/UI-only — mark synced immediately
   // so they never sit in the "pending sync" count (see SYNC_ELIGIBLE_EVENT_TYPES).
   entry.synced=!SYNC_ELIGIBLE_EVENT_TYPES.has(entry.type);
@@ -9345,8 +9414,8 @@ function scheduleSyncPush(){
   if(_syncPushTimer) return;
   _syncPushTimer=setTimeout(()=>{ _syncPushTimer=null; syncPush(); }, 1500);
 }
-function currentIncidentId(){
-  return SITE_TO_INCIDENT_ID.SITE_A;
+function currentIncidentId(siteId){
+  return SITE_TO_INCIDENT_ID[siteId] || SITE_TO_INCIDENT_ID.SITE_A;
 }
 async function syncPush(){
   if(!currentUser) return; // local-demo mode: never touches the network
@@ -9361,42 +9430,105 @@ async function syncPush(){
   try{ sessionResult=await client.auth.getSession(); }catch(e){ return; }
   const token=sessionResult?.data?.session?.access_token;
   if(!token) return;
-  let resp;
-  try{
-    resp=await fetch(SYNC_FUNCTION_URL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body:JSON.stringify({
-        device_id:getDeviceId(),
-        incident_id:currentIncidentId(),
-        events:pending.map(e=>({
-          local_event_id:e.local_event_id,
-          type:e.type,
-          patient_id:e.patient_id||null,
-          local_timestamp:e.local_timestamp,
-          payload_json:e.payload_json||{}
-        }))
-      })
-    });
-  }catch(e){
-    return; // offline/network failure — next scheduled push or saveLocalEvent call retries
+  // SITE_A/SITE_B can both have pending events in the same client session (command roles act
+  // across both), but each POST targets exactly one incident_id — group and issue one POST per
+  // resolved incident rather than assuming everything belongs to a single site.
+  const groups=new Map(); // incidentId -> entries[]
+  for(const e of pending){
+    const incId=currentIncidentId(e.siteId);
+    if(!groups.has(incId)) groups.set(incId, []);
+    groups.get(incId).push(e);
   }
-  if(!resp.ok) return;
-  let result;
-  try{ result=await resp.json(); }catch(e){ return; }
-  const doneIds=new Set([...(result.accepted||[]),...(result.duplicates||[])].map(x=>x.local_event_id));
-  const rejectedIds=new Set((result.rejected||[]).map(x=>x.local_event_id));
+  const doneIds=new Set();
+  const rejectedIds=new Set();
+  let anyRejected=false;
+  for(const [incidentId, entries] of groups){
+    let resp;
+    try{
+      resp=await fetch(SYNC_FUNCTION_URL,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body:JSON.stringify({
+          device_id:getDeviceId(),
+          incident_id:incidentId,
+          events:entries.map(e=>({
+            local_event_id:e.local_event_id,
+            type:e.type,
+            patient_id:e.patient_id||null,
+            local_timestamp:e.local_timestamp,
+            payload_json:e.payload_json||{}
+          }))
+        })
+      });
+    }catch(e){
+      continue; // offline/network failure for this group — next scheduled push retries it
+    }
+    if(!resp.ok) continue;
+    let result;
+    try{ result=await resp.json(); }catch(e){ continue; }
+    [...(result.accepted||[]),...(result.duplicates||[])].forEach(x=>doneIds.add(x.local_event_id));
+    (result.rejected||[]).forEach(x=>{ rejectedIds.add(x.local_event_id); anyRejected=true; });
+    // blocked_dependency entries are left as-is (unsynced) for retry on the next push.
+    if(result.next_pull_cursor!=null) setPullCursor(incidentId, result.next_pull_cursor);
+  }
+  // Single combined write-back at the end, not per-group, so a mid-loop failure never leaves
+  // localStorage in a partially-updated state.
   outbox.forEach(e=>{
     if(doneIds.has(e.local_event_id)) e.synced=true;
     if(rejectedIds.has(e.local_event_id)){ e.synced=true; e.syncRejected=true; }
-    // blocked_dependency entries are left as-is (unsynced) for retry on the next push.
   });
   try{ localStorage.setItem(key, JSON.stringify(outbox)); }catch(e){}
   lastSyncAt=Date.now();
-  if(!rejectedIds.size) demoSyncMode='fresh';
+  if(!anyRejected) demoSyncMode='fresh';
   updateDemoStatus();
+  syncPullAll(); // pull opportunistically right after a push so the AAR feed feels responsive
 }
 setInterval(()=>{ if(currentUser) syncPush(); }, 45000);
+
+// ── Sync pull: server → client, read-only AAR-timeline feed ──
+// See plan doc for what this deliberately does NOT do: no local-state projection into
+// patients[], no conflict resolution, no dependency-graph validation on the pull side.
+let _pulledEvents=[]; // in-memory, replaced per-incident on each pull cycle
+async function syncPull(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let sessionResult;
+  try{ sessionResult=await client.auth.getSession(); }catch(e){ return; }
+  const token=sessionResult?.data?.session?.access_token;
+  if(!token) return;
+  let cursor=getPullCursor(incidentId);
+  let hasMore=true;
+  const collected=[];
+  while(hasMore){
+    let resp;
+    try{
+      resp=await fetch(`${SYNC_FUNCTION_URL}?incident_id=${encodeURIComponent(incidentId)}&since_cursor=${cursor}&limit=500`,
+        {headers:{'Authorization':'Bearer '+token}});
+    }catch(e){ break; } // offline — keep whatever cursor we had, retry next cycle
+    if(!resp.ok) break;
+    let result;
+    try{ result=await resp.json(); }catch(e){ break; }
+    collected.push(...(result.events||[]));
+    cursor=result.next_cursor;
+    hasMore=!!result.has_more;
+  }
+  setPullCursor(incidentId, cursor);
+  const deviceId=getDeviceId();
+  const merged=collected
+    // Don't double-count events this device pushed itself — those already show via localEvents.
+    .filter(e=>e.device_id!==deviceId)
+    .map(e=>({...e, _incidentId:incidentId}));
+  _pulledEvents=[..._pulledEvents.filter(e=>e._incidentId!==incidentId), ...merged];
+  updateDemoStatus();
+}
+function syncPullAll(){
+  // Only two incidents exist in the whole system today (SITE_TO_INCIDENT_ID is exhaustive) —
+  // RLS silently returns zero rows for one this caller's role/membership can't see, so pulling
+  // both unconditionally is simpler and just as correct as trying to infer which one to pull.
+  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>syncPull(id));
+}
+setInterval(()=>{ if(currentUser) syncPullAll(); }, 45000);
 
 function activeScreenId(){
   const el=document.querySelector('.screen.active');
