@@ -83,6 +83,12 @@ The product treats stale data as an operational condition, not a UI bug.
 - Alerts should distinguish "patient deteriorating" from "data stale."
 - The AAR should include sync gaps and stale periods.
 
+## Backend Deployment Status
+
+`database/001_postgresql_schema_v1.2.sql` was deployed for the first time this session, to a real Supabase project (`c5-sentinel-sar`, project ref `btvvjmuwdzirjyauyijx`) rather than staying an undeployed draft. Deploying it surfaced real gaps that weren't visible from reading the file - see `database/004_rls_gap_fixes_and_trigger_security_definer.sql` and `database/005_rls_performance_fixes.sql`, applied immediately after: 19 views were bypassing RLS entirely, 17 tables never had RLS enabled, and several trigger functions needed `SECURITY DEFINER` to keep cascading safety-alert writes (e.g. pediatric medication warnings) working once RLS is enforced against real non-service-role accounts. Supabase's security and performance advisors are both clean as of this deployment.
+
+Not yet done: real Supabase Auth wiring (users mapped to `user_role`), the `/sync/log` API itself, and RLS policies for the `rpc`/`rcc` roles added in V2.995 - `user_role` in the schema still only has `medic, pc, logistics_officer, cc, chamal, admin`.
+
 ## Planned Production Split
 
 The next major implementation should split the repo into these packages only when the prototype behavior is stable enough:
