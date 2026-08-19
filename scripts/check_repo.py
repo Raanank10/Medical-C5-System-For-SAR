@@ -109,6 +109,75 @@ def check_markdown_links(errors: list[str]) -> None:
                 fail(f"{path.relative_to(ROOT)} has a broken link: {raw_target}", errors)
 
 
+DOMAIN_RULES_FACTORY_MARKER = "function buildDomainRules() {"
+
+
+def extract_domain_rules_factory_body(text: str, rel: str, errors: list[str]) -> str | None:
+    """Pull the body of buildDomainRules() out of a file's text.
+
+    Both src/domain/rules.js and the copy inlined into index.html /
+    demo/rescue-app.html define the exact same factory function; this is how
+    the app avoids a build step while still having one tested module. If the
+    inlined copy and the standalone file ever diverge (as happened once
+    already, silently, with the SABCDE airway branch) the app's real
+    behavior stops matching what the tests verify.
+    """
+    marker_count = text.count(DOMAIN_RULES_FACTORY_MARKER)
+    if marker_count != 1:
+        fail(
+            f"{rel}: expected exactly one '{DOMAIN_RULES_FACTORY_MARKER}', found {marker_count} "
+            "(domain-rules sync check assumptions no longer hold, update check_repo.py)",
+            errors,
+        )
+        return None
+    body_start = text.find(DOMAIN_RULES_FACTORY_MARKER) + len(DOMAIN_RULES_FACTORY_MARKER)
+    body_end = text.find("\n});", body_start)
+    if body_end == -1 or body_end - body_start < 1000:
+        fail(f"{rel}: could not locate a plausible buildDomainRules() body for the sync check", errors)
+        return None
+    return text[body_start:body_end]
+
+
+def normalize_js_body(snippet: str) -> str:
+    # Whitespace and trailing commas (e.g. `{a, b,}` vs `{a, b}`) are harmless
+    # JS formatting choices with no behavioral effect - normalize both away so
+    # this check only fires on actual logic drift, not reformatting.
+    text = re.sub(r"\s+", "", snippet)
+    text = re.sub(r",(?=[}\]])", "", text)
+    return text
+
+
+def check_domain_rules_sync(errors: list[str]) -> None:
+    rules_path = ROOT / "src/domain/rules.js"
+    if not rules_path.exists():
+        return
+    canonical_body = extract_domain_rules_factory_body(
+        rules_path.read_text(encoding="utf-8", errors="ignore"), "src/domain/rules.js", errors
+    )
+    if canonical_body is None:
+        return
+    canonical_norm = normalize_js_body(canonical_body)
+
+    for rel in ["index.html", "demo/rescue-app.html"]:
+        path = ROOT / rel
+        if not path.exists():
+            continue
+        inlined_body = extract_domain_rules_factory_body(
+            path.read_text(encoding="utf-8", errors="ignore"), rel, errors
+        )
+        if inlined_body is None:
+            continue
+        if normalize_js_body(inlined_body) != canonical_norm:
+            fail(
+                f"{rel}: the domain-rules module inlined in this file has drifted from "
+                "src/domain/rules.js (the buildDomainRules() body differs). The inlined copy is "
+                "what actually runs in the app; src/domain/rules.js is what the tests cover. Keep "
+                "them identical (aside from the browser/CommonJS export wrapper) or the two will "
+                "silently disagree about triage/vitals/dosing behavior.",
+                errors,
+            )
+
+
 def check_python_syntax(errors: list[str]) -> None:
     for path in ROOT.rglob("*.py"):
         if any(part in {".git", ".venv", "venv", "__pycache__"} for part in path.parts):
@@ -125,6 +194,7 @@ def main() -> int:
     check_required_paths(errors)
     check_html_files(errors)
     check_markdown_links(errors)
+    check_domain_rules_sync(errors)
     check_python_syntax(errors)
 
     if errors:

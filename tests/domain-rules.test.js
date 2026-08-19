@@ -73,11 +73,46 @@ assert.deepEqual(
   { triage: "green", reason: "מדדים תקינים · AVPU A", reasons: [] },
 );
 assert.equal(
-  rules.suggestMstartTriage({ vitals: { rr: 16 }, sabcde: { A: "blocked", B: "abnormal" } }).triage,
+  rules.suggestMstartTriage({ vitals: { rr: 8, bp_estimate: "carotid", avpu: "P", spo2: 90 } }).triage,
+  "red",
+);
+
+// suggestedSweepColor: the live MSTART sweep classifier (walking/breathing/perfusion/AVPU/trapped
+// qualitative fields, not full vitals). This is the function actually called during the fast
+// first-pass sweep in index.html — distinct from suggestMstartTriage, which runs later during
+// full-vitals re-triage. Previously had zero test coverage despite making the sweep's black/red call.
+assert.equal(rules.suggestedSweepColor({ walking: "yes" }), "green");
+assert.equal(
+  rules.suggestedSweepColor({ breathing: "no", airwayOpened: true, breathingAfterAirway: "no" }),
   "black",
 );
+assert.equal(rules.suggestedSweepColor({ breathing: "no", airwayOpened: false }), "red");
 assert.equal(
-  rules.suggestMstartTriage({ vitals: { rr: 8, bp_estimate: "carotid", avpu: "P", spo2: 90 } }).triage,
+  rules.suggestedSweepColor({ breathing: "no", airwayOpened: true, breathingAfterAirway: "yes" }),
+  "red",
+);
+assert.equal(rules.suggestedSweepColor({ breathing: "yes", perfusion: "absent" }), "black");
+assert.equal(rules.suggestedSweepColor({ breathing: "yes", perfusion: "carotid_only" }), "red");
+assert.equal(rules.suggestedSweepColor({ breathing: "yes", perfusion: "radial_weak" }), "red");
+assert.equal(rules.suggestedSweepColor({ breathing: "yes", perfusion: "radial_strong", avpu: "V" }), "red");
+assert.equal(
+  rules.suggestedSweepColor({ breathing: "yes", perfusion: "radial_strong", avpu: "A", trapped: "trapped" }),
+  "yellow",
+);
+assert.equal(
+  rules.suggestedSweepColor({ breathing: "yes", perfusion: "radial_strong", avpu: "A", trapped: "immobile" }),
+  "yellow",
+);
+assert.equal(
+  rules.suggestedSweepColor({ breathing: "yes", perfusion: "radial_strong", avpu: "A" }),
+  "yellow",
+);
+assert.equal(
+  rules.suggestedSweepColor({ walking: "no", overrideReason: "medic override", color: "red" }),
+  "red",
+);
+assert.equal(
+  rules.suggestedSweepColor({ walking: "yes", lifeThreateningHemorrhage: true }),
   "red",
 );
 

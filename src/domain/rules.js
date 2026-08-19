@@ -111,13 +111,10 @@
     return "yellow";
   }
 
-  function suggestMstartTriage({ vitals, sabcde = {} } = {}) {
+  function suggestMstartTriage({ vitals } = {}) {
     const v = vitals || {};
     if (v.rr === 0) {
       return { triage: "black", reason: "MCI: לא נושם — מסווג שחור", reasons: [] };
-    }
-    if (sabcde.B === "abnormal" && sabcde.A !== "managed") {
-      return { triage: "black", reason: "ללא נשימה לאחר פתיחת נתיב אוויר", reasons: [] };
     }
 
     const reasons = [];
@@ -132,6 +129,19 @@
       return { triage: "green", reason: "מדדים תקינים · AVPU A", reasons: [] };
     }
     return { triage: "yellow", reason: "מידע חלקי / מדדים בינוניים — לא מסווג אוטומטית כירוק", reasons: [] };
+  }
+
+  function suggestedSweepColor(m = {}) {
+    if (m.overrideReason && m.color) return m.color;
+    if (m.lifeThreateningHemorrhage) return "red";
+    if (m.walking === "yes") return "green";
+    if (m.breathing === "no") return m.airwayOpened && m.breathingAfterAirway === "no" ? "black" : "red";
+    if (m.perfusion === "absent") return "black";
+    if (["carotid_only", "radial_weak"].includes(m.perfusion)) return "red";
+    if (["V", "P", "U"].includes(m.avpu)) return "red";
+    if (["trapped", "immobile"].includes(m.trapped)) return "yellow";
+    if (m.breathing === "yes" && m.perfusion === "radial_strong" && m.avpu === "A") return "yellow";
+    return "yellow";
   }
 
   function detectDeterioration(prev = {}, next = {}) {
@@ -172,6 +182,7 @@
     needsVitals,
     PEDIATRIC_AGE_CUTOFF,
     PEDIATRIC_HIGH_RISK_DOSE_LIMITS,
+    suggestedSweepColor,
     suggestMstartTriage,
     timeCodeToTodayMs,
     tourniquetTimer,
