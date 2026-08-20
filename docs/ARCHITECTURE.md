@@ -78,7 +78,7 @@ For product-level UI guardrails, see `docs/TACTICAL_UI_GUIDELINES.md`. For the p
 
 The product treats stale data as an operational condition, not a UI bug.
 
-- Device presence is tracked through heartbeat events.
+- Device presence is tracked through heartbeat events — implemented: `index.html` upserts its own `device_presence` row (RLS-scoped, `database/004_rls_gap_fixes_and_trigger_security_definer.sql`/`005_rls_performance_fixes.sql`) every 45s, and the command device panel reads real rows for the incident rather than inferring devices from patient data (`docs/ROADMAP.md` Phase 3).
 - Command views must show last-seen and sync-latency indicators.
 - Alerts should distinguish "patient deteriorating" from "data stale."
 - The AAR should include sync gaps and stale periods.
