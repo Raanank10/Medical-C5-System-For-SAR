@@ -1768,6 +1768,8 @@ textarea{resize:vertical;min-height:70px;}
   <div id="cmd-panel-heatmap" class="cmd-panel-body collapsed"><div id="cmd-heatmap" class="cmd-status-matrix"></div></div>
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('devices')"><span>מכשירים / Sync</span><span class="cmd-panel-sub" id="cmd-panel-devices-meta">COLLAPSED</span></button>
   <div id="cmd-panel-devices" class="cmd-panel-body collapsed"><div id="cmd-device-panel" class="device-panel"></div></div>
+  <button class="cmd-panel-toggle" onclick="toggleCmdPanel('serverstate')"><span>מצב שרת (incident_command_state)</span><span class="cmd-panel-sub" id="cmd-panel-serverstate-meta">COLLAPSED</span></button>
+  <div id="cmd-panel-serverstate" class="cmd-panel-body collapsed"><div id="cmd-server-state" class="cmd-status-matrix"></div></div>
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('watchdogs')"><span>Watchdog Stack</span><span class="cmd-panel-sub" id="cmd-panel-watchdogs-meta">COLLAPSED</span></button>
   <div id="cmd-panel-watchdogs" class="cmd-panel-body collapsed"><div id="cmd-watchdogs" class="cmd-status-matrix"></div></div>
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('duplicates')"><span>חשד לכפילויות</span><span class="cmd-panel-sub" id="cmd-panel-duplicates-meta">COLLAPSED</span></button>
@@ -2892,6 +2894,7 @@ async function loadProfileAndEnter(client, userId){
   pullProjectedPatientStateAll();
   pushDevicePresenceAll();
   pullDevicePresenceAll();
+  pullIncidentCommandStateAll();
   return true;
 }
 function enterAuthenticatedRole(serverRole){
@@ -8343,7 +8346,7 @@ function getSitePatients(siteId){
   return [];
 }
 let cmdActiveSite='ALL', cmdFilter='all', alertFilter='critical', cmdAlertFilter='critical', commandRole='pc', ccCompanySite='SITE_A';
-let cmdPanelOpen={priority:true,reinforcement:true,heatmap:false,devices:false,watchdogs:false,duplicates:false,alerts:true};
+let cmdPanelOpen={priority:true,reinforcement:true,heatmap:false,devices:false,serverstate:false,watchdogs:false,duplicates:false,alerts:true};
 function companyLabelForSite(siteId){
   return siteId==='SITE_B' ? 'פלוגה ב / BRAVO' : siteId==='SITE_A' ? 'פלוגה א / ALFA' : 'כל הפלוגות';
 }
@@ -9205,6 +9208,28 @@ function renderCommandOperationalPanels(pts, site){
     return `<div class="device-row ${silent?'offline':''}"><div><div class="device-name">${d.id}</div><div class="device-meta">${d.patients} פצועים · ${d.unsynced} unsynced</div></div><div class="sync-pill ${silent?'offline':''}">${silent?'SILENT':timeAgoLabel(d.last)}</div></div>`;
   }).join('');
   setCmdPanelMeta('devices', `${[...deviceMap.values()].filter(d=>C5Rules.isDeviceSilent(d.last)).length} SILENT · ${deviceMap.size} DEVICES`);
+
+  // Real command-dashboard read: incident_command_state via get_incident_command_state RPC
+  // (database/014_command_dashboard_state_rpc.sql). A genuine server-authoritative cross-check
+  // next to the locally-computed priority cards above, not a replacement for them — most of
+  // those cards (reinforcement requests, device/sync counts, per-patient watchdog detail) have
+  // no equivalent in this aggregate snapshot.
+  const serverStateEl=document.getElementById('cmd-server-state');
+  if(serverStateEl){
+    const remote=currentUser ? _remoteCommandState[SITE_TO_INCIDENT_ID[site.id]] : null;
+    if(remote){
+      serverStateEl.innerHTML=`<div class="cmd-matrix-row">
+        <div>
+          <div class="cmd-matrix-title">SERVER SNAPSHOT · ${timeAgoLabel(Date.parse(remote.last_refreshed_at)||0)}</div>
+          <div class="cmd-matrix-sub">incident_command_state · ${remote.total_patients} פצועים · ${remote.active_red_patients} אדום פעיל · ${remote.handed_over_patients} הועברו · ${remote.patients_missing_full_vitals} ללא הערכה מלאה · ${remote.active_watchdog_alerts} התראות פתוחות · ${remote.dead_man_switch_active} Dead Man's Switch</div>
+        </div>
+      </div>`;
+      setCmdPanelMeta('serverstate', `SYNCED · ${timeAgoLabel(Date.parse(remote.last_refreshed_at)||0)}`);
+    } else {
+      serverStateEl.innerHTML=`<div class="cmd-matrix-row"><div class="cmd-matrix-sub">${currentUser?'טרם התקבל מהשרת':'זמין רק במצב מחובר (לא בדמו מקומי)'}</div></div>`;
+      setCmdPanelMeta('serverstate', currentUser?'PENDING':'N/A (LOCAL DEMO)');
+    }
+  }
   renderWatchdogPanel(pts);
 
   const dupes=duplicateCandidates(pts);
@@ -9920,6 +9945,29 @@ async function pullDevicePresenceAll(){
   if(currentUser) refreshActiveScreenData();
 }
 setInterval(()=>{ if(currentUser) pullDevicePresenceAll(); }, 45000);
+
+// ── Real command-dashboard reads: incident_command_state via get_incident_command_state RPC ──
+// See database/014_command_dashboard_state_rpc.sql: incident_command_state is a service-role-only
+// precomputed snapshot (RLS disabled, grants revoked from anon/authenticated), read through a
+// SECURITY DEFINER RPC that performs the same app.can_access_incident() gate used everywhere
+// else, matching docs/API_SURFACE_v1.2.md's "one API-level permission check" for
+// GET /command/incidents/:incidentId/state.
+let _remoteCommandState={}; // incidentId -> row
+async function pullIncidentCommandState(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let result;
+  try{ result=await client.rpc('get_incident_command_state', {p_incident_id:incidentId}); }
+  catch(e){ return; } // offline/network failure — next interval retries
+  if(result.error || !result.data) return;
+  _remoteCommandState[incidentId]=result.data;
+}
+async function pullIncidentCommandStateAll(){
+  await Promise.all(Object.values(SITE_TO_INCIDENT_ID).map(id=>pullIncidentCommandState(id)));
+  if(currentUser) refreshActiveScreenData();
+}
+setInterval(()=>{ if(currentUser) pullIncidentCommandStateAll(); }, 45000);
 // Screens that display patient state need a refresh when projected state changes them in the
 // background — this mirrors goTo()'s per-screen render dispatch but skips the navigation-only
 // side effects (scroll reset, active-class toggling) that would be jarring during a quiet poll.
