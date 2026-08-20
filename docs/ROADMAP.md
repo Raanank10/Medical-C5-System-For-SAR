@@ -58,14 +58,16 @@ Goal: introduce real app boundaries after the workflow stabilizes.
 
 Goal: identify what would be required before any real-world pilot discussion.
 
-- Threat model.
-- Privacy and data minimization review.
-- Authentication and role model.
-- Encrypted local storage design.
-- Audit and retention policy.
-- Failure-mode review for stale data and sync conflicts.
-- Clinical governance review.
-- Field usability testing with synthetic scenarios only.
+`[x]` done, `[~]` partially done (see the note), `[ ]` not started.
+
+- [x] Threat model — `docs/THREAT_MODEL.md`. Top finding: RLS/authorization gaps are the most concrete evidenced risk (four real instances found and fixed in one session), not a hypothetical — a systematic full-coverage audit is the top recommended next step, not incremental discovery.
+- [ ] Privacy and data minimization review.
+- [~] Authentication and role model — real implementation exists and is verified (`docs/ARCHITECTURE.md`), but not yet reviewed as a standalone design document separate from the threat model.
+- [ ] Encrypted local storage design — real gap, see `docs/THREAT_MODEL.md`'s T2.
+- [ ] Audit and retention policy.
+- [ ] Failure-mode review for stale data and sync conflicts.
+- [ ] Clinical governance review.
+- [ ] Field usability testing with synthetic scenarios only.
 
 ## Guiding Constraint
 

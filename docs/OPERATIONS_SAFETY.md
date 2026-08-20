@@ -60,13 +60,13 @@ Require extra review before merging changes that affect:
 
 ## Security and Privacy Direction
 
-Before any real deployment conversation, the project needs:
+Before any real deployment conversation, the project needs (`docs/ROADMAP.md` Phase 5):
 
-- threat model
-- authentication and role model review
-- row-level security review
-- encrypted local storage design
-- audit log retention policy
-- backup and incident response plan
-- data minimization review
-- medical/legal governance review
+- [x] threat model — `docs/THREAT_MODEL.md`
+- [~] authentication and role model review — real Supabase Auth + RLS implemented and verified (`docs/ARCHITECTURE.md`), but not yet reviewed as a standalone design document
+- [~] row-level security review — RLS exists everywhere it should; two real gaps found and fixed live this session (see `docs/THREAT_MODEL.md`'s T1), but no systematic full-coverage audit has been done — T1 names this as the top residual risk
+- [ ] encrypted local storage design — `localStorage` is currently plaintext (`docs/THREAT_MODEL.md`'s T2)
+- [ ] audit log retention policy
+- [ ] backup and incident response plan
+- [ ] data minimization review
+- [ ] medical/legal governance review
