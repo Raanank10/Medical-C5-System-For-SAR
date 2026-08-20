@@ -69,7 +69,7 @@ Ranked by sensitivity, assuming a real (non-synthetic) deployment:
 
 **Pattern**: every one of these was found by deliberately checking a specific policy/grant against the established convention used elsewhere in the same schema, or by re-running the Supabase security advisor after a change — not by a systematic audit. **This strongly suggests more exist that haven't been found yet.** A real pre-pilot review needs a full, deliberate pass over every RLS policy and every `SECURITY DEFINER` function's internal authorization logic, not incremental discovery.
 
-*Mitigation status*: partial. RLS exists everywhere it should (verified via `mcp__Supabase__get_advisors`), and the four known instances above are fixed and verified live. No systematic full-coverage audit has been done.
+*Mitigation status*: the systematic pass this called for has now been done — see `docs/RLS_AUDIT_v1.md`. Every live RLS policy (86, across 32 tables) and every live `SECURITY DEFINER` function (17 in `public`, 4 in `app`) was checked against the schema's `app.*()` authorization-helper convention, not just the migration files (later files overwrite earlier ones; only live state was trusted). Two more real gaps were found this way — both in the account-deactivation path (`profiles.is_active`), not the cross-incident-read class `013`-`016` already covered — and fixed live in `database/017_lock_out_inactive_profiles.sql`, verified with a real deactivated-profile impersonation test, not just inspection. See T4/T8 below for what changed. No further systematic pass is scheduled; a repeat is recommended after any schema change that adds a new table, policy, or `SECURITY DEFINER` function, using `docs/RLS_AUDIT_v1.md`'s table/function checklist as the starting point.
 
 ### T2: Lost or stolen field device exposes local data
 
@@ -87,7 +87,7 @@ A compromised, buggy, or malicious client could push malformed events, events fo
 
 Could a new signup grant itself an elevated role (e.g. `admin`, `cc`) via the invite metadata path?
 
-*Mitigation status*: mitigated. `handle_new_user()` validates the requested role against the real `user_role` enum; an invalid/missing role does not silently default to a plausible-looking role — it creates the profile with `is_active=false`, which every RLS policy and the sync-log function already check, so the account is locked out and obviously wrong rather than silently over-privileged. (Role elevation for a *legitimate* account, e.g. promoting a medic to `pc`, is a separate, deliberate admin action outside signup, by design.)
+*Mitigation status*: mitigated, but wasn't actually live until this session's RLS audit (`docs/RLS_AUDIT_v1.md`). `handle_new_user()` validates the requested role against the real `user_role` enum and is documented (`database/011_handle_new_user_reads_role_from_metadata.sql`) to set `is_active=false` for a missing/invalid role so the account fails closed rather than landing as a fully active, plausible-looking `medic`. The audit found the *live* function body omitted `is_active` from its insert entirely (silently taking the column default of `true`) — root cause unclear, but the documented behavior and the live behavior had diverged. Fixed by redeploying the function in `database/017_lock_out_inactive_profiles.sql`. (Role elevation for a *legitimate* account, e.g. promoting a medic to `pc`, is a separate, deliberate admin action outside signup, by design.)
 
 ### T5: Service-role key leakage
 
@@ -111,17 +111,18 @@ The Supabase anon key is embedded directly in `index.html` (`SUPABASE_ANON_KEY`)
 
 An invited user can authenticate successfully but be deliberately left without an active profile (`is_active=false`) — either intentionally (as with a specific test account handled earlier this session) or by a real onboarding mistake (wrong role in the invite metadata, forgotten activation step).
 
-*Mitigation status*: fails safe, not silently. `is_active=false` is checked everywhere (RLS, sync-log), so a mis-scoped account is locked out rather than granted default/wrong access. The gap is operational, not technical: there's no current admin UI or documented process for *noticing* a stuck/mis-scoped account other than someone checking manually.
+*Mitigation status*: fails safe, not silently — but only as of `docs/RLS_AUDIT_v1.md`'s fixes. This claimed "`is_active=false` is checked everywhere (RLS, sync-log)" before this session; the audit found that was only true of the sync-log Edge Function's own explicit check (`supabase/functions/sync-log/index.ts:145`) — RLS itself did not check `is_active` anywhere, because `app.current_user_role()` and the `incident_memberships`-membership branch of `app.can_access_incident()`/`app.can_write_incident_event()` didn't filter on it. A deactivated profile was fully able to read/write everything RLS gates, not just bypass the one sync-log path. Fixed and verified live in `database/017_lock_out_inactive_profiles.sql` (see `docs/RLS_AUDIT_v1.md`'s "Fix applied" for the live impersonation test). The remaining gap is operational, not technical: there's no current admin UI or documented process for *noticing* a stuck/mis-scoped account other than someone checking manually.
 
 ## Residual Risks and Recommended Priority
 
 Ranked by (severity × how concrete the evidence is), not just severity alone:
 
-1. **A systematic RLS/authorization audit (T1).** Four real instances found incidentally in one session is a strong signal, not noise. This should be a deliberate, complete pass — every policy, every `SECURITY DEFINER` function — before any pilot discussion, not something left to keep surfacing one bug at a time.
-2. **Encrypted local storage (T2).** No mitigation exists today, and the threat scenario (lost/stolen field device) is realistic for the exact operational context this system targets.
-3. **Enable leaked-password protection (T6).** Dashboard-only, but requires the Supabase project to be on a paid plan first (Free tier doesn't offer it) — a cost decision to make explicitly before onboarding real users, not something to defer indefinitely either.
-4. **Service-role key handling review (T5).** Define where/how an operator is expected to store `SUPABASE_SERVICE_ROLE_KEY`, and whether a scoped/short-lived alternative is worth building before this tool sees real use.
-5. **Everything in `docs/PRODUCTION_READINESS.md`'s Security and Privacy section not yet checked off** — secret management review, audit retention policy, data minimization review, and an incident response plan, none of which currently exist as real documents.
+1. **Encrypted local storage (T2).** Now the top open item. No mitigation exists today, and the threat scenario (lost/stolen field device) is realistic for the exact operational context this system targets.
+2. **Enable leaked-password protection (T6).** Dashboard-only, but requires the Supabase project to be on a paid plan first (Free tier doesn't offer it) — a cost decision to make explicitly before onboarding real users, not something to defer indefinitely either.
+3. **Service-role key handling review (T5).** Define where/how an operator is expected to store `SUPABASE_SERVICE_ROLE_KEY`, and whether a scoped/short-lived alternative is worth building before this tool sees real use.
+4. **Everything in `docs/PRODUCTION_READINESS.md`'s Security and Privacy section not yet checked off** — secret management review, audit retention policy, data minimization review, and an incident response plan, none of which currently exist as real documents.
+
+~~A systematic RLS/authorization audit (T1)~~ — **done**, see `docs/RLS_AUDIT_v1.md`. Two more real gaps were found (both in the `is_active`/account-deactivation path, fixed in `database/017_lock_out_inactive_profiles.sql`) and no cross-incident/cross-role escalation gaps remain outstanding as of this pass. Not a closed book forever — re-run the same checklist after any schema change that adds a table, policy, or `SECURITY DEFINER` function — but no longer the top-ranked open item.
 
 ## Explicitly Out of Scope Here
 
