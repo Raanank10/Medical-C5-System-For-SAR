@@ -60,7 +60,7 @@ Goal: identify what would be required before any real-world pilot discussion.
 
 `[x]` done, `[~]` partially done (see the note), `[ ]` not started.
 
-- [x] Threat model — `docs/THREAT_MODEL.md`. Top finding: RLS/authorization gaps are the most concrete evidenced risk (four real instances found and fixed in one session), not a hypothetical — a systematic full-coverage audit is the top recommended next step, not incremental discovery.
+- [x] Threat model — `docs/THREAT_MODEL.md`. Top finding: RLS/authorization gaps are the most concrete evidenced risk. The systematic full-coverage audit the threat model called for is now done — `docs/RLS_AUDIT_v1.md` (86 policies across 32 tables, 21 `SECURITY DEFINER` functions, all reviewed against the live database). Two more real gaps were found and fixed live (`database/017_lock_out_inactive_profiles.sql`, both in the account-deactivation/`is_active` path). Encrypted local storage (T2) is now the threat model's top-ranked open item.
 - [ ] Privacy and data minimization review.
 - [~] Authentication and role model — real implementation exists and is verified (`docs/ARCHITECTURE.md`), but not yet reviewed as a standalone design document separate from the threat model.
 - [ ] Encrypted local storage design — real gap, see `docs/THREAT_MODEL.md`'s T2.
