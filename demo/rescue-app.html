@@ -6953,8 +6953,36 @@ function openPatient(id){
     </div>
     <div style="height:80px"></div>`;
 
-  document.getElementById('detail-bottom-bar').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><button class="btn-primary" onclick="openQuickVitals('${p.id}')">📊 עדכן מדדים</button><button class="btn-primary" style="background:var(--accent)" onclick="speakMist('${p.id}')">🔊 הקרא MIST</button><button class="btn-primary" style="background:var(--green)" onclick="handoverPatient('${p.id}')">הועבר למד״א — עכשיו</button></div>`;
+  const showCollectionPointBtn = p.patientStatus!=='evacuating' && C5Rules.canChangePatientStatus(p);
+  document.getElementById('detail-bottom-bar').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn-primary" onclick="openQuickVitals('${p.id}')">📊 עדכן מדדים</button><button class="btn-primary" style="background:var(--accent)" onclick="speakMist('${p.id}')">🔊 הקרא MIST</button></div><div style="display:grid;grid-template-columns:${showCollectionPointBtn?'1fr 1fr':'1fr'};gap:8px;margin-top:8px">${showCollectionPointBtn?`<button class="btn-primary" style="background:var(--orange)" onclick="markPatientAtCollectionPoint('${p.id}')">🚶 יצא לנקודת איסוף</button>`:''}<button class="btn-primary" style="background:var(--green)" onclick="handoverPatient('${p.id}')">הועבר למד״א — עכשיו</button></div>`;
   goTo('patient');
+}
+
+// Intermediate step before final MDA handover: the patient has left the incident site for the
+// company collection point but is still under the platoon commander's supervision, not yet
+// handed to MDA. Uses the generic PATIENT_STATUS_UPDATED event (already sync-eligible for
+// medic/pc) rather than a new event type, since the server projects patients.current_status
+// straight from its payload - no backend change needed.
+function markPatientAtCollectionPoint(id){
+  const p=patients.find(x=>x.id===id); if(!p) return;
+  if(!C5Rules.canChangePatientStatus(p)){ toast('לא ניתן לשנות — הטיפול בפצוע כבר הסתיים'); return; }
+  if(p.patientStatus==='evacuating'){ toast('הפצוע כבר מסומן כיצא לנקודת איסוף'); return; }
+  p.patientStatus='evacuating';
+  p.lastTouchedBy=getDeviceId();
+  p.lastModifiedAt=new Date().toISOString();
+  p.unsyncedEvents=(p.unsyncedEvents||0)+1;
+  const event={
+    type:'PATIENT_STATUS_UPDATED',
+    time:nowT(),
+    detail:'יצא מהאתר לנקודת איסוף פלוגתית — בפיקוח חוג״ד, ממתין למסירה למד״א',
+    warn:false,
+    payload_json:{status:'evacuating', destination:'company_collection_point', still_under_pc_supervision:true}
+  };
+  p.events.push(event);
+  saveLocalEvent({...event, patient_id:p.id});
+  saveDemoState();
+  toast('סומן: יצא לנקודת איסוף · ממתין למסירה למד״א');
+  openPatient(id);
 }
 
 function handoverPatient(id){
