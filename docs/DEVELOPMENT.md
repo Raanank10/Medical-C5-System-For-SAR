@@ -32,6 +32,12 @@ pip install -r requirements.txt
 python seed_demo_db.py
 ```
 
+Run the analytics test suite (`db.py`/`kpis.py`/`charts.py`/`report.py`):
+
+```bash
+python -m pytest
+```
+
 Generate the sample AAR report:
 
 ```bash
@@ -44,8 +50,9 @@ python -c "from db import DB; from kpis import KPIEngine; from report import Rep
 2. Keep product, schema, API, analytics, and demo changes aligned.
 3. Run `python scripts/check_repo.py` before opening a pull request.
 4. Run `node tests/domain-rules.test.js` when triage, vitals, alert, sync, or timing rules change.
-5. Update docs when behavior, terminology, roles, or metrics change.
-6. Keep all demo data synthetic.
+5. Run `python -m pytest` in `analytics/c5_sentinel_sar_analytics_v1_1/` when `db.py`, `kpis.py`, `charts.py`, or `report.py` change.
+6. Update docs when behavior, terminology, roles, or metrics change.
+7. Keep all demo data synthetic.
 
 ## Branch Naming
 
@@ -67,6 +74,7 @@ Use this checklist for every meaningful change:
 - Safety/privacy assumptions did not become weaker.
 - `python scripts/check_repo.py` passes.
 - `node tests/domain-rules.test.js` passes if domain rules changed.
+- `python -m pytest` (from `analytics/c5_sentinel_sar_analytics_v1_1/`) passes if analytics code changed.
 
 ## Coding Guidelines
 
@@ -82,6 +90,5 @@ Use this checklist for every meaningful change:
 - Demo artifacts are duplicated between `index.html` and `demo/rescue-app.html`.
 - There is no automated browser regression test yet.
 - SQL migrations are draft files rather than an executable migration chain.
-- Analytics has no formal pytest suite yet.
 
 These are acceptable for the current stage, but new work should reduce this debt where practical.
