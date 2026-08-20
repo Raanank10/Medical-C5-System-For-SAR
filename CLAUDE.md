@@ -10,7 +10,7 @@ The repo is intentionally lightweight at this stage: a single-file HTML/JS proto
 
 ## Commands
 
-There is no package.json / build step. The prototype is plain HTML/CSS/JS loaded directly in a browser, and tests use each language's standard library only.
+The prototype itself has no build step — plain HTML/CSS/JS loaded directly in a browser — and its core tests use each language's standard library only. The one exception is a root `package.json` that exists solely to run a real-browser smoke test via Playwright (see below); it is dev-only, manual, and not required to open or use the prototype.
 
 ```bash
 # Open the prototype (no build step)
@@ -27,6 +27,12 @@ node scripts/smoke_v2_991_medic_cc.js
 node scripts/smoke_v2_992_decision_support.js
 # ...other scripts/smoke_*.js files follow the same pattern, one per feature milestone
 
+# Real-browser smoke test (Playwright, headless Chromium) — loads index.html and
+# demo/rescue-app.html and checks they actually render, not just that the HTML text
+# contains expected strings. Manual-only, not wired into CI, requires `npm install` once.
+npm install
+npm run test:browser-smoke            # or: node scripts/browser_smoke_test.js
+
 # Analytics package
 cd analytics/c5_sentinel_sar_analytics_v1_1
 python -m venv .venv
@@ -37,12 +43,14 @@ python -m pytest                  # pytest suite for db.py/kpis.py/charts.py/rep
 python -c "from db import DB; from kpis import KPIEngine; from report import ReportGenerator; db=DB('rescue_demo_v1_1.db'); kpi=KPIEngine(db); ReportGenerator(kpi).save('aar_report_v1_1.html')"
 ```
 
-CI (`.github/workflows/validate.yml`) runs exactly two things on every PR and push to `main`: `python scripts/check_repo.py` and `node tests/domain-rules.test.js`. The smoke scripts under `scripts/smoke_*.js` and the analytics package's `pytest` suite are not wired into CI — they're run manually (smoke scripts against `index.html` / `demo/rescue-app.html`; pytest requires the analytics venv/dependencies CI doesn't install).
+CI (`.github/workflows/validate.yml`) runs exactly two things on every PR and push to `main`: `python scripts/check_repo.py` and `node tests/domain-rules.test.js`. The smoke scripts under `scripts/smoke_*.js`, `scripts/browser_smoke_test.js` (Playwright), and the analytics package's `pytest` suite are not wired into CI — they're run manually (string-assertion smoke scripts and the Playwright smoke test against `index.html` / `demo/rescue-app.html`; pytest requires the analytics venv/dependencies CI doesn't install).
 
 `scripts/check_repo.py` enforces (stdlib only, no deps):
 - a fixed list of required paths exist (`REQUIRED_PATHS` in the script — update it when adding/renaming core docs, schema files, or archive folders)
 - `index.html` and `demo/rescue-app.html` have a doctype and closing `</html>`
 - every relative markdown link across the repo resolves to a real file (no broken/external-repo links)
+- the domain-rules module inlined in `index.html`/`demo/rescue-app.html` hasn't drifted from `src/domain/rules.js`
+- `database/*.sql` structural sanity: balanced parens/`$$` dollar-quoted blocks, and every `references table(...)` target resolves to a real `create table` — see docs/DEVELOPMENT.md's "Validating SQL Drafts" for what this does and doesn't catch (it's not a real SQL parser; a Postgres instance is still the only full validation)
 - every `*.py` file parses without a syntax error
 
 ## Architecture
@@ -100,5 +108,5 @@ This repo's actual product/API/data contracts live in `docs/`, not in code comme
 
 - Branch names: `feature/...`, `fix/...`, `docs/...`, `analytics/...` (short, descriptive).
 - UI strings are in Hebrew (RTL); the app is field-tested in Hebrew, so keep new UI copy consistent with existing terminology rather than introducing English strings.
-- No new production dependencies until there's a clear module boundary (per `docs/DEVELOPMENT.md`); the prototype and its tests are meant to run with nothing beyond Python stdlib, Node stdlib (`node:assert/strict`), and a browser.
+- No new production dependencies until there's a clear module boundary (per `docs/DEVELOPMENT.md`); the prototype and its core tests are meant to run with nothing beyond Python stdlib, Node stdlib (`node:assert/strict`), and a browser. The one deliberate, scoped exception is the root `package.json`'s Playwright dev dependency, used only by `scripts/browser_smoke_test.js` — it's manual-only, not wired into CI, and not required to open or use the prototype.
 - Preserve historical versions under `archive/` rather than deleting superseded docs/schema.

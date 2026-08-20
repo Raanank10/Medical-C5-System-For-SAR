@@ -1,0 +1,12 @@
+{
+  "name": "c5-sentinel-sar-dev-tools",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Dev-only tooling for C5 Sentinel-SAR. The prototype itself (index.html) stays dependency-free and loads directly in a browser with no build step; this package.json exists solely to run the Playwright browser smoke test manually. Not required to open or use the prototype, and not wired into CI - see CLAUDE.md.",
+  "scripts": {
+    "test:browser-smoke": "node scripts/browser_smoke_test.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.0"
+  }
+}
