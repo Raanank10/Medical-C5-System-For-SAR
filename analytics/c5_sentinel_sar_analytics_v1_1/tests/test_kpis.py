@@ -2,7 +2,7 @@
 incident inc_001 - see seed_demo_db.py for the exact scenario).
 
 A few KPIs (vitals_reassessment_compliance, medic_to_critical_ratio,
-data_freshness) compare event timestamps to `pd.Timestamp.utcnow()` at call
+data_freshness) compare event timestamps to `pd.Timestamp.now("UTC")` at call
 time. The seed script anchors its data ~35 minutes before the moment it
 runs, so as long as a test calls the KPI shortly after the `kpi` fixture
 seeds the database (a fraction of a second, never minutes), the computed

@@ -100,7 +100,7 @@ class KPIEngine:
                 rows.append({"patient_id": p["id"], "visual_id": p["visual_id"], "triage": triage, "latest_gap_min": np.nan, "target_min": target, "compliant": False, "reason": "no_vitals"})
                 continue
             last = pv["recorded_at"].max()
-            now = max(pd.Timestamp.utcnow(), last)
+            now = max(pd.Timestamp.now("UTC"), last)
             gap = (now - last).total_seconds() / 60
             rows.append({"patient_id": p["id"], "visual_id": p["visual_id"], "triage": triage, "latest_gap_min": round(gap, 1), "target_min": target, "compliant": gap <= target, "reason": "ok" if gap <= target else "overdue"})
         return pd.DataFrame(rows)
@@ -144,7 +144,7 @@ class KPIEngine:
         for col in ["applied_at", "last_reassessed_at", "next_reassessment_due_at", "released_at"]:
             if col in df.columns:
                 df[col] = pd.to_datetime(df[col], errors="coerce", utc=True)
-        df["is_due"] = df["next_reassessment_due_at"].le(pd.Timestamp.utcnow())
+        df["is_due"] = df["next_reassessment_due_at"].le(pd.Timestamp.now("UTC"))
         return df.sort_values("next_reassessment_due_at")
 
     # ── Operational KPIs ───────────────────────────────────────
@@ -188,7 +188,7 @@ class KPIEngine:
             active_red = int((patients["current_triage"] == "red").sum())
         active_medics = 0
         if not presence.empty:
-            active_medics = int(((pd.Timestamp.utcnow() - presence["last_heartbeat_at"]).dt.total_seconds() <= self.targets.dead_man_switch_min * 60).sum())
+            active_medics = int(((pd.Timestamp.now("UTC") - presence["last_heartbeat_at"]).dt.total_seconds() <= self.targets.dead_man_switch_min * 60).sum())
         return pd.DataFrame([{
             "incident_id": incident_id,
             "active_red_patients": active_red,
@@ -206,7 +206,7 @@ class KPIEngine:
         state = self.db.device_sync_state()
         if state.empty:
             return pd.DataFrame()
-        now = pd.Timestamp.utcnow()
+        now = pd.Timestamp.now("UTC")
         state = state.copy()
         state["seconds_since_pull"] = (now - state["last_successful_pull_at"]).dt.total_seconds()
         state["freshness_state"] = np.select(
@@ -280,7 +280,7 @@ class KPIEngine:
         inv_risk = self.stockout_risk(incident_id)
         row = {
             "incident_id": incident_id,
-            "snapshot_at": pd.Timestamp.utcnow(),
+            "snapshot_at": pd.Timestamp.now("UTC"),
             "total_patients": len(patients),
             "active_red_patients": int((patients["current_triage"] == "red").sum()) if not patients.empty else 0,
             "unresolved_alerts": len(alerts),
