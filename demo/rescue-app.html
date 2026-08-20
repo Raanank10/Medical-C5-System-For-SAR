@@ -2887,7 +2887,11 @@ async function loadProfileAndEnter(client, userId){
   renderAuthStatus();
   enterAuthenticatedRole(profile.role);
   scheduleSyncPush();
-  syncPullAll(); // don't wait for the 45s interval on a fresh login with an empty outbox
+  // Don't wait for the 45s interval on a fresh login — get real state on screen immediately.
+  syncPullAll();
+  pullProjectedPatientStateAll();
+  pushDevicePresenceAll();
+  pullDevicePresenceAll();
   return true;
 }
 function enterAuthenticatedRole(serverRole){
@@ -9174,13 +9178,28 @@ function renderCommandOperationalPanels(pts, site){
   }).join('') || '<div class="cmd-matrix-row"><div class="cmd-matrix-sub">אין פצועים פעילים למיפוי.</div></div>';
   setCmdPanelMeta('heatmap', `${commandState.sectors.length} SECTORS · CACHE`);
 
+  // Real device_presence rows when logged in and available; local-demo mode (no login, so
+  // _remoteDevicePresence never populates) falls back to inferring devices from locally-known
+  // patients' lastTouchedBy — the previous behavior, unchanged for the offline demo story.
   const deviceMap=new Map();
-  pts.forEach(p=>{
-    const id=p.lastTouchedBy||p.medic||'UNKNOWN';
-    if(!deviceMap.has(id)) deviceMap.set(id,{id,last:0,patients:0,unsynced:0});
-    const d=deviceMap.get(id); d.patients++; d.unsynced+=(p.unsyncedEvents||0); d.last=Math.max(d.last,p.lastVitalsAt||0,Date.parse(p.lastModifiedAt||'')||0);
-  });
-  if(!deviceMap.has(getDeviceId())) deviceMap.set(getDeviceId(),{id:getDeviceId(),last:Date.now(),patients:0,unsynced:localOutboxCount()});
+  if(currentUser && _remoteDevicePresence.length){
+    _remoteDevicePresence.forEach(d=>{
+      if(!deviceMap.has(d.device_id)) deviceMap.set(d.device_id,{id:d.device_id,last:Date.parse(d.last_heartbeat_at)||0,patients:0,unsynced:0,syncStatus:d.sync_status});
+    });
+    pts.forEach(p=>{
+      const id=p.lastTouchedBy||p.medic;
+      if(id && deviceMap.has(id)) deviceMap.get(id).patients++;
+    });
+    if(!deviceMap.has(getDeviceId())) deviceMap.set(getDeviceId(),{id:getDeviceId(),last:Date.now(),patients:0,unsynced:localOutboxCount()});
+    else deviceMap.get(getDeviceId()).unsynced=localOutboxCount();
+  } else {
+    pts.forEach(p=>{
+      const id=p.lastTouchedBy||p.medic||'UNKNOWN';
+      if(!deviceMap.has(id)) deviceMap.set(id,{id,last:0,patients:0,unsynced:0});
+      const d=deviceMap.get(id); d.patients++; d.unsynced+=(p.unsyncedEvents||0); d.last=Math.max(d.last,p.lastVitalsAt||0,Date.parse(p.lastModifiedAt||'')||0);
+    });
+    if(!deviceMap.has(getDeviceId())) deviceMap.set(getDeviceId(),{id:getDeviceId(),last:Date.now(),patients:0,unsynced:localOutboxCount()});
+  }
   document.getElementById('cmd-device-panel').innerHTML=[...deviceMap.values()].map(d=>{
     const silent=C5Rules.isDeviceSilent(d.last);
     return `<div class="device-row ${silent?'offline':''}"><div><div class="device-name">${d.id}</div><div class="device-meta">${d.patients} פצועים · ${d.unsynced} unsynced</div></div><div class="sync-pill ${silent?'offline':''}">${silent?'SILENT':timeAgoLabel(d.last)}</div></div>`;
@@ -9855,6 +9874,52 @@ function pullProjectedPatientStateAll(){
   Object.values(SITE_TO_INCIDENT_ID).forEach(id=>pullProjectedPatientState(id));
 }
 setInterval(()=>{ if(currentUser) pullProjectedPatientStateAll(); }, 45000);
+
+// ── Device presence: real heartbeat write + read (device_presence table) ──
+// Replaces the command device panel's previous fake presence, which only ever inferred
+// "devices" from lastTouchedBy fields on locally-known patients. device_presence already has
+// full RLS coverage (database/004_rls_gap_fixes_and_trigger_security_definer.sql,
+// database/005_rls_performance_fixes.sql: read scoped by app.can_access_incident, write scoped
+// to the caller's own actor_id or a command role) — no new server-side work needed, just using
+// what was already provisioned but never wired up client-side.
+async function pushDevicePresence(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  try{
+    await client.from('device_presence').upsert({
+      incident_id:incidentId,
+      actor_id:currentUser.id,
+      device_id:getDeviceId(),
+      last_heartbeat_at:new Date().toISOString(),
+      sync_status: localOutboxCount()>0 ? 'syncing' : 'online'
+    }, {onConflict:'incident_id,actor_id,device_id'});
+  }catch(e){} // offline — next interval retries
+}
+function pushDevicePresenceAll(){
+  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>pushDevicePresence(id));
+}
+setInterval(()=>{ if(currentUser) pushDevicePresenceAll(); }, 45000);
+
+let _remoteDevicePresence=[]; // in-memory, replaced per incident on each pull cycle
+async function pullDevicePresence(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let result;
+  try{
+    result=await client.from('device_presence')
+      .select('incident_id,actor_id,device_id,last_heartbeat_at,sync_status,current_patient_id')
+      .eq('incident_id', incidentId);
+  }catch(e){ return; }
+  if(result.error || !result.data) return;
+  _remoteDevicePresence=[..._remoteDevicePresence.filter(d=>d.incident_id!==incidentId), ...result.data];
+}
+async function pullDevicePresenceAll(){
+  await Promise.all(Object.values(SITE_TO_INCIDENT_ID).map(id=>pullDevicePresence(id)));
+  if(currentUser) refreshActiveScreenData();
+}
+setInterval(()=>{ if(currentUser) pullDevicePresenceAll(); }, 45000);
 // Screens that display patient state need a refresh when projected state changes them in the
 // background — this mirrors goTo()'s per-screen render dispatch but skips the navigation-only
 // side effects (scroll reset, active-class toggling) that would be jarring during a quiet poll.
