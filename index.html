@@ -2062,8 +2062,15 @@ textarea{resize:vertical;min-height:70px;}
 })(typeof globalThis !== "undefined" ? globalThis : window, function buildDomainRules() {
   "use strict";
 
-  const VITALS_INTERVAL_MS = 5 * 60 * 1000;
-  const WARN_AT_MS = 4 * 60 * 1000;
+  // Vitals reassessment interval varies by triage color - higher acuity gets checked more
+  // often. A patient with no/unset triage yet (freshly created, not yet MSTART-triaged)
+  // defaults to the red interval: most conservative until an actual color is known.
+  const VITALS_INTERVAL_MS_BY_TRIAGE = {
+    red: 10 * 60 * 1000,
+    yellow: 20 * 60 * 1000,
+    green: 30 * 60 * 1000,
+  };
+  const VITALS_WARN_BUFFER_MS = 60 * 1000;
   const TOURNIQUET_WARN_MS = 40 * 60 * 1000;
   const TOURNIQUET_CRITICAL_MS = 60 * 60 * 1000;
   const AVPU_RANK = { A: 0, V: 1, P: 2, U: 3 };
@@ -2114,14 +2121,23 @@ textarea{resize:vertical;min-height:70px;}
     return nowMs - (patient?.lastVitalsAt || 0);
   }
 
+  function vitalsIntervalMsFor(triage) {
+    return VITALS_INTERVAL_MS_BY_TRIAGE[triage] || VITALS_INTERVAL_MS_BY_TRIAGE.red;
+  }
+
+  function isVitalsOverdue(patient, nowMs = Date.now()) {
+    return needsVitals(patient) && vitalsAgeMs(patient, nowMs) >= vitalsIntervalMsFor(patient?.triage);
+  }
+
   function vitalsTimer(patient, nowMs = Date.now()) {
     if (!needsVitals(patient)) return null;
+    const intervalMs = vitalsIntervalMsFor(patient.triage);
     const age = vitalsAgeMs(patient, nowMs);
-    if (age >= VITALS_INTERVAL_MS) {
+    if (age >= intervalMs) {
       return { cls: "overdue", minutes: Math.floor(age / 60000), remainingMinutes: 0 };
     }
-    const remainingMinutes = Math.ceil((VITALS_INTERVAL_MS - age) / 60000);
-    if (age >= WARN_AT_MS) {
+    const remainingMinutes = Math.ceil((intervalMs - age) / 60000);
+    if (age >= intervalMs - VITALS_WARN_BUFFER_MS) {
       return { cls: "warn", minutes: Math.floor(age / 60000), remainingMinutes };
     }
     return { cls: "ok", minutes: Math.floor(age / 60000), remainingMinutes };
@@ -2214,7 +2230,7 @@ textarea{resize:vertical;min-height:70px;}
   }
 
   function isRoutineAlert(patient, nowMs = Date.now()) {
-    return needsVitals(patient) && vitalsAgeMs(patient, nowMs) >= VITALS_INTERVAL_MS;
+    return isVitalsOverdue(patient, nowMs);
   }
 
   function isCriticalAlert(patient) {
@@ -2252,8 +2268,8 @@ textarea{resize:vertical;min-height:70px;}
     FINAL_PATIENT_STATUSES,
     TOURNIQUET_CRITICAL_MS,
     TOURNIQUET_WARN_MS,
-    VITALS_INTERVAL_MS,
-    WARN_AT_MS,
+    VITALS_INTERVAL_MS_BY_TRIAGE,
+    VITALS_WARN_BUFFER_MS,
     canChangePatientStatus,
     computeMstartTriage,
     detectDeterioration,
@@ -2263,6 +2279,7 @@ textarea{resize:vertical;min-height:70px;}
     isHighRiskDose,
     isPediatricPatient,
     isRoutineAlert,
+    isVitalsOverdue,
     needsVitals,
     PEDIATRIC_AGE_CUTOFF,
     PEDIATRIC_HIGH_RISK_DOSE_LIMITS,
@@ -2271,6 +2288,7 @@ textarea{resize:vertical;min-height:70px;}
     timeCodeToTodayMs,
     tourniquetTimer,
     vitalsAgeMs,
+    vitalsIntervalMsFor,
     vitalsTimer,
   };
 });
@@ -2318,8 +2336,6 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const VITALS_INTERVAL_MS = C5Rules.VITALS_INTERVAL_MS;
-const WARN_AT_MS = C5Rules.WARN_AT_MS;
 const APP_VERSION = '2.99.5';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
@@ -2618,7 +2634,7 @@ function assessmentDebtHtml(p={}, compact=false){
   const debt=assessmentDebtList(p);
   if(!debt.length) return compact?'':'<div class="chip-row"><span class="identity-chip">חוב הערכה: אין</span></div>';
   return `<div class="chip-row" style="margin-top:6px">${debt.map(d=>{
-    const cls=(p.triage==='red' && ['full_vitals','evacuation_status','no_reassessment'].includes(d))?'critical':needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS?'overdue':'';
+    const cls=(p.triage==='red' && ['full_vitals','evacuation_status','no_reassessment'].includes(d))?'critical':isVitalsOverdue(p)?'overdue':'';
     return `<span class="debt-chip ${cls}">${DEBT_LABELS[d]||d}</span>`;
   }).join('')}</div>`;
 }
@@ -2635,7 +2651,7 @@ function lifeSavingSummary(p={}){
 }
 function getNextAction(p={}, role='medic'){
   const debt=assessmentDebtList(p);
-  const stale=needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS;
+  const stale=isVitalsOverdue(p);
   const status=normalizeTrapStatus(p);
   const openSupply=(reinforcementRequests||[]).some(r=>r.type==='resupply' && isRequestOpen(r) && (r.linkedPatientId===p.id || r.requestedByName===currentMedicName()));
   const lowSupply=lowStockEntries(state.localStockCache).some(x=>x.value<=x.threshold);
@@ -3715,7 +3731,7 @@ function updateDemoStatus(){
     el.textContent=label;
     el.className='sync-pill '+(demoSyncMode==='fresh'?'':demoSyncMode);
   });
-  const openAlerts=patients.filter(p=>p.alert || (needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS)).length;
+  const openAlerts=patients.filter(p=>p.alert || (isVitalsOverdue(p))).length;
   const handed=patients.filter(p=>['evacuating','evacuated'].includes(p.patientStatus)).length;
   const openRequests=reinforcementRequests.filter(isRequestOpen).length;
   const line=`${patients.length} פצועים · ${openAlerts} התראות · ${openRequests} תגבור · ${handed} הועברו`;
@@ -4112,7 +4128,7 @@ const DecisionSupportEngine=(()=>{
   function evaluatePatientDeterioration(ctx=defaultContext()){
     const recs=[];
     (ctx.patients||[]).forEach(p=>{
-      const stale=needsVitals(p)&&vitalsAgeMs(p,ctx.nowMs)>=VITALS_INTERVAL_MS;
+      const stale=isVitalsOverdue(p,ctx.nowMs);
       const deteriorating=(p.deterioration||[]).length>0;
       const evacuationDelayed=['red','yellow'].includes(p.triage) && !['evacuating','evacuated','handed_over','deceased'].includes(p.patientStatus);
       if((p.triage==='red'&&stale) || deteriorating){
@@ -4334,7 +4350,7 @@ const DecisionSupportEngine=(()=>{
       if(p.triage==='red') s.red++;
       s.activeMedics.add(p.assignedMedicId||userIdFromMedic(p.medic||p.lastTouchedBy)||'UNKNOWN');
       if(['red','yellow'].includes(p.triage)&&!['evacuating','evacuated','handed_over','deceased'].includes(p.patientStatus)) s.evacDelayed++;
-      if(p.alert || (p.deterioration||[]).length || (needsVitals(p)&&vitalsAgeMs(p,ctx.nowMs)>=VITALS_INTERVAL_MS)) s.unresolvedAlerts++;
+      if(p.alert || (p.deterioration||[]).length || (isVitalsOverdue(p,ctx.nowMs))) s.unresolvedAlerts++;
       s.tourniquets+=activeTourniquets(p).length;
     });
     const lowSupply=Object.entries(ctx.pcTruckStock||{}).filter(([k,v])=>v<=(demoSupplyThreshold(k).warning ?? PC_TRUCK_LOW_THRESHOLDS[k] ?? 1)).length;
@@ -4350,7 +4366,7 @@ const DecisionSupportEngine=(()=>{
   function OperationalPressureIndex(ctx=defaultContext()){
     const total=(ctx.patients||[]).length;
     const activeMedics=Math.max(1,DEMO_USERS.filter(u=>u.role==='medic'&&u.active).length);
-    const criticalAlerts=(ctx.patients||[]).filter(p=>p.alert||(p.deterioration||[]).length||(p.triage==='red'&&needsVitals(p)&&vitalsAgeMs(p,ctx.nowMs)>=VITALS_INTERVAL_MS)).length;
+    const criticalAlerts=(ctx.patients||[]).filter(p=>p.alert||(p.deterioration||[]).length||(p.triage==='red'&&isVitalsOverdue(p,ctx.nowMs))).length;
     const logisticsShortages=Object.entries(ctx.pcTruckStock||{}).filter(([k,v])=>v<=(demoSupplyThreshold(k).warning ?? PC_TRUCK_LOW_THRESHOLDS[k] ?? 1)).length;
     const evacQueue=(ctx.patients||[]).filter(p=>['red','yellow'].includes(p.triage)&&!['evacuating','evacuated','handed_over','deceased'].includes(p.patientStatus)).length;
     const score=Math.min(100,Math.round(total*5+(total/activeMedics)*8+criticalAlerts*14+logisticsShortages*8+evacQueue*10));
@@ -4439,7 +4455,7 @@ function renderPcNowTaskBoard(myPts){
   myPts.forEach(p=>{
     const debt=assessmentDebtList(p);
     const trapped=normalizeTrapStatus(p)==='trapped';
-    const stale=needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS;
+    const stale=isVitalsOverdue(p);
     const immediateReasons=[];
     const actions=[
       pcTaskAction('הקצה חובש',`demoReassignWithinPlatoon()`),
@@ -4519,7 +4535,7 @@ function renderPcResponsibilityBoard(){
   const buttons=[
     ['medics',`חובשים בקריסה`,`${medics.length} חובשים · עומס לפי פצועים ועדכון אחרון`],
     ['patients',`הפצועים שלי`,`${myPts.length} פצועים · ${myPts.filter(p=>['red','yellow'].includes(p.triage)).length} אדום/צהוב · ${myPts.filter(p=>normalizeTrapStatus(p)==='trapped').length} לכודים`],
-    ['status',`סטטוס פצועים`,`${myPts.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS).length} מדדים ישנים · פינוי/חסם/לכוד`],
+    ['status',`סטטוס פצועים`,`${myPts.filter(p=>isVitalsOverdue(p)).length} מדדים ישנים · פינוי/חסם/לכוד`],
     ['requests',`בקשות ומשאבים`,`${roleScopedRequests('pc').filter(isRequestOpen).length} בקשות פתוחות`],
     ['alerts',`התראות החלטה`,`${roleAlertRows('pc').length} התראות מנותבות לחוג"ד`]
   ].map(([key,title,sub])=>`<button class="role-row" onclick="showRoleDrilldown('${key}')" style="width:100%;text-align:right;cursor:pointer"><div class="role-row-title">${title}</div><div class="role-row-sub">${sub}</div></button>`).join('');
@@ -4532,7 +4548,7 @@ function renderDedicatedPcCommandBoard(myPts){
   const trapped=myPts.filter(p=>normalizeTrapStatus(p)==='trapped').length;
   const activeAlerts=myPts.filter(p=>p.alert===true && !p.alertAcknowledgedAt);
   const tqPts=myPts.filter(p=>p.tourniquet);
-  const stale=myPts.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS);
+  const stale=myPts.filter(p=>isVitalsOverdue(p));
   const alertStrip=activeAlerts.length ? activeAlerts.map(p=>`
     <div class="alert-banner ${triageKey(p.triage)}" style="border-color:var(--${triageKey(p.triage)==='black'?'muted':triageKey(p.triage)});margin:6px 0">
       <span style="font-family:var(--mono);font-weight:900">${p.id}</span>
@@ -4621,7 +4637,7 @@ function pcDrilldownHtml(key){
     const rows=DEMO_USERS.filter(u=>u.role==='medic' && u.platoonId==='PLT-A').map(u=>{
       const pts=myPts.filter(p=>(p.assignedMedicId||userIdFromMedic(p.medic||p.lastTouchedBy))===u.userId);
       const red=pts.filter(p=>p.triage==='red').length;
-      const stale=pts.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS).length;
+      const stale=pts.filter(p=>isVitalsOverdue(p)).length;
       return roleRow(displayUser(u.userId),`${pts.length} פצועים · ${red} אדומים · ${stale} מדדים באיחור · עדכון אחרון ${pts[0]?.time||'—'}`);
     }).join('');
     return roleSection('חובשים בקריסה', rows);
@@ -4634,7 +4650,7 @@ function pcDrilldownHtml(key){
     return roleSection('הפצועים שלי לפי סטטוס', rows);
   }
   if(key==='status'){
-    const rows=myPts.map(p=>roleRow(`${p.id} · ${TRIAGE_LABELS[p.triage]||p.triage}`,`${STATUS_LABELS[p.patientStatus]||''} · ${TRAP_LABELS[normalizeTrapStatus(p)]||'לא תועד'} · ${p.tourniquet?'חסם פעיל':'ללא חסם'} · ${needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS?'מדדים באיחור':'מדדים תקינים/לא נדרשים'}`)).join('');
+    const rows=myPts.map(p=>roleRow(`${p.id} · ${TRIAGE_LABELS[p.triage]||p.triage}`,`${STATUS_LABELS[p.patientStatus]||''} · ${TRAP_LABELS[normalizeTrapStatus(p)]||'לא תועד'} · ${p.tourniquet?'חסם פעיל':'ללא חסם'} · ${isVitalsOverdue(p)?'מדדים באיחור':'מדדים תקינים/לא נדרשים'}`)).join('');
     return roleSection('סטטוס פצועים', rows);
   }
   if(key==='requests'){
@@ -5134,7 +5150,7 @@ function assessmentDebtForPatient(p){
   if(!normalizeTrapStatus(p)) debt.push('missing_trap_status');
   if(!p.txHistory || !p.txHistory.length) debt.push('missing_treatment');
   if(!['evacuating','evacuated','handed_over'].includes(p.patientStatus)) debt.push('pending_handover');
-  if(needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS) debt.push('stale_vitals');
+  if(isVitalsOverdue(p)) debt.push('stale_vitals');
   if(p.tourniquet && !p.tourniquet.timeCode) debt.push('tourniquet_time_unknown');
   return debt;
 }
@@ -5163,7 +5179,7 @@ function exportExperimentLog(){
     started_at:experimentStartedAt,
     exported_at:new Date().toISOString(),
     total_patients:patients.length,
-    stale_patients:patients.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS).length,
+    stale_patients:patients.filter(p=>isVitalsOverdue(p)).length,
     unsynced_events:patients.reduce((s,p)=>s+(p.unsyncedEvents||0),0)+localOutboxCount(),
     commander_open_alerts:alertRows.filter(a=>a.audience.includes('pc')||a.audience.includes('chamal')).length,
     acknowledged_alerts:patients.filter(p=>p.alertAcknowledgedAt).length,
@@ -5379,6 +5395,9 @@ function needsVitals(p){
 function vitalsAgeMs(p){
   return C5Rules.vitalsAgeMs(p);
 }
+function isVitalsOverdue(p, nowMs){
+  return C5Rules.isVitalsOverdue(p, nowMs);
+}
 function vitalsTimerLabel(p){
   const timer=C5Rules.vitalsTimer(p);
   if(!timer) return null;
@@ -5518,7 +5537,7 @@ function patientPriorityScore(p){
   const hasDeter   = p.deterioration && p.deterioration.length > 0;
   const hasTq      = !!p.tourniquet;
   const isTrapped  = normalizeTrapStatus(p)==='trapped';
-  const stale      = needsVitals(p) && vitalsAgeMs(p)>=VITALS_INTERVAL_MS;
+  const stale      = isVitalsOverdue(p);
   const unconfBlack = p.triage==='black' && !p.confirmedClinical;
 
   if(p.triage==='red' && activeAlert && hasDeter)  return 0;
@@ -6316,7 +6335,7 @@ function buildAlertObjects(pts=patients){
     if(p.triage==='red' && !['evacuating','evacuated','handed_over'].includes(p.patientStatus)){
       pushAlert(alerts,{...base,id:`evac-${p.id}`,type:'RED_WITHOUT_EVAC_STATUS',severity:'high',owner:'pc',audience:['pc','cc'],escalatesTo:'cc',escalateAfterMin:5,actionRequired:'request_evac',scope:'patient',category:'evac',title:`${p.id} — אדום ללא סטטוס פינוי`,detail:'נדרש תעדוף / הקצאת פינוי או אישור עיכוב'});
     }
-    if(needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS){
+    if(isVitalsOverdue(p)){
       pushAlert(alerts,{...base,id:`vitals-${p.id}`,type:redOrYellow?'STALE_VITALS_PRIORITY':'STALE_VITALS_GREEN',severity:redOrYellow?'high':'medium',owner:'medic',audience:redOrYellow?['medic','pc']:['medic'],escalatesTo:redOrYellow?'pc':null,escalateAfterMin:redOrYellow?5:null,actionRequired:'update_vitals',scope:'patient',category:redOrYellow?'data':'complete',title:`${p.id} — מדדים באיחור`,detail:`עדכון אחרון: ${timeAgoLabel(p.lastVitalsAt||patientClockStart(p))}`});
     }
     const debt=assessmentDebtForPatient(p).filter(x=>!['pending_handover'].includes(x));
@@ -8274,7 +8293,7 @@ function renderCmdTabs(){
   const visible=allSites.filter(s=>canSeeCommandSite(s.id));
   el.innerHTML=visible.map(s=>{
     const pts=getSitePatients(s.id);
-    const hasAlert=pts.some(p=>(p.deterioration&&p.deterioration.length)||(needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS));
+    const hasAlert=pts.some(p=>(p.deterioration&&p.deterioration.length)||(isVitalsOverdue(p)));
     return `<button class="cmd-site-tab${s.id===cmdActiveSite?' active':''}${hasAlert?' has-alert':''}" onclick="switchCmdSite('${s.id}')">${s.id==='ALL'?'🌐 הכל':s.id==='SITE_A'?'📍 A':'📍 B'}${hasAlert?' 🔴':''}</button>`;
   }).join('');
 }
@@ -8493,7 +8512,7 @@ function patientMatchesBoardFilter(p){
   if(patientBoardFilter==='tourniquet') return !!p.tourniquet;
   if(patientBoardFilter==='airway') return (p.lifeSavingTreatments||[]).some(t=>t.treatmentType==='airway') || (p.txHistory||[]).some(t=>String(t.text||'').includes('נתיב'));
   if(patientBoardFilter==='no_vitals') return p.needsFullAssessment || (p.assessmentDebt||[]).includes('full_vitals');
-  if(patientBoardFilter==='stale') return needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS;
+  if(patientBoardFilter==='stale') return isVitalsOverdue(p);
   if(patientBoardFilter==='unknown_identity') return p.identityStatus==='unknown' || !p.fullName || p.fullName==='לא מזוהה';
   if(patientBoardFilter==='low_supplies') return lowStockEntries(state.localStockCache).length>0;
   if(patientBoardFilter==='zone') return (p.zone||p.locDetail)===zoneLabel();
@@ -8566,8 +8585,10 @@ function computeWatchdogRows(pts){
       rows.push({patient:p.id, name:'Tourniquet Critical', trigger:'Tourniquet per limb', threshold:'+120m', state:tqMin>=120?'red':'ok', detail:`${p.tourniquet.limb||'גפה לא צוינה'} · ${tqMin} דק׳`});
     }
     const vitalsMin=Math.floor((now-(p.lastVitalsAt||patientClockStart(p)))/60000);
-    if(p.triage==='red') rows.push({patient:p.id, name:'Reassessment RED', trigger:'Triage = RED', threshold:'Every 10m', state:vitalsMin>=10?'prompt':'ok', detail:`מדדים אחרונים ${vitalsMin} דק׳`});
-    if(p.triage==='yellow') rows.push({patient:p.id, name:'Reassessment YELLOW', trigger:'Triage = YELLOW', threshold:'Every 30m', state:vitalsMin>=30?'prompt':'ok', detail:`מדדים אחרונים ${vitalsMin} דק׳`});
+    if(['red','yellow','green'].includes(p.triage)){
+      const intervalMin=Math.round(C5Rules.vitalsIntervalMsFor(p.triage)/60000);
+      rows.push({patient:p.id, name:`Reassessment ${p.triage.toUpperCase()}`, trigger:`Triage = ${p.triage.toUpperCase()}`, threshold:`Every ${intervalMin}m`, state:vitalsMin>=intervalMin?'prompt':'ok', detail:`מדדים אחרונים ${vitalsMin} דק׳`});
+    }
   });
   const devices=new Map();
   pts.forEach(p=>{
@@ -8980,7 +9001,7 @@ function renderReinforcementPanel(){
   }).join('');
 }
 function renderCommandOperationalPanels(pts, site){
-  const stale=pts.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS);
+  const stale=pts.filter(p=>isVitalsOverdue(p));
   const tqOverdue=pts.filter(p=>p.tourniquet && Date.now()-p.tourniquet.appliedAt>=60*60*1000);
   const trappedSilent=pts.filter(p=>normalizeTrapStatus(p)==='trapped' && vitalsAgeMs(p)>=10*60*1000);
   const evacBlocked=pts.filter(p=>p.triage==='red' && !['evacuating','evacuated','handed_over'].includes(p.patientStatus));
@@ -9095,7 +9116,7 @@ function renderCmdContent(){
     ah+=`<div style="margin:8px 16px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px">${allSites.filter(s=>s.id!=='ALL').map(s=>{
       const sp=getSitePatients(s.id); const sc={red:0,yellow:0,green:0};
       sp.forEach(p=>{if(sc[p.triage]!==undefined)sc[p.triage]++;});
-      const al=sp.some(p=>(p.deterioration&&p.deterioration.length)||(needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS));
+      const al=sp.some(p=>(p.deterioration&&p.deterioration.length)||(isVitalsOverdue(p)));
       return `<div style="background:var(--surface);border:1px solid ${al?'var(--red)':'var(--border)'};border-radius:12px;padding:12px;cursor:pointer" onclick="switchCmdSite('${s.id}')">
         <div style="font-weight:700;font-size:13px;margin-bottom:8px${al?';color:var(--red)':''}">${s.name.split('—')[0].trim()} ${al?'🔴':''}</div>
         <div style="display:flex;gap:10px;font-family:var(--mono);font-size:16px;font-weight:700"><span style="color:var(--red)">${sc.red}</span><span style="color:var(--yellow)">${sc.yellow}</span><span style="color:var(--green)">${sc.green}</span></div>
@@ -9131,7 +9152,7 @@ function renderCmdPatients(){
   if(cmdFilter==='red') list=list.filter(p=>p.triage==='red');
   else if(cmdFilter==='yellow') list=list.filter(p=>p.triage==='yellow');
   else if(cmdFilter==='trapped') list=list.filter(p=>normalizeTrapStatus(p)==='trapped');
-  else if(cmdFilter==='alerts') list=list.filter(p=>(p.deterioration&&p.deterioration.length)||(needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS));
+  else if(cmdFilter==='alerts') list=list.filter(p=>(p.deterioration&&p.deterioration.length)||(isVitalsOverdue(p)));
   list.sort((a,b)=>{
     const ad=(a.deterioration&&a.deterioration.length)?0:1, bd=(b.deterioration&&b.deterioration.length)?0:1;
     if(ad!==bd) return ad-bd;
@@ -9151,7 +9172,7 @@ function renderCmdPatients(){
         ${assessmentDebtForPatient(p).length?`<div style="font-size:11px;color:var(--orange);font-weight:700;margin-top:2px">יש לקחת מדדים: ${assessmentDebtForPatient(p).join(', ')}</div>`:''}
         ${tourniquetTimerLabel(p)?`<div style="margin-top:4px"><span class="tq-timer ${tourniquetTimerLabel(p).cls}">${tourniquetTimerLabel(p).label}</span></div>`:''}
         ${p.deterioration&&p.deterioration.length?`<div style="font-size:11px;color:var(--red);font-weight:700;margin-top:2px">⚠ ${p.deterioration.join(' · ')}</div>`:''}
-        ${!(p.deterioration&&p.deterioration.length)&&needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS?`<div style="font-size:11px;color:var(--orange);margin-top:2px">⏱ מדדים נדרשים</div><button class="demo-mini-btn" onclick="event.stopPropagation();remindMedicVitals('${p.id}')" style="margin-top:6px">תזכר לחובש</button>`:''}
+        ${!(p.deterioration&&p.deterioration.length)&&isVitalsOverdue(p)?`<div style="font-size:11px;color:var(--orange);margin-top:2px">⏱ מדדים נדרשים</div><button class="demo-mini-btn" onclick="event.stopPropagation();remindMedicVitals('${p.id}')" style="margin-top:6px">תזכר לחובש</button>`:''}
         <div class="next-action-box">פעולה: ${nextActionForPatient(p,commandRole==='cc'?'cc':'pc')}</div>
       </div>
       <div class="cmd-vitals">
@@ -9259,7 +9280,7 @@ function renderAar(){
   const total=patients.length;
   const red=patients.filter(p=>p.triage==='red').length;
   const handed=patients.filter(p=>['evacuating','evacuated'].includes(p.patientStatus)).length;
-  const openAlerts=patients.filter(p=>p.alert || (needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS)).length;
+  const openAlerts=patients.filter(p=>p.alert || (isVitalsOverdue(p))).length;
   const tqDue=patients.filter(p=>p.tourniquet && Date.now()-p.tourniquet.appliedAt>=40*60*1000).length;
   const activeTqTotal=totalActiveTourniquets(patients);
   const allTourniquets=patients.flatMap(p=>ensureTourniquetArray(p));
@@ -9279,7 +9300,7 @@ function renderAar(){
   }).find(Number.isFinite);
   const longestTqMinutes=Math.max(0,...patients.map(p=>longestActiveTourniquet(p)).filter(Boolean).map(t=>elapsedMinutes(t.appliedAt)));
   const tqMissingVitals=patients.filter(p=>activeTourniquets(p).length && assessmentDebtList(p).includes('full_vitals')).length;
-  const stale=patients.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS).length;
+  const stale=patients.filter(p=>isVitalsOverdue(p)).length;
   const unsynced=patients.reduce((sum,p)=>sum+(p.unsyncedEvents||0),0)+localOutboxCount();
   const perMedic=new Map();
   patients.forEach(p=>perMedic.set(p.lastTouchedBy||p.medic||'UNKNOWN',(perMedic.get(p.lastTouchedBy||p.medic||'UNKNOWN')||0)+1));
@@ -9343,7 +9364,7 @@ function renderAar(){
       </div>
     </div>`).join('');
   document.getElementById('aar-timeline').innerHTML=timeline || '<div class="aar-note"><div class="aar-note-body">אין אירועים להצגה.</div></div>';
-  const overdue=patients.filter(p=>needsVitals(p)&&vitalsAgeMs(p)>=VITALS_INTERVAL_MS);
+  const overdue=patients.filter(p=>isVitalsOverdue(p));
   const pcRequests=reinforcementRequests.filter(r=>r.requestedByRole==='pc').length;
   const ccOpenRequests=reinforcementRequests.filter(isRequestOpen).length;
   const logisticsShortages=logisticsCompanies().reduce((sum,c)=>sum+c.lowItems.length,0);

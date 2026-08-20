@@ -7,8 +7,15 @@
 })(typeof globalThis !== "undefined" ? globalThis : window, function buildDomainRules() {
   "use strict";
 
-  const VITALS_INTERVAL_MS = 5 * 60 * 1000;
-  const WARN_AT_MS = 4 * 60 * 1000;
+  // Vitals reassessment interval varies by triage color - higher acuity gets checked more
+  // often. A patient with no/unset triage yet (freshly created, not yet MSTART-triaged)
+  // defaults to the red interval: most conservative until an actual color is known.
+  const VITALS_INTERVAL_MS_BY_TRIAGE = {
+    red: 10 * 60 * 1000,
+    yellow: 20 * 60 * 1000,
+    green: 30 * 60 * 1000,
+  };
+  const VITALS_WARN_BUFFER_MS = 60 * 1000;
   const TOURNIQUET_WARN_MS = 40 * 60 * 1000;
   const TOURNIQUET_CRITICAL_MS = 60 * 60 * 1000;
   const AVPU_RANK = { A: 0, V: 1, P: 2, U: 3 };
@@ -59,14 +66,23 @@
     return nowMs - (patient?.lastVitalsAt || 0);
   }
 
+  function vitalsIntervalMsFor(triage) {
+    return VITALS_INTERVAL_MS_BY_TRIAGE[triage] || VITALS_INTERVAL_MS_BY_TRIAGE.red;
+  }
+
+  function isVitalsOverdue(patient, nowMs = Date.now()) {
+    return needsVitals(patient) && vitalsAgeMs(patient, nowMs) >= vitalsIntervalMsFor(patient?.triage);
+  }
+
   function vitalsTimer(patient, nowMs = Date.now()) {
     if (!needsVitals(patient)) return null;
+    const intervalMs = vitalsIntervalMsFor(patient.triage);
     const age = vitalsAgeMs(patient, nowMs);
-    if (age >= VITALS_INTERVAL_MS) {
+    if (age >= intervalMs) {
       return { cls: "overdue", minutes: Math.floor(age / 60000), remainingMinutes: 0 };
     }
-    const remainingMinutes = Math.ceil((VITALS_INTERVAL_MS - age) / 60000);
-    if (age >= WARN_AT_MS) {
+    const remainingMinutes = Math.ceil((intervalMs - age) / 60000);
+    if (age >= intervalMs - VITALS_WARN_BUFFER_MS) {
       return { cls: "warn", minutes: Math.floor(age / 60000), remainingMinutes };
     }
     return { cls: "ok", minutes: Math.floor(age / 60000), remainingMinutes };
@@ -159,7 +175,7 @@
   }
 
   function isRoutineAlert(patient, nowMs = Date.now()) {
-    return needsVitals(patient) && vitalsAgeMs(patient, nowMs) >= VITALS_INTERVAL_MS;
+    return isVitalsOverdue(patient, nowMs);
   }
 
   function isCriticalAlert(patient) {
@@ -197,8 +213,8 @@
     FINAL_PATIENT_STATUSES,
     TOURNIQUET_CRITICAL_MS,
     TOURNIQUET_WARN_MS,
-    VITALS_INTERVAL_MS,
-    WARN_AT_MS,
+    VITALS_INTERVAL_MS_BY_TRIAGE,
+    VITALS_WARN_BUFFER_MS,
     canChangePatientStatus,
     computeMstartTriage,
     detectDeterioration,
@@ -208,6 +224,7 @@
     isHighRiskDose,
     isPediatricPatient,
     isRoutineAlert,
+    isVitalsOverdue,
     needsVitals,
     PEDIATRIC_AGE_CUTOFF,
     PEDIATRIC_HIGH_RISK_DOSE_LIMITS,
@@ -216,6 +233,7 @@
     timeCodeToTodayMs,
     tourniquetTimer,
     vitalsAgeMs,
+    vitalsIntervalMsFor,
     vitalsTimer,
   };
 });
