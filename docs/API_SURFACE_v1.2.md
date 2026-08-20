@@ -621,6 +621,8 @@ GET /command/incidents/:incidentId/state
 
 This endpoint uses one API-level permission check. It must not perform RLS-heavy joins over `events` for routine dashboard refreshes.
 
+**Implemented** (`database/014_command_dashboard_state_rpc.sql`, `docs/ROADMAP.md` Phase 3) as `get_incident_command_state(p_incident_id uuid)`, a `SECURITY DEFINER` Postgres function callable via `client.rpc('get_incident_command_state', {p_incident_id})` — not a literal HTTP path, same as `/sync/log` being a real Edge Function rather than a literal `/sync/log` route (`docs/ARCHITECTURE.md`'s "Backend Deployment Status"). `incident_command_state` has RLS disabled and `EXECUTE`/table grants revoked from `anon`/`authenticated` by design, so this function — which performs the same `app.can_access_incident()` gate used by every other RLS policy in this schema, then returns the row — is the only permitted read path for a non-service-role caller. `index.html` polls it every 45s (same interval as sync push/pull) rather than the 5-second interval recommended below, and shows it as a labeled server-authoritative cross-check next to the locally-computed command priority cards, not a replacement for them.
+
 Recommended dashboard behavior:
 
 - poll `GET /command/incidents/:incidentId/state` on a fixed interval such as 5 seconds
