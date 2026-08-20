@@ -64,7 +64,9 @@ pip install -r requirements.txt
 python seed_demo_db.py
 ```
 
-Run the analytics test suite (`db.py`/`kpis.py`/`charts.py`/`report.py`):
+To generate a report from a real incident instead of the synthetic demo, use `export_live_incident.py` (stdlib-only, no extra dependency) — see the analytics README's "Run against a real incident instead of the synthetic demo" section.
+
+Run the analytics test suite (`db.py`/`kpis.py`/`charts.py`/`report.py`/`export_live_incident.py`):
 
 ```bash
 python -m pytest

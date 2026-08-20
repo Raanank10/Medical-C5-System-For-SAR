@@ -16,3 +16,8 @@ coverage/
 htmlcov/
 dist/
 build/
+
+# Live-incident exports (export_live_incident.py) - operator/run-specific, never a stable
+# repo asset like rescue_demo_v1_1.db, and must never be committed.
+live_incident.db
+analytics/c5_sentinel_sar_analytics_v1_1/live_incident.db
