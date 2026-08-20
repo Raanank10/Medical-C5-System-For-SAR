@@ -99,7 +99,7 @@ Could a new signup grant itself an elevated role (e.g. `admin`, `cc`) via the in
 
 Supabase Auth's leaked-password protection (checks against HaveIBeenPwned) is currently **disabled** on the live project. A user could set a password already known to be compromised in an unrelated breach.
 
-*Mitigation status*: none yet. This is a dashboard-only toggle (Authentication → Policies → Password Security), not something applied via SQL migration — needs to be enabled by whoever administers the Supabase project before any real users are onboarded.
+*Mitigation status*: none yet, and not currently actionable without a plan change. This is a dashboard-only toggle (Authentication → Policies → Password Security), not something applied via SQL migration — but it's also a Supabase **Pro-tier feature**, unavailable on the Free plan this project currently runs on. Enabling it requires upgrading the Supabase project first, which is a cost/plan decision for whoever administers it, not something to do casually before that decision is made.
 
 ### T7: Anon key exposure
 
@@ -119,7 +119,7 @@ Ranked by (severity × how concrete the evidence is), not just severity alone:
 
 1. **A systematic RLS/authorization audit (T1).** Four real instances found incidentally in one session is a strong signal, not noise. This should be a deliberate, complete pass — every policy, every `SECURITY DEFINER` function — before any pilot discussion, not something left to keep surfacing one bug at a time.
 2. **Encrypted local storage (T2).** No mitigation exists today, and the threat scenario (lost/stolen field device) is realistic for the exact operational context this system targets.
-3. **Enable leaked-password protection (T6).** Cheap, dashboard-only, no reason to defer.
+3. **Enable leaked-password protection (T6).** Dashboard-only, but requires the Supabase project to be on a paid plan first (Free tier doesn't offer it) — a cost decision to make explicitly before onboarding real users, not something to defer indefinitely either.
 4. **Service-role key handling review (T5).** Define where/how an operator is expected to store `SUPABASE_SERVICE_ROLE_KEY`, and whether a scoped/short-lived alternative is worth building before this tool sees real use.
 5. **Everything in `docs/PRODUCTION_READINESS.md`'s Security and Privacy section not yet checked off** — secret management review, audit retention policy, data minimization review, and an incident response plan, none of which currently exist as real documents.
 

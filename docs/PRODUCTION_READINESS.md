@@ -46,7 +46,7 @@ This is enough for workflow validation and engineering iteration. It is not enou
 - [ ] Audit retention policy — no retention/deletion policy exists for `events`, `conflict_log`, `sync_ingestion_errors`, or `watchdog_alerts`.
 - [ ] Data minimization review — the repo-level "keep all data synthetic" policy (`docs/OPERATIONS_SAFETY.md`) is a different thing from a real review of what the schema collects and whether it needs all of it.
 - [ ] Incident response plan — does not exist.
-- [ ] Leaked-password protection (Supabase Auth) — currently disabled on the live project; a dashboard-only toggle (Authentication → Policies → Password Security), not something applied via SQL migration.
+- [ ] Leaked-password protection (Supabase Auth) — currently disabled on the live project; a dashboard-only toggle (Authentication → Policies → Password Security), not something applied via SQL migration, and a **Supabase Pro-tier feature** — requires a plan upgrade before it can be enabled at all.
 
 ### Clinical and Operational Governance
 
