@@ -45,6 +45,8 @@ Goal: prove the core offline-first architecture before introducing production se
 
 Goal: introduce real app boundaries after the workflow stabilizes.
 
+See `docs/PHASE_4_PLAN.md` for the detailed working plan — current-state inventory against what's actually built, open decisions that need the user's input before starting, and a risk-ordered sub-phase sequence (`packages/domain` first, `apps/field-mobile` last, `index.html` stays working throughout).
+
 - `apps/field-mobile`: Expo or native mobile field workflow.
 - `apps/command-web`: command dashboard.
 - `packages/domain`: triage, vitals, inventory, sync, and alert rules.
