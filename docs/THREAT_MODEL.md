@@ -75,7 +75,13 @@ Ranked by sensitivity, assuming a real (non-synthetic) deployment:
 
 `localStorage` (`patients[]`, `state.localEvents`, the sync outbox) is plaintext. A lost or stolen device in an MCI/SAR context — a realistic scenario, not an edge case — exposes every patient this device has touched, unencrypted, to anyone with filesystem/browser-storage access.
 
-*Mitigation status*: none. This is `docs/PRODUCTION_READINESS.md`'s "Encrypted local storage" item, currently unstarted. A device-lock/passcode requirement is also not enforced by the app itself (it inherits whatever the OS/browser provides, if anything).
+*Mitigation status*: mitigated for the clinically-relevant keys. A device PIN — never persisted anywhere, in any form, held only in memory for the session — is used purely as PBKDF2 key-derivation material for an AES-256-GCM key encrypting `patients[]`/site state, the sync outbox, the in-progress patient-intake draft, the conflict log, and observer notes at rest. This works identically whether the medic is logged in via Supabase Auth or in local-demo (no-login) mode, since it depends on nothing but the PIN itself — no OS/browser feature, no Supabase session material (which sits in its own, separately-managed plaintext `localStorage` key and is a real, distinct gap, tracked below as a fast follow-up, not yet closed). `screen-pin-gate` is now the true first screen on every fresh load, ahead of `screen-login`, gating both modes identically. Verified live via Playwright (`npm run test:browser-smoke`): a fresh device is prompted to set up a PIN; a returning device is prompted to unlock and a wrong PIN is rejected while the correct one succeeds; the raw `localStorage` record is confirmed to be an opaque `{salt,iv,ct}` blob, not readable JSON.
+
+Two residual points, stated explicitly rather than left implicit:
+- **A short PIN's real strength.** No PBKDF2 iteration count (300,000 by default, `PIN_KDF_ITERATIONS`) makes a 6-digit PIN (~20 bits of entropy) resistant to a determined offline attacker with the ciphertext, salt, and verifier — this targets opportunistic access to a lost/found device, not a forensic lab. PIN loss is unrecoverable by design (destructive reset only, `resetLocalPinAndWipe()`) — no key-escrow, since that would reintroduce a second durable on-device secret. Only truly-unsynced outbox events are lost forever this way; everything else re-hydrates from the server on next login/sync.
+- **Durability window narrowed slightly.** `crypto.subtle` is Promise-only, so the `beforeunload` flush that used to be a synchronous best-effort write is now async and not guaranteed to finish before an instant tab close — mitigated with an additional `visibilitychange` listener (fires reliably when a mobile browser is backgrounded, before the process might be killed) but not eliminated. Confidentiality improved; a small durability tradeoff was accepted to get there, not discovered later.
+
+Not yet in scope: the Supabase session token itself (see T1's system diagram — it's `persistSession`-managed by supabase-js under its own plaintext `localStorage` key, separate from the app's own keys). A stolen live session has arguably a *larger* blast radius than cached patient data (it lets an attacker act as that medic against the live server), but bundling it into this same change would force the PIN gate in front of a brand-new device's very first action (an email invite link), before any PIN exists or there's local clinical data to protect yet — a separate bootstrapping problem, deliberately deferred as a fast follow-up now that the PIN mechanism it would reuse is proven.
 
 ### T3: Malformed or adversarial event payloads
 
@@ -117,12 +123,14 @@ An invited user can authenticate successfully but be deliberately left without a
 
 Ranked by (severity × how concrete the evidence is), not just severity alone:
 
-1. **Encrypted local storage (T2).** Now the top open item. No mitigation exists today, and the threat scenario (lost/stolen field device) is realistic for the exact operational context this system targets.
+1. **Supabase session token encryption.** Now the top open item — the fast follow-up flagged when T2's PIN mechanism landed. The session token sits in its own plaintext `localStorage` key (managed by supabase-js, separate from the app's own keys) and is a live bearer credential with arguably a larger blast radius than cached patient data. Needs its own bootstrapping design (a brand-new device's first action is an email invite link, before any PIN exists), reusing the now-proven PIN-gate mechanism.
 2. **Enable leaked-password protection (T6).** Dashboard-only, but requires the Supabase project to be on a paid plan first (Free tier doesn't offer it) — a cost decision to make explicitly before onboarding real users, not something to defer indefinitely either.
 3. **Service-role key handling review (T5).** Define where/how an operator is expected to store `SUPABASE_SERVICE_ROLE_KEY`, and whether a scoped/short-lived alternative is worth building before this tool sees real use.
 4. **Everything in `docs/PRODUCTION_READINESS.md`'s Security and Privacy section not yet checked off** — secret management review, audit retention policy, data minimization review, and an incident response plan, none of which currently exist as real documents.
 
 ~~A systematic RLS/authorization audit (T1)~~ — **done**, see `docs/RLS_AUDIT_v1.md`. Two more real gaps were found (both in the `is_active`/account-deactivation path, fixed in `database/017_lock_out_inactive_profiles.sql`) and no cross-incident/cross-role escalation gaps remain outstanding as of this pass. Not a closed book forever — re-run the same checklist after any schema change that adds a table, policy, or `SECURITY DEFINER` function — but no longer the top-ranked open item.
+
+~~Encrypted local storage (T2)~~ — **mitigated** for the clinically-relevant `localStorage` keys (PIN-derived AES-256-GCM, `screen-pin-gate` on every fresh load). The Supabase session token itself remains open — see item 1 above.
 
 ## Explicitly Out of Scope Here
 

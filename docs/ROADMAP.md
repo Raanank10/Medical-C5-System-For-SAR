@@ -62,10 +62,10 @@ Goal: identify what would be required before any real-world pilot discussion.
 
 `[x]` done, `[~]` partially done (see the note), `[ ]` not started.
 
-- [x] Threat model — `docs/THREAT_MODEL.md`. Top finding: RLS/authorization gaps are the most concrete evidenced risk. The systematic full-coverage audit the threat model called for is now done — `docs/RLS_AUDIT_v1.md` (86 policies across 32 tables, 21 `SECURITY DEFINER` functions, all reviewed against the live database). Two more real gaps were found and fixed live (`database/017_lock_out_inactive_profiles.sql`, both in the account-deactivation/`is_active` path). Encrypted local storage (T2) is now the threat model's top-ranked open item.
+- [x] Threat model — `docs/THREAT_MODEL.md`. Top finding: RLS/authorization gaps are the most concrete evidenced risk. The systematic full-coverage audit the threat model called for is now done — `docs/RLS_AUDIT_v1.md` (86 policies across 32 tables, 21 `SECURITY DEFINER` functions, all reviewed against the live database). Two more real gaps were found and fixed live (`database/017_lock_out_inactive_profiles.sql`, both in the account-deactivation/`is_active` path). Encrypted local storage (T2) is done — see below; the Supabase session token is now the threat model's top-ranked open item.
 - [ ] Privacy and data minimization review.
 - [~] Authentication and role model — real implementation exists and is verified (`docs/ARCHITECTURE.md`), but not yet reviewed as a standalone design document separate from the threat model.
-- [ ] Encrypted local storage design — real gap, see `docs/THREAT_MODEL.md`'s T2.
+- [x] Encrypted local storage design — `docs/THREAT_MODEL.md`'s T2 is mitigated for the clinically-relevant `localStorage` keys: a device PIN (never persisted) derives an AES-256-GCM key via PBKDF2; `screen-pin-gate` gates every fresh load ahead of `screen-login`, identically for logged-in and local-demo modes. The Supabase session token itself is a deliberately deferred follow-up (separate onboarding-flow bootstrapping problem) — see `docs/THREAT_MODEL.md` T2.
 - [ ] Audit and retention policy.
 - [ ] Failure-mode review for stale data and sync conflicts.
 - [ ] Clinical governance review.

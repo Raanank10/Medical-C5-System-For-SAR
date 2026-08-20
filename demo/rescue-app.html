@@ -535,8 +535,34 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 
+<!-- ══════════════════════ PIN GATE (local-storage encryption unlock) ══ -->
+<div id="screen-pin-gate" class="screen active">
+  <div class="header">
+    <div class="header-left">
+      <div class="header-subtitle">C5 SENTINEL-SAR // SECURITY</div>
+      <div class="header-title" id="pin-gate-title">נעילת מכשיר</div>
+    </div>
+  </div>
+  <div class="demo-panel" id="pin-gate-setup-panel" style="margin:16px;display:none">
+    <div class="demo-strip-title">הצפנת אחסון מקומי</div>
+    <div class="demo-strip-sub" style="margin-bottom:12px">כדי להגן על נתוני פצועים במקרה של אובדן או גניבת המכשיר, יש להגדיר קוד גישה מקומי (6 ספרות לפחות). הקוד אינו נשלח לשרת ואינו ניתן לשחזור אם נשכח.</div>
+    <input type="password" inputmode="numeric" id="pin-gate-setup-new" placeholder="קוד גישה חדש (6 ספרות לפחות)" style="margin-bottom:10px" autocomplete="new-password">
+    <input type="password" inputmode="numeric" id="pin-gate-setup-confirm" placeholder="אימות קוד גישה" style="margin-bottom:10px" autocomplete="new-password" onkeydown="if(event.key==='Enter') submitPinSetup()">
+    <div class="login-error" id="pin-gate-setup-error"></div>
+    <button class="btn-primary" id="pin-gate-setup-btn" onclick="submitPinSetup()">הגדר קוד גישה</button>
+  </div>
+  <div class="demo-panel" id="pin-gate-unlock-panel" style="margin:16px;display:none">
+    <div class="demo-strip-title">נעילת מכשיר</div>
+    <div class="demo-strip-sub" style="margin-bottom:12px">הזן/י את קוד הגישה המקומי כדי לפתוח את הנתונים במכשיר זה.</div>
+    <input type="password" inputmode="numeric" id="pin-gate-unlock-input" placeholder="קוד גישה" style="margin-bottom:10px" autocomplete="current-password" onkeydown="if(event.key==='Enter') submitPinUnlock()">
+    <div class="login-error" id="pin-gate-unlock-error"></div>
+    <button class="btn-primary" id="pin-gate-unlock-btn" onclick="submitPinUnlock()">פתח נעילה</button>
+    <button class="demo-mini-btn" style="margin-top:10px;width:100%" onclick="resetLocalPinAndWipe()">שכחתי קוד גישה — אפס אחסון מקומי</button>
+  </div>
+</div>
+
 <!-- ══════════════════════ LOGIN ══ -->
-<div id="screen-login" class="screen active">
+<div id="screen-login" class="screen">
   <div class="header">
     <div class="header-left">
       <div class="header-subtitle">C5 SENTINEL-SAR // AUTH</div>
@@ -2427,6 +2453,12 @@ const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
 const CONFLICT_LOG_KEY = 'c5-sentinel-sar-conflict-log-v1';
 const ACTIVE_RECOVERY_KEY = 'c5_active_recovery_state';
 const DEVICE_ID_KEY = 'c5-sentinel-sar-device-id';
+const OUTBOX_KEY = 'c5_local_sqlite_outbox';
+// Local-storage-at-rest encryption (docs/THREAT_MODEL.md T2). PIN_VERIFIER_KEY holds a
+// non-secret {salt, iterations, iv, ct} record used only to check a re-entered PIN is correct —
+// never the PIN or the derived key. See "LOCAL ENCRYPTION" below.
+const PIN_VERIFIER_KEY = 'c5_pin_verifier_v1';
+const PIN_KDF_ITERATIONS = 300000; // PBKDF2-HMAC-SHA256; benchmark on real device hardware (target: comfortably under ~1s to unlock) and adjust if needed.
 // Pull cursor, persisted per-incident (sync_cursor is a shared, strictly-increasing sequence
 // across all incidents server-side, but each incident's "how far have I pulled" is separate).
 function pullCursorKey(incidentId){ return `c5_sync_cursor_${incidentId}`; }
@@ -2496,7 +2528,7 @@ const DEMO_KEYS_TO_PURGE = Object.freeze([
   OBSERVER_NOTES_KEY,
   CONFLICT_LOG_KEY,
   ACTIVE_RECOVERY_KEY,
-  'c5_local_sqlite_outbox'
+  OUTBOX_KEY
 ]);
 const ROLE_LABELS = {medic:'פעולת חובש', pc:'החלטת חוג"ד', cc:'סיכון מ״פ רפואה', logistics:'לוגיסטיקה', chamal:'מערכת', rpc:'מ״מ חילוץ', rcc:'מ״פ חילוץ', admin:'מנהל מערכת'};
 const ACTION_LABELS = {
@@ -2843,6 +2875,173 @@ function getSupabaseClient(){
   });
   return _supabaseClient;
 }
+
+// ═══════════════════════════════════════════════
+//  LOCAL ENCRYPTION (docs/THREAT_MODEL.md T2 — lost/stolen device exposes plaintext localStorage)
+// ═══════════════════════════════════════════════
+// A device PIN — never persisted anywhere, in any form — is the only secret this scheme relies
+// on, so it works identically whether the medic is logged in via Supabase Auth or in local-demo
+// (no-login) mode, and so it can't be recovered by anyone with filesystem access to the device:
+// that's the whole point. No PBKDF2 iteration count makes a short numeric PIN resistant to a
+// determined offline attacker (a 6-digit PIN is ~20 bits of entropy) — this targets opportunistic
+// access to a lost/found device, not a forensic lab. Say so; don't imply stronger protection than
+// a short PIN can give.
+let _localEncKey=null; // CryptoKey, extractable:false, in-memory only — never localStorage/sessionStorage/IndexedDB
+function bytesToB64(bytes){ return btoa(String.fromCharCode(...bytes)); }
+function b64ToBytes(str){ return Uint8Array.from(atob(str), c=>c.charCodeAt(0)); }
+async function deriveKeyFromPin(pin, saltBytes, iterations=PIN_KDF_ITERATIONS){
+  const baseKey=await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2', salt:saltBytes, iterations, hash:'SHA-256'},
+    baseKey,
+    {name:'AES-GCM', length:256},
+    false,
+    ['encrypt','decrypt']
+  );
+}
+function hasLocalPinSet(){
+  try{ return !!localStorage.getItem(PIN_VERIFIER_KEY); }catch(e){ return false; }
+}
+async function setUpLocalPin(pin){
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  const key=await deriveKeyFromPin(pin, salt);
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, new TextEncoder().encode('C5-SAR-PIN-OK-v1'));
+  localStorage.setItem(PIN_VERIFIER_KEY, JSON.stringify({
+    v:1, salt:bytesToB64(salt), iterations:PIN_KDF_ITERATIONS, iv:bytesToB64(iv), ct:bytesToB64(new Uint8Array(ct))
+  }));
+  _localEncKey=key;
+  return true;
+}
+async function unlockWithPin(pin){
+  let rec;
+  try{ rec=JSON.parse(localStorage.getItem(PIN_VERIFIER_KEY)||'null'); }catch(e){ return false; }
+  if(!rec) return false;
+  try{
+    const key=await deriveKeyFromPin(pin, b64ToBytes(rec.salt), rec.iterations||PIN_KDF_ITERATIONS);
+    // AES-GCM's authentication tag makes a wrong key throw here rather than silently producing
+    // garbage — free wrong-PIN detection, no separate hash/HMAC verification step needed.
+    await crypto.subtle.decrypt({name:'AES-GCM', iv:b64ToBytes(rec.iv)}, key, b64ToBytes(rec.ct));
+    _localEncKey=key;
+    return true;
+  }catch(e){ return false; }
+}
+function lockLocalStorage(){ _localEncKey=null; }
+async function secureSetItem(key, plaintextStr){
+  if(!_localEncKey) throw new Error('local storage is locked');
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM', iv}, _localEncKey, new TextEncoder().encode(plaintextStr));
+  localStorage.setItem(key, JSON.stringify({v:1, iv:bytesToB64(iv), ct:bytesToB64(new Uint8Array(ct))}));
+}
+async function secureGetItem(key){
+  const raw=localStorage.getItem(key);
+  if(!raw) return null;
+  let rec;
+  try{ rec=JSON.parse(raw); }catch(e){ return null; }
+  if(!rec || !rec.ct) return null; // absent, or not an encrypted record
+  if(!_localEncKey) throw new Error('local storage is locked');
+  const pt=await crypto.subtle.decrypt({name:'AES-GCM', iv:b64ToBytes(rec.iv)}, _localEncKey, b64ToBytes(rec.ct));
+  return new TextDecoder().decode(pt);
+}
+// crypto.subtle is Promise-only, but most callers below fire-and-forget a save (matching how
+// saveDemoState() etc. were already called ~45 places, none awaited) — a per-key promise chain
+// keeps overlapping saves to the SAME key from interleaving (e.g. saveDemoState's own
+// read-then-conditionally-write revision-conflict check would otherwise race under naive async).
+const _writeQueues=new Map();
+function runSerialized(key, task){
+  const prev=_writeQueues.get(key) || Promise.resolve();
+  const next=prev.then(task, task).catch(e=>console.error('local-persist failed', key, e));
+  _writeQueues.set(key, next);
+  return next;
+}
+function queuedSecureSetItem(key, plaintextStr){ return runSerialized(key, ()=>secureSetItem(key, plaintextStr)); }
+
+// In-memory mirrors for the keys with multiple independent read call sites elsewhere in this
+// file (outbox alone had 5) — keeps every existing synchronous caller working unchanged; only
+// persistence becomes async. Populated once by hydrateSecureCaches() right after PIN unlock.
+let _outboxCache=null, _conflictLogCache=null, _observerNotesCache=null;
+function getOutbox(){ return _outboxCache || (_outboxCache=[]); }
+function persistOutbox(){
+  if(_outboxCache && _outboxCache.length>500) _outboxCache=_outboxCache.slice(-500);
+  return queuedSecureSetItem(OUTBOX_KEY, JSON.stringify(getOutbox()));
+}
+function persistConflictLog(){
+  if(_conflictLogCache && _conflictLogCache.length>200) _conflictLogCache=_conflictLogCache.slice(-200);
+  return queuedSecureSetItem(CONFLICT_LOG_KEY, JSON.stringify(conflictLog()));
+}
+function persistObserverNotes(){ return queuedSecureSetItem(OBSERVER_NOTES_KEY, JSON.stringify(observerNotes())); }
+async function hydrateSecureCaches(){
+  try{ _outboxCache=JSON.parse(await secureGetItem(OUTBOX_KEY)||'[]'); }catch(e){ _outboxCache=[]; }
+  try{ _conflictLogCache=JSON.parse(await secureGetItem(CONFLICT_LOG_KEY)||'[]'); }catch(e){ _conflictLogCache=[]; }
+  try{ _observerNotesCache=JSON.parse(await secureGetItem(OBSERVER_NOTES_KEY)||'[]'); }catch(e){ _observerNotesCache=[]; }
+}
+function resetLocalPinAndWipe(){
+  if(!confirm('פעולה זו תמחק את כל הנתונים המקומיים במכשיר זה (כולל פצועים שטרם סונכרנו לשרת) ותאפס את קוד הגישה. נתונים שכבר סונכרנו לשרת אינם בסכנה ויטענו מחדש בכניסה הבאה. פעולה זו בלתי הפיכה. להמשיך?')) return;
+  DEMO_KEYS_TO_PURGE.forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
+  try{ localStorage.removeItem(PIN_VERIFIER_KEY); }catch(e){}
+  location.reload();
+}
+
+// ── PIN gate UI wiring ──
+function showPinGate(){
+  const setupPanel=document.getElementById('pin-gate-setup-panel');
+  const unlockPanel=document.getElementById('pin-gate-unlock-panel');
+  if(hasLocalPinSet()){
+    if(setupPanel) setupPanel.style.display='none';
+    if(unlockPanel) unlockPanel.style.display='block';
+    document.getElementById('pin-gate-unlock-input')?.focus();
+  }else{
+    if(unlockPanel) unlockPanel.style.display='none';
+    if(setupPanel) setupPanel.style.display='block';
+    document.getElementById('pin-gate-setup-new')?.focus();
+  }
+}
+async function submitPinSetup(){
+  const errEl=document.getElementById('pin-gate-setup-error');
+  if(errEl) errEl.textContent='';
+  const pin=document.getElementById('pin-gate-setup-new')?.value||'';
+  const confirmPin=document.getElementById('pin-gate-setup-confirm')?.value||'';
+  if(pin.length<6){ if(errEl) errEl.textContent='קוד הגישה חייב להכיל לפחות 6 תווים'; return; }
+  if(pin!==confirmPin){ if(errEl) errEl.textContent='קוד הגישה ואימות הקוד אינם תואמים'; return; }
+  const btn=document.getElementById('pin-gate-setup-btn');
+  if(btn){ btn.disabled=true; btn.textContent='מגדיר...'; }
+  try{
+    await setUpLocalPin(pin);
+    await bootAfterUnlock();
+  }catch(e){
+    if(errEl) errEl.textContent='שגיאה בהגדרת קוד הגישה, נסה/י שוב';
+    if(btn){ btn.disabled=false; btn.textContent='הגדר קוד גישה'; }
+  }
+}
+async function submitPinUnlock(){
+  const errEl=document.getElementById('pin-gate-unlock-error');
+  if(errEl) errEl.textContent='';
+  const pin=document.getElementById('pin-gate-unlock-input')?.value||'';
+  const btn=document.getElementById('pin-gate-unlock-btn');
+  if(btn){ btn.disabled=true; btn.textContent='פותח...'; }
+  const ok=await unlockWithPin(pin);
+  if(!ok){
+    if(errEl) errEl.textContent='קוד גישה שגוי, נסה/י שוב.';
+    if(btn){ btn.disabled=false; btn.textContent='פתח נעילה'; }
+    const input=document.getElementById('pin-gate-unlock-input');
+    if(input){ input.value=''; input.focus(); }
+    return;
+  }
+  await bootAfterUnlock();
+}
+async function bootAfterUnlock(){
+  await hydrateSecureCaches();
+  await restoreActiveRecoveryState();
+  try{ applyFieldMode(localStorage.getItem('rescue_field_mode')==='1'); }catch(e){ applyFieldMode(false); }
+  updateCountDisplay('pulse15');
+  updateCountDisplay('rr30');
+  renderDashboard();
+  renderAlerts();
+  updateDemoStatus();
+  goTo('login');
+  restoreSession(); // async; if a session is already persisted, jumps straight past screen-login
+}
+
 function showLoginError(msg){
   const el=document.getElementById('login-error');
   if(el) el.textContent=msg||'';
@@ -3198,7 +3397,7 @@ function serializeActiveDraft(screen=null){
   };
 }
 function saveActiveRecoveryState(screen=null){
-  try{ localStorage.setItem(ACTIVE_RECOVERY_KEY, JSON.stringify(serializeActiveDraft(screen))); }catch(e){}
+  return queuedSecureSetItem(ACTIVE_RECOVERY_KEY, JSON.stringify(serializeActiveDraft(screen)));
 }
 function clearActiveRecoveryState(){
   try{ localStorage.removeItem(ACTIVE_RECOVERY_KEY); }catch(e){}
@@ -3219,9 +3418,9 @@ function hydrateActiveDraft(snapshot){
   setTimeout(()=>{ updatePediatricEstimatePanel(); updatePediatricTreatmentUi(); renderLocalStockPanel(); },0);
   return true;
 }
-function restoreActiveRecoveryState(){
+async function restoreActiveRecoveryState(){
   try{
-    const snapshot=JSON.parse(localStorage.getItem(ACTIVE_RECOVERY_KEY)||'null');
+    const snapshot=JSON.parse(await secureGetItem(ACTIVE_RECOVERY_KEY)||'null');
     if(!snapshot || Date.now()-Date.parse(snapshot.savedAt||0)>6*60*60*1000) return false;
     if(!hydrateActiveDraft(snapshot)) return false;
     toast('טיוטת פצוע פעילה שוחזרה מהמכשיר');
@@ -3758,7 +3957,8 @@ function clearDemoPatientsOnly({confirmReset=true}={}){
   patients=[];
   reinforcementRequests=reinforcementRequests.filter(r=>r.type!=='death_certification_request' && r.type!=='medical_reinforcement' && r.type!=='resupply');
   pcTruckStock={...PC_TRUCK_BASELINE};
-  try{ localStorage.removeItem('c5_local_sqlite_outbox'); }catch(e){}
+  _outboxCache=[];
+  try{ localStorage.removeItem(OUTBOX_KEY); }catch(e){}
   lastSyncAt=Date.now();
   demoSyncMode='fresh';
   saveDemoState();
@@ -3769,59 +3969,73 @@ function clearDemoPatientsOnly({confirmReset=true}={}){
   return true;
 }
 function saveDemoState(){
-  try{
-    const raw=localStorage.getItem(DEMO_STORAGE_KEY);
-    if(raw){
-      const current=JSON.parse(raw);
-      if(current.revision && current.revision > demoRevision){
-        const conflicts=conflictLog();
-        conflicts.push({timestamp:new Date().toISOString(),device_id:getDeviceId(),local_revision:demoRevision,stored_revision:current.revision,reason:'last_write_conflict_detected'});
-        localStorage.setItem(CONFLICT_LOG_KEY, JSON.stringify(conflicts.slice(-200)));
+  return runSerialized(DEMO_STORAGE_KEY, async ()=>{
+    try{
+      const raw=await secureGetItem(DEMO_STORAGE_KEY);
+      if(raw){
+        const current=JSON.parse(raw);
+        if(current.revision && current.revision > demoRevision){
+          conflictLog().push({timestamp:new Date().toISOString(),device_id:getDeviceId(),local_revision:demoRevision,stored_revision:current.revision,reason:'last_write_conflict_detected'});
+          await persistConflictLog();
+        }
       }
-    }
-    demoRevision += 1;
-    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:6,appVersion:APP_VERSION,revision:demoRevision,savedAt:new Date().toISOString(),experimentStartedAt,experimentPhase,siteData,patients,reinforcementRequests,pcTruckStock,companyStock,demoSyncMode,lastSyncAt}));
-  }catch(e){}
+      demoRevision += 1;
+      await secureSetItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:6,appVersion:APP_VERSION,revision:demoRevision,savedAt:new Date().toISOString(),experimentStartedAt,experimentPhase,siteData,patients,reinforcementRequests,pcTruckStock,companyStock,demoSyncMode,lastSyncAt}));
+    }catch(e){}
+  });
 }
 function loadStoredDemoState(){
-  try{
-    const raw=localStorage.getItem(DEMO_STORAGE_KEY);
-    if(!raw) return false;
-    const saved=JSON.parse(raw);
-    if(!saved || !Array.isArray(saved.patients)) return false;
-    siteData=saved.siteData||siteData;
-    ensureSiteReadiness();
-    patients=saved.patients;
-    reinforcementRequests=Array.isArray(saved.reinforcementRequests)?saved.reinforcementRequests:[];
-    pcTruckStock={...PC_TRUCK_BASELINE, ...(saved.pcTruckStock||{})};
-    companyStock={...COMPANY_STOCK_BASELINE, ...(saved.companyStock||{})};
-    patients.forEach(p=>{
-      if(!p.lastModifiedAt) p.lastModifiedAt=saved.savedAt||new Date().toISOString();
-      if(!p.trapStatus) p.trapStatus=normalizeTrapStatus(p);
-      if(!p.fullName) p.fullName='לא מזוהה';
-      if(!p.identityStatus) p.identityStatus='unknown';
-      if(!p.assignedMedicId) p.assignedMedicId=userIdFromMedic(p.medic||p.lastTouchedBy);
-      if(!p.assignedPlatoonId) p.assignedPlatoonId=p.siteId==='SITE_B'?'PLT-B':'PLT-A';
-      if(Array.isArray(p.vitalsHistory)){
-        p.vitalsHistory.forEach(h=>{ if(h.rr===undefined) h.rr=p.vitals?.rr ?? null; });
-      }
-    });
-    demoSyncMode=saved.demoSyncMode||'fresh';
-    lastSyncAt=saved.lastSyncAt||Date.now();
-    demoRevision=saved.revision||0;
-    experimentStartedAt=saved.experimentStartedAt||experimentStartedAt;
-    experimentPhase=saved.experimentPhase||experimentPhase;
-    allSites.find(s=>s.id==='SITE_A').externalReports=siteData.externalReports||[];
-    return true;
-  }catch(e){ return false; }
+  return runSerialized(DEMO_STORAGE_KEY, async ()=>{
+    try{
+      const raw=await secureGetItem(DEMO_STORAGE_KEY);
+      if(!raw) return false;
+      const saved=JSON.parse(raw);
+      if(!saved || !Array.isArray(saved.patients)) return false;
+      siteData=saved.siteData||siteData;
+      ensureSiteReadiness();
+      patients=saved.patients;
+      reinforcementRequests=Array.isArray(saved.reinforcementRequests)?saved.reinforcementRequests:[];
+      pcTruckStock={...PC_TRUCK_BASELINE, ...(saved.pcTruckStock||{})};
+      companyStock={...COMPANY_STOCK_BASELINE, ...(saved.companyStock||{})};
+      patients.forEach(p=>{
+        if(!p.lastModifiedAt) p.lastModifiedAt=saved.savedAt||new Date().toISOString();
+        if(!p.trapStatus) p.trapStatus=normalizeTrapStatus(p);
+        if(!p.fullName) p.fullName='לא מזוהה';
+        if(!p.identityStatus) p.identityStatus='unknown';
+        if(!p.assignedMedicId) p.assignedMedicId=userIdFromMedic(p.medic||p.lastTouchedBy);
+        if(!p.assignedPlatoonId) p.assignedPlatoonId=p.siteId==='SITE_B'?'PLT-B':'PLT-A';
+        if(Array.isArray(p.vitalsHistory)){
+          p.vitalsHistory.forEach(h=>{ if(h.rr===undefined) h.rr=p.vitals?.rr ?? null; });
+        }
+      });
+      demoSyncMode=saved.demoSyncMode||'fresh';
+      lastSyncAt=saved.lastSyncAt||Date.now();
+      demoRevision=saved.revision||0;
+      experimentStartedAt=saved.experimentStartedAt||experimentStartedAt;
+      experimentPhase=saved.experimentPhase||experimentPhase;
+      allSites.find(s=>s.id==='SITE_A').externalReports=siteData.externalReports||[];
+      return true;
+    }catch(e){ return false; }
+  });
 }
-window.addEventListener('beforeunload', ()=>{ saveActiveRecoveryState(activeScreenId()); saveDemoState(); });
+// crypto.subtle is async, so this can no longer guarantee completion before the page actually
+// unloads (a real, deliberate durability tradeoff — see docs/THREAT_MODEL.md's T2 entry).
+// visibilitychange fires reliably when a mobile browser is backgrounded, well before the process
+// might be killed, giving the async encrypt+write a real chance to finish; beforeunload stays as
+// an additional best-effort attempt on top, not the only one.
+function flushLocalStateForUnload(){
+  if(!_localEncKey) return;
+  saveActiveRecoveryState(activeScreenId());
+  saveDemoState();
+}
+window.addEventListener('beforeunload', flushLocalStateForUnload);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushLocalStateForUnload(); });
 function startPcDemo(screen){
   if(!patients.length) loadDemoScenario(true);
   goTo(screen);
 }
-function continueDemo(){
-  if(!loadStoredDemoState()) toast('אין שמירת דמו קיימת');
+async function continueDemo(){
+  if(!(await loadStoredDemoState())) toast('אין שמירת דמו קיימת');
   goTo('dashboard');
 }
 function setDemoSyncMode(){
@@ -5214,10 +5428,10 @@ function haptic(pattern=35){
 }
 function hapticSave(){ haptic(15); }
 function observerNotes(){
-  try{return JSON.parse(localStorage.getItem(OBSERVER_NOTES_KEY)||'[]');}catch(e){return [];}
+  return _observerNotesCache || (_observerNotesCache=[]);
 }
 function conflictLog(){
-  try{return JSON.parse(localStorage.getItem(CONFLICT_LOG_KEY)||'[]');}catch(e){return [];}
+  return _conflictLogCache || (_conflictLogCache=[]);
 }
 function updateExperimentLine(){
   const started=new Date(experimentStartedAt);
@@ -5237,9 +5451,8 @@ function saveObserverNote(){
   const input=document.getElementById('observer-note-text');
   const text=(input?.value||'').trim();
   if(!text){ toast('אין טקסט לשמירה'); return; }
-  const notes=observerNotes();
-  notes.push({timestamp:new Date().toISOString(),device_id:getDeviceId(),phase:experimentPhase,note:text});
-  localStorage.setItem(OBSERVER_NOTES_KEY, JSON.stringify(notes));
+  observerNotes().push({timestamp:new Date().toISOString(),device_id:getDeviceId(),phase:experimentPhase,note:text});
+  persistObserverNotes();
   hideObserverNote();
   toast('הערת צופה נשמרה');
   updateExperimentLine();
@@ -8239,16 +8452,15 @@ function queueModalTreatmentEvents(patient, text, medicName){
     consumeFieldSupply(spec.item, -Math.abs(qty), patient.id);
   });
 }
-function saveModalVitals(){
+async function saveModalVitals(){
   const p=patients.find(x=>x.id===modalPid); if(!p) return;
   const medicName=getDeviceId();
   try{
-    const saved=JSON.parse(localStorage.getItem(DEMO_STORAGE_KEY)||'{}');
+    const saved=JSON.parse(await secureGetItem(DEMO_STORAGE_KEY)||'{}');
     const savedPatient=(saved.patients||[]).find(x=>x.id===modalPid);
     if(savedPatient?.lastModifiedAt && modalOpenedLastModified && savedPatient.lastModifiedAt!==modalOpenedLastModified){
-      const conflicts=conflictLog();
-      conflicts.push({timestamp:new Date().toISOString(),patient_id:modalPid,device_id:medicName,opened_at:modalOpenedLastModified,stored_at:savedPatient.lastModifiedAt,reason:'simultaneous_patient_edit'});
-      localStorage.setItem(CONFLICT_LOG_KEY, JSON.stringify(conflicts.slice(-200)));
+      conflictLog().push({timestamp:new Date().toISOString(),patient_id:modalPid,device_id:medicName,opened_at:modalOpenedLastModified,stored_at:savedPatient.lastModifiedAt,reason:'simultaneous_patient_edit'});
+      persistConflictLog();
       saveLocalEvent({type:'PATIENT_EDIT_CONFLICT_DETECTED',detail:`עריכה מקבילה זוהתה עבור ${modalPid}`,warn:true,payload_json:{patient_id:modalPid,opened_last_modified_at:modalOpenedLastModified,stored_last_modified_at:savedPatient.lastModifiedAt}});
       toast('זוהתה עריכה מקבילה — נשמר עם סימון קונפליקט');
     }
@@ -8443,10 +8655,10 @@ function switchCmdSite(id){
   renderCmdTabs(); renderCmdContent();
 }
 function localOutboxCount(){
-  try{return JSON.parse(localStorage.getItem('c5_local_sqlite_outbox')||'[]').filter(e=>!e.synced).length;}catch(e){return 0;}
+  return getOutbox().filter(e=>!e.synced).length;
 }
 function rejectedOutboxCount(){
-  try{return JSON.parse(localStorage.getItem('c5_local_sqlite_outbox')||'[]').filter(e=>e.syncRejected).length;}catch(e){return 0;}
+  return getOutbox().filter(e=>e.syncRejected).length;
 }
 function sectorFromLocation(location=''){
   const building=(location.match(/בניין\s*([^,]+)/)||[])[1] || (location.includes('חצר')?'חצר':'לא ידוע');
@@ -8568,8 +8780,7 @@ function renderLogisticsOfficer(){
     {n:totalStock,l:'יחידות מלאי נגזרות',c:''},
     {n:localOutboxCount(),l:'אירועי ledger ממתינים',c:localOutboxCount()?'critical':''}
   ].map(x=>`<div class="cmd-priority-card ${x.c}"><div class="cmd-priority-num">${x.n}</div><div class="cmd-priority-label">${x.l}</div></div>`).join('');
-  let outbox=[];
-  try{ outbox=JSON.parse(localStorage.getItem('c5_local_sqlite_outbox')||'[]'); }catch(e){}
+  let outbox=getOutbox();
   const consumptionEvents=outbox.filter(e=>e.type==='SUPPLY_CONSUMED');
   const focusedConsumption=focusFilteredList(consumptionEvents, event=>{
     const payload=event.payload_json||{};
@@ -9508,8 +9719,7 @@ function renderAar(){
   patients.forEach(p=>perMedic.set(p.lastTouchedBy||p.medic||'UNKNOWN',(perMedic.get(p.lastTouchedBy||p.medic||'UNKNOWN')||0)+1));
   const busiest=[...perMedic.entries()].sort((a,b)=>b[1]-a[1])[0]||['—',0];
   const extDelta=externalConflictCount(patients, allSites.filter(s=>s.id!=='ALL').flatMap(s=>s.externalReports||[]));
-  let outbox=[];
-  try{ outbox=JSON.parse(localStorage.getItem('c5_local_sqlite_outbox')||'[]'); }catch(e){}
+  let outbox=getOutbox();
   const supplyConsumed=outbox.filter(e=>e.type==='SUPPLY_CONSUMED').length;
   const resupplyOpen=reinforcementRequests.filter(r=>r.type==='resupply' && isRequestOpen(r)).length;
   const unresolvedDebt=patients.reduce((sum,p)=>sum+(assessmentDebtForPatient(p)||[]).filter(x=>x!=='pending_handover').length,0);
@@ -9706,12 +9916,8 @@ function saveLocalEvent(event){
   entry.synced=!SYNC_ELIGIBLE_EVENT_TYPES.has(entry.type);
   state.localEvents.push(entry);
   saveActiveRecoveryState(activeScreenId());
-  try{
-    const key='c5_local_sqlite_outbox';
-    const outbox=JSON.parse(localStorage.getItem(key)||'[]');
-    outbox.push(entry);
-    localStorage.setItem(key, JSON.stringify(outbox.slice(-500)));
-  }catch(e){}
+  getOutbox().push(entry);
+  persistOutbox();
   if(!entry.synced) scheduleSyncPush();
 }
 
@@ -9730,9 +9936,7 @@ async function syncPush(){
   if(!currentUser) return; // local-demo mode: never touches the network
   const client=getSupabaseClient();
   if(!client) return;
-  const key='c5_local_sqlite_outbox';
-  let outbox;
-  try{ outbox=JSON.parse(localStorage.getItem(key)||'[]'); }catch(e){ return; }
+  const outbox=getOutbox();
   const pending=outbox.filter(e=>!e.synced && SYNC_ELIGIBLE_EVENT_TYPES.has(e.type));
   if(!pending.length) return;
   let sessionResult;
@@ -9791,7 +9995,7 @@ async function syncPush(){
     if(doneIds.has(e.local_event_id)) e.synced=true;
     if(rejectedIds.has(e.local_event_id)){ e.synced=true; e.syncRejected=true; }
   });
-  try{ localStorage.setItem(key, JSON.stringify(outbox)); }catch(e){}
+  await persistOutbox();
   lastSyncAt=Date.now();
   if(!anyRejected) demoSyncMode='fresh';
   updateDemoStatus();
@@ -9859,8 +10063,7 @@ const VALID_LOCAL_TRIAGE = new Set(['red','yellow','green','black','pending']);
 const VALID_LOCAL_STATUS = new Set(['identified','stabilizing','observing','evacuating','handed_over','closed','self_evacuated','deceased']);
 
 function patientsWithPendingLocalEdits(){
-  let outbox=[];
-  try{ outbox=JSON.parse(localStorage.getItem('c5_local_sqlite_outbox')||'[]'); }catch(e){}
+  let outbox=getOutbox();
   return new Set(outbox.filter(e=>!e.synced && e.patient_id).map(e=>e.patient_id));
 }
 function accessibilityFromServerStatus(access_status){
@@ -10389,14 +10592,12 @@ function computeMstartTriage(v) {
 // ═══════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════
-restoreActiveRecoveryState();
-try{ applyFieldMode(localStorage.getItem('rescue_field_mode')==='1'); }catch(e){ applyFieldMode(false); }
-updateCountDisplay('pulse15');
-updateCountDisplay('rr30');
-renderDashboard();
-renderAlerts();
-updateDemoStatus();
-restoreSession(); // async; if a session is already persisted, jumps straight past screen-login
+// Local storage is encrypted at rest (docs/THREAT_MODEL.md T2) behind a device PIN that's never
+// itself persisted — screen-pin-gate (setup on first use, unlock on every fresh load) is the true
+// entry point now, ahead of screen-login, and gates both logged-in and local-demo mode identically
+// since local persistence works the same in both. bootAfterUnlock() runs the rest of what used to
+// be here unconditionally, only once a PIN has actually unlocked the local encryption key.
+showPinGate();
 </script>
 </body>
 </html>
