@@ -1770,6 +1770,8 @@ textarea{resize:vertical;min-height:70px;}
   <div id="cmd-panel-devices" class="cmd-panel-body collapsed"><div id="cmd-device-panel" class="device-panel"></div></div>
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('serverstate')"><span>מצב שרת (incident_command_state)</span><span class="cmd-panel-sub" id="cmd-panel-serverstate-meta">COLLAPSED</span></button>
   <div id="cmd-panel-serverstate" class="cmd-panel-body collapsed"><div id="cmd-server-state" class="cmd-status-matrix"></div></div>
+  <button class="cmd-panel-toggle" onclick="toggleCmdPanel('quarantine')"><span>אירועים חסומים / סיכון גבוה</span><span class="cmd-panel-sub" id="cmd-panel-quarantine-meta">COLLAPSED</span></button>
+  <div id="cmd-panel-quarantine" class="cmd-panel-body collapsed"><div id="cmd-quarantine-panel" class="cmd-status-matrix"></div></div>
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('watchdogs')"><span>Watchdog Stack</span><span class="cmd-panel-sub" id="cmd-panel-watchdogs-meta">COLLAPSED</span></button>
   <div id="cmd-panel-watchdogs" class="cmd-panel-body collapsed"><div id="cmd-watchdogs" class="cmd-status-matrix"></div></div>
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('duplicates')"><span>חשד לכפילויות</span><span class="cmd-panel-sub" id="cmd-panel-duplicates-meta">COLLAPSED</span></button>
@@ -2895,6 +2897,7 @@ async function loadProfileAndEnter(client, userId){
   pushDevicePresenceAll();
   pullDevicePresenceAll();
   pullIncidentCommandStateAll();
+  pullSyncIngestionErrorsAll();
   return true;
 }
 function enterAuthenticatedRole(serverRole){
@@ -8346,7 +8349,7 @@ function getSitePatients(siteId){
   return [];
 }
 let cmdActiveSite='ALL', cmdFilter='all', alertFilter='critical', cmdAlertFilter='critical', commandRole='pc', ccCompanySite='SITE_A';
-let cmdPanelOpen={priority:true,reinforcement:true,heatmap:false,devices:false,serverstate:false,watchdogs:false,duplicates:false,alerts:true};
+let cmdPanelOpen={priority:true,reinforcement:true,heatmap:false,devices:false,serverstate:false,quarantine:false,watchdogs:false,duplicates:false,alerts:true};
 function companyLabelForSite(siteId){
   return siteId==='SITE_B' ? 'פלוגה ב / BRAVO' : siteId==='SITE_A' ? 'פלוגה א / ALFA' : 'כל הפלוגות';
 }
@@ -9230,6 +9233,29 @@ function renderCommandOperationalPanels(pts, site){
       setCmdPanelMeta('serverstate', currentUser?'PENDING':'N/A (LOCAL DEMO)');
     }
   }
+
+  // Poison-event quarantine + high-risk-but-accepted flags — real server-side concepts
+  // (docs/API_SURFACE_v1.2.md's Atomic Individual Event Processing) that previously had no
+  // dedicated client review surface, only a numeric "rejected" count in the sync pill.
+  const quarantineEl=document.getElementById('cmd-quarantine-panel');
+  if(quarantineEl){
+    const incId=SITE_TO_INCIDENT_ID[site.id];
+    const errors=currentUser ? (_syncIngestionErrors[incId]||[]) : [];
+    const flags=currentUser ? _highRiskFlags.filter(f=>f.incidentId===incId) : [];
+    if(!errors.length && !flags.length){
+      quarantineEl.innerHTML=`<div class="cmd-matrix-row"><div class="cmd-matrix-sub">${currentUser?'אין אירועים חסומים או סיכון גבוה פעילים':'זמין רק במצב מחובר (לא בדמו מקומי)'}</div></div>`;
+    } else {
+      const errorRows=errors.map(e=>`<div class="cmd-matrix-row critical">
+        <div><div class="cmd-matrix-title">חסום · ${e.error_code}</div><div class="cmd-matrix-sub">${e.error_message} · מכשיר ${e.device_id||'—'} · ${e.dependency_status||''} · ${timeAgoLabel(Date.parse(e.created_at)||0)}</div></div>
+      </div>`).join('');
+      const flagRows=flags.map(f=>`<div class="cmd-matrix-row ${f.severity==='critical'?'critical':''}">
+        <div><div class="cmd-matrix-title">סיכון גבוה · ${f.code}</div><div class="cmd-matrix-sub">${f.message} · חומרה: ${f.severity} · ${timeAgoLabel(f._ts||0)}</div></div>
+      </div>`).join('');
+      quarantineEl.innerHTML=errorRows+flagRows;
+    }
+    setCmdPanelMeta('quarantine', currentUser?`${errors.length} חסומים · ${flags.length} סיכון גבוה`:'N/A (LOCAL DEMO)');
+  }
+
   renderWatchdogPanel(pts);
 
   const dupes=duplicateCandidates(pts);
@@ -9753,6 +9779,11 @@ async function syncPush(){
     (result.rejected||[]).forEach(x=>{ rejectedIds.add(x.local_event_id); anyRejected=true; });
     // blocked_dependency entries are left as-is (unsynced) for retry on the next push.
     if(result.next_pull_cursor!=null) setPullCursor(incidentId, result.next_pull_cursor);
+    // high_risk_flags: read back from watchdog_alerts by the sync-log function itself (not
+    // reimplemented here) — clinical events are almost never rejected, so this is how a
+    // high-risk-but-accepted event (e.g. a pediatric medication dose) actually surfaces.
+    (result.high_risk_flags||[]).forEach(f=>_highRiskFlags.unshift({...f, _ts:Date.now(), incidentId}));
+    if(_highRiskFlags.length>200) _highRiskFlags.length=200;
   }
   // Single combined write-back at the end, not per-group, so a mid-loop failure never leaves
   // localStorage in a partially-updated state.
@@ -9773,6 +9804,7 @@ setInterval(()=>{ if(currentUser) syncPush(); }, 45000);
 // local-state projection into patients[], no conflict resolution, no dependency-graph
 // validation on the pull side.
 let _pulledEvents=[]; // in-memory, replaced per-incident on each pull cycle
+let _highRiskFlags=[]; // in-memory, appended to on each push response, capped at 200
 async function syncPull(incidentId){
   if(!currentUser) return;
   const client=getSupabaseClient();
@@ -9968,6 +10000,35 @@ async function pullIncidentCommandStateAll(){
   if(currentUser) refreshActiveScreenData();
 }
 setInterval(()=>{ if(currentUser) pullIncidentCommandStateAll(); }, 45000);
+
+// ── Poison-event quarantine review: sync_ingestion_errors, command-role only ──
+// The "poison event quarantine" concept (CLAUDE.md, docs/API_SURFACE_v1.2.md's Atomic
+// Individual Event Processing) has always been real server-side — malformed/dependency-blocked
+// events land here instead of failing a whole sync batch. Read access is command-role-only
+// (database/015_scope_sync_ingestion_errors_by_incident.sql), so this pull is skipped entirely
+// for non-command roles rather than erroring — RLS would just return zero rows anyway.
+let _syncIngestionErrors={}; // incidentId -> rows, unresolved only
+async function pullSyncIngestionErrors(incidentId){
+  if(!currentUser || !['pc','cc','chamal','admin'].includes(currentUser.role)) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let result;
+  try{
+    result=await client.from('sync_ingestion_errors')
+      .select('id,incident_id,device_id,local_event_id,error_code,error_message,dependency_status,created_at')
+      .eq('incident_id', incidentId)
+      .is('resolved_at', null)
+      .order('created_at', {ascending:false})
+      .limit(50);
+  }catch(e){ return; }
+  if(result.error || !result.data) return;
+  _syncIngestionErrors[incidentId]=result.data;
+}
+async function pullSyncIngestionErrorsAll(){
+  await Promise.all(Object.values(SITE_TO_INCIDENT_ID).map(id=>pullSyncIngestionErrors(id)));
+  if(currentUser) refreshActiveScreenData();
+}
+setInterval(()=>{ if(currentUser) pullSyncIngestionErrorsAll(); }, 45000);
 // Screens that display patient state need a refresh when projected state changes them in the
 // background — this mirrors goTo()'s per-screen render dispatch but skips the navigation-only
 // side effects (scroll reset, active-class toggling) that would be jarring during a quiet poll.
