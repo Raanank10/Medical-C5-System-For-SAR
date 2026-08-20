@@ -278,12 +278,13 @@ Example payload:
 
 Server projection rules:
 
-- update `patients.current_status = 'evacuating'`
+- update `patients.current_status = 'handed_over'` — this is the final custody state; distinct from `'evacuating'`, which is a separate, earlier status set by `PATIENT_STATUS_UPDATED` when a patient leaves the incident site for the company collection point but is not yet formally handed to MDA (still under the platoon commander's supervision). A completed handover must not leave a patient looking identical to one still waiting at the collection point.
 - set `patients.needs_full_assessment = false`
 - set `patients.handed_over_at` and `patients.handed_over_to`
 - resolve active vitals, reassessment, tourniquet, and missing-full-assessment watchdog alerts for that patient
 - tag resolved alerts with `resolved_by_event_id`
 - store token metadata in `patient_handover_tokens` when `token_hash` and `token_signature` are supplied
+- skip the `current_status`/`handed_over_at`/`handed_over_to` update entirely if the patient is already in a terminal status (`deceased`, `handed_over`, `closed`, `self_evacuated`) — prevents a duplicate/replayed handover packet from silently reopening or overwriting a closed patient record. Watchdog-alert resolution and token-metadata storage are unconditional and idempotent regardless (resolving an already-resolved alert or inserting a token that already exists is a no-op, not an error)
 
 Idempotency remains `device_id + local_event_id`. If a weak network resends the handover packet, the duplicate must not re-run treatment/status side effects.
 
@@ -326,15 +327,19 @@ Server projection rules:
 | `stabilizing` | Care is ongoing at the treatment site, such as tourniquet, medication, or airway management. |
 | `observing` | Care milestone completed; patient waits for extraction or reassessment. |
 | `extricating` | Casualty is being physically moved through the structure or ruins. |
-| `handed_over` | Transferred to MDA / evacuation force through `מסירת מצב רפואי לפינוי` (MIST) or secure QR. |
+| `evacuating` | Left the incident site for the company collection point, still under the platoon commander's supervision - not yet formally handed to MDA. Set via `PATIENT_STATUS_UPDATED` (`payload_json.status = 'evacuating'`), an optional intermediate step before `handed_over`. |
+| `handed_over` | Transferred to MDA / evacuation force through `מסירת מצב רפואי לפינוי` (MIST) or secure QR. Final custody state. |
 | `deceased` | Black triage fast-path or casualty expired during care. |
 
-The projection is event-driven:
+The projection is event-driven (`project_patient_state()` in the schema - the single trigger function responsible for every `patients` column write from an event, after a 2026-08 fix consolidated two independent triggers that had raced on this exact projection):
 
 - `PATIENT_TRIAGED_EXPECTANT` or payload `current_triage = black` -> `deceased`
 - `TOURNIQUET_APPLIED`, `MEDICATION_ADMINISTERED`, `AIRWAY_MANAGED` -> `stabilizing`
 - `VITALS_RECORDED` from stabilizing -> `observing`
-- `PATIENT_HANDED_OVER` -> `evacuating`
+- `PATIENT_STATUS_UPDATED` with payload `status` -> that status (e.g. `evacuating` for the collection-point step)
+- `PATIENT_HANDED_OVER` -> `handed_over`
+
+Every branch above except the black-triage fast path refuses to run once a patient is already in a terminal status (`deceased`, `handed_over`, `closed`, `self_evacuated`) - a stray or replayed event cannot reopen or overwrite a closed patient record.
 
 ---
 

@@ -807,6 +807,21 @@ Actiq: [count]
 Bandage / Combat Gauze / TQ / Airway: [count]
 ```
 
+### Left Site to Collection Point (optional intermediate step)
+
+Button:
+
+```text
+🚶 יצא לנקודת איסוף
+```
+
+Action:
+
+- Writes a `PATIENT_STATUS_UPDATED` event with `payload_json.status = 'evacuating'`
+- Sets patient status to `evacuating`
+- Represents the patient having left the incident site for the company collection point, still under the platoon commander's supervision, not yet formally handed to MDA
+- Only shown while the patient is not already `evacuating` or in a terminal status
+
 ### Handover Confirmation
 
 Button:
@@ -818,7 +833,7 @@ Button:
 Action:
 
 - Writes `PATIENT_HANDED_OVER` event
-- Sets patient status to `handed_over`
+- Sets patient status to `handed_over` (final custody state - distinct from the `evacuating` collection-point step above)
 - Makes field file read-only
 - Updates heatmap sector state
 
