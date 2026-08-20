@@ -16,8 +16,14 @@
     green: 30 * 60 * 1000,
   };
   const VITALS_WARN_BUFFER_MS = 60 * 1000;
-  const TOURNIQUET_WARN_MS = 40 * 60 * 1000;
-  const TOURNIQUET_CRITICAL_MS = 60 * 60 * 1000;
+  // Tourniquet review thresholds, correctly at 60m/120m (this used to disagree with a second,
+  // independent implementation in index.html's command-view watchdog panel, which already had
+  // the right numbers - see computeWatchdogRows). TOURNIQUET_NOTICE_MS is an early heads-up for
+  // the medic, well before the 60-minute review point actually arrives.
+  const TOURNIQUET_NOTICE_MS = 45 * 60 * 1000;
+  const TOURNIQUET_WARN_MS = 60 * 60 * 1000;
+  const TOURNIQUET_CRITICAL_MS = 120 * 60 * 1000;
+  const DEVICE_SILENCE_MS = 10 * 60 * 1000;
   const AVPU_RANK = { A: 0, V: 1, P: 2, U: 3 };
   const PEDIATRIC_AGE_CUTOFF = 8;
   const PEDIATRIC_HIGH_RISK_DOSE_LIMITS = {
@@ -98,8 +104,16 @@
     if (!tourniquet || !tourniquet.appliedAt) return null;
     const elapsedMs = nowMs - tourniquet.appliedAt;
     const minutes = elapsedMinutes(tourniquet.appliedAt, nowMs);
-    const cls = elapsedMs >= TOURNIQUET_CRITICAL_MS ? "critical" : elapsedMs >= TOURNIQUET_WARN_MS ? "warn" : "";
+    const cls =
+      elapsedMs >= TOURNIQUET_CRITICAL_MS ? "critical"
+      : elapsedMs >= TOURNIQUET_WARN_MS ? "warn"
+      : elapsedMs >= TOURNIQUET_NOTICE_MS ? "notice"
+      : "";
     return { cls, minutes, limb: tourniquet.limb || "לא צוין" };
+  }
+
+  function isDeviceSilent(lastSeenMs, nowMs = Date.now()) {
+    return !lastSeenMs || nowMs - lastSeenMs > DEVICE_SILENCE_MS;
   }
 
   function timeCodeToTodayMs(code, nowMs = Date.now()) {
@@ -210,8 +224,10 @@
 
   return {
     AVPU_RANK,
+    DEVICE_SILENCE_MS,
     FINAL_PATIENT_STATUSES,
     TOURNIQUET_CRITICAL_MS,
+    TOURNIQUET_NOTICE_MS,
     TOURNIQUET_WARN_MS,
     VITALS_INTERVAL_MS_BY_TRIAGE,
     VITALS_WARN_BUFFER_MS,
@@ -220,6 +236,7 @@
     detectDeterioration,
     elapsedMinutes,
     isCriticalAlert,
+    isDeviceSilent,
     isFinalPatientStatus,
     isHighRiskDose,
     isPediatricPatient,

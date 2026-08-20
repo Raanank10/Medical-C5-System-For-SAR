@@ -82,14 +82,31 @@ assert.equal(rules.isVitalsOverdue(patient({ triage: "green" }), baseTime + 25 *
 assert.equal(rules.isVitalsOverdue(patient({ triage: "green" }), baseTime + 31 * 60 * 1000), true);
 assert.equal(rules.isVitalsOverdue(patient({ triage: "black" }), baseTime + 60 * 60 * 1000), false);
 
+// Tourniquet review: notice (heads-up) at 45m, yellow/warn at 60m, red/critical at 120m.
 assert.deepEqual(
-  rules.tourniquetTimer(patient({ tourniquet: { limb: "right leg", appliedAt: baseTime } }), baseTime + 41 * 60 * 1000),
-  { cls: "warn", minutes: 41, limb: "right leg" },
+  rules.tourniquetTimer(patient({ tourniquet: { limb: "right leg", appliedAt: baseTime } }), baseTime + 30 * 60 * 1000),
+  { cls: "", minutes: 30, limb: "right leg" },
+);
+assert.deepEqual(
+  rules.tourniquetTimer(patient({ tourniquet: { limb: "right leg", appliedAt: baseTime } }), baseTime + 45 * 60 * 1000),
+  { cls: "notice", minutes: 45, limb: "right leg" },
 );
 assert.deepEqual(
   rules.tourniquetTimer(patient({ tourniquet: { limb: "right leg", appliedAt: baseTime } }), baseTime + 61 * 60 * 1000),
-  { cls: "critical", minutes: 61, limb: "right leg" },
+  { cls: "warn", minutes: 61, limb: "right leg" },
 );
+assert.deepEqual(
+  rules.tourniquetTimer(patient({ tourniquet: { limb: "right leg", appliedAt: baseTime } }), baseTime + 121 * 60 * 1000),
+  { cls: "critical", minutes: 121, limb: "right leg" },
+);
+
+// Device silence: one canonical 10-minute threshold shared across the medic load board,
+// the command-view device panel, and the Dead Man's Switch watchdog row (previously three
+// different values: 4m/5m/>5m).
+assert.equal(rules.isDeviceSilent(baseTime, baseTime + 9 * 60 * 1000), false);
+assert.equal(rules.isDeviceSilent(baseTime, baseTime + 11 * 60 * 1000), true);
+assert.equal(rules.isDeviceSilent(0, baseTime), true);
+assert.equal(rules.isDeviceSilent(null, baseTime), true);
 
 assert.equal(rules.computeMstartTriage({ rr: 0 }), "black");
 assert.equal(rules.computeMstartTriage({ rr: 34, bp_estimate: "radial", avpu: "A", spo2: 98 }), "red");

@@ -93,6 +93,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .vitals-timer.warn{color:var(--yellow);border-color:var(--yellow);}
 .vitals-timer.overdue{color:var(--orange);border-color:var(--orange);animation:blink 1.5s infinite;}
 .tq-timer{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:20px;border:1px solid var(--red);color:var(--red);background:rgba(230,57,70,0.08);}
+.tq-timer.notice{border-color:var(--muted);color:var(--muted);background:rgba(180,180,200,0.08);}
 .tq-timer.warn{border-color:var(--orange);color:var(--orange);background:rgba(255,107,53,0.08);}
 .tq-timer.critical{border-color:var(--red);color:var(--red);background:rgba(230,57,70,0.16);animation:blink 1.5s infinite;}
 .sweep-tq-card{border:1px solid var(--border);border-right:4px solid var(--red);border-radius:10px;padding:10px;margin-bottom:8px;background:var(--surface2);}
@@ -2071,8 +2072,14 @@ textarea{resize:vertical;min-height:70px;}
     green: 30 * 60 * 1000,
   };
   const VITALS_WARN_BUFFER_MS = 60 * 1000;
-  const TOURNIQUET_WARN_MS = 40 * 60 * 1000;
-  const TOURNIQUET_CRITICAL_MS = 60 * 60 * 1000;
+  // Tourniquet review thresholds, correctly at 60m/120m (this used to disagree with a second,
+  // independent implementation in index.html's command-view watchdog panel, which already had
+  // the right numbers - see computeWatchdogRows). TOURNIQUET_NOTICE_MS is an early heads-up for
+  // the medic, well before the 60-minute review point actually arrives.
+  const TOURNIQUET_NOTICE_MS = 45 * 60 * 1000;
+  const TOURNIQUET_WARN_MS = 60 * 60 * 1000;
+  const TOURNIQUET_CRITICAL_MS = 120 * 60 * 1000;
+  const DEVICE_SILENCE_MS = 10 * 60 * 1000;
   const AVPU_RANK = { A: 0, V: 1, P: 2, U: 3 };
   const PEDIATRIC_AGE_CUTOFF = 8;
   const PEDIATRIC_HIGH_RISK_DOSE_LIMITS = {
@@ -2153,8 +2160,16 @@ textarea{resize:vertical;min-height:70px;}
     if (!tourniquet || !tourniquet.appliedAt) return null;
     const elapsedMs = nowMs - tourniquet.appliedAt;
     const minutes = elapsedMinutes(tourniquet.appliedAt, nowMs);
-    const cls = elapsedMs >= TOURNIQUET_CRITICAL_MS ? "critical" : elapsedMs >= TOURNIQUET_WARN_MS ? "warn" : "";
+    const cls =
+      elapsedMs >= TOURNIQUET_CRITICAL_MS ? "critical"
+      : elapsedMs >= TOURNIQUET_WARN_MS ? "warn"
+      : elapsedMs >= TOURNIQUET_NOTICE_MS ? "notice"
+      : "";
     return { cls, minutes, limb: tourniquet.limb || "לא צוין" };
+  }
+
+  function isDeviceSilent(lastSeenMs, nowMs = Date.now()) {
+    return !lastSeenMs || nowMs - lastSeenMs > DEVICE_SILENCE_MS;
   }
 
   function timeCodeToTodayMs(code, nowMs = Date.now()) {
@@ -2265,8 +2280,10 @@ textarea{resize:vertical;min-height:70px;}
 
   return {
     AVPU_RANK,
+    DEVICE_SILENCE_MS,
     FINAL_PATIENT_STATUSES,
     TOURNIQUET_CRITICAL_MS,
+    TOURNIQUET_NOTICE_MS,
     TOURNIQUET_WARN_MS,
     VITALS_INTERVAL_MS_BY_TRIAGE,
     VITALS_WARN_BUFFER_MS,
@@ -2275,6 +2292,7 @@ textarea{resize:vertical;min-height:70px;}
     detectDeterioration,
     elapsedMinutes,
     isCriticalAlert,
+    isDeviceSilent,
     isFinalPatientStatus,
     isHighRiskDose,
     isPediatricPatient,
@@ -4536,10 +4554,10 @@ function renderPcMedicLoadBoard(myPts){
     const red=pts.filter(p=>p.triage==='red').length;
     const trapped=pts.filter(p=>normalizeTrapStatus(p)==='trapped').length;
     const tqs=totalActiveTourniquets(pts);
-    const lastMs=Math.max(0,...pts.map(p=>Date.parse(p.lastModifiedAt||p.createdAt||0)).filter(Number.isFinite));
+    const lastMs=Math.max(0,...pts.map(p=>Math.max(p.lastVitalsAt||0,Date.parse(p.lastModifiedAt||p.createdAt||0)||0)).filter(Number.isFinite));
     const mins=lastMs?Math.max(0,Math.floor((Date.now()-lastMs)/60000)):null;
     const overloaded=pts.length>=4||red>=2;
-    const silent=mins===null||mins>=4;
+    const silent=C5Rules.isDeviceSilent(lastMs);
     const status=overloaded?'עמוס':silent?'שקט':'פעיל';
     const action=silent?pcTaskAction('בדוק קשר',`toast('נרשם: בדיקת קשר עם ${displayUser(u.userId)}')`):overloaded?pcTaskAction('הקצה מחדש',`demoReassignWithinPlatoon()`):'';
     return roleRow(displayUser(u.userId),`${status} · ${pts.length} פצועים · ${red} אדומים · ${trapped} לכודים · ${tqs} חסמים · ${mins===null?'אין עדכון':`עדכון לפני ${mins} דק׳`}`,action);
@@ -8619,8 +8637,10 @@ function computeWatchdogRows(pts){
     }
     if(p.tourniquet?.appliedAt){
       const tqMin=Math.floor((now-p.tourniquet.appliedAt)/60000);
-      rows.push({patient:p.id, name:'Tourniquet Warning', trigger:'Tourniquet per limb', threshold:'+60m', state:tqMin>=60?'amber':'ok', detail:`${p.tourniquet.limb||'גפה לא צוינה'} · ${tqMin} דק׳`});
-      rows.push({patient:p.id, name:'Tourniquet Critical', trigger:'Tourniquet per limb', threshold:'+120m', state:tqMin>=120?'red':'ok', detail:`${p.tourniquet.limb||'גפה לא צוינה'} · ${tqMin} דק׳`});
+      const tqWarnMin=Math.round(C5Rules.TOURNIQUET_WARN_MS/60000);
+      const tqCriticalMin=Math.round(C5Rules.TOURNIQUET_CRITICAL_MS/60000);
+      rows.push({patient:p.id, name:'Tourniquet Warning', trigger:'Tourniquet per limb', threshold:`+${tqWarnMin}m`, state:tqMin>=tqWarnMin?'amber':'ok', detail:`${p.tourniquet.limb||'גפה לא צוינה'} · ${tqMin} דק׳`});
+      rows.push({patient:p.id, name:'Tourniquet Critical', trigger:'Tourniquet per limb', threshold:`+${tqCriticalMin}m`, state:tqMin>=tqCriticalMin?'red':'ok', detail:`${p.tourniquet.limb||'גפה לא צוינה'} · ${tqMin} דק׳`});
     }
     const vitalsMin=Math.floor((now-(p.lastVitalsAt||patientClockStart(p)))/60000);
     if(['red','yellow','green'].includes(p.triage)){
@@ -8636,7 +8656,8 @@ function computeWatchdogRows(pts){
   });
   devices.forEach((last,id)=>{
     const silentMin=Math.floor((now-last)/60000);
-    rows.push({patient:id, name:"Dead Man's Switch", trigger:'Medic inactivity', threshold:'>5m no heartbeat', state:silentMin>5?'red':'ok', detail:`פעילות אחרונה ${silentMin} דק׳`});
+    const deviceSilenceMin=Math.round(C5Rules.DEVICE_SILENCE_MS/60000);
+    rows.push({patient:id, name:"Dead Man's Switch", trigger:'Medic inactivity', threshold:`>${deviceSilenceMin}m no heartbeat`, state:C5Rules.isDeviceSilent(last,now)?'red':'ok', detail:`פעילות אחרונה ${silentMin} דק׳`});
   });
   return rows;
 }
@@ -9088,14 +9109,14 @@ function renderCommandOperationalPanels(pts, site){
   pts.forEach(p=>{
     const id=p.lastTouchedBy||p.medic||'UNKNOWN';
     if(!deviceMap.has(id)) deviceMap.set(id,{id,last:0,patients:0,unsynced:0});
-    const d=deviceMap.get(id); d.patients++; d.unsynced+=(p.unsyncedEvents||0); d.last=Math.max(d.last,p.lastVitalsAt||0);
+    const d=deviceMap.get(id); d.patients++; d.unsynced+=(p.unsyncedEvents||0); d.last=Math.max(d.last,p.lastVitalsAt||0,Date.parse(p.lastModifiedAt||'')||0);
   });
   if(!deviceMap.has(getDeviceId())) deviceMap.set(getDeviceId(),{id:getDeviceId(),last:Date.now(),patients:0,unsynced:localOutboxCount()});
   document.getElementById('cmd-device-panel').innerHTML=[...deviceMap.values()].map(d=>{
-    const silent=Date.now()-d.last>5*60*1000;
+    const silent=C5Rules.isDeviceSilent(d.last);
     return `<div class="device-row ${silent?'offline':''}"><div><div class="device-name">${d.id}</div><div class="device-meta">${d.patients} פצועים · ${d.unsynced} unsynced</div></div><div class="sync-pill ${silent?'offline':''}">${silent?'SILENT':timeAgoLabel(d.last)}</div></div>`;
   }).join('');
-  setCmdPanelMeta('devices', `${[...deviceMap.values()].filter(d=>Date.now()-d.last>5*60*1000).length} SILENT · ${deviceMap.size} DEVICES`);
+  setCmdPanelMeta('devices', `${[...deviceMap.values()].filter(d=>C5Rules.isDeviceSilent(d.last)).length} SILENT · ${deviceMap.size} DEVICES`);
   renderWatchdogPanel(pts);
 
   const dupes=duplicateCandidates(pts);
