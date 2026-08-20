@@ -88,7 +88,7 @@ def clean_link_target(target: str) -> str:
 
 def check_markdown_links(errors: list[str]) -> None:
     for path in ROOT.rglob("*.md"):
-        if ".git" in path.parts:
+        if ".git" in path.parts or "node_modules" in path.parts:
             continue
         rel_parent = path.parent
         text = path.read_text(encoding="utf-8", errors="ignore")
@@ -178,9 +178,76 @@ def check_domain_rules_sync(errors: list[str]) -> None:
             )
 
 
+SQL_TOKEN_RE = re.compile(
+    r"--[^\n]*"          # line comment
+    r"|/\*.*?\*/"        # block comment
+    r"|\$\$"             # dollar-quote delimiter (this repo only uses untagged $$)
+    r"|'(?:[^']|'')*'"   # single-quoted string, '' is an escaped quote
+    r"|[()]",            # a paren
+    re.DOTALL,
+)
+
+
+def check_sql_structure(errors: list[str]) -> None:
+    """Lightweight structural sanity checks for the SQL drafts under database/.
+
+    This is not a real SQL parser - it can't be, with stdlib only - so it only
+    checks two cheap, high-value invariants that are easy to get wrong when
+    hand-editing a 2,500-line file: parens balance, and every quoted string /
+    dollar-quoted block is actually closed by EOF. It skips comments and
+    string contents so a stray '(' inside a comment or literal doesn't trip
+    it. Full syntax/semantic validation still requires a real Postgres
+    instance - see docs/DEVELOPMENT.md's "Validating SQL Drafts" section.
+    """
+    sql_dir = ROOT / "database"
+    if not sql_dir.exists():
+        return
+
+    known_tables: set[str] = set()
+    file_texts: dict[Path, str] = {}
+    for path in sorted(sql_dir.glob("*.sql")):
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        file_texts[path] = text
+        known_tables.update(m.lower() for m in re.findall(
+            r"create\s+table\s+(?:if\s+not\s+exists\s+)?\"?([a-zA-Z_][a-zA-Z0-9_]*)\"?", text, re.IGNORECASE
+        ))
+
+    for path, text in file_texts.items():
+        rel = path.relative_to(ROOT)
+        depth = 0
+        in_dollar_quote = False
+        for match in SQL_TOKEN_RE.finditer(text):
+            tok = match.group(0)
+            if tok == "$$":
+                in_dollar_quote = not in_dollar_quote
+            elif in_dollar_quote:
+                continue
+            elif tok == "(":
+                depth += 1
+            elif tok == ")":
+                depth -= 1
+                if depth < 0:
+                    fail(f"{rel}: unbalanced ')' at offset {match.start()} (no matching '(')", errors)
+                    depth = 0
+        if depth != 0:
+            fail(f"{rel}: {depth} unclosed '(' by end of file", errors)
+        if in_dollar_quote:
+            fail(f"{rel}: unterminated $$ dollar-quoted block by end of file", errors)
+
+        for m in re.finditer(r"\breferences\s+\"?([a-zA-Z_][a-zA-Z0-9_]*)\"?\s*\(", text, re.IGNORECASE):
+            target = m.group(1).lower()
+            if target not in known_tables:
+                fail(
+                    f"{rel}: 'references {m.group(1)}(...)' targets a table not defined by any "
+                    "'create table' in database/*.sql (typo, or the table was renamed/dropped "
+                    "without updating this reference)",
+                    errors,
+                )
+
+
 def check_python_syntax(errors: list[str]) -> None:
     for path in ROOT.rglob("*.py"):
-        if any(part in {".git", ".venv", "venv", "__pycache__"} for part in path.parts):
+        if any(part in {".git", ".venv", "venv", "__pycache__", "node_modules"} for part in path.parts):
             continue
         try:
             ast.parse(path.read_text(encoding="utf-8"))
@@ -195,6 +262,7 @@ def main() -> int:
     check_html_files(errors)
     check_markdown_links(errors)
     check_domain_rules_sync(errors)
+    check_sql_structure(errors)
     check_python_syntax(errors)
 
     if errors:
