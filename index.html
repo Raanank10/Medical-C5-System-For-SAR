@@ -9645,8 +9645,8 @@ function saveLocalEvent(event){
 }
 
 // ── Sync push: outbox → deployed /sync/log Edge Function ──
-// Pull (server → client) and full event-sourced state projection are deliberately out of
-// scope for this pass — see plan doc. This only pushes locally-created events outward.
+// Pushes locally-created events outward. Full event-sourced state projection of pulled
+// events into patients[] is not yet implemented — see docs/ROADMAP.md's Phase 3.
 let _syncPushTimer=null;
 function scheduleSyncPush(){
   if(_syncPushTimer) return;
@@ -9724,8 +9724,9 @@ async function syncPush(){
 setInterval(()=>{ if(currentUser) syncPush(); }, 45000);
 
 // ── Sync pull: server → client, read-only AAR-timeline feed ──
-// See plan doc for what this deliberately does NOT do: no local-state projection into
-// patients[], no conflict resolution, no dependency-graph validation on the pull side.
+// What this deliberately does NOT do yet (tracked in docs/ROADMAP.md's Phase 3): no
+// local-state projection into patients[], no conflict resolution, no dependency-graph
+// validation on the pull side.
 let _pulledEvents=[]; // in-memory, replaced per-incident on each pull cycle
 async function syncPull(incidentId){
   if(!currentUser) return;
