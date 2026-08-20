@@ -2439,6 +2439,7 @@ const SITE_TO_INCIDENT_ID = {
   SITE_A: '00000000-0000-0000-0000-0000000000a1',
   SITE_B: '00000000-0000-0000-0000-0000000000b2'
 };
+const INCIDENT_ID_TO_SITE = Object.fromEntries(Object.entries(SITE_TO_INCIDENT_ID).map(([site,id])=>[id,site]));
 // Server user_role enum uses 'logistics_officer'; client's internal role key is 'logistics'.
 const SERVER_ROLE_TO_CLIENT_ROLE = { logistics_officer: 'logistics' };
 function mapServerRole(role){ return SERVER_ROLE_TO_CLIENT_ROLE[role] || role; }
@@ -9768,6 +9769,105 @@ function syncPullAll(){
   Object.values(SITE_TO_INCIDENT_ID).forEach(id=>syncPull(id));
 }
 setInterval(()=>{ if(currentUser) syncPullAll(); }, 45000);
+
+// ── Pull projected patient state: server `patients` table → local patients[] ──
+// Reads the server's already-computed patient rows (kept current by project_patient_state(),
+// database/013) instead of replaying raw pulled events client-side. Re-implementing that
+// trigger's triage/status/handover logic a second time in JS would be exactly the kind of
+// duplicate-source-of-truth drift that caused the racing-trigger bug fixed in that same file —
+// so this stays a thin read + merge, not a second projector.
+// A patient with any unsynced local outbox entry is left untouched this round: the medic's own
+// in-flight edit wins locally until it's actually pushed, rather than being clobbered mid-edit.
+const PROJECTED_PATIENT_COLUMNS = 'id,incident_id,visual_id,current_triage,current_status,access_status,needs_full_assessment,is_pediatric,pediatric_age_years,last_vitals_at,version';
+const VALID_LOCAL_TRIAGE = new Set(['red','yellow','green','black','pending']);
+const VALID_LOCAL_STATUS = new Set(['identified','stabilizing','observing','evacuating','handed_over','closed','self_evacuated','deceased']);
+
+function patientsWithPendingLocalEdits(){
+  let outbox=[];
+  try{ outbox=JSON.parse(localStorage.getItem('c5_local_sqlite_outbox')||'[]'); }catch(e){}
+  return new Set(outbox.filter(e=>!e.synced && e.patient_id).map(e=>e.patient_id));
+}
+function accessibilityFromServerStatus(access_status){
+  if(access_status==='trapped' || access_status==='partial') return {accessibility:'trapped', trapStatus:'trapped'};
+  if(access_status==='free') return {accessibility:'full', trapStatus:'not_trapped'};
+  return {accessibility:null, trapStatus:null};
+}
+function applyProjectedPatientState(rows){
+  if(!rows || !rows.length) return;
+  const pending=patientsWithPendingLocalEdits();
+  let changed=false;
+  for(const row of rows){
+    if(pending.has(row.id)) continue; // local edit wins until pushed
+    const access=accessibilityFromServerStatus(row.access_status);
+    const triage=VALID_LOCAL_TRIAGE.has(row.current_triage) ? row.current_triage : null;
+    const status=VALID_LOCAL_STATUS.has(row.current_status) ? row.current_status : null;
+    const existing=patients.find(x=>x.id===row.id);
+    if(existing){
+      if(existing._serverVersion!=null && row.version!=null && row.version<=existing._serverVersion) continue;
+      const before=JSON.stringify([existing.triage,existing.patientStatus,existing.accessibility,existing.trapStatus,existing.needsFullAssessment]);
+      existing.triage=triage;
+      if(status) existing.patientStatus=status;
+      existing.accessibility=access.accessibility;
+      existing.trapStatus=access.trapStatus;
+      existing.needsFullAssessment=!!row.needs_full_assessment;
+      if(row.last_vitals_at) existing.lastVitalsAt=Date.parse(row.last_vitals_at)||existing.lastVitalsAt;
+      existing._serverVersion=row.version;
+      if(before!==JSON.stringify([existing.triage,existing.patientStatus,existing.accessibility,existing.trapStatus,existing.needsFullAssessment])){
+        changed=true;
+        existing.lastModifiedAt=new Date().toISOString();
+        (existing.events||(existing.events=[])).push({type:'REMOTE_STATE_APPLIED',time:nowT(),detail:'עודכן מסנכרון (מכשיר אחר)'});
+      }
+    } else {
+      // Unknown locally: another device created this patient. Add a minimal local record so
+      // it's visible at all, rather than staying invisible until this device happens to touch it.
+      changed=true;
+      patients.push({
+        id:row.id, visualId:row.visual_id, triage, accessibility:access.accessibility, trapStatus:access.trapStatus,
+        location:'לא צוין (התקבל ממכשיר אחר)', locDetail:'',
+        injury:null, injuryZones:[], patientStatus:status||'identified',
+        needsFullAssessment:!!row.needs_full_assessment,
+        patientAgeGroup:row.is_pediatric?'pediatric':'adult', patientAge:row.pediatric_age_years||null,
+        fullName:'לא מזוהה', identityStatus:'unknown', temporaryDescription:'',
+        assignedMedicId:null, assignedPlatoonId:null, tempPatientId:null,
+        stockSnapshot:{}, lastTouchedBy:'(remote)', lastModifiedAt:new Date().toISOString(),
+        confirmedClinical:true, unsyncedEvents:0, locationHistory:[], possibleDuplicate:false,
+        time:nowT(), vitals:{...VITALS_BASELINE}, vitalsCapture:null, txHistory:[],
+        alert:false, deterioration:[], lastVitalsAt:row.last_vitals_at?Date.parse(row.last_vitals_at):null,
+        vitalsHistory:[], tourniquet:null, medic:'(remote)', siteId:INCIDENT_ID_TO_SITE[row.incident_id]||'SITE_A',
+        _serverVersion:row.version, sourcedFromRemote:true,
+        events:[{type:'REMOTE_PATIENT_DISCOVERED',time:nowT(),detail:`${row.visual_id} התקבל ממכשיר אחר (סנכרון)`}]
+      });
+    }
+  }
+  if(changed){ saveDemoState(); refreshActiveScreenData(); }
+}
+async function pullProjectedPatientState(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let result;
+  try{ result=await client.from('patients').select(PROJECTED_PATIENT_COLUMNS).eq('incident_id', incidentId); }
+  catch(e){ return; } // offline/network failure — next interval retries
+  if(result.error || !result.data) return;
+  applyProjectedPatientState(result.data);
+}
+function pullProjectedPatientStateAll(){
+  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>pullProjectedPatientState(id));
+}
+setInterval(()=>{ if(currentUser) pullProjectedPatientStateAll(); }, 45000);
+// Screens that display patient state need a refresh when projected state changes them in the
+// background — this mirrors goTo()'s per-screen render dispatch but skips the navigation-only
+// side effects (scroll reset, active-class toggling) that would be jarring during a quiet poll.
+function refreshActiveScreenData(){
+  const screen=activeScreenId();
+  if(screen==='dashboard'){ renderDashboard(); renderAlerts(); }
+  else if(screen==='sweep') renderMstartSweep();
+  else if(screen==='commander') renderCommander();
+  else if(screen==='logistics') renderLogisticsOfficer();
+  else if(screen==='role-dashboard') renderRoleDashboard(activeRoleDashboard);
+  else if(screen==='aar') renderAar();
+  updateDemoStatus();
+}
 
 function activeScreenId(){
   const el=document.querySelector('.screen.active');
