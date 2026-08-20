@@ -33,10 +33,11 @@ python -m venv .venv
 .venv\Scripts\activate            # Windows; use `source .venv/bin/activate` on macOS/Linux
 pip install -r requirements.txt
 python seed_demo_db.py
+python -m pytest                  # pytest suite for db.py/kpis.py/charts.py/report.py — seeds its own temp DBs, doesn't touch rescue_demo_v1_1.db
 python -c "from db import DB; from kpis import KPIEngine; from report import ReportGenerator; db=DB('rescue_demo_v1_1.db'); kpi=KPIEngine(db); ReportGenerator(kpi).save('aar_report_v1_1.html')"
 ```
 
-CI (`.github/workflows/validate.yml`) runs exactly two things on every PR and push to `main`: `python scripts/check_repo.py` and `node tests/domain-rules.test.js`. The smoke scripts under `scripts/smoke_*.js` are not wired into CI — they're ad hoc regression checks for specific version milestones, run manually against `index.html` / `demo/rescue-app.html`.
+CI (`.github/workflows/validate.yml`) runs exactly two things on every PR and push to `main`: `python scripts/check_repo.py` and `node tests/domain-rules.test.js`. The smoke scripts under `scripts/smoke_*.js` and the analytics package's `pytest` suite are not wired into CI — they're run manually (smoke scripts against `index.html` / `demo/rescue-app.html`; pytest requires the analytics venv/dependencies CI doesn't install).
 
 `scripts/check_repo.py` enforces (stdlib only, no deps):
 - a fixed list of required paths exist (`REQUIRED_PATHS` in the script — update it when adding/renaming core docs, schema files, or archive folders)

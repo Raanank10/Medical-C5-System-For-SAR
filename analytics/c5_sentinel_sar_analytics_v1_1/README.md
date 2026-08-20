@@ -42,6 +42,15 @@ print(kpi.command_summary())
 ReportGenerator(kpi).save("aar_report_v1_1.html")
 ```
 
+## Test
+
+```bash
+pip install -r requirements.txt
+python -m pytest
+```
+
+Tests seed a fresh temporary database per test (via `seed_demo_db.main()`) rather than depending on `rescue_demo_v1_1.db`, so they're independent of whatever state that file happens to be in.
+
 ## Files
 
 - `db.py` — SQLite DataFrame wrapper
@@ -50,6 +59,7 @@ ReportGenerator(kpi).save("aar_report_v1_1.html")
 - `report.py` — self-contained HTML report generator
 - `seed_demo_db.py` — creates `rescue_demo_v1_1.db`
 - `analytics_demo.ipynb` — quick demo notebook
+- `tests/` — pytest suite for `db.py`/`kpis.py`/`charts.py`/`report.py`
 
 ## Safety note
 
