@@ -46,11 +46,53 @@ async function checkFile(browser, file) {
   const appVersion = await page.evaluate(() => (typeof APP_VERSION !== 'undefined' ? APP_VERSION : null));
   assert(typeof appVersion === 'string' && /^\d+\.\d+(\.\d+)?$/.test(appVersion), `${rel}: APP_VERSION missing or malformed (got ${JSON.stringify(appVersion)})`);
 
-  const activeScreens = await page.locator('.screen.active').count();
-  assert(activeScreens === 1, `${rel}: expected exactly one active screen on initial load, found ${activeScreens}`);
+  // Local storage is encrypted at rest (docs/THREAT_MODEL.md T2) behind a device PIN gate that's
+  // now the true first screen, ahead of screen-login - a brand-new device (no PIN set yet) shows
+  // the setup view first.
+  let activeScreenId = await page.locator('.screen.active').first().getAttribute('id');
+  assert(activeScreenId === 'screen-pin-gate', `${rel}: expected screen-pin-gate active on a fresh load with no PIN set, got ${activeScreenId}`);
+  const setupPanelVisible = await page.locator('#pin-gate-setup-panel').isVisible();
+  assert(setupPanelVisible, `${rel}: expected the PIN setup panel visible on a device with no PIN set yet`);
 
-  const activeScreenId = await page.locator('.screen.active').first().getAttribute('id');
-  assert(activeScreenId === 'screen-login', `${rel}: expected screen-login active on a fresh load with no session, got ${activeScreenId}`);
+  const TEST_PIN = '135790';
+  await page.fill('#pin-gate-setup-new', TEST_PIN);
+  await page.fill('#pin-gate-setup-confirm', TEST_PIN);
+  await page.click('#pin-gate-setup-btn');
+  await page.waitForFunction(() => document.querySelector('.screen.active')?.id === 'screen-login', { timeout: 5000 });
+
+  const activeScreens = await page.locator('.screen.active').count();
+  assert(activeScreens === 1, `${rel}: expected exactly one active screen after PIN setup, found ${activeScreens}`);
+  activeScreenId = await page.locator('.screen.active').first().getAttribute('id');
+  assert(activeScreenId === 'screen-login', `${rel}: expected screen-login active after PIN setup completes, got ${activeScreenId}`);
+
+  // Prove the encryption actually happened, not just that the app kept working: inspect the raw
+  // localStorage record directly - it must not be readable JSON with patient/clinical content.
+  const rawVerifier = await page.evaluate((k) => localStorage.getItem(k), 'c5_pin_verifier_v1');
+  assert(!!rawVerifier, `${rel}: expected a PIN verifier record in localStorage after setup`);
+  const verifierShape = JSON.parse(rawVerifier);
+  assert(verifierShape && verifierShape.ct && verifierShape.iv && verifierShape.salt, `${rel}: PIN verifier record missing expected {salt, iv, ct} shape`);
+
+  // Reload (same page/origin, so localStorage persists) - a returning device with a PIN already
+  // set must show the unlock view, not setup, and must reject a wrong PIN before accepting the
+  // right one.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(500);
+  activeScreenId = await page.locator('.screen.active').first().getAttribute('id');
+  assert(activeScreenId === 'screen-pin-gate', `${rel}: expected screen-pin-gate active again after reload, got ${activeScreenId}`);
+  const unlockPanelVisible = await page.locator('#pin-gate-unlock-panel').isVisible();
+  assert(unlockPanelVisible, `${rel}: expected the PIN unlock panel (not setup) visible on a returning device with a PIN already set`);
+
+  await page.fill('#pin-gate-unlock-input', '000000');
+  await page.click('#pin-gate-unlock-btn');
+  await page.waitForFunction(() => document.querySelector('#pin-gate-unlock-error')?.textContent?.length > 0, { timeout: 5000 });
+  activeScreenId = await page.locator('.screen.active').first().getAttribute('id');
+  assert(activeScreenId === 'screen-pin-gate', `${rel}: a wrong PIN must not unlock the device - expected screen-pin-gate still active, got ${activeScreenId}`);
+
+  await page.fill('#pin-gate-unlock-input', TEST_PIN);
+  await page.click('#pin-gate-unlock-btn');
+  await page.waitForFunction(() => document.querySelector('.screen.active')?.id === 'screen-login', { timeout: 5000 });
+  activeScreenId = await page.locator('.screen.active').first().getAttribute('id');
+  assert(activeScreenId === 'screen-login', `${rel}: the correct PIN must unlock the device - expected screen-login active, got ${activeScreenId}`);
 
   // A page that only half-parsed would still often report zero console errors (they're
   // warnings by default), so also fail loudly if anything logged at error level - a failed
@@ -59,7 +101,7 @@ async function checkFile(browser, file) {
   assert(unexpectedConsoleErrors.length === 0, `${rel}: unexpected console error(s): ${unexpectedConsoleErrors.join(' | ')}`);
 
   await page.close();
-  console.log(`${rel}: browser smoke passed (APP_VERSION ${appVersion}, screen-login active, C5DomainRules loaded, no page errors)`);
+  console.log(`${rel}: browser smoke passed (APP_VERSION ${appVersion}, PIN gate setup/unlock/wrong-PIN-rejection verified, screen-login active, C5DomainRules loaded, no page errors)`);
 }
 
 async function main() {
