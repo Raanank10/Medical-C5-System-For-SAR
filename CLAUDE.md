@@ -92,7 +92,7 @@ Invalid/dependency-blocked sync events go to `sync_ingestion_errors` / `sync_eve
 
 ### Analytics package (`analytics/c5_sentinel_sar_analytics_v1_1/`)
 
-A standalone local Python package (`DB`, `KPIEngine`, `ReportGenerator`) that reads a SQLite demo DB and produces AAR (after-action review) HTML reports and KPIs (triage funnel, vitals/tourniquet timers, inventory burn, stale-data/sync-gap metrics). It has no pytest suite yet (noted as a gap in `docs/DEVELOPMENT.md`). It mirrors concepts from the Postgres schema but runs independently against `rescue_demo_v1_1.db`, seeded via `seed_demo_db.py`.
+A standalone local Python package (`DB`, `KPIEngine`, `ReportGenerator`) that reads a SQLite DB and produces AAR (after-action review) HTML reports and KPIs (triage funnel, vitals/tourniquet timers, inventory burn, stale-data/sync-gap metrics), with a pytest suite (`tests/`) covering all four modules. It mirrors concepts from the Postgres schema in its own SQLite schema (`seed_demo_db.SCHEMA`) rather than sharing one, and normally runs against `rescue_demo_v1_1.db`, seeded via `seed_demo_db.py`. `export_live_incident.py` (stdlib-only, no new dependency) can also export a real incident from the live Supabase database into a SQLite file shaped like that same schema, so the same `DB`/`KPIEngine`/`ReportGenerator` code runs against real event data unmodified — see its module docstring for the per-table mapping and the deliberately-skipped `incident_command_state` table (schema mismatch; `KPIEngine.command_summary()` already falls back to computing it from real exported data).
 
 ### Docs are the spec — read before changing behavior
 

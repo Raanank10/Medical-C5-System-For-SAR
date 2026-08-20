@@ -27,6 +27,15 @@ pip install -r requirements.txt
 python seed_demo_db.py
 ```
 
+### Run against a real incident instead of the synthetic demo
+
+```bash
+export SUPABASE_SERVICE_ROLE_KEY=...   # Supabase dashboard: Project Settings -> API -> service_role secret; never commit it
+python export_live_incident.py --incident-id <incident-uuid> --out live_incident.db
+```
+
+Then use `live_incident.db` exactly like `rescue_demo_v1_1.db` below. Stdlib-only (`urllib.request`), no new dependency. See `export_live_incident.py`'s module docstring for exactly which tables/columns are exported and the handful of documented best-effort mappings where the live and analytics schemas don't line up 1:1 (e.g. `inventory_ledger` is exported from the live `inventory_ledger_v12` table). `incident_command_state` is deliberately not exported — its live and SQLite schemas don't match, and `KPIEngine.command_summary()` already falls back to computing the same aggregates from real exported `patients`/`watchdog_alerts` data when it's empty.
+
 Then:
 
 ```python
@@ -58,6 +67,7 @@ Tests seed a fresh temporary database per test (via `seed_demo_db.main()`) rathe
 - `charts.py` — tactical/dark charts
 - `report.py` — self-contained HTML report generator
 - `seed_demo_db.py` — creates `rescue_demo_v1_1.db`
+- `export_live_incident.py` — exports a real incident from the live Supabase Postgres database into a local SQLite file shaped like `seed_demo_db.py`'s schema
 - `analytics_demo.ipynb` — quick demo notebook
 - `tests/` — pytest suite for `db.py`/`kpis.py`/`charts.py`/`report.py`
 
