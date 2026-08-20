@@ -31,30 +31,82 @@ assert.equal(rules.isHighRiskDose("fentanyl", 10, { patientAgeGroup: "pediatric"
 assert.equal(rules.isHighRiskDose("fentanyl", 4, { patientAgeGroup: "pediatric" }), false);
 assert.equal(rules.isHighRiskDose("morphine", 10, { patientAge: 12 }), false);
 
+// Vitals reassessment interval varies by triage color - red tightest (10m), yellow (20m),
+// green loosest (30m). Unset/unrecognized triage (e.g. freshly created, not yet MSTART-triaged)
+// defaults to the red interval - most conservative until an actual color is known.
 assert.deepEqual(rules.vitalsTimer(patient(), baseTime + 2 * 60 * 1000), {
   cls: "ok",
   minutes: 2,
-  remainingMinutes: 3,
+  remainingMinutes: 8,
 });
-assert.deepEqual(rules.vitalsTimer(patient(), baseTime + 4 * 60 * 1000), {
+assert.deepEqual(rules.vitalsTimer(patient(), baseTime + 9 * 60 * 1000), {
   cls: "warn",
-  minutes: 4,
+  minutes: 9,
   remainingMinutes: 1,
 });
-assert.deepEqual(rules.vitalsTimer(patient(), baseTime + 7 * 60 * 1000), {
+assert.deepEqual(rules.vitalsTimer(patient(), baseTime + 11 * 60 * 1000), {
   cls: "overdue",
-  minutes: 7,
+  minutes: 11,
+  remainingMinutes: 0,
+});
+assert.deepEqual(rules.vitalsTimer(patient({ triage: "yellow" }), baseTime + 15 * 60 * 1000), {
+  cls: "ok",
+  minutes: 15,
+  remainingMinutes: 5,
+});
+assert.deepEqual(rules.vitalsTimer(patient({ triage: "yellow" }), baseTime + 21 * 60 * 1000), {
+  cls: "overdue",
+  minutes: 21,
+  remainingMinutes: 0,
+});
+assert.deepEqual(rules.vitalsTimer(patient({ triage: "green" }), baseTime + 25 * 60 * 1000), {
+  cls: "ok",
+  minutes: 25,
+  remainingMinutes: 5,
+});
+assert.deepEqual(rules.vitalsTimer(patient({ triage: "green" }), baseTime + 31 * 60 * 1000), {
+  cls: "overdue",
+  minutes: 31,
   remainingMinutes: 0,
 });
 
+assert.equal(rules.vitalsIntervalMsFor("red"), 10 * 60 * 1000);
+assert.equal(rules.vitalsIntervalMsFor("yellow"), 20 * 60 * 1000);
+assert.equal(rules.vitalsIntervalMsFor("green"), 30 * 60 * 1000);
+assert.equal(rules.vitalsIntervalMsFor("pending"), 10 * 60 * 1000);
+assert.equal(rules.vitalsIntervalMsFor(undefined), 10 * 60 * 1000);
+
+assert.equal(rules.isVitalsOverdue(patient({ triage: "yellow" }), baseTime + 15 * 60 * 1000), false);
+assert.equal(rules.isVitalsOverdue(patient({ triage: "yellow" }), baseTime + 21 * 60 * 1000), true);
+assert.equal(rules.isVitalsOverdue(patient({ triage: "green" }), baseTime + 25 * 60 * 1000), false);
+assert.equal(rules.isVitalsOverdue(patient({ triage: "green" }), baseTime + 31 * 60 * 1000), true);
+assert.equal(rules.isVitalsOverdue(patient({ triage: "black" }), baseTime + 60 * 60 * 1000), false);
+
+// Tourniquet review: notice (heads-up) at 45m, yellow/warn at 60m, red/critical at 120m.
 assert.deepEqual(
-  rules.tourniquetTimer(patient({ tourniquet: { limb: "right leg", appliedAt: baseTime } }), baseTime + 41 * 60 * 1000),
-  { cls: "warn", minutes: 41, limb: "right leg" },
+  rules.tourniquetTimer(patient({ tourniquet: { limb: "right leg", appliedAt: baseTime } }), baseTime + 30 * 60 * 1000),
+  { cls: "", minutes: 30, limb: "right leg" },
+);
+assert.deepEqual(
+  rules.tourniquetTimer(patient({ tourniquet: { limb: "right leg", appliedAt: baseTime } }), baseTime + 45 * 60 * 1000),
+  { cls: "notice", minutes: 45, limb: "right leg" },
 );
 assert.deepEqual(
   rules.tourniquetTimer(patient({ tourniquet: { limb: "right leg", appliedAt: baseTime } }), baseTime + 61 * 60 * 1000),
-  { cls: "critical", minutes: 61, limb: "right leg" },
+  { cls: "warn", minutes: 61, limb: "right leg" },
 );
+assert.deepEqual(
+  rules.tourniquetTimer(patient({ tourniquet: { limb: "right leg", appliedAt: baseTime } }), baseTime + 121 * 60 * 1000),
+  { cls: "critical", minutes: 121, limb: "right leg" },
+);
+
+// Device silence: one canonical 10-minute threshold shared across the medic load board,
+// the command-view device panel, and the Dead Man's Switch watchdog row (previously three
+// different values: 4m/5m/>5m).
+assert.equal(rules.isDeviceSilent(baseTime, baseTime + 9 * 60 * 1000), false);
+assert.equal(rules.isDeviceSilent(baseTime, baseTime + 11 * 60 * 1000), true);
+assert.equal(rules.isDeviceSilent(0, baseTime), true);
+assert.equal(rules.isDeviceSilent(null, baseTime), true);
 
 assert.equal(rules.computeMstartTriage({ rr: 0 }), "black");
 assert.equal(rules.computeMstartTriage({ rr: 34, bp_estimate: "radial", avpu: "A", spo2: 98 }), "red");

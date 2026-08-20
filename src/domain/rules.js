@@ -7,10 +7,23 @@
 })(typeof globalThis !== "undefined" ? globalThis : window, function buildDomainRules() {
   "use strict";
 
-  const VITALS_INTERVAL_MS = 5 * 60 * 1000;
-  const WARN_AT_MS = 4 * 60 * 1000;
-  const TOURNIQUET_WARN_MS = 40 * 60 * 1000;
-  const TOURNIQUET_CRITICAL_MS = 60 * 60 * 1000;
+  // Vitals reassessment interval varies by triage color - higher acuity gets checked more
+  // often. A patient with no/unset triage yet (freshly created, not yet MSTART-triaged)
+  // defaults to the red interval: most conservative until an actual color is known.
+  const VITALS_INTERVAL_MS_BY_TRIAGE = {
+    red: 10 * 60 * 1000,
+    yellow: 20 * 60 * 1000,
+    green: 30 * 60 * 1000,
+  };
+  const VITALS_WARN_BUFFER_MS = 60 * 1000;
+  // Tourniquet review thresholds, correctly at 60m/120m (this used to disagree with a second,
+  // independent implementation in index.html's command-view watchdog panel, which already had
+  // the right numbers - see computeWatchdogRows). TOURNIQUET_NOTICE_MS is an early heads-up for
+  // the medic, well before the 60-minute review point actually arrives.
+  const TOURNIQUET_NOTICE_MS = 45 * 60 * 1000;
+  const TOURNIQUET_WARN_MS = 60 * 60 * 1000;
+  const TOURNIQUET_CRITICAL_MS = 120 * 60 * 1000;
+  const DEVICE_SILENCE_MS = 10 * 60 * 1000;
   const AVPU_RANK = { A: 0, V: 1, P: 2, U: 3 };
   const PEDIATRIC_AGE_CUTOFF = 8;
   const PEDIATRIC_HIGH_RISK_DOSE_LIMITS = {
@@ -59,14 +72,23 @@
     return nowMs - (patient?.lastVitalsAt || 0);
   }
 
+  function vitalsIntervalMsFor(triage) {
+    return VITALS_INTERVAL_MS_BY_TRIAGE[triage] || VITALS_INTERVAL_MS_BY_TRIAGE.red;
+  }
+
+  function isVitalsOverdue(patient, nowMs = Date.now()) {
+    return needsVitals(patient) && vitalsAgeMs(patient, nowMs) >= vitalsIntervalMsFor(patient?.triage);
+  }
+
   function vitalsTimer(patient, nowMs = Date.now()) {
     if (!needsVitals(patient)) return null;
+    const intervalMs = vitalsIntervalMsFor(patient.triage);
     const age = vitalsAgeMs(patient, nowMs);
-    if (age >= VITALS_INTERVAL_MS) {
+    if (age >= intervalMs) {
       return { cls: "overdue", minutes: Math.floor(age / 60000), remainingMinutes: 0 };
     }
-    const remainingMinutes = Math.ceil((VITALS_INTERVAL_MS - age) / 60000);
-    if (age >= WARN_AT_MS) {
+    const remainingMinutes = Math.ceil((intervalMs - age) / 60000);
+    if (age >= intervalMs - VITALS_WARN_BUFFER_MS) {
       return { cls: "warn", minutes: Math.floor(age / 60000), remainingMinutes };
     }
     return { cls: "ok", minutes: Math.floor(age / 60000), remainingMinutes };
@@ -82,8 +104,16 @@
     if (!tourniquet || !tourniquet.appliedAt) return null;
     const elapsedMs = nowMs - tourniquet.appliedAt;
     const minutes = elapsedMinutes(tourniquet.appliedAt, nowMs);
-    const cls = elapsedMs >= TOURNIQUET_CRITICAL_MS ? "critical" : elapsedMs >= TOURNIQUET_WARN_MS ? "warn" : "";
+    const cls =
+      elapsedMs >= TOURNIQUET_CRITICAL_MS ? "critical"
+      : elapsedMs >= TOURNIQUET_WARN_MS ? "warn"
+      : elapsedMs >= TOURNIQUET_NOTICE_MS ? "notice"
+      : "";
     return { cls, minutes, limb: tourniquet.limb || "לא צוין" };
+  }
+
+  function isDeviceSilent(lastSeenMs, nowMs = Date.now()) {
+    return !lastSeenMs || nowMs - lastSeenMs > DEVICE_SILENCE_MS;
   }
 
   function timeCodeToTodayMs(code, nowMs = Date.now()) {
@@ -159,7 +189,7 @@
   }
 
   function isRoutineAlert(patient, nowMs = Date.now()) {
-    return needsVitals(patient) && vitalsAgeMs(patient, nowMs) >= VITALS_INTERVAL_MS;
+    return isVitalsOverdue(patient, nowMs);
   }
 
   function isCriticalAlert(patient) {
@@ -194,20 +224,24 @@
 
   return {
     AVPU_RANK,
+    DEVICE_SILENCE_MS,
     FINAL_PATIENT_STATUSES,
     TOURNIQUET_CRITICAL_MS,
+    TOURNIQUET_NOTICE_MS,
     TOURNIQUET_WARN_MS,
-    VITALS_INTERVAL_MS,
-    WARN_AT_MS,
+    VITALS_INTERVAL_MS_BY_TRIAGE,
+    VITALS_WARN_BUFFER_MS,
     canChangePatientStatus,
     computeMstartTriage,
     detectDeterioration,
     elapsedMinutes,
     isCriticalAlert,
+    isDeviceSilent,
     isFinalPatientStatus,
     isHighRiskDose,
     isPediatricPatient,
     isRoutineAlert,
+    isVitalsOverdue,
     needsVitals,
     PEDIATRIC_AGE_CUTOFF,
     PEDIATRIC_HIGH_RISK_DOSE_LIMITS,
@@ -216,6 +250,7 @@
     timeCodeToTodayMs,
     tourniquetTimer,
     vitalsAgeMs,
+    vitalsIntervalMsFor,
     vitalsTimer,
   };
 });

@@ -61,8 +61,9 @@ Inside the HTML, look for:
 This is the one piece of logic that has been pulled out of the HTML prototype into a standalone, testable module. It's written as a UMD-style wrapper (`module.exports` under Node, `window.C5DomainRules` in the browser) specifically so the same file can be `require()`d by `tests/domain-rules.test.js` **and** loaded unmodified by the HTML prototype with no build step.
 
 It owns:
-- vitals reassessment timing (`vitalsTimer`, 5-minute interval, 4-minute warning)
-- tourniquet timing (`tourniquetTimer`, 40-minute warning / 60-minute critical)
+- vitals reassessment timing (`vitalsTimer`, interval varies by triage color — red 10m / yellow 20m / green 30m — 1-minute warning buffer before each)
+- tourniquet timing (`tourniquetTimer`, 45-minute heads-up notice / 60-minute warning / 120-minute critical)
+- device-silence detection (`isDeviceSilent`, 10-minute threshold, one shared constant across the medic load board, command-view device panel, and Dead Man's Switch watchdog row)
 - MSTART triage computation (`computeMstartTriage`, `suggestMstartTriage`) — the auto-triage suggestion logic from vitals/SABCDE
 - pediatric detection and high-risk medication dose guardrails (`isPediatricPatient`, `isHighRiskDose` — age cutoff 8, dose limits currently hardcoded for morphine/fentanyl)
 - deterioration detection (`detectDeterioration`) and alert classification (`isRoutineAlert`/`isCriticalAlert`)
