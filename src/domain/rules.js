@@ -24,6 +24,13 @@
   const TOURNIQUET_WARN_MS = 60 * 60 * 1000;
   const TOURNIQUET_CRITICAL_MS = 120 * 60 * 1000;
   const DEVICE_SILENCE_MS = 10 * 60 * 1000;
+  // Inventory burn-rate / stock-out risk, matching the KPI definitions in
+  // docs/C5_SENTINEL_SAR_MVP_SPEC_v1.2.md ("Supply burn rate: items consumed per 10m",
+  // "Stock-out risk: current stock / recent burn rate"). A warning-tier count is flagged well
+  // before it's actually critical - critical defaults to 40% of the warning threshold unless a
+  // specific value is given for that item.
+  const SUPPLY_BURN_WINDOW_MS = 10 * 60 * 1000;
+  const SUPPLY_CRITICAL_RATIO = 0.4;
   const AVPU_RANK = { A: 0, V: 1, P: 2, U: 3 };
   const PEDIATRIC_AGE_CUTOFF = 8;
   const PEDIATRIC_HIGH_RISK_DOSE_LIMITS = {
@@ -114,6 +121,54 @@
 
   function isDeviceSilent(lastSeenMs, nowMs = Date.now()) {
     return !lastSeenMs || nowMs - lastSeenMs > DEVICE_SILENCE_MS;
+  }
+
+  function supplyCriticalThreshold(warningThreshold) {
+    return Math.max(0, Math.round(warningThreshold * SUPPLY_CRITICAL_RATIO));
+  }
+
+  function supplyRiskTier(remaining, warningThreshold, criticalThreshold) {
+    if (remaining <= criticalThreshold) return "critical";
+    if (remaining <= warningThreshold) return "warning";
+    return "ok";
+  }
+
+  // events: local event log entries (state.localEvents), each shaped like
+  // {type, local_timestamp, payload_json:{item_type|item, quantity_delta}} - as emitted by
+  // consumeFieldSupply()/reconcileSupplySource() in index.html. Counts only real consumption
+  // (negative quantity_delta) inside the trailing 10-minute window; restocks/corrections don't
+  // count as burn.
+  function supplyBurnRatePer10Min(events, itemType, nowMs = Date.now()) {
+    const windowStart = nowMs - SUPPLY_BURN_WINDOW_MS;
+    return (events || []).reduce((sum, e) => {
+      if (e.type !== "SUPPLY_CONSUMED") return sum;
+      const payload = e.payload_json || {};
+      if ((payload.item_type || payload.item) !== itemType) return sum;
+      const ts = typeof e.local_timestamp === "string" ? Date.parse(e.local_timestamp) : e.local_timestamp;
+      if (!Number.isFinite(ts) || ts < windowStart || ts > nowMs) return sum;
+      const delta = Number(payload.quantity_delta) || 0;
+      return delta < 0 ? sum + Math.abs(delta) : sum;
+    }, 0);
+  }
+
+  // "Current stock / recent burn rate" per the spec, expressed in minutes. Returns null when
+  // there's no recent consumption to extrapolate from (an idle burn rate says nothing about
+  // when stock will run out, not that it never will).
+  function minutesToStockout(remaining, burnRatePer10Min) {
+    if (!Number.isFinite(burnRatePer10Min) || burnRatePer10Min <= 0) return null;
+    return Math.max(0, Math.round((remaining / burnRatePer10Min) * 10));
+  }
+
+  // Alerting policy on top of the KPI numbers above: flag "critical" once stock is already at/
+  // below the critical threshold or projected to run out within 15 minutes at the current pace;
+  // "warning" at the warning threshold or a 30-minute projection. Both horizons are deliberately
+  // adjustable - not part of the KPI definition itself, just when it's worth surfacing.
+  function supplyBurnAlertLevel({ remaining, warningThreshold, criticalThreshold, minutesToStockout: minsToZero }) {
+    const isCritical = remaining <= criticalThreshold || (minsToZero != null && minsToZero <= 15);
+    const isWarning = remaining <= warningThreshold || (minsToZero != null && minsToZero <= 30);
+    if (isCritical) return "CRITICAL";
+    if (isWarning) return "HIGH";
+    return null;
   }
 
   function timeCodeToTodayMs(code, nowMs = Date.now()) {
@@ -226,6 +281,8 @@
     AVPU_RANK,
     DEVICE_SILENCE_MS,
     FINAL_PATIENT_STATUSES,
+    SUPPLY_BURN_WINDOW_MS,
+    SUPPLY_CRITICAL_RATIO,
     TOURNIQUET_CRITICAL_MS,
     TOURNIQUET_NOTICE_MS,
     TOURNIQUET_WARN_MS,
@@ -242,11 +299,16 @@
     isPediatricPatient,
     isRoutineAlert,
     isVitalsOverdue,
+    minutesToStockout,
     needsVitals,
     PEDIATRIC_AGE_CUTOFF,
     PEDIATRIC_HIGH_RISK_DOSE_LIMITS,
     suggestedSweepColor,
     suggestMstartTriage,
+    supplyBurnAlertLevel,
+    supplyBurnRatePer10Min,
+    supplyCriticalThreshold,
+    supplyRiskTier,
     timeCodeToTodayMs,
     tourniquetTimer,
     vitalsAgeMs,

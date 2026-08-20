@@ -2080,6 +2080,13 @@ textarea{resize:vertical;min-height:70px;}
   const TOURNIQUET_WARN_MS = 60 * 60 * 1000;
   const TOURNIQUET_CRITICAL_MS = 120 * 60 * 1000;
   const DEVICE_SILENCE_MS = 10 * 60 * 1000;
+  // Inventory burn-rate / stock-out risk, matching the KPI definitions in
+  // docs/C5_SENTINEL_SAR_MVP_SPEC_v1.2.md ("Supply burn rate: items consumed per 10m",
+  // "Stock-out risk: current stock / recent burn rate"). A warning-tier count is flagged well
+  // before it's actually critical - critical defaults to 40% of the warning threshold unless a
+  // specific value is given for that item.
+  const SUPPLY_BURN_WINDOW_MS = 10 * 60 * 1000;
+  const SUPPLY_CRITICAL_RATIO = 0.4;
   const AVPU_RANK = { A: 0, V: 1, P: 2, U: 3 };
   const PEDIATRIC_AGE_CUTOFF = 8;
   const PEDIATRIC_HIGH_RISK_DOSE_LIMITS = {
@@ -2170,6 +2177,54 @@ textarea{resize:vertical;min-height:70px;}
 
   function isDeviceSilent(lastSeenMs, nowMs = Date.now()) {
     return !lastSeenMs || nowMs - lastSeenMs > DEVICE_SILENCE_MS;
+  }
+
+  function supplyCriticalThreshold(warningThreshold) {
+    return Math.max(0, Math.round(warningThreshold * SUPPLY_CRITICAL_RATIO));
+  }
+
+  function supplyRiskTier(remaining, warningThreshold, criticalThreshold) {
+    if (remaining <= criticalThreshold) return "critical";
+    if (remaining <= warningThreshold) return "warning";
+    return "ok";
+  }
+
+  // events: local event log entries (state.localEvents), each shaped like
+  // {type, local_timestamp, payload_json:{item_type|item, quantity_delta}} - as emitted by
+  // consumeFieldSupply()/reconcileSupplySource() in index.html. Counts only real consumption
+  // (negative quantity_delta) inside the trailing 10-minute window; restocks/corrections don't
+  // count as burn.
+  function supplyBurnRatePer10Min(events, itemType, nowMs = Date.now()) {
+    const windowStart = nowMs - SUPPLY_BURN_WINDOW_MS;
+    return (events || []).reduce((sum, e) => {
+      if (e.type !== "SUPPLY_CONSUMED") return sum;
+      const payload = e.payload_json || {};
+      if ((payload.item_type || payload.item) !== itemType) return sum;
+      const ts = typeof e.local_timestamp === "string" ? Date.parse(e.local_timestamp) : e.local_timestamp;
+      if (!Number.isFinite(ts) || ts < windowStart || ts > nowMs) return sum;
+      const delta = Number(payload.quantity_delta) || 0;
+      return delta < 0 ? sum + Math.abs(delta) : sum;
+    }, 0);
+  }
+
+  // "Current stock / recent burn rate" per the spec, expressed in minutes. Returns null when
+  // there's no recent consumption to extrapolate from (an idle burn rate says nothing about
+  // when stock will run out, not that it never will).
+  function minutesToStockout(remaining, burnRatePer10Min) {
+    if (!Number.isFinite(burnRatePer10Min) || burnRatePer10Min <= 0) return null;
+    return Math.max(0, Math.round((remaining / burnRatePer10Min) * 10));
+  }
+
+  // Alerting policy on top of the KPI numbers above: flag "critical" once stock is already at/
+  // below the critical threshold or projected to run out within 15 minutes at the current pace;
+  // "warning" at the warning threshold or a 30-minute projection. Both horizons are deliberately
+  // adjustable - not part of the KPI definition itself, just when it's worth surfacing.
+  function supplyBurnAlertLevel({ remaining, warningThreshold, criticalThreshold, minutesToStockout: minsToZero }) {
+    const isCritical = remaining <= criticalThreshold || (minsToZero != null && minsToZero <= 15);
+    const isWarning = remaining <= warningThreshold || (minsToZero != null && minsToZero <= 30);
+    if (isCritical) return "CRITICAL";
+    if (isWarning) return "HIGH";
+    return null;
   }
 
   function timeCodeToTodayMs(code, nowMs = Date.now()) {
@@ -2282,6 +2337,8 @@ textarea{resize:vertical;min-height:70px;}
     AVPU_RANK,
     DEVICE_SILENCE_MS,
     FINAL_PATIENT_STATUSES,
+    SUPPLY_BURN_WINDOW_MS,
+    SUPPLY_CRITICAL_RATIO,
     TOURNIQUET_CRITICAL_MS,
     TOURNIQUET_NOTICE_MS,
     TOURNIQUET_WARN_MS,
@@ -2298,11 +2355,16 @@ textarea{resize:vertical;min-height:70px;}
     isPediatricPatient,
     isRoutineAlert,
     isVitalsOverdue,
+    minutesToStockout,
     needsVitals,
     PEDIATRIC_AGE_CUTOFF,
     PEDIATRIC_HIGH_RISK_DOSE_LIMITS,
     suggestedSweepColor,
     suggestMstartTriage,
+    supplyBurnAlertLevel,
+    supplyBurnRatePer10Min,
+    supplyCriticalThreshold,
+    supplyRiskTier,
     timeCodeToTodayMs,
     tourniquetTimer,
     vitalsAgeMs,
@@ -3953,9 +4015,14 @@ function saveRecommendationAckMap(map){
   try{localStorage.setItem(RECOMMENDATION_ACK_KEY,JSON.stringify(map));}catch(e){}
 }
 function demoSupplyThreshold(item){
-  return DEMO_SUPPLY_THRESHOLDS[item] || {
-    critical:PC_TRUCK_LOW_THRESHOLDS[item]??SUPPLY_LOW_THRESHOLDS[item]??1,
-    warning:PC_TRUCK_LOW_THRESHOLDS[item]??SUPPLY_LOW_THRESHOLDS[item]??1,
+  if(DEMO_SUPPLY_THRESHOLDS[item]) return DEMO_SUPPLY_THRESHOLDS[item];
+  // No explicit override for this item - derive a real critical/warning split instead of
+  // treating the same number as both (PC_TRUCK_LOW_THRESHOLDS is already used elsewhere as
+  // the "resupply soon" line, so it becomes the warning tier; critical is a fraction of that).
+  const warning=PC_TRUCK_LOW_THRESHOLDS[item]??SUPPLY_LOW_THRESHOLDS[item]??1;
+  return {
+    critical:C5Rules.supplyCriticalThreshold(warning),
+    warning,
     recommendedMin:PC_TRUCK_BASELINE[item]??0
   };
 }
@@ -4120,7 +4187,7 @@ function acknowledgeRecommendation(id){
 }
 const DecisionSupportEngine=(()=>{
   function defaultContext(){
-    return {patients,reinforcementRequests,pcTruckStock,companyStock,siteData,allSites,nowMs:Date.now()};
+    return {patients,reinforcementRequests,pcTruckStock,companyStock,siteData,allSites,localEvents:state.localEvents,nowMs:Date.now()};
   }
   function ackFor(id){
     const ack=recommendationAckMap()[id];
@@ -4305,36 +4372,37 @@ const DecisionSupportEngine=(()=>{
     });
     return recs;
   }
+  // Burn rate is computed from real SUPPLY_CONSUMED events (consumeFieldSupply/
+  // reconcileSupplySource) over the trailing 10 minutes - see supplyBurnRatePer10Min in
+  // src/domain/rules.js, matching docs/C5_SENTINEL_SAR_MVP_SPEC_v1.2.md §10.3. Only items with
+  // real consumption tracking are checked here (everything in PC_TRUCK_BASELINE except
+  // batteryPacks, which nothing in the app currently logs consumption for - chestSeals was
+  // dropped for the same reason: it isn't even part of PC_TRUCK_BASELINE's tracked catalog, so
+  // its old "burn rate" here was always a fabricated estimate, not real usage).
   function evaluateSupplyBurn(ctx=defaultContext()){
     const recs=[];
     const stock={...PC_TRUCK_BASELINE,...(ctx.pcTruckStock||{})};
-    const activeTq=totalActiveTourniquets(ctx.patients||[]);
-    const criticalPatients=(ctx.patients||[]).filter(p=>['red','yellow'].includes(p.triage)).length;
-    const checks=[
-      {item:'tourniquets',used:activeTq,threshold:demoSupplyThreshold('tourniquets').warning,critical:demoSupplyThreshold('tourniquets').critical},
-      {item:'pressureDressings',used:(ctx.patients||[]).reduce((s,p)=>s+(p.lifeSavingTreatments||[]).filter(t=>t.treatmentType==='pressure_bandage').length,0),threshold:demoSupplyThreshold('pressureDressings').warning,critical:demoSupplyThreshold('pressureDressings').critical},
-      {item:'chestSeals',used:Math.max(1,Math.floor(criticalPatients/2)),threshold:PC_TRUCK_LOW_THRESHOLDS.chestSeals||2,critical:1},
-      {item:'hemostaticGauze',used:Math.max(1,Math.floor(activeTq/2)),threshold:demoSupplyThreshold('hemostaticGauze').warning,critical:demoSupplyThreshold('hemostaticGauze').critical}
-    ];
-    checks.forEach(c=>{
-      const remaining=stock[c.item]??0;
-      const burnRate=Math.max(1,c.used||Math.ceil(criticalPatients/3));
-      const minutesToZero=Math.max(0,Math.round((remaining/Math.max(1,burnRate))*18));
-      if(remaining<=c.threshold || minutesToZero<=25){
-        recs.push(createRecommendation({
-          id:`REC_SUPPLY_BURN_${c.item}`,
-          category:'Supply Burn Prediction',
-          priority:remaining<=c.critical?'CRITICAL':remaining<=c.threshold?'HIGH':'MEDIUM',
-          title:`${SUPPLY_LABELS[c.item]||c.item} עלולים להיגמר`,
-          explanation:`ברכב חוג״ד נותרו ${remaining}. קצב צריכה משוער ${burnRate} ל־18 דק׳ · זמן לאפס כ־${minutesToZero} דק׳.`,
-          suggestedAction:'בדוק מלאי רכב חוג״ד, בקש השלמה או העבר ציוד ממחלקה פנויה',
-          responsibleRole:'Logistics',
-          affectedSector:siteData.name||'מוקד',
-          confidence:0.7,
-          timestamp:new Date().toISOString(),
-          source:{item:c.item,remaining,burnRate,minutesToZero}
-        }));
-      }
+    const events=ctx.localEvents||[];
+    Object.keys(PC_TRUCK_BASELINE).filter(item=>item!=='batteryPacks').forEach(item=>{
+      const remaining=stock[item]??0;
+      const {warning,critical}=demoSupplyThreshold(item);
+      const burnRate=C5Rules.supplyBurnRatePer10Min(events,item,ctx.nowMs);
+      const minutesToZero=C5Rules.minutesToStockout(remaining,burnRate);
+      const level=C5Rules.supplyBurnAlertLevel({remaining,warningThreshold:warning,criticalThreshold:critical,minutesToStockout:minutesToZero});
+      if(!level) return;
+      recs.push(createRecommendation({
+        id:`REC_SUPPLY_BURN_${item}`,
+        category:'Supply Burn Prediction',
+        priority:level,
+        title:`${SUPPLY_LABELS[item]||item} עלולים להיגמר`,
+        explanation:`ברכב חוג״ד נותרו ${remaining}${burnRate?` · קצב צריכה ${burnRate} ל־10 דק׳`:''}${minutesToZero!=null?` · זמן לאפס כ־${minutesToZero} דק׳`:''}.`,
+        suggestedAction:'בדוק מלאי רכב חוג״ד, בקש השלמה או העבר ציוד ממחלקה פנויה',
+        responsibleRole:'Logistics',
+        affectedSector:siteData.name||'מוקד',
+        confidence:0.7,
+        timestamp:new Date().toISOString(),
+        source:{item,remaining,burnRate,minutesToZero}
+      }));
     });
     return recs;
   }

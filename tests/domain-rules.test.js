@@ -108,6 +108,36 @@ assert.equal(rules.isDeviceSilent(baseTime, baseTime + 11 * 60 * 1000), true);
 assert.equal(rules.isDeviceSilent(0, baseTime), true);
 assert.equal(rules.isDeviceSilent(null, baseTime), true);
 
+// Inventory burn-rate / stock-out risk (docs/C5_SENTINEL_SAR_MVP_SPEC_v1.2.md §10.3):
+// burn rate = items consumed per 10m, stock-out risk = current stock / recent burn rate.
+assert.equal(rules.supplyCriticalThreshold(5), 2);
+assert.equal(rules.supplyCriticalThreshold(8), 3);
+assert.equal(rules.supplyRiskTier(1, 5, 2), "critical");
+assert.equal(rules.supplyRiskTier(3, 5, 2), "warning");
+assert.equal(rules.supplyRiskTier(6, 5, 2), "ok");
+
+const supplyEvents = [
+  { type: "SUPPLY_CONSUMED", local_timestamp: new Date(baseTime - 2 * 60 * 1000).toISOString(), payload_json: { item_type: "tourniquets", quantity_delta: -2 } },
+  { type: "SUPPLY_CONSUMED", local_timestamp: new Date(baseTime - 9 * 60 * 1000).toISOString(), payload_json: { item_type: "tourniquets", quantity_delta: -1 } },
+  { type: "SUPPLY_CONSUMED", local_timestamp: new Date(baseTime - 11 * 60 * 1000).toISOString(), payload_json: { item_type: "tourniquets", quantity_delta: -5 } },
+  { type: "SUPPLY_CONSUMED", local_timestamp: new Date(baseTime - 1 * 60 * 1000).toISOString(), payload_json: { item_type: "tourniquets", quantity_delta: 3 } },
+  { type: "SUPPLY_CONSUMED", local_timestamp: new Date(baseTime - 1 * 60 * 1000).toISOString(), payload_json: { item_type: "pressureDressings", quantity_delta: -4 } },
+];
+// -11m falls outside the 10-minute window and a positive delta is a restock, not burn - both excluded.
+assert.equal(rules.supplyBurnRatePer10Min(supplyEvents, "tourniquets", baseTime), 3);
+assert.equal(rules.supplyBurnRatePer10Min(supplyEvents, "pressureDressings", baseTime), 4);
+assert.equal(rules.supplyBurnRatePer10Min(supplyEvents, "blankets", baseTime), 0);
+
+assert.equal(rules.minutesToStockout(6, 3), 20);
+assert.equal(rules.minutesToStockout(6, 0), null);
+assert.equal(rules.minutesToStockout(0, 3), 0);
+
+assert.equal(rules.supplyBurnAlertLevel({ remaining: 1, warningThreshold: 5, criticalThreshold: 2, minutesToStockout: null }), "CRITICAL");
+assert.equal(rules.supplyBurnAlertLevel({ remaining: 4, warningThreshold: 5, criticalThreshold: 2, minutesToStockout: null }), "HIGH");
+assert.equal(rules.supplyBurnAlertLevel({ remaining: 10, warningThreshold: 5, criticalThreshold: 2, minutesToStockout: 10 }), "CRITICAL");
+assert.equal(rules.supplyBurnAlertLevel({ remaining: 10, warningThreshold: 5, criticalThreshold: 2, minutesToStockout: 25 }), "HIGH");
+assert.equal(rules.supplyBurnAlertLevel({ remaining: 10, warningThreshold: 5, criticalThreshold: 2, minutesToStockout: 40 }), null);
+
 assert.equal(rules.computeMstartTriage({ rr: 0 }), "black");
 assert.equal(rules.computeMstartTriage({ rr: 34, bp_estimate: "radial", avpu: "A", spo2: 98 }), "red");
 assert.equal(rules.computeMstartTriage({ rr: 16, bp_estimate: "absent", avpu: "A", spo2: 98 }), "red");
