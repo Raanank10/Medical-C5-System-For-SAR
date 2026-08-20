@@ -518,6 +518,8 @@ Dashboard read APIs should read from precomputed command state such as `incident
 
 Direct table access is scoped by `incident_memberships`. Mobile clients should normally avoid direct table reads/writes and use local SQLite plus `/sync/log`, but any fallback direct access must still be incident-scoped.
 
+`index.html`'s periodic patient-state projection pull (`pullProjectedPatientState`, `docs/ROADMAP.md` Phase 3) is a deliberate use of this fallback: it reads the `patients` table directly (RLS-scoped via `patients_read_authenticated`) rather than extending `/sync/log`'s response, specifically to avoid re-implementing `project_patient_state()`'s triage/status projection logic a second time client-side — see that trigger's own history (`database/013_consolidate_patient_status_projection.sql`) for why a second copy of that logic is a real risk, not a theoretical one. If `/sync/log` is ever extended to carry projected snapshots directly, this should move onto that path instead.
+
 
 ---
 
