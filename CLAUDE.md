@@ -67,6 +67,7 @@ It owns:
 - MSTART triage computation (`computeMstartTriage`, `suggestMstartTriage`) — the auto-triage suggestion logic from vitals/SABCDE
 - pediatric detection and high-risk medication dose guardrails (`isPediatricPatient`, `isHighRiskDose` — age cutoff 8, dose limits currently hardcoded for morphine/fentanyl)
 - deterioration detection (`detectDeterioration`) and alert classification (`isRoutineAlert`/`isCriticalAlert`)
+- inventory burn-rate / stock-out risk (`supplyBurnRatePer10Min`, `minutesToStockout`, `supplyBurnAlertLevel`, `supplyCriticalThreshold`/`supplyRiskTier`) — burn rate is items consumed per 10 minutes from real `SUPPLY_CONSUMED` events, matching `docs/C5_SENTINEL_SAR_MVP_SPEC_v1.2.md` §10.3's KPI definitions
 
 When product rules like these change, prefer extending `src/domain/rules.js` and its test file over adding more inline logic to the HTML — this is the stated direction in `docs/ROADMAP.md` (Phase 2: "Extract Product Rules").
 
