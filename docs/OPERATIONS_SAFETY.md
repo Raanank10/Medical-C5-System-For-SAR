@@ -69,4 +69,4 @@ Before any real deployment conversation, the project needs (`docs/ROADMAP.md` Ph
 - [x] audit log retention policy — `docs/AUDIT_AND_RETENTION_POLICY.md`. Proposal only (four retention classes, deletion-must-be-audited principle); no retention window or deletion code is implemented, and real durations need legal/records-governance input this doc doesn't invent.
 - [ ] backup and incident response plan
 - [x] data minimization review — `docs/PRIVACY_AND_DATA_MINIMIZATION_REVIEW.md`
-- [ ] medical/legal governance review
+- [~] medical/legal governance review — `docs/CLINICAL_GOVERNANCE_REVIEW_FRAMEWORK.md` is the checklist for a qualified reviewer to complete, not the review itself
