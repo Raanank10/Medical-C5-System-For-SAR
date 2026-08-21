@@ -50,15 +50,19 @@ This is enough for workflow validation and engineering iteration. It is not enou
 
 ### Clinical and Operational Governance
 
+`docs/CLINICAL_GOVERNANCE_REVIEW_FRAMEWORK.md` catalogs the concrete checklist below with exact current values and code locations, for a qualified reviewer to complete — not a substitute for the review itself.
+
 - Doctrine review for triage and reassessment thresholds.
 - Review of tourniquet timing rules.
 - Review of pediatric triage behavior.
 - Human override requirements.
 - Training materials.
-- Failure-mode review.
+- [x] Failure-mode review — `docs/FAILURE_MODE_REVIEW.md` (a systems/sync failure-mode review; not a substitute for the clinical-doctrine review this section is otherwise about).
 - Approval boundaries for any pilot.
 
 ### Field Validation
+
+`docs/FIELD_USABILITY_TEST_PLAN.md` is a real, runnable protocol for everything below — not yet run.
 
 - Gloved touch testing.
 - Low-light and sunlight testing.
