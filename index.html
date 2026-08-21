@@ -2962,7 +2962,19 @@ function queuedSecureSetItem(key, plaintextStr){ return runSerialized(key, ()=>s
 let _outboxCache=null, _conflictLogCache=null, _observerNotesCache=null;
 function getOutbox(){ return _outboxCache || (_outboxCache=[]); }
 function persistOutbox(){
-  if(_outboxCache && _outboxCache.length>500) _outboxCache=_outboxCache.slice(-500);
+  // A blind slice(-500) here would drop the OLDEST array entries regardless of sync status - on
+  // a long enough offline stretch (exactly the offline-first MCI scenario this outbox exists
+  // for), that silently discards real unsynced clinical events with no error shown to anyone
+  // (docs/FAILURE_MODE_REVIEW.md). Never evict an unsynced entry: trim only already-synced
+  // history, and only as much of it as still leaves room under the cap. If unsynced entries
+  // alone exceed 500 (a genuinely extreme offline period), the outbox is left to grow past the
+  // cap rather than lose data - accepting the storage cost is the deliberate tradeoff here.
+  if(_outboxCache && _outboxCache.length>500){
+    const unsynced=_outboxCache.filter(e=>!e.synced);
+    const synced=_outboxCache.filter(e=>e.synced);
+    const keepSyncedCount=Math.max(0, 500-unsynced.length);
+    _outboxCache=[...synced.slice(-keepSyncedCount), ...unsynced];
+  }
   return queuedSecureSetItem(OUTBOX_KEY, JSON.stringify(getOutbox()));
 }
 function persistConflictLog(){
