@@ -22,14 +22,14 @@ The current implementation is intentionally lightweight: a standalone HTML proto
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Field/command prototype | Active Demo V2.7 | `index.html` and `demo/rescue-app.html` |
-| Product specification | Active V2.7 field-command ticket addendum | `docs/ROLE_COMMAND_MODEL_v2.7.md`, `docs/ALERT_OWNERSHIP_v1.3.md`, `docs/C5_SENTINEL_SAR_MVP_SPEC_v1.2.md` |
-| API contract | Draft v1.2 | `docs/API_SURFACE_v1.2.md` |
-| Data model | Draft PostgreSQL schema | `database/001_postgresql_schema_v1.2.sql` |
+| Field/command prototype | Active Demo 2.995 (`APP_VERSION 2.99.5`) | `index.html` and `demo/rescue-app.html` (byte-identical) |
+| Product specification | Active V2.8 role/command model | `docs/ROLE_COMMAND_MODEL_v2.8.md`, `docs/ALERT_OWNERSHIP_v1.3.md`, `docs/C5_SENTINEL_SAR_MVP_SPEC_v1.2.md` |
+| API contract | v1.2, sync endpoints implemented | `docs/API_SURFACE_v1.2.md` — `/sync/log` push/pull is a real deployed Edge Function; Command Actions and most of the AAR API are still unbuilt |
+| Data model | Deployed to a live Supabase project, RLS enabled and audited | `database/001_postgresql_schema_v1.2.sql` + incremental fixes `004`-`017`; see `docs/RLS_AUDIT_v1.md` |
 | Demo data | Draft seed data | `database/002_seed_demo_data_v1.2.sql` |
-| Analytics/AAR | Working local package | `analytics/c5_sentinel_sar_analytics_v1_1/` |
-| Production backend | Not implemented | Planned after the workflow stabilizes |
-| Native mobile app | Not implemented | Planned after local storage and sync are validated |
+| Analytics/AAR | Working local package, with a pytest suite and a real-incident export path | `analytics/c5_sentinel_sar_analytics_v1_1/` |
+| Production backend | Deployed | Real Supabase Auth, RLS-enforced Postgres, `/sync/log` Edge Function; see `docs/ARCHITECTURE.md`'s "Backend Deployment Status" |
+| Native mobile app | Not implemented | Planned as a PWA in `apps/field-mobile`, see `docs/PHASE_4_PLAN.md` (not started) |
 
 ## Quick Start
 
@@ -66,8 +66,18 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 python seed_demo_db.py
+python -m pytest
 python -c "from db import DB; from kpis import KPIEngine; from report import ReportGenerator; db=DB('rescue_demo_v1_1.db'); kpi=KPIEngine(db); ReportGenerator(kpi).save('aar_report_v1_1.html')"
 ```
+
+Run the real-browser smoke test (optional, requires `npm install` once — the only place in the repo with an npm dependency):
+
+```bash
+npm install
+npm run test:browser-smoke
+```
+
+See `CLAUDE.md` for the full command reference, including what CI actually runs.
 
 ## Repository Map
 
@@ -75,35 +85,47 @@ python -c "from db import DB; from kpis import KPIEngine; from report import Rep
 .
 |-- index.html                         # standalone prototype entry point
 |-- demo/
-|   `-- rescue-app.html                # explicit demo artifact
+|   `-- rescue-app.html                # byte-identical demo artifact
 |-- docs/
-|   |-- ARCHITECTURE.md                # system design and module boundaries
+|   |-- ARCHITECTURE.md                # system design, module boundaries, backend deployment status
 |   |-- DEVELOPMENT.md                 # local setup and contribution workflow
 |   |-- TACTICAL_UI_GUIDELINES.md      # field UI principles and New Patient guardrails
 |   |-- PRODUCTION_READINESS.md        # path from prototype to pilot/production readiness
 |   |-- OPERATIONS_SAFETY.md           # safety/privacy boundaries
-|   |-- ROLE_AUTHORIZATION_AND_WATCHDOGS_v1.2.md
-|   |-- ALERT_OWNERSHIP_v1.3.md
-|   |-- ROLE_COMMAND_MODEL_v2.7.md
-|   |-- C5_SENTINEL_SAR_MVP_SPEC_v1.2.md
+|   |-- ROLE_COMMAND_MODEL_v2.8.md
 |   |-- API_SURFACE_v1.2.md
+|   |-- C5_SENTINEL_SAR_MVP_SPEC_v1.2.md
+|   |-- THREAT_MODEL.md                # Phase 5: threat model
+|   |-- AUTH_AND_ROLE_MODEL.md         # Phase 5: identity/session/role layer
+|   |-- RLS_AUDIT_v1.md                # Phase 5: full RLS policy audit
+|   |-- AUDIT_AND_RETENTION_POLICY.md  # Phase 5: retention classes proposal
+|   |-- PRIVACY_AND_DATA_MINIMIZATION_REVIEW.md
+|   |-- CLINICAL_GOVERNANCE_REVIEW_FRAMEWORK.md
+|   |-- FIELD_USABILITY_TEST_PLAN.md
+|   |-- FAILURE_MODE_REVIEW.md
+|   |-- PHASE_4_PLAN.md                # plan for splitting into apps/packages/services
+|   |-- MULTI_AGENT_DEV_PLAN.md        # how work on this repo is actually planned
 |   |-- METRICS_DICTIONARY.md
-|   |-- PC_DEMO_SCRIPT_v2.7.md
 |   `-- ROADMAP.md
 |-- database/
-|   |-- 001_postgresql_schema_v1.2.sql
+|   |-- 001_postgresql_schema_v1.2.sql # base schema, deployed to a live Supabase project
 |   |-- 002_seed_demo_data_v1.2.sql
-|   `-- 003_mci_ui_alignment.sql
+|   |-- 003_mci_ui_alignment.sql
+|   `-- 004_...sql - 017_...sql        # incremental fixes applied against the live project
+|-- supabase/
+|   `-- functions/sync-log/index.ts   # deployed Edge Function implementing /sync/log
 |-- src/
 |   `-- domain/rules.js               # testable triage, vitals, alert, and timing rules
 |-- tests/
 |   `-- domain-rules.test.js
 |-- analytics/
-|   `-- c5_sentinel_sar_analytics_v1_1/
+|   `-- c5_sentinel_sar_analytics_v1_1/  # DB/KPIEngine/ReportGenerator + pytest suite
 |-- assets/
 |   `-- mockups/
 |-- scripts/
-|   `-- check_repo.py
+|   |-- check_repo.py
+|   |-- browser_smoke_test.js         # Playwright real-browser smoke test
+|   `-- smoke_v2_*.js                 # string-assertion smoke checks, one per milestone
 `-- archive/
     |-- v0.6/
     `-- v0.7/
@@ -111,15 +133,9 @@ python -c "from db import DB; from kpis import KPIEngine; from report import Rep
 
 ## Development Direction
 
-The repo should move from prototype assets toward a clean product-development structure:
+`docs/ROADMAP.md` tracks five phases. Phases 1 (dev-surface stabilization), 2 (domain rules extracted), 3 (local-first hardening — real sync/auth/RLS, not simulated), and 5 (operational-readiness research — threat model, RLS audit, encrypted local storage, privacy/audit/governance docs) are done or substantially done. Phase 4 — splitting `index.html` into `apps/field-mobile`, `apps/command-web`, `packages/domain`, `packages/fixtures`, `services/sync-api`, and real `database/migrations` — is planned (`docs/PHASE_4_PLAN.md`) but not started; `index.html` keeps working unmodified until that split reaches feature parity.
 
-1. Keep `index.html` stable as the fastest field demo.
-2. Extract shared product rules from the prototype into documented state machines and fixtures.
-3. Add tests around triage, vitals intervals, inventory burn, sync ingestion, and AAR metrics.
-4. Split the next implementation into app boundaries only when the workflow stops changing quickly.
-5. Treat all patient data as synthetic until a formal privacy and governance review exists.
-
-See [docs/ROADMAP.md](docs/ROADMAP.md) for the active build plan.
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the active build plan and [docs/MULTI_AGENT_DEV_PLAN.md](docs/MULTI_AGENT_DEV_PLAN.md) for how work on this repo is actually planned and reviewed.
 
 ## Core Concepts
 
@@ -134,20 +150,32 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the active build plan.
 ## Useful Links
 
 - [Development guide](docs/DEVELOPMENT.md)
-- [Architecture](docs/ARCHITECTURE.md)
+- [Architecture, incl. Backend Deployment Status](docs/ARCHITECTURE.md)
 - [Tactical UI guidelines](docs/TACTICAL_UI_GUIDELINES.md)
 - [Production readiness path](docs/PRODUCTION_READINESS.md)
-- [Field experiment gap register](docs/FIELD_EXPERIMENT_GAPS.md)
 - [Operations and safety notes](docs/OPERATIONS_SAFETY.md)
-- [Role authorization and watchdog stack](docs/ROLE_AUTHORIZATION_AND_WATCHDOGS_v1.2.md)
-- [Alert ownership and reinforcement workflow v1.3](docs/ALERT_OWNERSHIP_v1.3.md)
-- [Role-based medical command model V2.7](docs/ROLE_COMMAND_MODEL_v2.7.md)
+- [Role-based medical command model V2.8](docs/ROLE_COMMAND_MODEL_v2.8.md)
+- [API surface v1.2](docs/API_SURFACE_v1.2.md)
+- [Phase 4 plan: splitting into apps/packages/services](docs/PHASE_4_PLAN.md)
+- [Multi-agent development plan](docs/MULTI_AGENT_DEV_PLAN.md)
+
+### Phase 5 operational-readiness docs
+
+- [Threat model](docs/THREAT_MODEL.md)
+- [Auth and role model](docs/AUTH_AND_ROLE_MODEL.md)
+- [RLS audit v1](docs/RLS_AUDIT_v1.md)
+- [Audit and retention policy](docs/AUDIT_AND_RETENTION_POLICY.md)
+- [Privacy and data-minimization review](docs/PRIVACY_AND_DATA_MINIMIZATION_REVIEW.md)
+- [Clinical governance review framework](docs/CLINICAL_GOVERNANCE_REVIEW_FRAMEWORK.md)
+- [Failure-mode review](docs/FAILURE_MODE_REVIEW.md)
+- [Field usability test plan](docs/FIELD_USABILITY_TEST_PLAN.md)
+
+### Reference
+
 - [Metrics dictionary](docs/METRICS_DICTIONARY.md)
+- [Field experiment gap register](docs/FIELD_EXPERIMENT_GAPS.md)
 - [Demo script](docs/PC_DEMO_SCRIPT.md)
-- [V2.7 changelog](docs/CHANGELOG_v2.7.md)
-- [v2.0 changelog](docs/CHANGELOG_v2.0.md)
-- [v1.3 changelog](docs/CHANGELOG_v1.3.md)
-- [v1.2 changelog](docs/CHANGELOG_v1.2.md)
+- [Latest changelog (v2.995)](docs/CHANGELOG_v2.995.md)
 
 ## Safety Status
 
