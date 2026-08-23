@@ -2863,8 +2863,24 @@ let _supabaseClient=null;
 function getSupabaseClient(){
   if(_supabaseClient) return _supabaseClient;
   if(!window.supabase || !window.supabase.createClient) return null;
+  // Session token encrypted at rest via the same device-PIN-derived key as everything else in
+  // localStorage (docs/THREAT_MODEL.md T2) - safe because every call site of
+  // getSupabaseClient() (and therefore every read/write of this storage) is only ever reached
+  // after bootAfterUnlock() has run, i.e. after a PIN has been set up or unlocked. A device with
+  // a pre-existing plaintext session from before this change is signed out once, silently -
+  // secureGetItem() sees a raw JWT blob, not the {v,iv,ct} shape it expects, and treats it as
+  // absent. Acceptable for a prototype with only synthetic test accounts; not a migration to
+  // build for.
   _supabaseClient=window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth:{persistSession:true, autoRefreshToken:true}
+    auth:{
+      persistSession:true,
+      autoRefreshToken:true,
+      storage:{
+        getItem:(key)=>secureGetItem(key),
+        setItem:(key,value)=>queuedSecureSetItem(key,value),
+        removeItem:(key)=>runSerialized(key, ()=>{ try{ localStorage.removeItem(key); }catch(e){} })
+      }
+    }
   });
   // Secondary safety net only — primary invite/recovery detection is AUTH_LINK_SIGNAL, captured
   // synchronously at load before this client ever existed. This event is documented as

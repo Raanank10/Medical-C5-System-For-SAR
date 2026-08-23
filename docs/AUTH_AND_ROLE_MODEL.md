@@ -6,7 +6,7 @@
 
 Authentication is real Supabase Auth (email/password), not custom-built. Onboarding is invite-only: an admin invites a person via `scripts/invite_user.js` (which sets the intended role in the invite's `user_metadata` — the Supabase dashboard's own "Send invitation" button has no field for this, so inviting through the dashboard directly produces an account with no usable role, see Account Lifecycle below), the invitee sets their own password on first login (`docs/AUTH_INVITE_AND_PASSWORD_RESET.md` covers this flow's own history — it originally silently dropped a person into their dashboard with no password ever set, a real bug, now fixed).
 
-A successful login produces a Supabase session (JWT). The client (`index.html`) holds `currentUser = {id, email, role}` in memory and persists the session via the Supabase JS client's own storage handling. The clinically-relevant `localStorage` keys (`patients[]`, the outbox, drafts, conflict log) are encrypted at rest behind a device PIN (`docs/THREAT_MODEL.md` T2) — **the Supabase session token itself is not covered by that encryption**, a deliberately deferred follow-up noted in that same document, not an oversight repeated here.
+A successful login produces a Supabase session (JWT). The client (`index.html`) holds `currentUser = {id, email, role}` in memory and persists the session via a custom `storage` adapter passed into the Supabase JS client's `createClient()` call, routed through the same PIN-derived encryption as every other clinically-relevant `localStorage` key (`patients[]`, the outbox, drafts, conflict log — `docs/THREAT_MODEL.md` T2). The session token is fully covered by that encryption, not an exception to it.
 
 ## Role Model
 
@@ -39,7 +39,6 @@ Why `SECURITY DEFINER`: these functions need to read `profiles`/`incident_member
 
 - **No MFA.** Password-only authentication.
 - **No leaked-password protection** — a Supabase Pro-tier feature, currently unavailable on the Free plan this project runs on (`docs/THREAT_MODEL.md` T6).
-- **Session token not encrypted at rest** — deferred follow-up to the PIN-gate work (`docs/THREAT_MODEL.md` T2).
 - **No `rpc`/`rcc` platoon/company scoping** — `docs/ARCHITECTURE.md`'s "Backend Deployment Status" already documents this: the "tactical view scoped to my own platoon/company, no vitals/identity" requirement needs a real platoon/company data model (a `platoons` table, `patients.assigned_platoon_id` or equivalent) that doesn't exist yet. `rpc`/`rcc` currently get the same incident-wide access shape as other roles, just with different write-action permissions (`database/007`).
 - **No role-change audit trail.** `profiles.role`/`is_active` changes aren't themselves logged as auditable events — an admin's own promote/demote/deactivate actions leave no record beyond the row's own `updated_at`. Real gap, not previously documented elsewhere; candidate for `docs/AUDIT_AND_RETENTION_POLICY.md`'s Class A (clinical/operational record) if adopted, since who has access to what is exactly the kind of thing an after-action review might need to reconstruct.
 
