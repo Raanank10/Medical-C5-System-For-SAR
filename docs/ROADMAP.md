@@ -45,6 +45,8 @@ Goal: prove the core offline-first architecture before introducing production se
 
 Goal: introduce real app boundaries after the workflow stabilizes.
 
+**Gate before starting any Phase 4 sub-phase**: (1) `docs/FIELD_USABILITY_TEST_PLAN.md`'s Session 2 (offline/intermittent-connectivity drill) has run at least once — even informally, two devices and a controllable network, without waiting for a fully staffed field exercise — and its result (real reconnect-to-sync latency, whether `docs/FAILURE_MODE_REVIEW.md`'s F1 fix holds under a live extended-offline stress test, what actually happens in a real F3 concurrent-edit case) is recorded; and (2) `docs/FAILURE_MODE_REVIEW.md`'s F3 (cross-device concurrent edits to the same patient) has an explicit, documented resolution rule — see `docs/CONFLICT_RESOLUTION_DECISION.md` — rather than being carried into the `apps/command-web`/`apps/field-mobile` split as an open question. Phase 4 is exactly the point where undecided product behavior becomes expensive engineering ambiguity across two codebases instead of one; both gates exist to keep that from happening by neglect.
+
 See `docs/PHASE_4_PLAN.md` for the detailed working plan — current-state inventory against what's actually built, open decisions that need the user's input before starting, and a risk-ordered sub-phase sequence (`packages/domain` first, `apps/field-mobile` last, `index.html` stays working throughout).
 
 - `apps/field-mobile`: Expo or native mobile field workflow.
