@@ -1914,6 +1914,7 @@ textarea{resize:vertical;min-height:70px;}
     <button class="demo-mini-btn" onclick="goTo('commander')">חזרה לחפ״ק</button>
     <button class="demo-mini-btn" onclick="exportExperimentLog()">ייצוא סיכום</button>
     <button class="demo-mini-btn" onclick="if(clearDemoScenario())goTo('aar')">נקה סיכום</button>
+    <button class="demo-mini-btn" onclick="finalizeIncidentAar()">סיים AAR ומחק זיהוי</button>
   </div>
   <div style="height:70px"></div>
 </div>
@@ -5417,7 +5418,10 @@ function reassignPatient(patientId, {toMedicId=null, toPlatoonId=null, assignedB
   p.lastModifiedAt=new Date().toISOString();
   p.events=p.events||[];
   const type=toPlatoonId&&toPlatoonId!==fromPlatoonId?'PATIENT_REASSIGNED_BETWEEN_PLATOONS':'PATIENT_REASSIGNED_WITHIN_PLATOON';
-  p.events.unshift({type,time:nowT(),detail:`${displayPatientIdentity(p)} · ${displayUser(fromMedicId)} → ${displayUser(toMedicId||p.assignedMedicId)} · ${platoonName(fromPlatoonId)} → ${platoonName(p.assignedPlatoonId)}`,warn:false});
+  // Never bake fullName/identity into a permanent event detail string - events are immutable
+  // and identity must stay deletable (docs/PATIENT_IDENTITY_LIFECYCLE.md). Reference the patient
+  // by tag only; a renderer that needs the current name can look it up live from patients[].
+  p.events.unshift({type,time:nowT(),detail:`${p.visualId||p.id} · ${displayUser(fromMedicId)} → ${displayUser(toMedicId||p.assignedMedicId)} · ${platoonName(fromPlatoonId)} → ${platoonName(p.assignedPlatoonId)}`,warn:false});
   saveLocalEvent({type,detail:`${p.id} reassigned`,payload_json:{patientId:p.id,fromMedicId,toMedicId:toMedicId||p.assignedMedicId,fromPlatoonId,toPlatoonId:p.assignedPlatoonId,assignedByRole,assignedByName:displayUser(assignedByRole==='cc'?'USR-MIZRAHI':'USR-BARAK'),reason,timestamp:new Date().toISOString()}});
   saveDemoState();
   renderRoleDashboard(activeRoleDashboard);
@@ -5503,9 +5507,11 @@ function exportExperimentLog(){
     patient_id:p.id, triage:p.triage, location:p.location, type:e.type, time:e.time,
     detail:e.detail, warn:!!e.warn, device_id:p.lastTouchedBy||p.medic||''
   })));
+  // Identity (fullName/identityStatus/temporaryDescription) is deliberately excluded from this
+  // export - it's a local debug/observer log, not an official handover artifact, and doesn't
+  // need identity to serve its purpose (docs/PATIENT_IDENTITY_LIFECYCLE.md).
   const patientRows=patients.map(p=>({
     id:p.id, triage:p.triage, status:p.patientStatus, location:p.location,
-    full_name:p.fullName||'', identity_status:p.identityStatus||'unknown', temporary_description:p.temporaryDescription||'',
     assigned_medic_id:p.assignedMedicId||'', assigned_platoon_id:p.assignedPlatoonId||'',
     trap_status:normalizeTrapStatus(p)||'', last_touched_by:p.lastTouchedBy||p.medic||'',
     needs_full_assessment:!!p.needsFullAssessment, assessment_debt:assessmentDebtForPatient(p).join('|'),
@@ -5537,11 +5543,33 @@ function exportExperimentLog(){
     csv:{
       experiment_events:toCsv(events, ['patient_id','triage','location','type','time','detail','warn','device_id']),
       alert_ownership:toCsv(alertRows, ['id','type','severity','owner','audience','escalates_to','action_required','scope','category','patient_id','site_id','title']),
-      patients_summary:toCsv(patientRows, ['id','triage','status','location','full_name','identity_status','temporary_description','assigned_medic_id','assigned_platoon_id','trap_status','last_touched_by','needs_full_assessment','assessment_debt','last_modified_at']),
+      patients_summary:toCsv(patientRows, ['id','triage','status','location','assigned_medic_id','assigned_platoon_id','trap_status','last_touched_by','needs_full_assessment','assessment_debt','last_modified_at']),
       observer_notes:toCsv(observer, ['timestamp','device_id','phase','note'])
     }
   },null,2), 'application/json');
   toast('קובץ ניסוי אחד יוצא');
+}
+// Command action: marks this incident's AAR as finalized and deletes patient identity (name +
+// identifying description) for every patient in it. Clinical data (triage, vitals, treatments,
+// evacuation destination) is never touched - see docs/PATIENT_IDENTITY_LIFECYCLE.md. Actual
+// authorization is enforced server-side by finalize_incident_aar() (command roles only); this
+// client-side check is just a fast, friendlier failure than waiting for the RPC to reject it.
+async function finalizeIncidentAar(){
+  if(!currentUser){ toast('נדרשת התחברות למערכת כדי לסיים AAR'); return; }
+  if(!confirm('פעולה זו תסמן את ה-AAR עבור אירוע זה כסגור ותמחק לצמיתות את פרטי הזיהוי (שם ותיאור זיהוי) של כל הפצועים באירוע. הנתונים הקליניים (מיון, מדדים, טיפולים, פינוי) לא יימחקו. פעולה זו בלתי הפיכה. להמשיך?')) return;
+  const client=getSupabaseClient();
+  if(!client){ toast('שירות הרשת אינו זמין'); return; }
+  const incidentId=currentIncidentId(currentSiteId());
+  let result;
+  try{ result=await client.rpc('finalize_incident_aar', {p_incident_id:incidentId}); }
+  catch(e){ toast('הפעולה נכשלה — בדוק חיבור אינטרנט'); return; }
+  if(result.error){ toast('הפעולה נכשלה: אין הרשאה לסיים AAR'); return; }
+  patients.filter(p=>p.siteId===currentSiteId()).forEach(p=>{
+    p.fullName='לא מזוהה'; p.identityStatus='unknown'; p.temporaryDescription='';
+  });
+  saveDemoState();
+  toast('AAR סומן כסגור, פרטי זיהוי נמחקו');
+  renderAar();
 }
 
 // ═══════════════════════════════════════════════
@@ -7260,6 +7288,36 @@ function openLateExternalPatientUpdate(id){
 // ═══════════════════════════════════════════════
 //  PATIENT DETAIL + TREND CHART
 // ═══════════════════════════════════════════════
+function escAttr(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+// Identity (name / identifying description) is always optional - in a mass-casualty incident
+// there is often no time to identify every patient, and nothing here may ever be required.
+// Synced via update_patient_identity() (a direct write, not an event - see
+// docs/PATIENT_IDENTITY_LIFECYCLE.md) so it can be deleted later by finalize_incident_aar()
+// without touching the immutable clinical event log.
+async function savePatientIdentity(id){
+  const p=patients.find(x=>x.id===id); if(!p) return;
+  const name=(document.getElementById('identity-name-input')?.value||'').trim();
+  const desc=(document.getElementById('identity-desc-input')?.value||'').trim();
+  p.fullName=name||'לא מזוהה';
+  p.identityStatus=name?'reported':'unknown';
+  p.temporaryDescription=desc;
+  p.lastModifiedAt=new Date().toISOString();
+  saveDemoState();
+  if(currentUser){
+    const client=getSupabaseClient();
+    if(client){
+      // Best-effort, no retry queue: identity is low-frequency and not on the critical clinical
+      // path, so on failure the medic can simply reopen/resave from this screen later - doesn't
+      // need the outbox's full retry machinery.
+      try{ await client.rpc('update_patient_identity', {p_patient_id:id, p_name:name||null, p_identifying_description:desc||null}); }
+      catch(e){}
+    }
+  }
+  toast('פרטי זיהוי נשמרו');
+  openPatient(id);
+}
 function openPatient(id){
   const p=patients.find(x=>x.id===id); if(!p) return;
   document.getElementById('detail-pid').textContent=p.id;
@@ -7273,6 +7331,13 @@ function openPatient(id){
       <div class="summary-row"><span class="summary-key">פציעה</span><span class="summary-val">${p.injury}</span></div>
       <div class="summary-row"><span class="summary-key">מצב</span><span class="summary-val">${STATUS_LABELS[p.patientStatus]||''}</span></div>
       ${tq?`<div class="summary-row"><span class="summary-key">חסם עורקים</span><span class="summary-val"><span class="tq-timer ${tq.cls}">${tq.label}</span></span></div>`:''}
+    </div>
+    <div class="summary-card">
+      <div style="font-weight:700;font-size:14px;margin-bottom:8px">זיהוי (אופציונלי)</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">לא חובה למלא. ניתן להשלים בכל שלב, כשיש זמן.</div>
+      <input type="text" id="identity-name-input" placeholder="שם (אם ידוע)" value="${escAttr(p.fullName&&p.fullName!=='לא מזוהה'?p.fullName:'')}" style="margin-bottom:8px">
+      <input type="text" id="identity-desc-input" placeholder="תיאור זיהוי / לבוש (אם ידוע)" value="${escAttr(p.temporaryDescription||'')}" style="margin-bottom:10px">
+      <button class="btn-secondary" onclick="savePatientIdentity('${p.id}')">שמור זיהוי</button>
     </div>
     <div class="summary-card">
       <div style="font-weight:700;font-size:14px;margin-bottom:10px">סיווג פינוי — עקיפת מפקד ידנית</div>
@@ -10070,7 +10135,7 @@ setInterval(()=>{ if(currentUser) syncPullAll(); }, 45000);
 // so this stays a thin read + merge, not a second projector.
 // A patient with any unsynced local outbox entry is left untouched this round: the medic's own
 // in-flight edit wins locally until it's actually pushed, rather than being clobbered mid-edit.
-const PROJECTED_PATIENT_COLUMNS = 'id,incident_id,visual_id,current_triage,current_status,access_status,needs_full_assessment,is_pediatric,pediatric_age_years,last_vitals_at,version';
+const PROJECTED_PATIENT_COLUMNS = 'id,incident_id,visual_id,current_triage,current_status,access_status,needs_full_assessment,is_pediatric,pediatric_age_years,last_vitals_at,version,optional_name,identifying_description';
 const VALID_LOCAL_TRIAGE = new Set(['red','yellow','green','black','pending']);
 const VALID_LOCAL_STATUS = new Set(['identified','stabilizing','observing','evacuating','handed_over','closed','self_evacuated','deceased']);
 
@@ -10095,15 +10160,21 @@ function applyProjectedPatientState(rows){
     const existing=patients.find(x=>x.id===row.id);
     if(existing){
       if(existing._serverVersion!=null && row.version!=null && row.version<=existing._serverVersion) continue;
-      const before=JSON.stringify([existing.triage,existing.patientStatus,existing.accessibility,existing.trapStatus,existing.needsFullAssessment]);
+      const before=JSON.stringify([existing.triage,existing.patientStatus,existing.accessibility,existing.trapStatus,existing.needsFullAssessment,existing.fullName,existing.temporaryDescription]);
       existing.triage=triage;
       if(status) existing.patientStatus=status;
       existing.accessibility=access.accessibility;
       existing.trapStatus=access.trapStatus;
       existing.needsFullAssessment=!!row.needs_full_assessment;
       if(row.last_vitals_at) existing.lastVitalsAt=Date.parse(row.last_vitals_at)||existing.lastVitalsAt;
+      // Identity is optional and may be null (never identified, or already purged by
+      // finalize_incident_aar()) - a null here correctly overwrites any locally-cached name too,
+      // so a purge on another device propagates down instead of leaving a stale local copy.
+      existing.fullName=row.optional_name||'לא מזוהה';
+      existing.identityStatus=row.optional_name?'reported':'unknown';
+      existing.temporaryDescription=row.identifying_description||'';
       existing._serverVersion=row.version;
-      if(before!==JSON.stringify([existing.triage,existing.patientStatus,existing.accessibility,existing.trapStatus,existing.needsFullAssessment])){
+      if(before!==JSON.stringify([existing.triage,existing.patientStatus,existing.accessibility,existing.trapStatus,existing.needsFullAssessment,existing.fullName,existing.temporaryDescription])){
         changed=true;
         existing.lastModifiedAt=new Date().toISOString();
         (existing.events||(existing.events=[])).push({type:'REMOTE_STATE_APPLIED',time:nowT(),detail:'עודכן מסנכרון (מכשיר אחר)'});
@@ -10118,7 +10189,7 @@ function applyProjectedPatientState(rows){
         injury:null, injuryZones:[], patientStatus:status||'identified',
         needsFullAssessment:!!row.needs_full_assessment,
         patientAgeGroup:row.is_pediatric?'pediatric':'adult', patientAge:row.pediatric_age_years||null,
-        fullName:'לא מזוהה', identityStatus:'unknown', temporaryDescription:'',
+        fullName:row.optional_name||'לא מזוהה', identityStatus:row.optional_name?'reported':'unknown', temporaryDescription:row.identifying_description||'',
         assignedMedicId:null, assignedPlatoonId:null, tempPatientId:null,
         stockSnapshot:{}, lastTouchedBy:'(remote)', lastModifiedAt:new Date().toISOString(),
         confirmedClinical:true, unsyncedEvents:0, locationHistory:[], possibleDuplicate:false,
