@@ -65,7 +65,7 @@ Before any real deployment conversation, the project needs (`docs/ROADMAP.md` Ph
 - [x] threat model — `docs/THREAT_MODEL.md`
 - [x] authentication and role model review — `docs/AUTH_AND_ROLE_MODEL.md`
 - [x] row-level security review — systematic full-coverage audit done: `docs/RLS_AUDIT_v1.md` (86 policies across 32 tables, 21 `SECURITY DEFINER` functions, all checked against the live database, not just migration files). Four real gaps found and fixed live across this audit and the threat model that preceded it (`database/013`, `014`, `015`, `016`, `017`).
-- [x] encrypted local storage design — AES-256-GCM behind a device PIN (PBKDF2-derived, never persisted); `screen-pin-gate` gates every fresh load. `docs/THREAT_MODEL.md` T2. The Supabase session token itself is a deliberately deferred follow-up.
+- [x] encrypted local storage design — AES-256-GCM behind a device PIN (PBKDF2-derived, never persisted); `screen-pin-gate` gates every fresh load. `docs/THREAT_MODEL.md` T2. The Supabase session token itself is fully covered, wired through the same PIN-derived encryption via a custom Supabase auth `storage` adapter.
 - [x] audit log retention policy — `docs/AUDIT_AND_RETENTION_POLICY.md`. Proposal only (four retention classes, deletion-must-be-audited principle); no retention window or deletion code is implemented, and real durations need legal/records-governance input this doc doesn't invent.
 - [ ] backup and incident response plan
 - [x] data minimization review — `docs/PRIVACY_AND_DATA_MINIMIZATION_REVIEW.md`
