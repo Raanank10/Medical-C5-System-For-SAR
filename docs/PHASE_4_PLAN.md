@@ -74,6 +74,7 @@ Real design work. `index.html`'s `loadDemoScenario()` (JS, in-memory objects mat
 Command-web is the better first real app to build: no offline-first requirement, and the backend it needs (`get_incident_command_state` RPC, `device_presence`, projected `patients` reads, `sync_ingestion_errors`) is already real, RLS-scoped, and consumable directly via a normal Supabase JS client — no new backend work required to get started.
 
 - Scope: the pc/cc/chamal/logistics command views currently in `index.html` (`renderCommander`, `renderCcHeroDashboard`, `renderLogisticsOfficer`, the command panels built this session — device presence, server-state snapshot, poison-event/high-risk review).
+- Also in scope: `docs/CONFLICT_RESOLUTION_DECISION.md`'s F3 resolution (already decided, not yet built) — `project_patient_state()`'s field-level projection rework and the role-authority tie-break (physician > cc > pc > medic) are exactly the kind of new API surface this build needs from the start, not retrofit later. Resolve that decision's open prerequisite first (the physician role doesn't exist in the live server `user_role` enum) before implementing the authority order.
 - Build in React (decision 2 above — already settled, don't re-ask).
 - Acceptance: feature parity with `index.html`'s command views for at least one full role (recommend `cc`, since it has the richest panel set), verified against the same live Supabase project, not a mock.
 

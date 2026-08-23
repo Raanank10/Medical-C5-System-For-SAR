@@ -1,6 +1,6 @@
-# Decision Needed: Cross-Device Concurrent-Edit Resolution (F3)
+# Decision: Cross-Device Concurrent-Edit Resolution (F3)
 
-This is an open decision, not a settled one — written up for the user to decide, the same way `docs/PHASE_4_PLAN.md`'s six framework/tooling decisions were made explicitly before that plan was finalized rather than assumed. `docs/ROADMAP.md`'s Phase 4 gate points here: this should be resolved before `apps/command-web`/`apps/field-mobile` exist, because it's currently a silent behavior, and splitting into two codebases would otherwise just reimplement that silence twice.
+**Status: decided (recorded here), not yet built.** The choice among A-D below belonged to the user, per this repo's established pattern (`docs/PHASE_4_PLAN.md`: "ask before ambiguous/architecturally significant choices") — the user chose a hybrid of A, B, and C. Building it is real schema/trigger engineering on `project_patient_state()`, deliberately deferred to Phase 4 rather than done as a side effect of a repo-alignment pass — see "Decision" below for the full reasoning and what's still open before it can be built.
 
 ## The problem
 
@@ -24,10 +24,16 @@ This is exactly the scenario `docs/FIELD_USABILITY_TEST_PLAN.md` Session 2 step 
 
 These aren't mutually exclusive in sequence — A is a reasonable interim step even if B or C is the eventual target, since it's the cheapest way to stop the failure from being *silent* while a fuller fix is designed.
 
+## Decision
+
+A hybrid of A, B, and C — not any single option alone:
+
+- **B provides the mechanism.** `project_patient_state()` stops treating `current_triage`/`current_status` as single-column overwrites and instead tracks which specific fields each event touches, so two genuinely independent edits (a triage override and a medication administration, in this doc's running example) never conflict at all — they touch different fields and both apply cleanly. This is the real schema/projection work the original write-up flagged as the highest-cost option; it's chosen anyway because it's what actually eliminates most false conflicts rather than just resolving them after the fact.
+- **C provides the tie-break for what's left.** Once B is in place, only genuine same-field collisions remain (two devices both setting `current_triage` in the same window). Those are resolved by role authority order, decided by the user: **physician > cc > pc > medic.** A higher-authority role's edit to the same field always wins, regardless of which event's trigger happened to fire last on the server.
+- **A provides the transparency layer on top.** Whenever C's authority rule causes an override — i.e. a lower-authority edit to a field loses to a higher-authority one — that event is written to `conflict_log` (or a new `PATIENT_FIELD_CONFLICT_DETECTED` event type) and surfaced as a flag on the patient card in the command view. The overridden medic's action is never silently lost from view, even though there's still always one deterministic winner and no real-time merge UI.
+
+**Open implementation prerequisite, found while recording this decision, not resolved here**: the chosen authority order names "physician" at the top, but **no such role exists in the live `user_role` enum** (`medic`, `pc`, `logistics_officer`, `cc`, `chamal`, `admin`, `rpc`, `rcc` — confirmed live against the database). "Physician" (`רופא / פראמדיק`) exists today only as a client-side-only dashboard label (`activeRoleDashboard==='doctor'` in `index.html`) for local role-switching in the demo — it has no corresponding authenticated server role, no RLS treatment, and no `profiles.role` value. Whoever builds this in Phase 4 needs to resolve that gap first: either add a real `doctor`/physician value to the server-side role enum (schema change, plus deciding its RLS scope relative to `cc`/`chamal`), or determine that the client's "doctor" dashboard is meant to map onto an existing server role (most likely `cc`, since senior medical review currently reads similarly to that role's scope) rather than needing a new one. This is a real, concrete open question for whoever implements the authority order, not a detail to guess at during implementation.
+
 ## What this decision should produce
 
-Once decided: update `docs/FAILURE_MODE_REVIEW.md`'s F3 entry from "Open" to reference this decision, update `docs/API_SURFACE_v1.2.md`/`docs/ARCHITECTURE.md` if a new event type or projection behavior is introduced, and add the chosen behavior as an explicit case in `docs/PHASE_4_PLAN.md`'s 4E/4D scope (this is exactly the kind of new API surface Phase 4's command-web build needs to implement correctly from the start, not retrofit later).
-
-## Not decided here
-
-This document lays out the problem and options; it does not pick one. Per this repo's established pattern (`docs/PHASE_4_PLAN.md`: "ask before ambiguous/architecturally significant choices"), the choice among A-D belongs to the user.
+Done as part of recording this decision: `docs/FAILURE_MODE_REVIEW.md`'s F3 entry updated from "Open" to reference this decision; `docs/ROADMAP.md`'s Phase 4 gate updated to reflect this item is resolved (the field-usability-drill gate item remains open independently). Still needed once B/C are actually built in Phase 4: update `docs/API_SURFACE_v1.2.md`/`docs/ARCHITECTURE.md` for the new field-level projection behavior and any new event type, and resolve the physician-role prerequisite above before or during that build.
