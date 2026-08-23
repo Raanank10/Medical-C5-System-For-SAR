@@ -28,7 +28,7 @@ The pull-side projection policy (`pullProjectedPatientState`, `docs/ROADMAP.md` 
 
 **Current mitigation**: partial. `conflict_log` and the `PATIENT_EDIT_CONFLICT_DETECTED` event exist for same-device concurrent-edit detection (comparing `lastModifiedAt` at modal-open time vs. save time) but this only catches conflicts within *one device's* local storage (e.g. two browser tabs), not genuine cross-device concurrent edits — those are silently resolved by "whichever trigger fired last," with the loser's specific field-level intent gone, not merged or flagged.
 
-**Recommendation**: this is a real, unaddressed gap, not just a documentation note. `docs/PHASE_4_PLAN.md`'s command-web/field-mobile split would be a natural point to add real cross-device conflict surfacing (e.g. extending `conflict_log` writes to cover trigger-level overwrites, not just client-side same-device detection) — flagging here rather than fixing now, since it's a real design decision (what should happen when two medics genuinely disagree about a patient's triage in the same 45-second window?) that needs product input, not a unilateral technical fix. See `docs/CONFLICT_RESOLUTION_DECISION.md` for the options write-up and `docs/ROADMAP.md`'s Phase 4 gate, which blocks starting Phase 4 sub-phases until this is decided.
+**Recommendation**: this was a real, unaddressed gap, not just a documentation note — now decided, not yet built. `docs/CONFLICT_RESOLUTION_DECISION.md` records the chosen resolution: field-level projection (so unrelated-field edits never conflict) plus a role-authority tie-break for genuine same-field collisions (physician > cc > pc > medic), with every authority-rule override logged and surfaced rather than silently lost. Building it is real schema/trigger work on `project_patient_state()`, deliberately deferred to `docs/PHASE_4_PLAN.md`'s command-web/field-mobile split rather than done now — see that decision doc for the full reasoning and one open prerequisite (the "physician" role in the chosen order doesn't exist in the live server role enum yet).
 
 ## F4: Stale command-dashboard data goes unnoticed
 
@@ -54,7 +54,7 @@ The command view's sync-freshness indicator (`.sync-pill`, fresh/stale/offline) 
 |---|---|---|
 | F1 | Outbox cap could silently drop unsynced data | **Fixed** in this review (verified with 3 Playwright cases) |
 | F2 | Platform-level `localStorage` eviction | Open — architectural, addressed by Phase 4's move away from `localStorage` for new apps |
-| F3 | Cross-device concurrent edits to the same patient | Open — decision write-up in `docs/CONFLICT_RESOLUTION_DECISION.md`, gates Phase 4 per `docs/ROADMAP.md` |
+| F3 | Cross-device concurrent edits to the same patient | Decided, not yet built — hybrid field-level-merge + role-authority resolution, `docs/CONFLICT_RESOLUTION_DECISION.md`. Build deferred to `docs/PHASE_4_PLAN.md` |
 | F4 | Passive stale-data indicator may go unnoticed | Open — needs field-validation data before deciding whether to make it more aggressive |
 | F5 | Handover event created but never synced | Open — already tracked in `docs/PRODUCTION_READINESS.md`, the QR-token flow is the real fix |
 

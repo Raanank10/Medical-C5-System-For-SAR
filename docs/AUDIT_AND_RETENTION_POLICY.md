@@ -14,9 +14,11 @@ Retention should be driven by *why the data exists*, not a single blanket window
 
 ### Class A: Clinical/event history of record — long retention, append-only, never silently deleted
 
-`events` (the full clinical event log), `patients`, `tourniquets`, `inventory_ledger_v12`, `watchdog_alerts`, `patient_handover_tokens` (post-expiry, for the audit record of what was issued and consumed, not the live token itself).
+`events` (the full clinical event log), `patients`, `tourniquets`, `inventory_ledger_v12`, `watchdog_alerts`, `patient_handover_tokens` (post-expiry, for the audit record of what was issued and consumed, not the live token itself — but see the refinement below).
 
 This is the actual medical/incident record. Real-world SAR/EMS record retention requirements are jurisdiction- and organization-specific (**needs real legal/medical-records governance input — not something to assert a specific number of years for here**), but the *principle* is clear regardless of the exact number: this class should never be silently deleted, only formally archived under a documented process, and any deletion must itself be an audited event (who deleted what, when, under what authority), not a bare `DELETE`. `docs/OPERATIONS_SAFETY.md`'s "do not remove audit history to make a workflow look cleaner" already states this as a non-negotiable — this class is exactly what that rule protects.
+
+**Refinement on `patient_handover_tokens`**: the *fact* that a handover token was issued at time X for patient Y, and whether/when it was consumed, is genuine Class A audit value. The token's actual credential material (`token_hash`, `token_signature`, `encrypted_link`) is not — once expired and unconsumed, it's a dead secret with no further operational or audit use, sitting in the database purely as latent attack surface. Recommend nulling those three columns specifically once `expires_at` has passed (whether or not `consumed_at` was ever set), while keeping the row itself — `patient_id`, `handover_method`, `destination_facility`, `created_at`, `expires_at`, `consumed_at` — as the permanent Class A audit record. This is a real, low-risk, near-term-actionable item independent of the rest of this document's Class A/B timing questions, since it doesn't require picking any retention duration — the trigger is `expires_at`, which the schema already has.
 
 ### Class B: Operational/audit trail — medium retention, purpose expires with the incident
 
