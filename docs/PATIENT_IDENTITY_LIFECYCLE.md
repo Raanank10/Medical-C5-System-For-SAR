@@ -1,6 +1,6 @@
 # Patient Identity Lifecycle
 
-This is a concrete implementation of `docs/ROADMAP.md`'s "data minimization review" Phase 5 item, and extends `docs/AUDIT_RETENTION_POLICY.md`'s permanent-vs-prunable split down to the *field* level within a single patient record.
+This is a concrete implementation of `docs/ROADMAP.md`'s "data minimization review" Phase 5 item, building directly on `docs/PRIVACY_AND_DATA_MINIMIZATION_REVIEW.md`'s finding #1 (`patients.optional_name` is already correctly minimized — name only captured if known) and extending `docs/AUDIT_AND_RETENTION_POLICY.md`'s Class A/B split down to the *field* level within a single patient record: identity is deletable independent of the permanent clinical record it lives alongside.
 
 ## The operational need
 
