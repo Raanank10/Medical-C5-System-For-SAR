@@ -2490,7 +2490,11 @@ const SITE_TO_INCIDENT_ID = {
 };
 const INCIDENT_ID_TO_SITE = Object.fromEntries(Object.entries(SITE_TO_INCIDENT_ID).map(([site,id])=>[id,site]));
 // Server user_role enum uses 'logistics_officer'; client's internal role key is 'logistics'.
-const SERVER_ROLE_TO_CLIENT_ROLE = { logistics_officer: 'logistics' };
+// physician maps onto the existing 'doctor' client dashboard (red/black patient review,
+// senior clinical decisions) rather than a new dashboard - closest existing analog. paramedic
+// needs no remap: it's an exact mirror of medic's scope (docs/CONFLICT_RESOLUTION_DECISION.md),
+// so it flows straight through as 'paramedic' and is added alongside every 'medic' check below.
+const SERVER_ROLE_TO_CLIENT_ROLE = { logistics_officer: 'logistics', physician: 'doctor' };
 function mapServerRole(role){ return SERVER_ROLE_TO_CLIENT_ROLE[role] || role; }
 // Exact vocabulary the deployed sync-log Edge Function accepts (supabase/functions/sync-log/index.ts,
 // ROLE_ALLOWED_EVENT_TYPES categories). Local event types outside this set are demo/UI-only and are
@@ -2543,7 +2547,7 @@ const DEMO_KEYS_TO_PURGE = Object.freeze([
   ACTIVE_RECOVERY_KEY,
   OUTBOX_KEY
 ]);
-const ROLE_LABELS = {medic:'פעולת חובש', pc:'החלטת חוג"ד', cc:'סיכון מ״פ רפואה', logistics:'לוגיסטיקה', chamal:'מערכת', rpc:'מ״מ חילוץ', rcc:'מ״פ חילוץ', admin:'מנהל מערכת'};
+const ROLE_LABELS = {medic:'פעולת חובש', pc:'החלטת חוג"ד', cc:'סיכון מ״פ רפואה', logistics:'לוגיסטיקה', chamal:'מערכת', rpc:'מ״מ חילוץ', rcc:'מ״פ חילוץ', admin:'מנהל מערכת', doctor:'רופא', paramedic:'פראמדיק'};
 const ACTION_LABELS = {
   update_vitals:'עדכן מדדים',
   assign_medic:'הקצה חובש',
@@ -2680,6 +2684,7 @@ const ROLE_DEFS = [
   {key:'pc', label:'חוג"ד', he:'חוג"ד / חפ״ק רפואי', desc:'פותח ומאשר אירוע רשמי, מנהל תמונת מצב, התראות, אספקה וסיכום אירוע חי.'},
   {key:'log_o', label:'Log-O', he:'קצין לוגיסטיקה', desc:'מנהל ערכות ורצי אספקה, רואה מלאי לפי פלוגה, לא מבצע רישום קליני.'},
   {key:'cc', label:'מ״פ רפואה', he:'מפקד פלוגה רפואית', desc:'סמכות פיקודית לפתיחת/אישור אירוע, סגירה, אתר נקי, דשבורד וייצוא.'},
+  {key:'doctor', label:'Doctor', he:'רופא / פראמדיק', desc:'תור סקירה רפואית בכירה: פצועים קשים, קביעת מוות, מענה לבקשות חוג"ד / מ״פ רפואה.'},
   {key:'chamal', label:'Chamal', he:'חמ״ל', desc:'תמונת מצב מלאה, אישור טיוטות, ניהול אירוע ברמת חטיבה וסיכום אירוע חי, ללא רישום פצועים.'},
   {key:'rpc', label:'מ״מ', he:'מפקד מחלקת חילוץ', desc:'פאנל טקטי למחלקה שלו: תג, מיון, אזור, לכוד/נייד, סטטוס פינוי, חובש אחראי (כינוי קריאה). ללא מדדים, טיפול, מנגנון פציעה או זהות. סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא אישור רפואי. יכול לדווח פצוע ראשוני (מיקום/לכוד/חסם בלבד).'},
   {key:'rcc', label:'מ״פ חילוץ', he:'מפקד פלוגת חילוץ', desc:'פאנל טקטי מרוכז לפי מחלקות עבור הפלוגה שלו, כולל בקשות אספקה פתוחות (לוגיסטיקת פלוגת חילוץ). ללא מדדים, טיפול, מנגנון פציעה או זהות. סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא אישור רפואי. יכול לדווח פצוע ראשוני (מיקום/לכוד/חסם בלבד).'},
@@ -3138,11 +3143,12 @@ async function loadProfileAndEnter(client, userId){
   pullDevicePresenceAll();
   pullIncidentCommandStateAll();
   pullSyncIngestionErrorsAll();
+  pullFieldConflictsAll();
   return true;
 }
 function enterAuthenticatedRole(serverRole){
   const clientRole=mapServerRole(serverRole);
-  if(['medic','pc','cc','chamal','rpc','rcc','logistics'].includes(clientRole)){
+  if(['medic','pc','cc','chamal','rpc','rcc','logistics','doctor','paramedic'].includes(clientRole)){
     startRoleDashboard(clientRole);
   }else{
     goTo('demo');
@@ -4166,7 +4172,9 @@ function updateDemoStatus(){
 
 function startRoleDashboard(role){
   activeRoleDashboard=role;
-  if(role==='medic'){
+  // paramedic mirrors medic's scope exactly (docs/CONFLICT_RESOLUTION_DECISION.md) - same
+  // field workflow screen, not the generic role-dashboard summary view.
+  if(role==='medic'||role==='paramedic'){
     goTo('enroute');
     return;
   }
@@ -4235,6 +4243,7 @@ function renderMedicActionPanel(){
       <div class="patient-info" style="width:100%">
         ${triageBand(p.triage,p)}
         ${ticketMetaHtml(p,'medic')}
+        ${patientHasFieldConflict(p)?'<span class="badge badge-orange">⚠ עדכון תפקידי</span>':''}
         <div style="font-size:12px;color:var(--muted);margin-top:8px">${trend.detail}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
           <button class="demo-mini-btn" onclick="event.stopPropagation();openQuickVitals('${p.id}')">מדדים מלאים עכשיו</button>
@@ -5024,7 +5033,7 @@ function renderPcPatientTile(p){
     <div class="patient-info">
       ${triageBand(p.triage,p)}
       <div style="font-weight:800">${p.injury||'פגיעה לא צוינה'}</div>
-      <div class="patient-badges">${timer?`<span class="vitals-timer ${timer.cls}">${timer.label}</span>`:''}${tq?`<span class="tq-timer ${tq.cls}">${tq.label}</span>`:''}</div>
+      <div class="patient-badges">${timer?`<span class="vitals-timer ${timer.cls}">${timer.label}</span>`:''}${tq?`<span class="tq-timer ${tq.cls}">${tq.label}</span>`:''}${patientHasFieldConflict(p)?'<span class="badge badge-orange">⚠ עדכון תפקידי</span>':''}</div>
       ${ticketMetaHtml(p,'pc')}
     </div>
     ${activeAlert?'<div class="alert-dot"></div>':''}
@@ -5839,6 +5848,7 @@ function renderDashboard(){
           <span class="badge ${['stabilizing','in_treatment'].includes(p.patientStatus)?'badge-green':['evacuating','evacuated'].includes(p.patientStatus)?'badge-accent':p.patientStatus==='deceased'?'badge-red':'badge-muted'}">${STATUS_LABELS[p.patientStatus]||''}</span>
           <span class="badge badge-muted">${TRAP_LABELS[normalizeTrapStatus(p)]||'לא תועד'}</span>
           ${p.needsFullAssessment?'<span class="badge badge-orange">חסר הערכה</span>':''}
+          ${patientHasFieldConflict(p)?'<span class="badge badge-orange">⚠ עדכון תפקידי</span>':''}
           ${p.patientAgeGroup==='pediatric'?'<span class="badge badge-yellow">ילד</span>':''}
           ${p.unsyncedEvents?`<span class="badge badge-accent">${p.unsyncedEvents} unsynced</span>`:''}
           ${timer?`<span class="vitals-timer ${timer.cls}" onclick="event.stopPropagation();openQuickVitals('${p.id}')">${timer.label}</span>`:''}
@@ -9649,8 +9659,11 @@ function renderCommandOperationalPanels(pts, site){
     const incId=SITE_TO_INCIDENT_ID[site.id];
     const errors=currentUser ? (_syncIngestionErrors[incId]||[]) : [];
     const flags=currentUser ? _highRiskFlags.filter(f=>f.incidentId===incId) : [];
-    if(!errors.length && !flags.length){
-      quarantineEl.innerHTML=`<div class="cmd-matrix-row"><div class="cmd-matrix-sub">${currentUser?'אין אירועים חסומים או סיכון גבוה פעילים':'זמין רק במצב מחובר (לא בדמו מקומי)'}</div></div>`;
+    // F3 (docs/CONFLICT_RESOLUTION_DECISION.md): unresolved role-authority overrides, folded
+    // into this same "things command needs to review" panel rather than a new dedicated one.
+    const conflicts=currentUser ? (_fieldConflicts[incId]||[]) : [];
+    if(!errors.length && !flags.length && !conflicts.length){
+      quarantineEl.innerHTML=`<div class="cmd-matrix-row"><div class="cmd-matrix-sub">${currentUser?'אין אירועים חסומים, סיכון גבוה או ניגודי עדכון פעילים':'זמין רק במצב מחובר (לא בדמו מקומי)'}</div></div>`;
     } else {
       const errorRows=errors.map(e=>`<div class="cmd-matrix-row critical">
         <div><div class="cmd-matrix-title">חסום · ${e.error_code}</div><div class="cmd-matrix-sub">${e.error_message} · מכשיר ${e.device_id||'—'} · ${e.dependency_status||''} · ${timeAgoLabel(Date.parse(e.created_at)||0)}</div></div>
@@ -9658,9 +9671,12 @@ function renderCommandOperationalPanels(pts, site){
       const flagRows=flags.map(f=>`<div class="cmd-matrix-row ${f.severity==='critical'?'critical':''}">
         <div><div class="cmd-matrix-title">סיכון גבוה · ${f.code}</div><div class="cmd-matrix-sub">${f.message} · חומרה: ${f.severity} · ${timeAgoLabel(f._ts||0)}</div></div>
       </div>`).join('');
-      quarantineEl.innerHTML=errorRows+flagRows;
+      const conflictRows=conflicts.map(c=>`<div class="cmd-matrix-row ${c.severity==='high'?'critical':''}">
+        <div><div class="cmd-matrix-title">ניגוד עדכון · ${(c.payload_json&&c.payload_json.field)||'שדה'}</div><div class="cmd-matrix-sub">${c.description} · פצוע ${c.patient_id||'—'} · ${timeAgoLabel(Date.parse(c.created_at)||0)}</div></div>
+      </div>`).join('');
+      quarantineEl.innerHTML=errorRows+flagRows+conflictRows;
     }
-    setCmdPanelMeta('quarantine', currentUser?`${errors.length} חסומים · ${flags.length} סיכון גבוה`:'מצב מקומי (ללא שרת)');
+    setCmdPanelMeta('quarantine', currentUser?`${errors.length} חסומים · ${flags.length} סיכון גבוה · ${conflicts.length} ניגודי עדכון`:'מצב מקומי (ללא שרת)');
   }
 
   renderWatchdogPanel(pts);
@@ -10185,6 +10201,11 @@ async function syncPush(){
     // high-risk-but-accepted event (e.g. a pediatric medication dose) actually surfaces.
     (result.high_risk_flags||[]).forEach(f=>_highRiskFlags.unshift({...f, _ts:Date.now(), incidentId}));
     if(_highRiskFlags.length>200) _highRiskFlags.length=200;
+    // field_conflicts (F3, docs/CONFLICT_RESOLUTION_DECISION.md): lets the acting device know
+    // right away if its own just-pushed triage/status edit won or lost a role-authority
+    // tie-break, mirroring high_risk_flags above rather than waiting for the command-tier pull.
+    (result.field_conflicts||[]).forEach(f=>_fieldConflictFlags.unshift({...f, _ts:Date.now(), incidentId}));
+    if(_fieldConflictFlags.length>200) _fieldConflictFlags.length=200;
   }
   // Single combined write-back at the end, not per-group, so a mid-loop failure never leaves
   // localStorage in a partially-updated state.
@@ -10206,6 +10227,7 @@ setInterval(()=>{ if(currentUser) syncPush(); }, 45000);
 // validation on the pull side.
 let _pulledEvents=[]; // in-memory, replaced per-incident on each pull cycle
 let _highRiskFlags=[]; // in-memory, appended to on each push response, capped at 200
+let _fieldConflictFlags=[]; // in-memory, appended to on each push response, capped at 200 (F3)
 async function syncPull(incidentId){
   if(!currentUser) return;
   const client=getSupabaseClient();
@@ -10414,8 +10436,12 @@ setInterval(()=>{ if(currentUser) pullIncidentCommandStateAll(); }, 45000);
 // (database/015_scope_sync_ingestion_errors_by_incident.sql), so this pull is skipped entirely
 // for non-command roles rather than erroring — RLS would just return zero rows anyway.
 let _syncIngestionErrors={}; // incidentId -> rows, unresolved only
+// physician included alongside the original command roles: it's added to app.is_command_role()
+// server-side (database/020_physician_paramedic_rls.sql), so its RLS read access already covers
+// this table — this client-side pre-filter just needs to match, or a physician's client would
+// never even attempt the pull despite the server allowing it.
 async function pullSyncIngestionErrors(incidentId){
-  if(!currentUser || !['pc','cc','chamal','admin'].includes(currentUser.role)) return;
+  if(!currentUser || !['pc','cc','chamal','admin','physician'].includes(currentUser.role)) return;
   const client=getSupabaseClient();
   if(!client) return;
   let result;
@@ -10435,6 +10461,37 @@ async function pullSyncIngestionErrorsAll(){
   if(currentUser) refreshActiveScreenData();
 }
 setInterval(()=>{ if(currentUser) pullSyncIngestionErrorsAll(); }, 45000);
+
+// ── F3 field-authority conflict review: conflict_log, command-role only (same gate as above) ──
+// Complements the push-response field_conflicts echo above (immediate feedback to the device
+// whose edit was involved) with a periodic command-tier pull covering every conflict for the
+// incident, so command review isn't limited to whatever this device happened to push itself.
+let _fieldConflicts={}; // incidentId -> rows, unresolved only
+async function pullFieldConflicts(incidentId){
+  if(!currentUser || !['pc','cc','chamal','admin','physician'].includes(currentUser.role)) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let result;
+  try{
+    result=await client.from('conflict_log')
+      .select('id,incident_id,patient_id,severity,reason,description,payload_json,created_at')
+      .eq('incident_id', incidentId)
+      .eq('conflict_type', 'PATIENT_FIELD_CONFLICT_DETECTED')
+      .is('resolved_at', null)
+      .order('created_at', {ascending:false})
+      .limit(50);
+  }catch(e){ return; }
+  if(result.error || !result.data) return;
+  _fieldConflicts[incidentId]=result.data;
+}
+async function pullFieldConflictsAll(){
+  await Promise.all(Object.values(SITE_TO_INCIDENT_ID).map(id=>pullFieldConflicts(id)));
+  if(currentUser) refreshActiveScreenData();
+}
+setInterval(()=>{ if(currentUser) pullFieldConflictsAll(); }, 45000);
+function patientHasFieldConflict(p){
+  return Object.values(_fieldConflicts).some(rows=>(rows||[]).some(c=>c.patient_id===p.id));
+}
 // Screens that display patient state need a refresh when projected state changes them in the
 // background — this mirrors goTo()'s per-screen render dispatch but skips the navigation-only
 // side effects (scroll reset, active-class toggling) that would be jarring during a quiet poll.

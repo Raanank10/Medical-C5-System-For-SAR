@@ -176,12 +176,24 @@ for event in events:
       "message": "Medication saved but flagged for immediate review."
     }
   ],
+  "field_conflicts": [
+    {
+      "local_event_id": "local-triage-004",
+      "field": "current_triage",
+      "won": false,
+      "winning_role": "physician",
+      "losing_role": "medic",
+      "message": "Role-authority override on current_triage: physician edit (red) overrides medic edit (yellow)"
+    }
+  ],
   "next_pull_cursor": 1843
 }
 ```
 
 Clinical events should almost never be rejected. Bad-but-important clinical data is accepted and flagged.
 Only malformed/unparseable envelopes are rejected and quarantined.
+
+`field_conflicts` (F3, `docs/CONFLICT_RESOLUTION_DECISION.md`) reports whenever an event in this push batch was involved in a role-authority conflict resolution on `PATIENT_TRIAGE_UPDATED`/`PATIENT_STATUS_UPDATED` — read back from `conflict_log` by `sync-log` itself, not computed client-side. `won:false` means this device's own edit lost the tie-break; the field's projected value in `patients` reflects the winning edit either way. A parallel command-tier read (`conflict_log` where `conflict_type='PATIENT_FIELD_CONFLICT_DETECTED'`, RLS-gated the same as `sync_ingestion_errors`) covers every conflict for the incident, not just ones this device happened to push.
 
 ## Pediatric High-Risk Medication Event
 
@@ -582,7 +594,8 @@ The sync endpoint processes events individually, but not blindly. Events may dec
     }
   ],
   "rejected": [],
-  "high_risk_flags": []
+  "high_risk_flags": [],
+  "field_conflicts": []
 }
 ```
 
