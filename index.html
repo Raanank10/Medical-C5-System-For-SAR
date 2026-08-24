@@ -656,7 +656,7 @@ textarea{resize:vertical;min-height:70px;}
           <div class="demo-icon">📋</div>
           <div><strong>AAR — מה למדנו</strong><span>סיכום אירוע חי, KPI, ציר זמן ותובנות אחרי פעולה.</span></div>
         </button>
-        <button class="demo-card" onclick="startRoleDashboard('doctor')">
+        <button class="demo-card" onclick="startRoleDashboard('physician')">
           <div class="demo-icon">⚕</div>
           <div><strong>רופא / פראמדיק</strong><span>בקשות סקירה רפואית בכירה ואישור מוות.</span></div>
         </button>
@@ -2490,11 +2490,12 @@ const SITE_TO_INCIDENT_ID = {
 };
 const INCIDENT_ID_TO_SITE = Object.fromEntries(Object.entries(SITE_TO_INCIDENT_ID).map(([site,id])=>[id,site]));
 // Server user_role enum uses 'logistics_officer'; client's internal role key is 'logistics'.
-// physician maps onto the existing 'doctor' client dashboard (red/black patient review,
-// senior clinical decisions) rather than a new dashboard - closest existing analog. paramedic
-// needs no remap: it's an exact mirror of medic's scope (docs/CONFLICT_RESOLUTION_DECISION.md),
-// so it flows straight through as 'paramedic' and is added alongside every 'medic' check below.
-const SERVER_ROLE_TO_CLIENT_ROLE = { logistics_officer: 'logistics', physician: 'doctor' };
+// physician needs no remap either (the client used to alias it onto a separate 'doctor'
+// dashboard key, but physician and doctor were always the same role - consolidated to one
+// key, 'physician', throughout). paramedic also needs no remap: it's an exact mirror of
+// medic's scope (docs/CONFLICT_RESOLUTION_DECISION.md), so both flow straight through
+// unchanged and are added alongside every 'medic' check below.
+const SERVER_ROLE_TO_CLIENT_ROLE = { logistics_officer: 'logistics' };
 function mapServerRole(role){ return SERVER_ROLE_TO_CLIENT_ROLE[role] || role; }
 // Exact vocabulary the deployed sync-log Edge Function accepts (supabase/functions/sync-log/index.ts,
 // ROLE_ALLOWED_EVENT_TYPES categories). Local event types outside this set are demo/UI-only and are
@@ -2516,7 +2517,7 @@ const SYNC_ELIGIBLE_EVENT_TYPES = new Set([
   'EXTERNAL_REPORT_CREATED','EXTERNAL_REPORT_LINKED','WATCHDOG_ALERT','WATCHDOG_ACKNOWLEDGED',
   'WATCHDOG_RESOLVED','DEAD_MAN_SWITCH_ESCALATED','SYNC_CONFLICT','CONFLICT_LOG_ENTRY',
   'TREATMENT_SAFETY_WARNING','COMMAND_CONTEXT_NOTE_ADDED','VOICE_MEMO_ADDED',
-  'HIGH_RISK_CLINICAL_VIOLATION','NOTE_ADDED','AAR_CONTEXT_NOTE_ADDED'
+  'HIGH_RISK_CLINICAL_VIOLATION','NOTE_ADDED','AAR_CONTEXT_NOTE_ADDED','PATIENT_DEATH_CONFIRMED'
 ]);
 const SUPPLY_BASELINE = Object.freeze({tourniquets:3, pressureDressings:4, hemostaticGauze:2, airwayEquipment:2, ivKits:1, blankets:2, batteryPacks:1});
 const PC_TRUCK_BASELINE = Object.freeze({tourniquets:20, pressureDressings:30, hemostaticGauze:15, airwayEquipment:10, ivKits:8, blankets:25, batteryPacks:6});
@@ -2547,7 +2548,7 @@ const DEMO_KEYS_TO_PURGE = Object.freeze([
   ACTIVE_RECOVERY_KEY,
   OUTBOX_KEY
 ]);
-const ROLE_LABELS = {medic:'פעולת חובש', pc:'החלטת חוג"ד', cc:'סיכון מ״פ רפואה', logistics:'לוגיסטיקה', chamal:'מערכת', rpc:'מ״מ חילוץ', rcc:'מ״פ חילוץ', admin:'מנהל מערכת', doctor:'רופא', paramedic:'פראמדיק'};
+const ROLE_LABELS = {medic:'פעולת חובש', pc:'החלטת חוג"ד', cc:'סיכון מ״פ רפואה', logistics:'לוגיסטיקה', chamal:'מערכת', rpc:'מ״מ חילוץ', rcc:'מ״פ חילוץ', admin:'מנהל מערכת', physician:'רופא', paramedic:'פראמדיק'};
 const ACTION_LABELS = {
   update_vitals:'עדכן מדדים',
   assign_medic:'הקצה חובש',
@@ -2626,7 +2627,7 @@ const DEMO_USERS = [
   {userId:'USR-LEVI', fullName:'סמ״ר דניאל לוי', role:'medic', callsign:'חובש 2', platoonId:'PLT-A', companyId:'COMP-1', active:true},
   {userId:'USR-BARAK', fullName:'סגן רועי ברק', role:'pc', callsign:'חוג"ד א', platoonId:'PLT-A', companyId:'COMP-1', active:true},
   {userId:'USR-MIZRAHI', fullName:'סרן יעל מזרחי', role:'cc', callsign:'מ״פ רפואה', platoonId:null, companyId:'COMP-1', active:true},
-  {userId:'USR-DR', fullName:'ד״ר איתן שלו', role:'doctor', callsign:'רופא חברה', platoonId:null, companyId:'COMP-1', active:true},
+  {userId:'USR-DR', fullName:'ד״ר איתן שלו', role:'physician', callsign:'רופא חברה', platoonId:null, companyId:'COMP-1', active:true},
   {userId:'USR-PARA', fullName:'רס״ר מיה אדרי', role:'paramedic', callsign:'פראמדיקית', platoonId:null, companyId:'COMP-1', active:true},
   {userId:'USR-LOG', fullName:'רס״ם אמיר דגן', role:'logistics', callsign:'Log-O', platoonId:null, companyId:'COMP-1', active:true},
   {userId:'USR-CHAMAL', fullName:'סמלת תמר גולן', role:'chamal', callsign:'חמ״ל', platoonId:null, companyId:'COMP-1', active:true}
@@ -2684,34 +2685,35 @@ const ROLE_DEFS = [
   {key:'pc', label:'חוג"ד', he:'חוג"ד / חפ״ק רפואי', desc:'פותח ומאשר אירוע רשמי, מנהל תמונת מצב, התראות, אספקה וסיכום אירוע חי.'},
   {key:'log_o', label:'Log-O', he:'קצין לוגיסטיקה', desc:'מנהל ערכות ורצי אספקה, רואה מלאי לפי פלוגה, לא מבצע רישום קליני.'},
   {key:'cc', label:'מ״פ רפואה', he:'מפקד פלוגה רפואית', desc:'סמכות פיקודית לפתיחת/אישור אירוע, סגירה, אתר נקי, דשבורד וייצוא.'},
-  {key:'doctor', label:'Doctor', he:'רופא / פראמדיק', desc:'תור סקירה רפואית בכירה: פצועים קשים, קביעת מוות, מענה לבקשות חוג"ד / מ״פ רפואה.'},
+  {key:'physician', label:'Physician', he:'רופא', desc:'סמכות פיקודית כמו מ״פ רפואה (ניהול אירוע, מכשירים, תמונת מצב, ניגודי עדכון) בתוספת סמכות רישום קליני מלאה: מדדים, טיפול, מיון. אינו פותח פצוע חדש. הדרג הגבוה ביותר בהכרעת ניגודי עדכון בין מכשירים. בעל סמכות אישור מוות קליני.'},
+  {key:'paramedic', label:'Paramedic', he:'פראמדיק', desc:'אותה סמכות טיפול שדה כמו חובש: פתיחת פצוע, מדדים, תרופות, מיון, מסירת מצב — כולל אישור חריגת סיכון גבוה. ללא הסמכות הפיקודית של רופא/מ״פ רפואה וללא סמכות אישור מוות קליני.'},
   {key:'chamal', label:'Chamal', he:'חמ״ל', desc:'תמונת מצב מלאה, אישור טיוטות, ניהול אירוע ברמת חטיבה וסיכום אירוע חי, ללא רישום פצועים.'},
   {key:'rpc', label:'מ״מ', he:'מפקד מחלקת חילוץ', desc:'פאנל טקטי למחלקה שלו: תג, מיון, אזור, לכוד/נייד, סטטוס פינוי, חובש אחראי (כינוי קריאה). ללא מדדים, טיפול, מנגנון פציעה או זהות. סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא אישור רפואי. יכול לדווח פצוע ראשוני (מיקום/לכוד/חסם בלבד).'},
   {key:'rcc', label:'מ״פ חילוץ', he:'מפקד פלוגת חילוץ', desc:'פאנל טקטי מרוכז לפי מחלקות עבור הפלוגה שלו, כולל בקשות אספקה פתוחות (לוגיסטיקת פלוגת חילוץ). ללא מדדים, טיפול, מנגנון פציעה או זהות. סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא אישור רפואי. יכול לדווח פצוע ראשוני (מיקום/לכוד/חסם בלבד).'},
   {key:'admin', label:'Admin', he:'מנהל מערכת', desc:'גישה טכנית מלאה: כל הנתונים הגולמיים, טעינת/ניקוי תרחישים, ייצוא ניסוי, בדיקת גרסה וסנכרון. תפקיד טכני להרצת דמו/בדיקות, לא תפקיד פיקודי מבצעי.'}
 ];
 const AUTH_MATRIX = [
-  {action:'Create local draft incident', medic:'yes', pc:'yes', log_o:'no', cc:'yes', chamal:'yes', rpc:'no', rcc:'no', admin:'yes'},
-  {action:'Open official incident and set T0', medic:'no', pc:'yes', log_o:'no', cc:'yes', chamal:'yes', rpc:'yes', rcc:'yes', admin:'yes'},
-  {action:'Confirm draft incident', medic:'no', pc:'yes', log_o:'no', cc:'yes', chamal:'yes', rpc:'yes', rcc:'yes', admin:'yes'},
-  {action:'Close / reopen official incident', medic:'limited', pc:'yes', log_o:'no', cc:'yes', chamal:'yes', rpc:'yes', rcc:'yes', admin:'yes'},
-  {action:'Register new patient', medic:'yes', pc:'yes', log_o:'no', cc:'no', chamal:'no', rpc:'limited', rcc:'limited', admin:'yes'},
-  {action:'Record vitals and interventions', medic:'yes', pc:'yes', log_o:'no', cc:'no', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
-  {action:'Override MSTART / JumpSTART triage', medic:'yes', pc:'yes', log_o:'no', cc:'no', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
-  {action:'Mark patient handed over', medic:'yes', pc:'yes', log_o:'no', cc:'no', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
-  {action:'View tactical patient panel (color / zone / evac / trapped, no vitals, no identity)', medic:'yes', pc:'yes', log_o:'no', cc:'yes', chamal:'yes', rpc:'limited', rcc:'limited', admin:'yes'},
-  {action:'Request medical reinforcement', medic:'limited', pc:'yes', log_o:'no', cc:'yes', chamal:'yes', rpc:'no', rcc:'no', admin:'yes'},
-  {action:'Request resupply', medic:'yes', pc:'no', log_o:'no', cc:'no', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
-  {action:'View resupply / reinforcement requests (read-only)', medic:'yes', pc:'yes', log_o:'yes', cc:'yes', chamal:'yes', rpc:'no', rcc:'limited', admin:'yes'},
-  {action:'Dispatch supply to Log-O', medic:'no', pc:'yes', log_o:'no', cc:'no', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
-  {action:'Manage kit templates', medic:'no', pc:'yes', log_o:'yes', cc:'yes', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
-  {action:'Dispatch resupply runner', medic:'no', pc:'no', log_o:'yes', cc:'no', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
-  {action:'Update building status', medic:'yes', pc:'yes', log_o:'no', cc:'yes', chamal:'yes', rpc:'yes', rcc:'yes', admin:'yes'},
-  {action:'Confirm Site Clear', medic:'no', pc:'yes', log_o:'no', cc:'yes', chamal:'yes', rpc:'yes', rcc:'yes', admin:'yes'},
-  {action:'View full command dashboard', medic:'no', pc:'yes', log_o:'yes', cc:'yes', chamal:'yes', rpc:'no', rcc:'no', admin:'yes'},
-  {action:'View conflict log', medic:'no', pc:'yes', log_o:'no', cc:'yes', chamal:'yes', rpc:'no', rcc:'no', admin:'yes'},
-  {action:'Unlock and export live incident summary', medic:'no', pc:'yes', log_o:'no', cc:'yes', chamal:'yes', rpc:'no', rcc:'no', admin:'yes'},
-  {action:'View raw data / source code / run demo controls', medic:'no', pc:'no', log_o:'no', cc:'no', chamal:'no', rpc:'no', rcc:'no', admin:'yes'}
+  {action:'Create local draft incident', medic:'yes', pc:'yes', log_o:'no', cc:'yes', physician:'yes', paramedic:'yes', chamal:'yes', rpc:'no', rcc:'no', admin:'yes'},
+  {action:'Open official incident and set T0', medic:'no', pc:'yes', log_o:'no', cc:'yes', physician:'yes', paramedic:'no', chamal:'yes', rpc:'yes', rcc:'yes', admin:'yes'},
+  {action:'Confirm draft incident', medic:'no', pc:'yes', log_o:'no', cc:'yes', physician:'yes', paramedic:'no', chamal:'yes', rpc:'yes', rcc:'yes', admin:'yes'},
+  {action:'Close / reopen official incident', medic:'limited', pc:'yes', log_o:'no', cc:'yes', physician:'yes', paramedic:'limited', chamal:'yes', rpc:'yes', rcc:'yes', admin:'yes'},
+  {action:'Register new patient', medic:'yes', pc:'yes', log_o:'no', cc:'no', physician:'no', paramedic:'yes', chamal:'no', rpc:'limited', rcc:'limited', admin:'yes'},
+  {action:'Record vitals and interventions', medic:'yes', pc:'yes', log_o:'no', cc:'no', physician:'yes', paramedic:'yes', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
+  {action:'Override MSTART / JumpSTART triage', medic:'yes', pc:'yes', log_o:'no', cc:'no', physician:'yes', paramedic:'yes', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
+  {action:'Mark patient handed over', medic:'yes', pc:'yes', log_o:'no', cc:'no', physician:'yes', paramedic:'yes', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
+  {action:'View tactical patient panel (color / zone / evac / trapped, no vitals, no identity)', medic:'yes', pc:'yes', log_o:'no', cc:'yes', physician:'yes', paramedic:'yes', chamal:'yes', rpc:'limited', rcc:'limited', admin:'yes'},
+  {action:'Request medical reinforcement', medic:'limited', pc:'yes', log_o:'no', cc:'yes', physician:'yes', paramedic:'limited', chamal:'yes', rpc:'no', rcc:'no', admin:'yes'},
+  {action:'Request resupply', medic:'yes', pc:'no', log_o:'no', cc:'no', physician:'no', paramedic:'yes', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
+  {action:'View resupply / reinforcement requests (read-only)', medic:'yes', pc:'yes', log_o:'yes', cc:'yes', physician:'yes', paramedic:'yes', chamal:'yes', rpc:'no', rcc:'limited', admin:'yes'},
+  {action:'Dispatch supply to Log-O', medic:'no', pc:'yes', log_o:'no', cc:'no', physician:'no', paramedic:'no', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
+  {action:'Manage kit templates', medic:'no', pc:'yes', log_o:'yes', cc:'yes', physician:'yes', paramedic:'no', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
+  {action:'Dispatch resupply runner', medic:'no', pc:'no', log_o:'yes', cc:'no', physician:'no', paramedic:'no', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
+  {action:'Update building status', medic:'yes', pc:'yes', log_o:'no', cc:'yes', physician:'yes', paramedic:'yes', chamal:'yes', rpc:'yes', rcc:'yes', admin:'yes'},
+  {action:'Confirm Site Clear', medic:'no', pc:'yes', log_o:'no', cc:'yes', physician:'yes', paramedic:'no', chamal:'yes', rpc:'yes', rcc:'yes', admin:'yes'},
+  {action:'View full command dashboard', medic:'no', pc:'yes', log_o:'yes', cc:'yes', physician:'yes', paramedic:'no', chamal:'yes', rpc:'no', rcc:'no', admin:'yes'},
+  {action:'View conflict log', medic:'no', pc:'yes', log_o:'no', cc:'yes', physician:'yes', paramedic:'no', chamal:'yes', rpc:'no', rcc:'no', admin:'yes'},
+  {action:'Unlock and export live incident summary', medic:'no', pc:'yes', log_o:'no', cc:'yes', physician:'yes', paramedic:'no', chamal:'yes', rpc:'no', rcc:'no', admin:'yes'},
+  {action:'View raw data / source code / run demo controls', medic:'no', pc:'no', log_o:'no', cc:'no', physician:'no', paramedic:'no', chamal:'no', rpc:'no', rcc:'no', admin:'yes'}
 ];
 const BODY_ZONE_LABELS = {
   head:'ראש',
@@ -3148,7 +3150,7 @@ async function loadProfileAndEnter(client, userId){
 }
 function enterAuthenticatedRole(serverRole){
   const clientRole=mapServerRole(serverRole);
-  if(['medic','pc','cc','chamal','rpc','rcc','logistics','doctor','paramedic'].includes(clientRole)){
+  if(['medic','pc','cc','chamal','rpc','rcc','logistics','physician','paramedic'].includes(clientRole)){
     startRoleDashboard(clientRole);
   }else{
     goTo('demo');
@@ -4186,7 +4188,7 @@ function roleConfig(role){
     medic:{title:'חובש — מפעיל פצועים', actor:'חובש — משתמש מחובר', audience:'medic', legacy:'dashboard', responsibilities:['פתיחת פצועים ועדכון מדדים','תיעוד טיפול ומיון','סימון לכוד / לא לכוד / לא ידוע','טיוטת מוקד ראשונית','סימון חשד לנפטר / לא בר הצלה ופתיחת בקשת רופא אוטומטית']},
     pc:{title:'חוג"ד / חפ״ק רפואי', actor:'חוג"ד — משתמש מחובר', audience:'pc', legacy:'commander', responsibilities:['ניהול כל החובשים במחלקה','אישור טיוטות מוקד','הקצאה מחדש בתוך המחלקה','בקשת חובשים / פראמדיק / רופא','ניהול פינוי ותעדוף מקומי','יכול לפתוח ולטפל בפצוע ישירות כמו חובש, כולל סריקת MSTART, כשנדרש']},
     cc:{title:'מ״פ רפואה', actor:'מ״פ רפואה — משתמש מחובר', audience:'cc', legacy:'commander', responsibilities:['פיקוד ישיר על משאבים רפואיים','הקצאה בין מחלקות','אישור / דחייה / ניתוב בקשות תגבור','ניהול תורי רופא / פראמדיק / קביעת מוות','הסרת צווארי בקבוק ברמת פלוגה']},
-    doctor:{title:'רופא / פראמדיק — תור סקירה רפואית', actor:'רופא / פראמדיק — משתמש מחובר', audience:'doctor', legacy:'commander', responsibilities:['סקירת פצועים קשים','מענה לבקשות חוג"ד / מ״פ רפואה','החלטה רפואית בכירה','קביעת מוות / אישור מוות','סגירת בקשת סקירה רפואית']},
+    physician:{title:'רופא / פראמדיק — תור סקירה רפואית', actor:'רופא / פראמדיק — משתמש מחובר', audience:'physician', legacy:'commander', responsibilities:['סקירת פצועים קשים','מענה לבקשות חוג"ד / מ״פ רפואה','החלטה רפואית בכירה','קביעת מוות / אישור מוות','סגירת בקשת סקירה רפואית']},
     logistics:{title:'קצין לוגיסטיקה / Log-O', actor:'רס״ם אמיר דגן — Log-O', audience:'logistics', legacy:'logistics', responsibilities:['מלאי ציוד רפואי לפי מחלקה / מוקד','מענה לבקשות ציוד','הקצאת אספקה מחדש','מעקב burn rate','הצפת חוסר המשפיע על טיפול']},
     chamal:{title:'חמ״ל / מפעיל', actor:'חמ״ל — משתמש מחובר', audience:'chamal', legacy:'commander', responsibilities:['תמונת מצב כללית','אמינות נתונים ו-Sync','כפילויות ודיווחים חיצוניים','תמיכה בחוג"ד / מ״פ רפואה','ייצוא סיכום אירוע חי']},
     admin:{title:'מנהל דמו', actor:'מנהל דמו', audience:'chamal', legacy:'roles', responsibilities:['הפעלת תרחיש חתום','ניקוי דמו','ייצוא ניסוי','בדיקת הרשאות','הפרדת דמו מנתוני אמת']},
@@ -4212,11 +4214,11 @@ function roleScopedPatients(role){
     const myPlatoonIds=DEMO_PLATOONS.filter(pl=>pl.companyId==='COMP-1').map(pl=>pl.platoonId);
     return sortedPatients(patients.filter(p=>myPlatoonIds.includes(p.assignedPlatoonId||'PLT-A')));
   }
-  if(role==='doctor') return sortedPatients(patients.filter(p=>['red','black'].includes(p.triage)));
+  if(role==='physician') return sortedPatients(patients.filter(p=>['red','black'].includes(p.triage)));
   return sortedPatients(patients);
 }
 function roleScopedRequests(role){
-  if(role==='doctor') return reinforcementRequests.filter(r=>['doctor_treatment','doctor_death_cert','paramedic'].includes(r.resourceType));
+  if(role==='physician') return reinforcementRequests.filter(r=>['doctor_treatment','doctor_death_cert','paramedic'].includes(r.resourceType));
   if(role==='logistics') return reinforcementRequests.filter(r=>r.type==='resupply' || ['cat_tourniquets','hemostatic_gauze','airway_equipment','iv_fluids','hypothermia_blankets','medical_equipment'].includes(r.resourceType));
   if(role==='medic') return reinforcementRequests.filter(r=>(r.linkedPatientIds||[]).some(pid=>roleScopedPatients('medic').some(p=>p.id===pid)));
   if(role==='cc') return reinforcementRequests;
@@ -4226,7 +4228,7 @@ function roleScopedRequests(role){
 }
 function roleAlertRows(role){
   const audience=roleConfig(role).audience;
-  return buildAlertObjects(roleScopedPatients(role)).filter(a=>a.audience.includes(audience) || (role==='doctor' && a.type==='MEDICAL_REINFORCEMENT_REQUEST'));
+  return buildAlertObjects(roleScopedPatients(role)).filter(a=>a.audience.includes(audience) || (role==='physician' && a.type==='MEDICAL_REINFORCEMENT_REQUEST'));
 }
 function medicOperationalTopLine(){
   ensureSiteReadiness();
@@ -5145,7 +5147,7 @@ function renderDeathCertificationChain(){
 }
 function renderCompanyResourceCenter(openReqs, doctorReqs, deathReqs, blockedEvac, overloaded){
   const activeMedics=DEMO_USERS.filter(u=>u.role==='medic' && u.active).length;
-  const seniorResources=DEMO_USERS.filter(u=>['doctor','paramedic'].includes(u.role) && u.active)
+  const seniorResources=DEMO_USERS.filter(u=>['physician','paramedic'].includes(u.role) && u.active)
     .map(u=>roleRow(`${u.fullName} — ${u.callsign}`, doctorReqs.length ? `${doctorReqs.length} בקשות בכירות פתוחות · דרוש שיוך` : 'זמין לשיוך / סקירה')).join('');
   const resourceRows=[
     roleRow('חובשים זמינים', `${activeMedics} פעילים · ${overloaded} מחלקות עמוסות`),
@@ -5441,10 +5443,27 @@ function renderRoleDashboard(role=activeRoleDashboard){
       roleRow('תמונת מצב מוקד',`${siteData.name||'אין מוקד'} · צפי לכודים ${siteData.expectedCasualties?.trapped||0} · נעדרים ${siteData.expectedCasualties?.missing||0}`),
       ...sitesSummaryRows()
     ].join('');
-  }else if(role==='medic'||role==='doctor'){
+  }else if(role==='medic'){
     objects=[
       roleRow('סוג אירוע', incidentTypeLabel(currentSiteId())),
       ...pts.slice(0,8).map(p=>roleRow(displayPatientIdentity(p),`${TRIAGE_LABELS[p.triage]||p.triage} · ${p.location} · אחראי: ${displayUser(p.assignedMedicId)}`,`<span class="identity-chip">${p.temporaryDescription||'אין תיאור זמני'}</span>`))
+    ].join('');
+  }else if(role==='physician'){
+    // Real physician-only clinical death confirmation (distinct from any legal
+    // certification, which stays out of scope - docs/CONFLICT_RESOLUTION_DECISION.md).
+    // Only offered on already field-tagged-deceased patients; already-confirmed
+    // patients show a badge instead of the button (physicianDeathConfirmedAt is
+    // populated client-side immediately on save and again via pull once another
+    // device's confirmation projects through - see PROJECTED_PATIENT_COLUMNS).
+    objects=[
+      roleRow('סוג אירוע', incidentTypeLabel(currentSiteId())),
+      ...pts.slice(0,8).map(p=>roleRow(displayPatientIdentity(p),`${TRIAGE_LABELS[p.triage]||p.triage} · ${p.location} · אחראי: ${displayUser(p.assignedMedicId)}`,
+        p.patientStatus==='deceased'
+          ? (p.physicianDeathConfirmedAt
+              ? `<span class="identity-chip">אושר קלינית ✓ ${timeAgoLabel(p.physicianDeathConfirmedAt)}</span>`
+              : `<button class="demo-mini-btn" onclick="event.stopPropagation();confirmDeathByPhysician('${p.id}')">אשר מוות (קליני, לא רשמי)</button>`)
+          : `<span class="identity-chip">${p.temporaryDescription||'אין תיאור זמני'}</span>`
+      ))
     ].join('');
   }else if(role==='cc'){
     objects=[
@@ -5510,14 +5529,14 @@ function renderRoleDashboard(role=activeRoleDashboard){
     ['pc','cc'].includes(role)?`<button class="demo-mini-btn" onclick="openReinforcementRequest()">בקשת תגבור רפואי</button><button class="demo-mini-btn" onclick="generateSitrep()">צור דיווח רדיו</button>`:'',
     role==='pc'?`<button class="demo-mini-btn" onclick="demoReassignWithinPlatoon()">הדגם הקצאה בתוך מחלקה</button>`:'',
     role==='cc'?`<button class="demo-mini-btn" onclick="demoReassignBetweenPlatoons()">הדגם הקצאה בין מחלקות</button>`:'',
-    role==='doctor'?`<button class="demo-mini-btn" onclick="exitEventView()">יציאה מהאירוע</button>`:'',
+    role==='physician'?`<button class="demo-mini-btn" onclick="exitEventView()">יציאה מהאירוע</button>`:'',
     role==='admin'?`<button class="demo-mini-btn" onclick="activateSignedDemoScenario();renderRoleDashboard('admin')">טען Omni-Role</button><button class="demo-mini-btn" onclick="if(clearDemoScenario())renderRoleDashboard('admin')">נקה דמו</button><button class="demo-mini-btn" onclick="exportExperimentLog()">ייצוא ניסוי</button>`:''
   ].filter(Boolean).join('');
   const genericSections=`
     ${roleSection('האחריות שלי', responsibilities)}
     ${rescueAuthorityPanel}
     ${roleSection('התראות שדורשות פעולה ממני', alertHtml)}
-    ${roleSection(role==='pc'?'האובייקטים שלי: חובשים / פצועים / מוקדים':role==='cc'?'האובייקטים שלי: מחלקות / מוקדים / משאבים':role==='doctor'?'תור סקירה רפואית':role==='logistics'?'מלאי ובקשות ציוד':role==='rpc'?'תמונה טקטית — מחלקה שלי (ללא מדדים / זהות)':role==='rcc'?'תמונה טקטית מרוכזת — פלוגה שלי (ללא מדדים / זהות)':'האובייקטים שלי', objects)}
+    ${roleSection(role==='pc'?'האובייקטים שלי: חובשים / פצועים / מוקדים':role==='cc'?'האובייקטים שלי: מחלקות / מוקדים / משאבים':role==='physician'?'תור סקירה רפואית':role==='logistics'?'מלאי ובקשות ציוד':role==='rpc'?'תמונה טקטית — מחלקה שלי (ללא מדדים / זהות)':role==='rcc'?'תמונה טקטית מרוכזת — פלוגה שלי (ללא מדדים / זהות)':'האובייקטים שלי', objects)}
     ${roleSection('בקשות / הקצאות פתוחות', reqHtml)}
     <div class="demo-actions" style="margin:0;grid-template-columns:1fr 1fr">${actions}</div>`;
   document.getElementById('role-dashboard-body').innerHTML=`
@@ -5525,7 +5544,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
     ${role==='cc'?renderCcCommandBoard():`<div class="role-top-grid">${metrics}</div>`}
     ${role==='medic'?renderMedicActionPanel():''}
     ${role==='pc'?renderPcResponsibilityBoard():''}
-    ${role==='doctor'?renderDoctorLegacyNote():''}
+    ${role==='physician'?renderDoctorLegacyNote():''}
     ${role==='medic'||role==='pc'?'':role==='cc'
       ? `<details style="margin:12px 0 0"><summary style="cursor:pointer;font-weight:900;color:var(--muted);padding:10px 0">פירוט נוסף / אחריות ותורים</summary>${genericSections}</details>`
       : genericSections}
@@ -6275,6 +6294,24 @@ function confirmSuspectedNotSalvageable(){
   saveDemoState();
   renderMstartSweep();
 }
+// Real physician-only clinical death confirmation - a physician's own authenticated
+// clinical fact ("I reviewed this patient and confirm death"), distinct from any legal
+// official death certification, which stays explicitly out of scope
+// (docs/CONFLICT_RESOLUTION_DECISION.md). Server-side: database/024-026 (event type,
+// death_confirmations table with physician-only RLS on both that table and the
+// PATIENT_DEATH_CONFIRMED event type itself, project_patient_state() branch).
+function confirmDeathByPhysician(patientId){
+  const p=patients.find(x=>x.id===patientId); if(!p) return;
+  if(p.patientStatus!=='deceased' || p.physicianDeathConfirmedAt) return;
+  p.physicianDeathConfirmedAt=Date.now();
+  p.physicianDeathConfirmedBy=currentUser?.id||null;
+  p.events=p.events||[];
+  p.events.unshift({type:'PATIENT_DEATH_CONFIRMED',time:nowT(),detail:'רופא אישר מוות קלינית (זה אינו אישור מוות רשמי)',warn:false});
+  saveLocalEvent({type:'PATIENT_DEATH_CONFIRMED',detail:`${p.id} · אישור מוות קליני ע"י רופא`,warn:false,payload_json:{patient_id:p.id}});
+  toast('אושר מוות קלינית — זהו אישור קליני, לא קביעת מוות רשמית');
+  saveDemoState();
+  renderRoleDashboard('physician');
+}
 function continueSweepAfterBlack(action){
   const p=activeSweepPatient(); if(!p) return;
   p.mstart.blackContinuationOpen=false;
@@ -6865,7 +6902,7 @@ function buildAlertObjects(pts=patients){
     }
     const isDeathCert=r.resourceType==='doctor_death_cert';
     const isDoctorTx=['doctor_treatment','paramedic'].includes(r.resourceType);
-    pushAlert(alerts,{id:`reinforcement-${r.id}`,type:isDeathCert?'DOCTOR_DEATH_CERTIFICATION_REQUEST':'MEDICAL_REINFORCEMENT_REQUEST',severity:r.urgency==='immediate'?'high':'medium',owner:isDeathCert||isDoctorTx?'doctor':'cc',audience:isDeathCert?['pc','cc','doctor','chamal']:isDoctorTx?['pc','cc','doctor','chamal']:['pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:r.urgency==='immediate'?3:10,actionRequired:isDeathCert?'certify_death':'request_reinforcement',scope:isDeathCert?'patient':'company',category:isDeathCert?'forces':'forces',siteId:r.siteId,patientId:(r.linkedPatientIds||[])[0],title:`בקשת תגבור — ${REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType}`,detail:`${r.targetLocation} · ${REINFORCEMENT_STATUS_LABELS[r.status]||r.status} · ${(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')}`});
+    pushAlert(alerts,{id:`reinforcement-${r.id}`,type:isDeathCert?'DOCTOR_DEATH_CERTIFICATION_REQUEST':'MEDICAL_REINFORCEMENT_REQUEST',severity:r.urgency==='immediate'?'high':'medium',owner:isDeathCert||isDoctorTx?'physician':'cc',audience:isDeathCert?['pc','cc','physician','chamal']:isDoctorTx?['pc','cc','physician','chamal']:['pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:r.urgency==='immediate'?3:10,actionRequired:isDeathCert?'certify_death':'request_reinforcement',scope:isDeathCert?'patient':'company',category:isDeathCert?'forces':'forces',siteId:r.siteId,patientId:(r.linkedPatientIds||[])[0],title:`בקשת תגבור — ${REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType}`,detail:`${r.targetLocation} · ${REINFORCEMENT_STATUS_LABELS[r.status]||r.status} · ${(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')}`});
   });
   return alerts;
 }
@@ -9092,7 +9129,7 @@ function authCell(value){
 function renderRolesAuthorization(){
   updateClock();
   const cards=document.getElementById('role-cards');
-  if(cards) cards.innerHTML=ROLE_DEFS.map(r=>`<div class="role-card ${['pc','cc','chamal','rpc','rcc'].includes(r.key)?'command':''}">
+  if(cards) cards.innerHTML=ROLE_DEFS.map(r=>`<div class="role-card ${['pc','cc','physician','chamal','rpc','rcc'].includes(r.key)?'command':''}">
     <div class="role-code">${r.label}</div>
     <div class="role-title">${r.he}</div>
     <div class="role-desc">${r.desc}</div>
@@ -10285,7 +10322,7 @@ setInterval(()=>{ if(currentUser) syncPullAll(); }, 45000);
 // so this stays a thin read + merge, not a second projector.
 // A patient with any unsynced local outbox entry is left untouched this round: the medic's own
 // in-flight edit wins locally until it's actually pushed, rather than being clobbered mid-edit.
-const PROJECTED_PATIENT_COLUMNS = 'id,incident_id,visual_id,current_triage,current_status,access_status,needs_full_assessment,is_pediatric,pediatric_age_years,last_vitals_at,version,optional_name,identifying_description';
+const PROJECTED_PATIENT_COLUMNS = 'id,incident_id,visual_id,current_triage,current_status,access_status,needs_full_assessment,is_pediatric,pediatric_age_years,last_vitals_at,version,optional_name,identifying_description,physician_death_confirmed_at,physician_death_confirmed_by';
 const VALID_LOCAL_TRIAGE = new Set(['red','yellow','green','black','pending']);
 const VALID_LOCAL_STATUS = new Set(['identified','stabilizing','observing','evacuating','handed_over','closed','self_evacuated','deceased']);
 
@@ -10310,7 +10347,7 @@ function applyProjectedPatientState(rows){
     const existing=patients.find(x=>x.id===row.id);
     if(existing){
       if(existing._serverVersion!=null && row.version!=null && row.version<=existing._serverVersion) continue;
-      const before=JSON.stringify([existing.triage,existing.patientStatus,existing.accessibility,existing.trapStatus,existing.needsFullAssessment,existing.fullName,existing.temporaryDescription]);
+      const before=JSON.stringify([existing.triage,existing.patientStatus,existing.accessibility,existing.trapStatus,existing.needsFullAssessment,existing.fullName,existing.temporaryDescription,existing.physicianDeathConfirmedAt]);
       existing.triage=triage;
       if(status) existing.patientStatus=status;
       existing.accessibility=access.accessibility;
@@ -10323,8 +10360,12 @@ function applyProjectedPatientState(rows){
       existing.fullName=row.optional_name||'לא מזוהה';
       existing.identityStatus=row.optional_name?'reported':'unknown';
       existing.temporaryDescription=row.identifying_description||'';
+      if(row.physician_death_confirmed_at){
+        existing.physicianDeathConfirmedAt=Date.parse(row.physician_death_confirmed_at)||existing.physicianDeathConfirmedAt;
+        existing.physicianDeathConfirmedBy=row.physician_death_confirmed_by||existing.physicianDeathConfirmedBy;
+      }
       existing._serverVersion=row.version;
-      if(before!==JSON.stringify([existing.triage,existing.patientStatus,existing.accessibility,existing.trapStatus,existing.needsFullAssessment,existing.fullName,existing.temporaryDescription])){
+      if(before!==JSON.stringify([existing.triage,existing.patientStatus,existing.accessibility,existing.trapStatus,existing.needsFullAssessment,existing.fullName,existing.temporaryDescription,existing.physicianDeathConfirmedAt])){
         changed=true;
         existing.lastModifiedAt=new Date().toISOString();
         (existing.events||(existing.events=[])).push({type:'REMOTE_STATE_APPLIED',time:nowT(),detail:'עודכן מסנכרון (מכשיר אחר)'});
@@ -10347,6 +10388,8 @@ function applyProjectedPatientState(rows){
         alert:false, deterioration:[], lastVitalsAt:row.last_vitals_at?Date.parse(row.last_vitals_at):null,
         vitalsHistory:[], tourniquet:null, medic:'(remote)', siteId:INCIDENT_ID_TO_SITE[row.incident_id]||'SITE_A',
         _serverVersion:row.version, sourcedFromRemote:true,
+        physicianDeathConfirmedAt:row.physician_death_confirmed_at?Date.parse(row.physician_death_confirmed_at):null,
+        physicianDeathConfirmedBy:row.physician_death_confirmed_by||null,
         events:[{type:'REMOTE_PATIENT_DISCOVERED',time:nowT(),detail:`${row.visual_id} התקבל ממכשיר אחר (סנכרון)`}]
       });
     }
