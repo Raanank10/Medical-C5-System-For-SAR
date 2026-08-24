@@ -3574,11 +3574,15 @@ function rescueConfirmSiteClear(role){
   renderRoleDashboard(role);
   toast('האתר הוכרז נקי · חוג"ד ומ״פ רפואה יראו עדכון');
 }
+function incidentTypeLabel(){
+  ensureSiteStatusFields();
+  return siteData.incidentType?(INCIDENT_TYPE_LABELS[siteData.incidentType]||siteData.incidentType):'לא נבחר';
+}
 function siteStatusSummaryLine(){
   ensureSiteStatusFields();
   const t0Label=siteData.t0?new Date(siteData.t0).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):'טרם נקבע';
   const changedBy=siteData.lastRescueStatusChange?` · עודכן לאחרונה ע"י ${siteData.lastRescueStatusChange.byLabel}: ${siteData.lastRescueStatusChange.detail}`:'';
-  return `סטטוס אירוע: ${INCIDENT_STATUS_LABELS[siteData.incidentStatus]||siteData.incidentStatus} · T0 ${t0Label} · מבנה: ${siteData.buildingStatus?BUILDING_STATUS_LABELS[siteData.buildingStatus]:'לא דווח'} · אתר: ${siteData.siteClear?.cleared?'נקי':'פעיל'}${changedBy}`;
+  return `סטטוס אירוע: ${INCIDENT_STATUS_LABELS[siteData.incidentStatus]||siteData.incidentStatus} · T0 ${t0Label} · סוג אירוע: ${incidentTypeLabel()} · מבנה: ${siteData.buildingStatus?BUILDING_STATUS_LABELS[siteData.buildingStatus]:'לא דווח'} · אתר: ${siteData.siteClear?.cleared?'נקי':'פעיל'}${changedBy}`;
 }
 function displayUser(idOrName){
   const user=userById(idOrName);
@@ -5398,7 +5402,10 @@ function renderRoleDashboard(role=activeRoleDashboard){
       roleRow('סטטוס אתר (מפ"ק חילוץ)', siteStatusSummaryLine())
     ].join('');
   }else if(role==='medic'||role==='doctor'){
-    objects=pts.slice(0,8).map(p=>roleRow(displayPatientIdentity(p),`${TRIAGE_LABELS[p.triage]||p.triage} · ${p.location} · אחראי: ${displayUser(p.assignedMedicId)}`,`<span class="identity-chip">${p.temporaryDescription||'אין תיאור זמני'}</span>`)).join('');
+    objects=[
+      roleRow('סוג אירוע', incidentTypeLabel()),
+      ...pts.slice(0,8).map(p=>roleRow(displayPatientIdentity(p),`${TRIAGE_LABELS[p.triage]||p.triage} · ${p.location} · אחראי: ${displayUser(p.assignedMedicId)}`,`<span class="identity-chip">${p.temporaryDescription||'אין תיאור זמני'}</span>`))
+    ].join('');
   }else if(role==='cc'){
     objects=[
       roleRow('סטטוס אתר (מפ"ק חילוץ)', siteStatusSummaryLine()),
@@ -5408,7 +5415,10 @@ function renderRoleDashboard(role=activeRoleDashboard){
       })
     ].join('');
   }else if(role==='logistics'){
-    objects=logisticsCompanies().map(c=>roleRow(c.name,`${c.lowItems.length} פריטים מתחת לסף · ${c.patients} פצועים מקושרים`)).join('');
+    objects=[
+      roleRow('סוג אירוע', incidentTypeLabel()),
+      ...logisticsCompanies().map(c=>roleRow(c.name,`${c.lowItems.length} פריטים מתחת לסף · ${c.patients} פצועים מקושרים`))
+    ].join('');
   }else if(role==='rpc'){
     const c={red:0,yellow:0,green:0,black:0,trapped:0};
     pts.forEach(p=>{ if(c[p.triage]!==undefined) c[p.triage]++; if(p.trapStatus==='trapped') c.trapped++; });
@@ -5429,7 +5439,6 @@ function renderRoleDashboard(role=activeRoleDashboard){
     <div class="role-section">
       <div class="role-section-title">סמכות אתר — ראשונים בזירה</div>
       <div class="role-row"><div class="role-row-title">${siteStatusSummaryLine()}</div></div>
-      <div class="role-row"><div class="role-row-title">סוג אירוע: ${siteData.incidentType?(INCIDENT_TYPE_LABELS[siteData.incidentType]||siteData.incidentType):'לא נבחר'}</div></div>
       <div class="demo-actions" style="margin:8px 0 0;grid-template-columns:1fr 1fr">
         <button class="demo-mini-btn" onclick="rescueSetIncidentType('${role}','missile_strike_structural_collapse')">סוג: קריסת מבנה / טיל</button>
         <button class="demo-mini-btn" onclick="rescueSetIncidentType('${role}','mass_shooting')">סוג: ירי המוני</button>
