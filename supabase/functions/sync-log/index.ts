@@ -86,6 +86,13 @@ const SUPPLY_LOGISTICS_EVENTS = [
   "PLATOON_STOCK_REFILLED", "DIRECT_LOGO_TO_MEDIC_REFILL",
 ];
 const EXTERNAL_REPORT_EVENTS = ["EXTERNAL_REPORT_CREATED", "EXTERNAL_REPORT_LINKED"];
+// Real physician-only clinical death confirmation (docs/CONFLICT_RESOLUTION_DECISION.md's
+// "Official death certification" section) - deliberately its own array, not folded into
+// CLINICAL_EVENTS, since CLINICAL_EVENTS is shared by medic/pc/paramedic/physician and
+// including it there would defeat the physician-only intent at this layer. The real
+// database-level enforcement is death_confirmations' own physician-only RLS INSERT policy
+// (database/025) - this array is defense in depth, not the sole gate.
+const PHYSICIAN_ONLY_EVENTS = ["PATIENT_DEATH_CONFIRMED"];
 // System/audit-adjacent - acknowledgment and note events are intentionally
 // not tightly gated; over-restricting these blocks legitimate cross-role
 // coordination for little safety benefit.
@@ -109,7 +116,7 @@ const ROLE_ALLOWED_EVENT_TYPES: Record<string, string[]> = {
   // PATIENT_STATUS_UPDATED and defeat the point of the F3 role-authority
   // tie-break (docs/CONFLICT_RESOLUTION_DECISION.md). physician = cc's full
   // command-adjacent scope plus medic/pc-level clinical write access.
-  physician: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, ...INCIDENT_COMMAND_EVENTS, ...SITE_AUTHORITY_EVENTS, ...SUPPLY_LOGISTICS_EVENTS, ...EXTERNAL_REPORT_EVENTS, ...SYSTEM_EVENTS],
+  physician: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, ...INCIDENT_COMMAND_EVENTS, ...SITE_AUTHORITY_EVENTS, ...SUPPLY_LOGISTICS_EVENTS, ...EXTERNAL_REPORT_EVENTS, ...SYSTEM_EVENTS, ...PHYSICIAN_ONLY_EVENTS],
   // Exact mirror of medic's scope - paramedic is a clinical-seniority tier
   // for the F3 tie-break, not a different set of app capabilities.
   paramedic: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, "INCIDENT_DRAFT_CREATED", "MEDIC_SITE_CLOSE_REQUESTED", "SUPPLY_REQUEST_CREATED", ...SYSTEM_EVENTS],

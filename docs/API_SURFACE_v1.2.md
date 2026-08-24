@@ -195,6 +195,21 @@ Only malformed/unparseable envelopes are rejected and quarantined.
 
 `field_conflicts` (F3, `docs/CONFLICT_RESOLUTION_DECISION.md`) reports whenever an event in this push batch was involved in a role-authority conflict resolution on `PATIENT_TRIAGE_UPDATED`/`PATIENT_STATUS_UPDATED` — read back from `conflict_log` by `sync-log` itself, not computed client-side. `won:false` means this device's own edit lost the tie-break; the field's projected value in `patients` reflects the winning edit either way. A parallel command-tier read (`conflict_log` where `conflict_type='PATIENT_FIELD_CONFLICT_DETECTED'`, RLS-gated the same as `sync_ingestion_errors`) covers every conflict for the incident, not just ones this device happened to push.
 
+## Physician Clinical Death Confirmation Event
+
+`PATIENT_DEATH_CONFIRMED` (`database/024`-`026`) is a real, physician-only event type — deliberately distinct from any legal/official death certification, which stays out of this repo's scope. Only submittable by `physician`; enforced at two layers, not just the Edge Function's `ROLE_ALLOWED_EVENT_TYPES`: `events_insert_by_role` itself carries a type-specific carve-out (`type <> 'PATIENT_DEATH_CONFIRMED' or actor_role = 'physician'`), needed because `project_patient_state()` runs `SECURITY DEFINER` and would otherwise let its own insert into the `death_confirmations` audit table bypass that table's RLS.
+
+```json
+{
+  "type": "PATIENT_DEATH_CONFIRMED",
+  "patient_id": "<uuid>",
+  "local_timestamp": "2026-08-24T20:28:00.000Z",
+  "payload_json": { "notes": "visual exam, no pulse/breath" }
+}
+```
+
+Server-side, on acceptance: `patients.physician_death_confirmed_at`/`physician_death_confirmed_by` are set (idempotent via `coalesce()` — the first physician's confirmation wins if two somehow race), guarded to patients already field-tagged `current_status='deceased'` (a confirmation for any other patient is a silent no-op on `patients`, though the event itself is still logged); a row is written to `death_confirmations` (`incident_id`, `patient_id`, `event_id`, `actor_id`, `notes`, `confirmed_at`) unconditionally, as the durable audit record. Neither write touches `current_triage`/`current_status` — those are already `'black'`/`'deceased'` from the medic's earlier `PATIENT_TRIAGED_EXPECTANT` event; this is a second, later fact layered on top, not a replacement.
+
 ## Pediatric High-Risk Medication Event
 
 For patients under age 8, adult-range medication doses must not be blocked in the field UI. The client requires an explicit double confirmation and appends override metadata to the local outbox.
