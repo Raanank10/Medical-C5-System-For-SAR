@@ -4184,7 +4184,7 @@ function startRoleDashboard(role){
 function roleConfig(role){
   return {
     medic:{title:'חובש — מפעיל פצועים', actor:'חובש — משתמש מחובר', audience:'medic', legacy:'dashboard', responsibilities:['פתיחת פצועים ועדכון מדדים','תיעוד טיפול ומיון','סימון לכוד / לא לכוד / לא ידוע','טיוטת מוקד ראשונית','סימון חשד לנפטר / לא בר הצלה ופתיחת בקשת רופא אוטומטית']},
-    pc:{title:'חוג"ד / חפ״ק רפואי', actor:'חוג"ד — משתמש מחובר', audience:'pc', legacy:'commander', responsibilities:['ניהול כל החובשים במחלקה','אישור טיוטות מוקד','הקצאה מחדש בתוך המחלקה','בקשת חובשים / פראמדיק / רופא','ניהול פינוי ותעדוף מקומי']},
+    pc:{title:'חוג"ד / חפ״ק רפואי', actor:'חוג"ד — משתמש מחובר', audience:'pc', legacy:'commander', responsibilities:['ניהול כל החובשים במחלקה','אישור טיוטות מוקד','הקצאה מחדש בתוך המחלקה','בקשת חובשים / פראמדיק / רופא','ניהול פינוי ותעדוף מקומי','יכול לפתוח ולטפל בפצוע ישירות כמו חובש, כולל סריקת MSTART, כשנדרש']},
     cc:{title:'מ״פ רפואה', actor:'מ״פ רפואה — משתמש מחובר', audience:'cc', legacy:'commander', responsibilities:['פיקוד ישיר על משאבים רפואיים','הקצאה בין מחלקות','אישור / דחייה / ניתוב בקשות תגבור','ניהול תורי רופא / פראמדיק / קביעת מוות','הסרת צווארי בקבוק ברמת פלוגה']},
     doctor:{title:'רופא / פראמדיק — תור סקירה רפואית', actor:'רופא / פראמדיק — משתמש מחובר', audience:'doctor', legacy:'commander', responsibilities:['סקירת פצועים קשים','מענה לבקשות חוג"ד / מ״פ רפואה','החלטה רפואית בכירה','קביעת מוות / אישור מוות','סגירת בקשת סקירה רפואית']},
     logistics:{title:'קצין לוגיסטיקה / Log-O', actor:'רס״ם אמיר דגן — Log-O', audience:'logistics', legacy:'logistics', responsibilities:['מלאי ציוד רפואי לפי מחלקה / מוקד','מענה לבקשות ציוד','הקצאת אספקה מחדש','מעקב burn rate','הצפת חוסר המשפיע על טיפול']},
@@ -5017,6 +5017,14 @@ function renderDedicatedPcCommandBoard(myPts){
     ${renderCollapsibleSection('pc-active-alerts','התראות פעילות',alertStrip,activeAlerts.length,{criticalCount:activeAlerts.length,emptyMessage:'אין התראות פתוחות'})}
     ${renderCollapsibleSection('pc-tq-watch','⏱ חסמי עורקים פעילים',tqRows,tqPts.length,{criticalCount:tqPts.filter(isCriticalPatientForFocus).length,emptyMessage:'אין פצועים במיקוד הנוכחי'})}
     ${renderCollapsibleSection('pc-patient-board','לוח פצועים מחלקתי',cards,myPts.length,{criticalCount:myPts.filter(isCriticalPatientForFocus).length,emptyMessage:'אין פצועים במיקוד הנוכחי'})}
+    <div class="role-row" style="margin:0 16px 14px">
+      <div class="role-row-title">טיפול ישיר — go hands-on</div>
+      <div class="role-row-sub">חוג"ד יכול לפתוח ולטפל בפצוע בעצמו, בדיוק כמו חובש, כשצריך.</div>
+      <div class="demo-actions" style="margin-top:8px;grid-template-columns:1fr 1fr">
+        <button class="demo-mini-btn" onclick="startNewCasualtyInCurrentContext()" style="background:var(--red);border-color:var(--red);color:white">פצוע נוסף באזור הזה</button>
+        <button class="demo-mini-btn" onclick="goTo('enroute')">מסך שטח מלא / MSTART</button>
+      </div>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px 14px">
       <button class="btn-primary" onclick="openReinforcementRequest()" style="background:var(--accent)">בקשת תגבור</button>
       <button class="btn-primary" onclick="generateSitrep()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text)">דיווח רדיו</button>

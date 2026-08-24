@@ -35,6 +35,12 @@ This is the core authority decision in V2.8. As first responders, RPC/RCC can ta
 
 This currently exists only as a client-side capability check (the button set rendered per role). There is no server-side enforcement yet — see the "Known gap" note in [`CHANGELOG_v2.995.md`](CHANGELOG_v2.995.md). Before this ships anywhere beyond a demo, the RLS/auth work in Mission 2 of [`MULTI_AGENT_DEV_PLAN.md`](MULTI_AGENT_DEV_PLAN.md) must enforce this same restriction server-side, or a compromised/misconfigured client could call these actions as any role.
 
+## PC can go hands-on
+
+חוג״ד's server-side clinical write authority (`app.can_write_clinical_event()`, `ROLE_ALLOWED_EVENT_TYPES.pc`, `patients_insert`) has always matched medic's — the in-app read-only authorization matrix already documented this. What was missing was a client-side entry point: pc's dashboard had no button to create a new patient or reach the MSTART sweep/field workflow screen, so in practice pc could only treat patients already in its scope (via the shared `openPatient`/`openQuickVitals` path, which has never had a role check), not create new ones.
+
+Fixed: pc's dashboard now has an explicit "טיפול ישיר / go hands-on" action offering the same "פצוע נוסף" quick-patient path and full MSTART/field-workflow screen medic uses (`startNewCasualtyInCurrentContext()`, `goTo('enroute')` — no new server logic, both already worked for any role). This stays additive, not a default: unlike medic/paramedic, pc still lands on its command dashboard by default (`startRoleDashboard()`'s auto-routing to the field screen is medic/paramedic-only) — pc goes hands-on by choice, when the platoon needs it, not as its primary mode.
+
 ## Physician and Paramedic — real server roles, cross-device conflict authority
 
 V2.7's "Doctor / Paramedic" (senior clinical review: red/black patient review, death certification, response to חוג״ד/מ״פ רפואה requests) existed only as a client-side demo dashboard label, with no authenticated account backing it. V2.8 adds two real server roles, `physician` and `paramedic`, resolving that gap and giving F3 (cross-device concurrent-edit resolution, `docs/CONFLICT_RESOLUTION_DECISION.md`) the role-authority tie-break it needs.
