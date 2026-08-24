@@ -1585,6 +1585,15 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 
+<!-- ══════════════════════ INCIDENT TYPE INJURY BRIEF MODAL ══ -->
+<div class="modal-overlay panic-modal hidden" id="incident-type-brief-modal" onclick="closeIncidentTypeBriefModal(event)">
+  <div class="modal-sheet panic-sheet" style="border-color:var(--accent);box-shadow:0 22px 90px rgba(67,97,238,.22)">
+    <div class="panic-title" style="color:var(--accent)" id="incident-type-brief-title">סוג אירוע</div>
+    <div class="panic-message" id="incident-type-brief-message">—</div>
+    <button class="panic-confirm-btn" style="background:var(--accent)" onclick="hideIncidentTypeBriefModal()">הבנתי</button>
+  </div>
+</div>
+
 <!-- ══════════════════════ MEDIC RESUPPLY REQUEST MODAL ══ -->
 <div class="modal-overlay hidden" id="resupply-modal" onclick="closeResupplyModal(event)">
   <div class="modal-sheet">
@@ -3478,13 +3487,51 @@ function userIdFromMedic(label=''){
 }
 const BUILDING_STATUS_LABELS = {stable:'יציב', unstable:'לא יציב', progressive_collapse:'קריסה מתקדמת / מתמשכת', safe_to_enter:'בטוח לכניסה'};
 const INCIDENT_STATUS_LABELS = {draft:'טיוטה', official:'רשמי', closed:'סגור'};
+// Demo/UI-only classification of the MCI itself (not to be confused with per-patient triage) —
+// purely descriptive, feeds only the injury-pattern briefing popup below. Not part of any
+// triage/vitals/alert rule, so intentionally left out of SYNC_ELIGIBLE_EVENT_TYPES: it's a
+// local audit-trail note, never pushed to the live sync-log Edge Function.
+const INCIDENT_TYPE_LABELS = {
+  missile_strike_structural_collapse:'קריסת מבנה / פגיעת טיל',
+  mass_shooting:'ירי המוני',
+  vehicle_accident:'תאונת דרכים',
+  explosion:'פיצוץ'
+};
+const INCIDENT_TYPE_INJURY_BRIEFS = {
+  missile_strike_structural_collapse:'צפו לפציעות מעיכה, קטיעות טראומטיות וחבלות מפולת/הריסות. שכיחות גבוהה של חסימת דרכי אוויר, פנאומוטורקס ותסמונת מעיכה (Crush Syndrome) בנלכדים לאורך זמן. סבירות גבוהה ללכודים הדורשים חילוץ ממושך לפני שניתן לפנותם.',
+  mass_shooting:'צפו בעיקר לפציעות ירי חודרות בפלג גוף עליון, בטן וגפיים, עם דימום חיצוני קשה. שימוש נרחב וחוזר בחסמי עורקים ובתחבושות לחץ צפוי, וקצב גבוה של פצועים "אדום" בתחילת האירוע. יש להיערך לזיהוי מוקדם של פצועים מדממים-קריטית מול נפגעים ללא סיכוי הישרדות (שחור).',
+  vehicle_accident:'צפו לחבלות קהות: שברים בגפיים ובאגן, חבלת ראש/צוואר וחבלת בטן/חזה סגורה. סיכון גבוה לפציעות פנימיות שאינן גלויות לעין, לכן יש להקפיד על הערכת SABCDE מלאה גם ללא דימום חיצוני נראה. ייתכנו נלכדים בתוך כלי הרכב הדורשים חילוץ.',
+  explosion:'צפו לשילוב של כוויות, פציעות רסיסים חודרות וחבלת פיצוץ ראשונית (ריאות, אוזניים, מעיים). קיים סיכון לפציעות משניות ושלישוניות (הטלה/מפולת), ולכן יש להעריך גם חבלה קהה נלווית ולא רק כוויות ורסיסים.'
+};
 function ensureSiteStatusFields(){
   if(siteData.incidentStatus===undefined) siteData.incidentStatus='draft';
   if(siteData.t0===undefined) siteData.t0=null;
   if(siteData.buildingStatus===undefined) siteData.buildingStatus=null;
+  if(siteData.incidentType===undefined) siteData.incidentType=null;
   if(!siteData.siteClear) siteData.siteClear={cleared:false,clearedAt:null,clearedByRole:null};
   if(siteData.lastRescueStatusChange===undefined) siteData.lastRescueStatusChange=null;
 }
+function rescueSetIncidentType(role, type){
+  ensureSiteStatusFields();
+  siteData.incidentType=type;
+  siteData.lastRescueStatusChange={type:'incident_type',by:role,byLabel:rescueReporterLabel(role),detail:`סוג אירוע עודכן: ${INCIDENT_TYPE_LABELS[type]||type}`,at:Date.now()};
+  saveLocalEvent({type:'INCIDENT_TYPE_SET',detail:`${type} by ${role}`,payload_json:{role,incidentType:type,timestamp:new Date().toISOString()}});
+  saveDemoState();
+  renderRoleDashboard(role);
+  showIncidentTypeBriefModal(type);
+}
+function showIncidentTypeBriefModal(type){
+  const modal=document.getElementById('incident-type-brief-modal');
+  if(!modal) return;
+  document.getElementById('incident-type-brief-title').textContent=`סוג אירוע: ${INCIDENT_TYPE_LABELS[type]||type}`;
+  document.getElementById('incident-type-brief-message').textContent=INCIDENT_TYPE_INJURY_BRIEFS[type]||'אין מידע זמין על תבנית הפציעות הצפויה עבור סוג אירוע זה.';
+  modal.classList.remove('hidden');
+}
+function hideIncidentTypeBriefModal(){
+  const modal=document.getElementById('incident-type-brief-modal');
+  if(modal) modal.classList.add('hidden');
+}
+function closeIncidentTypeBriefModal(e){ if(e.target.id==='incident-type-brief-modal') hideIncidentTypeBriefModal(); }
 // Rescue-chain (rpc/rcc) site authority actions. Per design decision: final authority,
 // no medical (pc/cc) sign-off required — they only get notified via siteData.lastRescueStatusChange,
 // surfaced on their own dashboards next render.
@@ -5382,6 +5429,13 @@ function renderRoleDashboard(role=activeRoleDashboard){
     <div class="role-section">
       <div class="role-section-title">סמכות אתר — ראשונים בזירה</div>
       <div class="role-row"><div class="role-row-title">${siteStatusSummaryLine()}</div></div>
+      <div class="role-row"><div class="role-row-title">סוג אירוע: ${siteData.incidentType?(INCIDENT_TYPE_LABELS[siteData.incidentType]||siteData.incidentType):'לא נבחר'}</div></div>
+      <div class="demo-actions" style="margin:8px 0 0;grid-template-columns:1fr 1fr">
+        <button class="demo-mini-btn" onclick="rescueSetIncidentType('${role}','missile_strike_structural_collapse')">סוג: קריסת מבנה / טיל</button>
+        <button class="demo-mini-btn" onclick="rescueSetIncidentType('${role}','mass_shooting')">סוג: ירי המוני</button>
+        <button class="demo-mini-btn" onclick="rescueSetIncidentType('${role}','vehicle_accident')">סוג: תאונת דרכים</button>
+        <button class="demo-mini-btn" onclick="rescueSetIncidentType('${role}','explosion')">סוג: פיצוץ</button>
+      </div>
       <div class="demo-actions" style="margin:8px 0 0;grid-template-columns:1fr 1fr">
         <button class="demo-mini-btn" onclick="rescueOpenOfficialIncident('${role}')">${siteData.incidentStatus==='official'||siteData.incidentStatus==='closed'?'אירוע כבר רשמי':'פתח אירוע רשמי + T0'}</button>
         <button class="demo-mini-btn" onclick="rescueToggleIncidentClosed('${role}')">${siteData.incidentStatus==='closed'?'פתח אירוע מחדש':'סגור אירוע'}</button>
