@@ -99,9 +99,15 @@ Could a new signup grant itself an elevated role (e.g. `admin`, `cc`) via the in
 
 ### T5: Service-role key leakage
 
-`export_live_incident.py` requires a Supabase service-role key (bypasses RLS entirely) via `SUPABASE_SERVICE_ROLE_KEY`. If mishandled — committed, logged, or shared insecurely — this is the single highest-blast-radius credential in the system, since it isn't scoped by role or incident like every other access path is.
+The Supabase service-role key (`SUPABASE_SERVICE_ROLE_KEY`, bypasses RLS entirely) is the single highest-blast-radius credential in the system, since it isn't scoped by role or incident like every other access path is. It has three real usage sites in this repo, not just one:
 
-*Mitigation status*: partial. The key is never hardcoded, is documented as env-var-only, and the script's default output (`live_incident.db`) is gitignored so an export itself can't be accidentally committed either. No secret-rotation policy, no scoped/short-lived key option, and no review of how an operator is expected to actually store the key locally.
+- `analytics/c5_sentinel_sar_analytics_v1_1/export_live_incident.py` — offline reporting script, reads it via `os.environ.get(...)`.
+- `scripts/invite_user.js` — the operator-run invite CLI, reads it via `process.env.SUPABASE_SERVICE_ROLE_KEY`; its own header comment already warns never to commit it or pass it as a bare CLI arg.
+- `supabase/functions/sync-log/index.ts` — the deployed Edge Function, reads it via `Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")`. This one is the narrowest of the three: the service-role client it creates is used only to write `sync_ingestion_errors`, not as a blanket RLS bypass for the whole push/pull flow — the actual `events` insert/select run under the calling user's own JWT.
+
+*Mitigation status*: audited, no vulnerability found. All three sites read the key from an environment variable exclusively — no hardcoded value anywhere in the working tree or in git history (`git log --all -S"SERVICE_ROLE"` shows only documentation/env-var-reading code across every commit that touches the string). It never appears in any client-loaded file (`index.html`/`demo/rescue-app.html` only ever embed the public anon key, T7's concern, not this one). `export_live_incident.py`'s default output (`live_incident.db`) is gitignored so an export can't be accidentally committed either.
+
+What's still open, unchanged from before this audit: no secret-rotation policy, no scoped/short-lived key option, and — the one real gap this audit found — no stated operator-facing guidance for where to actually store the key day to day. Recommendation: keep it in a local `.env` file (already gitignored, with a new `.env.example` template added alongside this audit) or an OS keychain; never in shell history or a bare CLI argument; treat it as rotatable via the Supabase dashboard (Project Settings → API) if ever suspected exposed.
 
 ### T6: Weak or previously-leaked user passwords
 
@@ -126,8 +132,8 @@ An invited user can authenticate successfully but be deliberately left without a
 Ranked by (severity × how concrete the evidence is), not just severity alone:
 
 1. **Enable leaked-password protection (T6).** Now the top open item. Dashboard-only, but requires the Supabase project to be on a paid plan first (Free tier doesn't offer it) — a cost decision to make explicitly before onboarding real users, not something to defer indefinitely either.
-2. **Service-role key handling review (T5).** Define where/how an operator is expected to store `SUPABASE_SERVICE_ROLE_KEY`, and whether a scoped/short-lived alternative is worth building before this tool sees real use.
-3. **Everything in `docs/PRODUCTION_READINESS.md`'s Security and Privacy section not yet checked off** — secret management review and an incident response plan; audit retention policy and data minimization review are now real documents (`docs/AUDIT_AND_RETENTION_POLICY.md`, `docs/PRIVACY_AND_DATA_MINIMIZATION_REVIEW.md`), incident response plan is not.
+2. **Whether a scoped/short-lived alternative to the raw service-role key (T5) is worth building** before this tool sees real use — the audit itself found no leak and closed the "where does an operator store it" gap, but rotation/scoping tooling is still hypothetical, not built.
+3. **Backup and incident-response plan** — now a real document, `docs/BACKUP_AND_INCIDENT_RESPONSE_PLAN.md`; secret management (T5) is also now a real audit, not an open review. Both `docs/PRODUCTION_READINESS.md` lines updated to match.
 
 ~~A systematic RLS/authorization audit (T1)~~ — **done**, see `docs/RLS_AUDIT_v1.md`. Two more real gaps were found (both in the `is_active`/account-deactivation path, fixed in `database/017_lock_out_inactive_profiles.sql`) and no cross-incident/cross-role escalation gaps remain outstanding as of this pass. Not a closed book forever — re-run the same checklist after any schema change that adds a table, policy, or `SECURITY DEFINER` function — but no longer the top-ranked open item.
 

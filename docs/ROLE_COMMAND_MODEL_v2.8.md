@@ -1,6 +1,6 @@
 # Role-Based Medical Command Model V2.8
 
-V2.8 extends [V2.7](ROLE_COMMAND_MODEL_v2.7.md) by formally modeling the rescue command chain — RPC (מ״מ, Rescue Platoon Commander) and RCC (מ״פ חילוץ, Rescue Company Commander) — which V2.7 did not cover. Medic, חוג״ד, מ״פ רפואה, doctor/paramedic, logistics, and Chamal are unchanged from V2.7; this document only covers what's new.
+V2.8 extends [V2.7](ROLE_COMMAND_MODEL_v2.7.md) by formally modeling the rescue command chain — RPC (מ״מ, Rescue Platoon Commander) and RCC (מ״פ חילוץ, Rescue Company Commander) — which V2.7 did not cover, and by giving the "Doctor / Paramedic" senior-clinical-review concept (already described operationally in V2.7 §"Doctor / Paramedic") a real authenticated server role for the first time. Medic, חוג״ד, מ״פ רפואה, logistics, and Chamal are unchanged from V2.7; this document only covers what's new.
 
 ## Why RPC/RCC exist as separate roles
 
@@ -35,6 +35,22 @@ This is the core authority decision in V2.8. As first responders, RPC/RCC can ta
 
 This currently exists only as a client-side capability check (the button set rendered per role). There is no server-side enforcement yet — see the "Known gap" note in [`CHANGELOG_v2.995.md`](CHANGELOG_v2.995.md). Before this ships anywhere beyond a demo, the RLS/auth work in Mission 2 of [`MULTI_AGENT_DEV_PLAN.md`](MULTI_AGENT_DEV_PLAN.md) must enforce this same restriction server-side, or a compromised/misconfigured client could call these actions as any role.
 
+## PC can go hands-on
+
+חוג״ד's server-side clinical write authority (`app.can_write_clinical_event()`, `ROLE_ALLOWED_EVENT_TYPES.pc`, `patients_insert`) has always matched medic's — the in-app read-only authorization matrix already documented this. What was missing was a client-side entry point: pc's dashboard had no button to create a new patient or reach the MSTART sweep/field workflow screen, so in practice pc could only treat patients already in its scope (via the shared `openPatient`/`openQuickVitals` path, which has never had a role check), not create new ones.
+
+Fixed: pc's dashboard now has an explicit "טיפול ישיר / go hands-on" action offering the same "פצוע נוסף" quick-patient path and full MSTART/field-workflow screen medic uses (`startNewCasualtyInCurrentContext()`, `goTo('enroute')` — no new server logic, both already worked for any role). This stays additive, not a default: unlike medic/paramedic, pc still lands on its command dashboard by default (`startRoleDashboard()`'s auto-routing to the field screen is medic/paramedic-only) — pc goes hands-on by choice, when the platoon needs it, not as its primary mode.
+
+## Physician and Paramedic — real server roles, cross-device conflict authority
+
+V2.7's "Doctor / Paramedic" (senior clinical review: red/black patient review, death certification, response to חוג״ד/מ״פ רפואה requests) existed only as a client-side demo dashboard label, with no authenticated account backing it. V2.8 adds two real server roles, `physician` and `paramedic`, resolving that gap and giving F3 (cross-device concurrent-edit resolution, `docs/CONFLICT_RESOLUTION_DECISION.md`) the role-authority tie-break it needs.
+
+**Physician** (`רופא`) has `מ״פ רפואה`'s full command-adjacent scope (incident/sector management, device presence, conflict-log and quarantine review, patient-identity write access) plus medic/pc-level clinical event write access, so a physician can actually participate in triage/status decisions rather than only reviewing them after the fact. Logs in through the existing "Doctor / Paramedic" dashboard.
+
+**Paramedic** (`פראמדיק`) has the same field/clinical authority as physician — the same drugs and procedures, including confirming a high-risk clinical override (e.g. a pediatric medication dose outside the normal safe range) — with one exception: official death certification stays physician-only. Paramedic stays a field role otherwise, same patient-creation/vitals/treatment/triage-status write access and field workflow screen as medic, not physician's broader command-adjacent scope (incident/sector management, device presence, patient identity). In practice paramedic's clinical event-write list already matches medic's exactly (both get the same `CLINICAL_EVENTS`), so "same as physician" mostly shows up as a rank distinction in the tie-break below plus the `high_risk_override_insert` fix (`database/023`) rather than a new capability most of the time.
+
+**Role-authority tie-break**: when two devices genuinely collide on the same patient field within a short window, the higher-ranked role wins: **physician > paramedic > cc (מ״פ רפואה) > pc (חוג״ד) > medic**. Every such override is logged and surfaced to command, never silent — see `docs/CONFLICT_RESOLUTION_DECISION.md` for the full mechanism.
+
 ## First Responder Quick Report
 
 A deliberately minimal intake form, distinct from the medic's MSTART sweep:
@@ -49,8 +65,10 @@ A deliberately minimal intake form, distinct from the medic's MSTART sweep:
 |---|---|---|
 | RPC (מ״מ) | Tactical picture for own platoon; site authority for own area; first-responder reports | Vitals, treatment, mechanism, identity; medical reinforcement/resupply requests |
 | RCC (מ״פ חילוץ) | Tactical picture rolled up across own company's platoons; site authority for own area; first-responder reports; rescue-company resupply visibility | Vitals, treatment, mechanism, identity; medical reinforcement requests |
+| Physician (רופא) | מ״פ רפואה's full command-adjacent scope plus clinical event write access; senior review, death certification; top rank in the F3 conflict-authority tie-break | Creating new patient records (same restriction as מ״פ רפואה) |
+| Paramedic (פראמדיק) | Same field/clinical authority as physician (drugs, procedures, high-risk override confirmation); same patient-creation/vitals/treatment/triage-status scope as medic otherwise; ranks above מ״פ רפואה in the F3 conflict-authority tie-break | Official death certification (physician-only); physician's command-adjacent scope (incident/sector management, device presence, patient identity) |
 | Admin | Full technical access: raw data, scenario load/clear, experiment export, version/sync checks | Not an operational command role — demo/test-running only, same as V2.7 |
 
 ## Authorization matrix
 
-The full 8-role × 20-action matrix (all roles, all actions) lives in-app at the "Roles & Authorization" screen, generated from `ROLE_DEFS` / `AUTH_MATRIX` in `index.html`. This document covers the *why* behind the RPC/RCC/Admin columns; the matrix itself is the source of truth for the *what*, since duplicating a 20-row table into a second document is exactly the kind of copy that drifts (see the `src/domain/rules.js` vs. inlined-copy drift noted in [`MULTI_AGENT_DEV_PLAN.md`](MULTI_AGENT_DEV_PLAN.md)).
+The full 8-role × 20-action matrix (all roles, all actions) lives in-app at the "Roles & Authorization" screen, generated from `ROLE_DEFS` / `AUTH_MATRIX` in `index.html`. This document covers the *why* behind the RPC/RCC/Admin columns; the matrix itself is the source of truth for the *what*, since duplicating a 20-row table into a second document is exactly the kind of copy that drifts (see the `src/domain/rules.js` vs. inlined-copy drift noted in [`MULTI_AGENT_DEV_PLAN.md`](MULTI_AGENT_DEV_PLAN.md)). Physician and paramedic are real server roles (`docs/AUTH_AND_ROLE_MODEL.md`) but are not yet added as their own columns to this in-app matrix — physician logs in through the existing "doctor" `ROLE_DEFS` entry (a mapped alias, not a full matrix column), and paramedic reuses medic's entry outright since its scope is identical. Adding dedicated columns is a small follow-up, not done here.

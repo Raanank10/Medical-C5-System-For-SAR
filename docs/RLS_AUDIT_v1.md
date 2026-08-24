@@ -17,6 +17,8 @@ Two real, live gaps were found and fixed (`database/017_lock_out_inactive_profil
 
 Neither gap is a cross-incident/cross-role privilege escalation for an *active* account — the class of bug T1 primarily worries about (`013`-`016`) — but both are real defects in the account-deactivation control path, which is a documented, load-bearing safety mechanism (T4, T8), not a hypothetical one.
 
+**Addendum**: `database/020_physician_paramedic_rls.sql` (F3, `docs/CONFLICT_RESOLUTION_DECISION.md`) later re-issued roughly 30 of the 86 policies below to add `physician`/`paramedic` to their role lists, and widened `app.is_command_role()`/`app.can_access_incident()`/`app.can_write_clinical_event()`. Every predicate was reproduced verbatim from its live state (pulled via `pg_policies` immediately before writing that migration) plus the new role(s) — no shape was invented, and the total policy count is unchanged (86, confirmed live) since no table gained or lost a policy, only role lists within existing ones changed. Two follow-up gaps in that same migration were found afterward and fixed live: `events_insert_by_role` was missing `physician` from its own inline role array (`database/022`), and `high_risk_override_insert` was missing both `paramedic` (despite `020`'s own header comment saying it should be included) and `physician` (`database/023`) — both found by live testing, not migration-file review. The per-table table below reflects the audit's original point-in-time state and was not re-verified row-by-row after `020`/`022`/`023` — re-running this checklist after any further schema change remains the documented practice, not a one-time audit.
+
 ## RLS policies — 32 tables, 86 policies (all reviewed)
 
 | Table | Policies | Verdict | Note |

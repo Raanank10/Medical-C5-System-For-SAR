@@ -23,6 +23,11 @@
 //   logic (flag_pediatric_medication_missing_weight, trg_verify_pediatric_safety)
 //   and reimplementing it here would risk exactly the kind of drift this session
 //   already found and fixed once for the SABCDE branch.
+// - field_conflicts (F3, docs/CONFLICT_RESOLUTION_DECISION.md) are read back from
+//   conflict_log the same way, keyed off the just-inserted event's id appearing as
+//   either the winning or losing side in that row's payload_json - the role-authority
+//   tie-break logic itself lives entirely in project_patient_state() (database/021),
+//   not here.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -99,6 +104,15 @@ const ROLE_ALLOWED_EVENT_TYPES: Record<string, string[]> = {
   logistics_officer: [...SUPPLY_LOGISTICS_EVENTS, ...SYSTEM_EVENTS],
   rpc: [...FIRST_RESPONDER_EVENTS, ...SITE_AUTHORITY_EVENTS, ...SYSTEM_EVENTS],
   rcc: [...FIRST_RESPONDER_EVENTS, ...SITE_AUTHORITY_EVENTS, ...SUPPLY_LOGISTICS_EVENTS.filter((t) => t === "SUPPLY_REQUEST_CREATED"), ...SYSTEM_EVENTS],
+  // Not a literal mirror of cc: cc itself has no CLINICAL_EVENTS access today,
+  // which would leave physician unable to write PATIENT_TRIAGE_UPDATED/
+  // PATIENT_STATUS_UPDATED and defeat the point of the F3 role-authority
+  // tie-break (docs/CONFLICT_RESOLUTION_DECISION.md). physician = cc's full
+  // command-adjacent scope plus medic/pc-level clinical write access.
+  physician: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, ...INCIDENT_COMMAND_EVENTS, ...SITE_AUTHORITY_EVENTS, ...SUPPLY_LOGISTICS_EVENTS, ...EXTERNAL_REPORT_EVENTS, ...SYSTEM_EVENTS],
+  // Exact mirror of medic's scope - paramedic is a clinical-seniority tier
+  // for the F3 tie-break, not a different set of app capabilities.
+  paramedic: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, "INCIDENT_DRAFT_CREATED", "MEDIC_SITE_CLOSE_REQUESTED", "SUPPLY_REQUEST_CREATED", ...SYSTEM_EVENTS],
 };
 
 function isEventTypeAllowed(role: string, type: string): boolean {
@@ -188,6 +202,7 @@ async function handlePush(
   const rejected: Record<string, unknown>[] = [];
   const blocked_dependency: Record<string, unknown>[] = [];
   const high_risk_flags: Record<string, unknown>[] = [];
+  const field_conflicts: Record<string, unknown>[] = [];
   const acceptedInBatch = new Set<string>();
 
   async function quarantine(evt: Partial<IncomingEvent>, code: string, message: string, dependency?: { device_id: string; local_event_id: string }) {
@@ -331,6 +346,26 @@ async function handlePush(
           message: alert.message,
         });
       }
+
+      // F3 (docs/CONFLICT_RESOLUTION_DECISION.md): let the acting device know right away if
+      // its own just-pushed edit won or lost a role-authority tie-break, mirroring the
+      // high_risk_flags pattern above rather than making the device wait for a periodic pull.
+      const { data: conflicts } = await userClient
+        .from("conflict_log")
+        .select("payload_json, description")
+        .eq("conflict_type", "PATIENT_FIELD_CONFLICT_DETECTED")
+        .or(`payload_json->>winning_event_id.eq.${inserted.id},payload_json->>losing_event_id.eq.${inserted.id}`);
+      for (const conflict of conflicts ?? []) {
+        const payload = conflict.payload_json as Record<string, unknown> | null;
+        field_conflicts.push({
+          local_event_id,
+          field: payload?.field ?? null,
+          won: payload?.winning_event_id === inserted.id,
+          winning_role: payload?.winning_role ?? null,
+          losing_role: payload?.losing_role ?? null,
+          message: conflict.description,
+        });
+      }
       continue;
     }
 
@@ -373,6 +408,7 @@ async function handlePush(
     rejected,
     blocked_dependency,
     high_risk_flags,
+    field_conflicts,
     next_pull_cursor,
   });
 }

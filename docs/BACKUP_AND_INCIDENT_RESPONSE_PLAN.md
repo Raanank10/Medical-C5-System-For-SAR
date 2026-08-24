@@ -1,0 +1,48 @@
+# Backup and Incident-Response Plan
+
+`docs/ROADMAP.md` Phase 5 deliverable, and the last unchecked item in `docs/OPERATIONS_SAFETY.md`'s security/privacy checklist. Like `docs/AUDIT_AND_RETENTION_POLICY.md`, this is a planning document to review and adopt, not a drilled/tested runbook — exercising a real restore needs a non-production environment this repo doesn't have, and real incident-response authority (who gets paged, who has legal/organizational sign-off to act) needs a real operating organization this prototype doesn't have either. It states what's actually deployed, what Supabase's own tooling does and doesn't cover at the current plan tier, and where the gaps are — honestly, not aspirationally.
+
+## What's actually live and needs backing up
+
+The deployed backend is a single Supabase project, `c5-sentinel-sar` (ref `btvvjmuwdzirjyauyijx`, region `eu-central-1`, Postgres 17.6), currently on the **Free tier** (already established by `docs/THREAT_MODEL.md` T6, in the context of leaked-password protection being a paid-tier-only feature — the same tier constraint applies here). What it holds:
+
+- The full schema — `database/001_postgresql_schema_v1.2.sql` through the latest numbered migration, 32 RLS-covered tables. The two that matter most for a disaster scenario: `events` (the append-only clinical event log — the actual source of truth this whole architecture is built around) and `patients` (the mutable projection derived from it). Losing `events` with no backup means losing the ability to reconstruct `patients`, `conflict_log`, or anything else derived from it — it is the one table where "restore from backup" and "replay from source" are the same operation.
+- Everything else the projection/audit trail depends on: `tourniquets`, `inventory_ledger_v12`, `watchdog_alerts`, `conflict_log`, `sync_ingestion_errors`, `patient_handover_tokens`, `device_presence`, `device_sync_state`, `external_reports`, `external_patient_links`, `aar_context_notes`, `incident_memberships`, `profiles`.
+- The `sync-log` Edge Function (`supabase/functions/sync-log/index.ts`) — stateless code, not data, but a real dependency: a working restore of the database alone doesn't recover the service if the function itself is also lost or misconfigured. Redeploying it from this repo (`supabase/functions/sync-log/`) is the recovery path, not a data restore.
+- The `get_incident_command_state` `SECURITY DEFINER` RPC (`database/014`) and every other function/trigger/policy defined across the numbered migrations — these live in the same schema as the data and are covered by the same database backup, but are worth naming explicitly since "restore the database" implicitly means "restore the functions and RLS policies too," not just table rows.
+- Supabase Auth users and `profiles` rows — the identity/role layer. A backup that restores `events`/`patients` but not `auth.users`/`profiles` restores a clinical record nobody can log in to access.
+
+## What Supabase's own backup tooling provides — and doesn't, at the current tier
+
+This repo does not currently confirm the project's *actual configured* backup settings — that requires the Supabase dashboard (Project Settings → Database → Backups), which this document doesn't have access to. What can be stated reliably is the tier's standard capability:
+
+- **Free tier** (what this project runs on today): Supabase provides automatic **daily backups** with a short retention window (on the order of days, not weeks) — no self-service restore UI, no point-in-time recovery (PITR). A restore request from a Free-tier project goes through Supabase support, not a self-service control.
+- **Pro tier and above**: adds a longer daily-backup retention window and, as an add-on, PITR — the ability to restore to any point within a retention window rather than only to the most recent daily snapshot. `docs/THREAT_MODEL.md` T6 already flags that a plan upgrade is a live open decision for a different reason (leaked-password protection); this document adds a second, independent reason a Pro-tier upgrade would materially improve the project's actual disaster-recovery posture, not just its auth hardening.
+
+**Recovery Point Objective (RPO) at the current tier**: up to ~24 hours of data loss in a worst-case scenario (a failure immediately before the next daily backup). For a live MCI incident, that is a real, material risk — not a rounding error — and is the single clearest argument for treating a plan upgrade as more than a T6-only decision.
+
+**Recovery Time Objective (RTO)**: not established. A Free-tier restore-via-support-ticket has no committed SLA this document can respond for; this is an open question to resolve with whoever owns the Supabase account before any real-world pilot, not something to estimate here.
+
+## Restore interacts with the retention policy, not around it
+
+`docs/AUDIT_AND_RETENTION_POLICY.md` already establishes the governing principle: **deletion (and by extension, restoration that overwrites or reintroduces data) must itself be an audited event, never silent.** A disaster restore is exactly the kind of operation that principle was written to cover, even though the retention doc itself explicitly scoped backup/DR out of its own text (see its closing section). Concretely, this means:
+
+- A restore that rolls the database back to an earlier snapshot necessarily discards any events written after that snapshot — this is real data loss, distinct from and additional to whatever caused the original incident, and should be logged as its own explicit record (what snapshot was restored to, what time window of events was lost, who authorized it) once real incident-response tooling exists to do so. No such tooling exists today; this is a requirement for whoever builds it, not a built feature.
+- This document does not restate `docs/AUDIT_AND_RETENTION_POLICY.md`'s four retention classes — a restored `events` row is still Class A data and still governed by that document's "never silently deleted" principle for whatever it's later re-derived into.
+
+## Incident-response runbook (planning-stage, not drilled)
+
+A minimal outline of what "something is wrong with the backend" should trigger, given what's actually built:
+
+1. **Detect.** The command view's sync-freshness indicator (`docs/FAILURE_MODE_REVIEW.md` F4) and the "מצב שרת" server-state panel are the only real-time signals a command-role user has today that something is wrong — both are passive UI, not an active alert. There is no server-side monitoring/alerting layer in this prototype (no on-call paging, no uptime check) — that's real infrastructure this single-file prototype was never built to include, and is out of scope for this document to invent.
+2. **Assess scope.** Is this a backend outage (Supabase project down/unreachable) or a data-integrity problem (a bad migration, a bug that corrupted projected state)? The two need different responses — an outage is a "wait for Supabase / check status page" problem; a data-integrity problem may need the restore path above, and should be paused on rather than acted on immediately, since a restore is itself lossy (RPO above).
+3. **Field devices keep working during a backend outage, by design** — this is the whole point of the local-first architecture (`docs/ARCHITECTURE.md`). `docs/FAILURE_MODE_REVIEW.md` F2 (browser/OS storage eviction) and F5 (a handover event created locally but never synced because the device never reconnects) are the two client-side failure modes most relevant to "the backend is down for a while" — this document cross-links them rather than duplicating their analysis; neither is mitigated by anything backend-side, and F5 in particular means a prolonged outage can leave a real handover un-recorded server-side even after the outage ends, if the specific device that logged it never comes back online.
+4. **Recover.** Redeploy `supabase/functions/sync-log` from this repo if the Edge Function itself is the problem (stateless, no data risk). Restore from Supabase's daily backup (via support ticket at the current Free tier) only if data itself is lost or corrupted, understanding the RPO/audit implications above. Once the backend is reachable again, field devices already resume sync automatically (`index.html`'s existing push/pull retry logic) — no special recovery action needed on the device side beyond connectivity returning.
+5. **Communicate.** Who gets told, and how, is an organizational question this document cannot answer for a real deployment — there is no on-call rotation, escalation contact list, or incident-commander role defined anywhere in this repo today. Flagged as a real gap for whoever operates a real pilot, not something to invent placeholder names for here.
+
+## What this document does not do
+
+- Does not confirm the project's actual configured backup settings (requires direct Supabase dashboard access this session doesn't have) — states the tier's standard capability instead, and flags confirming the real configuration as an open action item.
+- Does not commit to an RTO, on-call process, or named incident-response contacts — those need a real operating organization, not a prototype repo.
+- Does not implement any backup automation, restore tooling, or alerting beyond what Supabase already provides at the current tier — this is a planning document, consistent with `docs/AUDIT_AND_RETENTION_POLICY.md`'s own "proposal, not implementation" scoping.
+- Does not replace `docs/FAILURE_MODE_REVIEW.md` — that document covers client-side/sync failure modes in depth; this one covers backend data durability and response process, and cross-links rather than duplicates.
