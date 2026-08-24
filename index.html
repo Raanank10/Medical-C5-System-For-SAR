@@ -415,6 +415,8 @@ input[type=range]{width:100%;accent-color:var(--orange);}
 .cmd-priority-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:8px 16px 0;}
 .cmd-priority-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:11px 10px;min-height:72px;}
 .cmd-priority-card.critical{border-color:rgba(230,57,70,.7);background:rgba(230,57,70,.08);}
+.cmd-priority-card.warn{border-color:rgba(244,162,97,.7);background:rgba(244,162,97,.08);}
+.cmd-priority-icon{font-size:13px;margin-bottom:2px;opacity:.85;}
 .cmd-priority-num{font-family:var(--mono);font-size:24px;font-weight:900;line-height:1;}
 .cmd-priority-label{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.35;}
 .cmd-panel-toggle{width:calc(100% - 32px);margin:10px 16px 0;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px 12px;color:var(--text);font-size:13px;font-weight:800;cursor:pointer;display:flex;justify-content:space-between;align-items:center;text-align:right;}
@@ -1794,6 +1796,7 @@ textarea{resize:vertical;min-height:70px;}
     <button class="alert-slice other" onclick="switchCommandRole('cc',this)">מ״פ רפואה / הפלוגה שלי</button>
   </div>
   <div style="display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto" id="cmd-site-tabs"></div>
+  <div style="padding:10px 16px 0;display:flex;gap:8px;flex-wrap:wrap" id="cmd-site-overview"></div>
   <div style="padding:12px 16px 0"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px" id="cmd-totals"></div></div>
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('priority')"><span>תעדוף מפקד</span><span class="cmd-panel-sub" id="cmd-panel-priority-meta">OPEN</span></button>
   <div id="cmd-panel-priority" class="cmd-panel-body"><div id="cmd-priority-board" class="cmd-priority-grid"></div></div>
@@ -3503,19 +3506,34 @@ const INCIDENT_TYPE_INJURY_BRIEFS = {
   vehicle_accident:'צפו לחבלות קהות: שברים בגפיים ובאגן, חבלת ראש/צוואר וחבלת בטן/חזה סגורה. סיכון גבוה לפציעות פנימיות שאינן גלויות לעין, לכן יש להקפיד על הערכת SABCDE מלאה גם ללא דימום חיצוני נראה. ייתכנו נלכדים בתוך כלי הרכב הדורשים חילוץ.',
   explosion:'צפו לשילוב של כוויות, פציעות רסיסים חודרות וחבלת פיצוץ ראשונית (ריאות, אוזניים, מעיים). קיים סיכון לפציעות משניות ושלישוניות (הטלה/מפולת), ולכן יש להעריך גם חבלה קהה נלווית ולא רק כוויות ורסיסים.'
 };
-function ensureSiteStatusFields(){
-  if(siteData.incidentStatus===undefined) siteData.incidentStatus='draft';
-  if(siteData.t0===undefined) siteData.t0=null;
-  if(siteData.buildingStatus===undefined) siteData.buildingStatus=null;
-  if(siteData.incidentType===undefined) siteData.incidentType=null;
-  if(!siteData.siteClear) siteData.siteClear={cleared:false,clearedAt:null,clearedByRole:null};
-  if(siteData.lastRescueStatusChange===undefined) siteData.lastRescueStatusChange=null;
+// Rescue-chain site-authority state (incident status/T0/building/incident-type per SITE_A/SITE_B),
+// kept separate from the singular siteData object above: siteData is the current device's own
+// "en route to the incident" profile (always the device's own site, see currentSiteId()), while
+// this is a genuinely per-site store so Site A and Site B can carry independent incident types.
+let siteAuthority = {
+  SITE_A:{incidentStatus:'draft', t0:null, buildingStatus:null, incidentType:null, siteClear:{cleared:false,clearedAt:null,clearedByRole:null}, lastRescueStatusChange:null},
+  SITE_B:{incidentStatus:'draft', t0:null, buildingStatus:null, incidentType:null, siteClear:{cleared:false,clearedAt:null,clearedByRole:null}, lastRescueStatusChange:null}
+};
+let rescueActiveSiteId='SITE_A'; // which site the rpc/rcc authority panel currently targets
+function ensureSiteStatusFields(siteId=rescueActiveSiteId){
+  const s=siteAuthority[siteId] || (siteAuthority[siteId]={});
+  if(s.incidentStatus===undefined) s.incidentStatus='draft';
+  if(s.t0===undefined) s.t0=null;
+  if(s.buildingStatus===undefined) s.buildingStatus=null;
+  if(s.incidentType===undefined) s.incidentType=null;
+  if(!s.siteClear) s.siteClear={cleared:false,clearedAt:null,clearedByRole:null};
+  if(s.lastRescueStatusChange===undefined) s.lastRescueStatusChange=null;
+  return s;
 }
-function rescueSetIncidentType(role, type){
-  ensureSiteStatusFields();
-  siteData.incidentType=type;
-  siteData.lastRescueStatusChange={type:'incident_type',by:role,byLabel:rescueReporterLabel(role),detail:`סוג אירוע עודכן: ${INCIDENT_TYPE_LABELS[type]||type}`,at:Date.now()};
-  saveLocalEvent({type:'INCIDENT_TYPE_SET',detail:`${type} by ${role}`,payload_json:{role,incidentType:type,timestamp:new Date().toISOString()}});
+function rescueSwitchAuthoritySite(role, siteId){
+  rescueActiveSiteId=siteId;
+  renderRoleDashboard(role);
+}
+function rescueSetIncidentType(role, type, siteId=rescueActiveSiteId){
+  const s=ensureSiteStatusFields(siteId);
+  s.incidentType=type;
+  s.lastRescueStatusChange={type:'incident_type',by:role,byLabel:rescueReporterLabel(role),detail:`סוג אירוע עודכן: ${INCIDENT_TYPE_LABELS[type]||type}`,at:Date.now()};
+  saveLocalEvent({type:'INCIDENT_TYPE_SET',detail:`${type} by ${role} at ${siteId}`,payload_json:{role,siteId,incidentType:type,timestamp:new Date().toISOString()}});
   saveDemoState();
   renderRoleDashboard(role);
   showIncidentTypeBriefModal(type);
@@ -3533,56 +3551,61 @@ function hideIncidentTypeBriefModal(){
 }
 function closeIncidentTypeBriefModal(e){ if(e.target.id==='incident-type-brief-modal') hideIncidentTypeBriefModal(); }
 // Rescue-chain (rpc/rcc) site authority actions. Per design decision: final authority,
-// no medical (pc/cc) sign-off required — they only get notified via siteData.lastRescueStatusChange,
+// no medical (pc/cc) sign-off required — they only get notified via siteAuthority[siteId].lastRescueStatusChange,
 // surfaced on their own dashboards next render.
 function rescueReporterLabel(role){ return role==='rpc'?'מ״מ':'מ״פ חילוץ'; }
-function rescueOpenOfficialIncident(role){
-  ensureSiteStatusFields();
-  siteData.incidentStatus='official';
-  if(!siteData.t0) siteData.t0=new Date().toISOString();
-  siteData.lastRescueStatusChange={type:'t0',by:role,byLabel:rescueReporterLabel(role),detail:'אירוע הוכרז רשמי · T0 נקבע',at:Date.now()};
-  saveLocalEvent({type:'OFFICIAL_INCIDENT_OPENED_BY_RESCUE',detail:`opened by ${role}`,payload_json:{role,t0:siteData.t0,timestamp:new Date().toISOString()}});
+function rescueOpenOfficialIncident(role, siteId=rescueActiveSiteId){
+  const s=ensureSiteStatusFields(siteId);
+  s.incidentStatus='official';
+  if(!s.t0) s.t0=new Date().toISOString();
+  s.lastRescueStatusChange={type:'t0',by:role,byLabel:rescueReporterLabel(role),detail:'אירוע הוכרז רשמי · T0 נקבע',at:Date.now()};
+  saveLocalEvent({type:'OFFICIAL_INCIDENT_OPENED_BY_RESCUE',detail:`opened by ${role} at ${siteId}`,payload_json:{role,siteId,t0:s.t0,timestamp:new Date().toISOString()}});
   saveDemoState();
   renderRoleDashboard(role);
   toast('אירוע הוכרז רשמי · T0 נקבע · חוג"ד ומ״פ רפואה יראו עדכון');
 }
-function rescueToggleIncidentClosed(role){
-  ensureSiteStatusFields();
-  const reopening=siteData.incidentStatus==='closed';
-  siteData.incidentStatus=reopening?'official':'closed';
-  siteData.lastRescueStatusChange={type:'close',by:role,byLabel:rescueReporterLabel(role),detail:reopening?'האירוע נפתח מחדש':'האירוע נסגר',at:Date.now()};
-  saveLocalEvent({type:'INCIDENT_CLOSE_TOGGLED',detail:`${reopening?'reopened':'closed'} by ${role}`,payload_json:{role,newStatus:siteData.incidentStatus,timestamp:new Date().toISOString()}});
+function rescueToggleIncidentClosed(role, siteId=rescueActiveSiteId){
+  const s=ensureSiteStatusFields(siteId);
+  const reopening=s.incidentStatus==='closed';
+  s.incidentStatus=reopening?'official':'closed';
+  s.lastRescueStatusChange={type:'close',by:role,byLabel:rescueReporterLabel(role),detail:reopening?'האירוע נפתח מחדש':'האירוע נסגר',at:Date.now()};
+  saveLocalEvent({type:'INCIDENT_CLOSE_TOGGLED',detail:`${reopening?'reopened':'closed'} by ${role} at ${siteId}`,payload_json:{role,siteId,newStatus:s.incidentStatus,timestamp:new Date().toISOString()}});
   saveDemoState();
   renderRoleDashboard(role);
   toast(reopening?'האירוע נפתח מחדש':'האירוע נסגר');
 }
-function rescueUpdateBuildingStatus(role, status){
-  ensureSiteStatusFields();
-  siteData.buildingStatus=status;
-  siteData.lastRescueStatusChange={type:'building',by:role,byLabel:rescueReporterLabel(role),detail:`סטטוס מבנה: ${BUILDING_STATUS_LABELS[status]||status}`,at:Date.now()};
-  saveLocalEvent({type:'BUILDING_STATUS_UPDATED',detail:`${status} by ${role}`,payload_json:{role,status,timestamp:new Date().toISOString()}});
+function rescueUpdateBuildingStatus(role, status, siteId=rescueActiveSiteId){
+  const s=ensureSiteStatusFields(siteId);
+  s.buildingStatus=status;
+  s.lastRescueStatusChange={type:'building',by:role,byLabel:rescueReporterLabel(role),detail:`סטטוס מבנה: ${BUILDING_STATUS_LABELS[status]||status}`,at:Date.now()};
+  saveLocalEvent({type:'BUILDING_STATUS_UPDATED',detail:`${status} by ${role} at ${siteId}`,payload_json:{role,siteId,status,timestamp:new Date().toISOString()}});
   saveDemoState();
   renderRoleDashboard(role);
   toast('סטטוס מבנה עודכן');
 }
-function rescueConfirmSiteClear(role){
-  ensureSiteStatusFields();
-  siteData.siteClear={cleared:true,clearedAt:new Date().toISOString(),clearedByRole:role};
-  siteData.lastRescueStatusChange={type:'clear',by:role,byLabel:rescueReporterLabel(role),detail:'האתר הוכרז נקי',at:Date.now()};
-  saveLocalEvent({type:'SITE_CLEAR_CONFIRMED',detail:`by ${role}`,payload_json:{role,timestamp:new Date().toISOString()}});
+function rescueConfirmSiteClear(role, siteId=rescueActiveSiteId){
+  const s=ensureSiteStatusFields(siteId);
+  s.siteClear={cleared:true,clearedAt:new Date().toISOString(),clearedByRole:role};
+  s.lastRescueStatusChange={type:'clear',by:role,byLabel:rescueReporterLabel(role),detail:'האתר הוכרז נקי',at:Date.now()};
+  saveLocalEvent({type:'SITE_CLEAR_CONFIRMED',detail:`by ${role} at ${siteId}`,payload_json:{role,siteId,timestamp:new Date().toISOString()}});
   saveDemoState();
   renderRoleDashboard(role);
   toast('האתר הוכרז נקי · חוג"ד ומ״פ רפואה יראו עדכון');
 }
-function incidentTypeLabel(){
-  ensureSiteStatusFields();
-  return siteData.incidentType?(INCIDENT_TYPE_LABELS[siteData.incidentType]||siteData.incidentType):'לא נבחר';
+function incidentTypeLabel(siteId=rescueActiveSiteId){
+  const s=ensureSiteStatusFields(siteId);
+  return s.incidentType?(INCIDENT_TYPE_LABELS[s.incidentType]||s.incidentType):'לא נבחר';
 }
-function siteStatusSummaryLine(){
-  ensureSiteStatusFields();
-  const t0Label=siteData.t0?new Date(siteData.t0).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):'טרם נקבע';
-  const changedBy=siteData.lastRescueStatusChange?` · עודכן לאחרונה ע"י ${siteData.lastRescueStatusChange.byLabel}: ${siteData.lastRescueStatusChange.detail}`:'';
-  return `סטטוס אירוע: ${INCIDENT_STATUS_LABELS[siteData.incidentStatus]||siteData.incidentStatus} · T0 ${t0Label} · סוג אירוע: ${incidentTypeLabel()} · מבנה: ${siteData.buildingStatus?BUILDING_STATUS_LABELS[siteData.buildingStatus]:'לא דווח'} · אתר: ${siteData.siteClear?.cleared?'נקי':'פעיל'}${changedBy}`;
+function siteStatusSummaryLine(siteId=rescueActiveSiteId){
+  const s=ensureSiteStatusFields(siteId);
+  const t0Label=s.t0?new Date(s.t0).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):'טרם נקבע';
+  const changedBy=s.lastRescueStatusChange?` · עודכן לאחרונה ע"י ${s.lastRescueStatusChange.byLabel}: ${s.lastRescueStatusChange.detail}`:'';
+  return `סטטוס אירוע: ${INCIDENT_STATUS_LABELS[s.incidentStatus]||s.incidentStatus} · T0 ${t0Label} · סוג אירוע: ${incidentTypeLabel(siteId)} · מבנה: ${s.buildingStatus?BUILDING_STATUS_LABELS[s.buildingStatus]:'לא דווח'} · אתר: ${s.siteClear?.cleared?'נקי':'פעיל'}${changedBy}`;
+}
+// Shared per-site status rows for pc/cc/chamal/admin dashboards, each pairing the site's name
+// with its own incident type and rescue-authority status - never a single blended line for both sites.
+function sitesSummaryRows(){
+  return allSites.filter(s=>s.id!=='ALL').map(s=>roleRow(`${s.name} · ${incidentTypeLabel(s.id)}`, siteStatusSummaryLine(s.id)));
 }
 function displayUser(idOrName){
   const user=userById(idOrName);
@@ -5399,16 +5422,16 @@ function renderRoleDashboard(role=activeRoleDashboard){
       roleRow('חובשים בקריסה',`${medics.length} חובשים זמינים / פעילים במחלקה`),
       roleRow('הפצועים שלי',`${myPts.length} פצועים תחת אחריות חוג"ד · ${myPts.filter(p=>['red','yellow'].includes(p.triage)).length} אדום/צהוב`),
       roleRow('תמונת מצב מוקד',`${siteData.name||'אין מוקד'} · צפי לכודים ${siteData.expectedCasualties?.trapped||0} · נעדרים ${siteData.expectedCasualties?.missing||0}`),
-      roleRow('סטטוס אתר (מפ"ק חילוץ)', siteStatusSummaryLine())
+      ...sitesSummaryRows()
     ].join('');
   }else if(role==='medic'||role==='doctor'){
     objects=[
-      roleRow('סוג אירוע', incidentTypeLabel()),
+      roleRow('סוג אירוע', incidentTypeLabel(currentSiteId())),
       ...pts.slice(0,8).map(p=>roleRow(displayPatientIdentity(p),`${TRIAGE_LABELS[p.triage]||p.triage} · ${p.location} · אחראי: ${displayUser(p.assignedMedicId)}`,`<span class="identity-chip">${p.temporaryDescription||'אין תיאור זמני'}</span>`))
     ].join('');
   }else if(role==='cc'){
     objects=[
-      roleRow('סטטוס אתר (מפ"ק חילוץ)', siteStatusSummaryLine()),
+      ...sitesSummaryRows(),
       ...DEMO_PLATOONS.map(pl=>{
         const plPts=patients.filter(p=>(p.assignedPlatoonId||'PLT-A')===pl.platoonId);
         return roleRow(pl.name,`${plPts.length} פצועים · ${plPts.filter(p=>p.triage==='red').length} אדומים · חוג"ד: ${displayUser(pl.pcId)}`);
@@ -5416,7 +5439,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
     ].join('');
   }else if(role==='logistics'){
     objects=[
-      roleRow('סוג אירוע', incidentTypeLabel()),
+      roleRow('סוג אירוע', incidentTypeLabel(currentSiteId())),
       ...logisticsCompanies().map(c=>roleRow(c.name,`${c.lowItems.length} פריטים מתחת לסף · ${c.patients} פצועים מקושרים`))
     ].join('');
   }else if(role==='rpc'){
@@ -5430,15 +5453,19 @@ function renderRoleDashboard(role=activeRoleDashboard){
     const myPlatoonIds=DEMO_PLATOONS.filter(pl=>pl.companyId==='COMP-1').map(pl=>pl.platoonId);
     objects=myPlatoonIds.map(tacticalPlatoonRollup).join('');
   }else{
-    objects=[
-      roleRow('סטטוס אתר (מפ"ק חילוץ)', siteStatusSummaryLine()),
-      ...allSites.filter(s=>s.id!=='ALL').map(s=>roleRow(s.name,`${getSitePatients(s.id).length} פצועים · ${externalConflictCount(getSitePatients(s.id), s.externalReports||[])} פערי דיווח`))
-    ].join('');
+    objects=allSites.filter(s=>s.id!=='ALL').map(s=>roleRow(
+      `${s.name} · ${incidentTypeLabel(s.id)}`,
+      `${getSitePatients(s.id).length} פצועים · ${externalConflictCount(getSitePatients(s.id), s.externalReports||[])} פערי דיווח · ${siteStatusSummaryLine(s.id)}`
+    )).join('');
   }
+  const authSite=ensureSiteStatusFields(rescueActiveSiteId);
   const rescueAuthorityPanel=['rpc','rcc'].includes(role)?`
     <div class="role-section">
       <div class="role-section-title">סמכות אתר — ראשונים בזירה</div>
-      <div class="role-row"><div class="role-row-title">${siteStatusSummaryLine()}</div></div>
+      <div class="demo-actions" style="margin:0 0 8px;grid-template-columns:1fr 1fr">
+        ${allSites.filter(s=>s.id!=='ALL').map(s=>`<button class="demo-mini-btn" style="${s.id===rescueActiveSiteId?'border-color:var(--accent);background:rgba(67,97,238,.12);color:var(--accent)':''}" onclick="rescueSwitchAuthoritySite('${role}','${s.id}')">${s.id===rescueActiveSiteId?'✓ ':''}${s.name.split('—')[0].trim()}</button>`).join('')}
+      </div>
+      <div class="role-row"><div class="role-row-title">${siteStatusSummaryLine(rescueActiveSiteId)}</div></div>
       <div class="demo-actions" style="margin:8px 0 0;grid-template-columns:1fr 1fr">
         <button class="demo-mini-btn" onclick="rescueSetIncidentType('${role}','missile_strike_structural_collapse')">סוג: קריסת מבנה / טיל</button>
         <button class="demo-mini-btn" onclick="rescueSetIncidentType('${role}','mass_shooting')">סוג: ירי המוני</button>
@@ -5446,8 +5473,8 @@ function renderRoleDashboard(role=activeRoleDashboard){
         <button class="demo-mini-btn" onclick="rescueSetIncidentType('${role}','explosion')">סוג: פיצוץ</button>
       </div>
       <div class="demo-actions" style="margin:8px 0 0;grid-template-columns:1fr 1fr">
-        <button class="demo-mini-btn" onclick="rescueOpenOfficialIncident('${role}')">${siteData.incidentStatus==='official'||siteData.incidentStatus==='closed'?'אירוע כבר רשמי':'פתח אירוע רשמי + T0'}</button>
-        <button class="demo-mini-btn" onclick="rescueToggleIncidentClosed('${role}')">${siteData.incidentStatus==='closed'?'פתח אירוע מחדש':'סגור אירוע'}</button>
+        <button class="demo-mini-btn" onclick="rescueOpenOfficialIncident('${role}')">${authSite.incidentStatus==='official'||authSite.incidentStatus==='closed'?'אירוע כבר רשמי':'פתח אירוע רשמי + T0'}</button>
+        <button class="demo-mini-btn" onclick="rescueToggleIncidentClosed('${role}')">${authSite.incidentStatus==='closed'?'פתח אירוע מחדש':'סגור אירוע'}</button>
         <button class="demo-mini-btn" onclick="rescueUpdateBuildingStatus('${role}','stable')">מבנה: יציב</button>
         <button class="demo-mini-btn" onclick="rescueUpdateBuildingStatus('${role}','unstable')">מבנה: לא יציב</button>
         <button class="demo-mini-btn" onclick="rescueUpdateBuildingStatus('${role}','progressive_collapse')">מבנה: קריסה מתמשכת</button>
@@ -8799,6 +8826,19 @@ function renderCmdTabs(){
     const hasAlert=pts.some(p=>(p.deterioration&&p.deterioration.length)||(isVitalsOverdue(p)));
     return `<button class="cmd-site-tab${s.id===cmdActiveSite?' active':''}${hasAlert?' has-alert':''}" onclick="switchCmdSite('${s.id}')">${s.id==='ALL'?'🌐 הכל':s.id==='SITE_A'?'📍 A':'📍 B'}${hasAlert?' 🔴':''}</button>`;
   }).join('');
+  // Always-visible "what am I looking at" strip: every real site paired with its own incident
+  // type, so a scenario mix (e.g. Site A = structural collapse, Site B = vehicle accident)
+  // is legible at a glance regardless of which site tab is currently selected.
+  const overviewEl=document.getElementById('cmd-site-overview');
+  if(overviewEl){
+    overviewEl.innerHTML=visible.filter(s=>s.id!=='ALL').map(s=>
+      `<div style="background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:6px 12px;font-size:12px;display:flex;gap:6px;align-items:center">
+        <span style="font-weight:700">${s.name.split('—')[0].trim()}</span>
+        <span style="color:var(--muted)">·</span>
+        <span style="color:var(--accent);font-weight:700">${incidentTypeLabel(s.id)}</span>
+      </div>`
+    ).join('');
+  }
 }
 function switchCmdSite(id){
   if(!canSeeCommandSite(id)){
@@ -9524,14 +9564,14 @@ function renderCommandOperationalPanels(pts, site){
       ? roleSection('תעדוף פינוי פלוגתי', companyEvacuationPriorityRows(pts))
       : '';
   document.getElementById('cmd-priority-board').innerHTML=commandMacro+[
-    {n:pts.filter(p=>p.triage==='red').length,l:'איפה האדומים?',c:'critical'},
-    {n:tqOverdue.length,l:'חסמי עורקים שעברו סף',c:tqOverdue.length?'critical':''},
-    {n:stale.length,l:'פצועים עם מידע ישן',c:stale.length?'critical':''},
-    {n:trappedSilent.length,l:'לכודים ללא קשר חובש',c:trappedSilent.length?'critical':''},
-    {n:evacBlocked.length,l:'פינויים חסומים / ממתינים',c:evacBlocked.length?'critical':''},
-    {n:reinforcementRequests.filter(isRequestOpen).length,l:'בקשות תגבור / ציוד פתוחות',c:reinforcementRequests.some(r=>r.urgency==='immediate'&&isRequestOpen(r))?'critical':''},
-    {n:unsynced,l:'אירועים מקומיים שלא סונכרנו',c:unsynced?'':''}
-  ].map(x=>`<div class="cmd-priority-card ${x.c}"><div class="cmd-priority-num">${x.n}</div><div class="cmd-priority-label">${x.l}</div></div>`).join('');
+    {n:pts.filter(p=>p.triage==='red').length,l:'איפה האדומים?',c:'critical',i:'🩸'},
+    {n:tqOverdue.length,l:'חסמי עורקים שעברו סף',c:tqOverdue.length?'critical':'',i:'⏱️'},
+    {n:stale.length,l:'פצועים עם מידע ישן',c:stale.length?'warn':'',i:'🕐'},
+    {n:trappedSilent.length,l:'לכודים ללא קשר חובש',c:trappedSilent.length?'critical':'',i:'⛓️'},
+    {n:evacBlocked.length,l:'פינויים חסומים / ממתינים',c:evacBlocked.length?'warn':'',i:'🚑'},
+    {n:reinforcementRequests.filter(isRequestOpen).length,l:'בקשות תגבור / ציוד פתוחות',c:reinforcementRequests.some(r=>r.urgency==='immediate'&&isRequestOpen(r))?'critical':'',i:'📋'},
+    {n:unsynced,l:'אירועים מקומיים שלא סונכרנו',c:unsynced?'warn':'',i:'🔄'}
+  ].map(x=>`<div class="cmd-priority-card ${x.c}"><div class="cmd-priority-icon">${x.i}</div><div class="cmd-priority-num">${x.n}</div><div class="cmd-priority-label">${x.l}</div></div>`).join('');
   renderReinforcementPanel();
 
   const commandState=buildIncidentCommandStateSnapshot(pts, site);
@@ -9687,7 +9727,8 @@ function renderCmdContent(){
       sp.forEach(p=>{if(sc[p.triage]!==undefined)sc[p.triage]++;});
       const al=sp.some(p=>(p.deterioration&&p.deterioration.length)||(isVitalsOverdue(p)));
       return `<div style="background:var(--surface);border:1px solid ${al?'var(--red)':'var(--border)'};border-radius:12px;padding:12px;cursor:pointer" onclick="switchCmdSite('${s.id}')">
-        <div style="font-weight:700;font-size:13px;margin-bottom:8px${al?';color:var(--red)':''}">${s.name.split('—')[0].trim()} ${al?'🔴':''}</div>
+        <div style="font-weight:700;font-size:13px;margin-bottom:4px${al?';color:var(--red)':''}">${s.name.split('—')[0].trim()} ${al?'🔴':''}</div>
+        <div style="font-size:11px;color:var(--accent);font-weight:700;margin-bottom:8px">${incidentTypeLabel(s.id)}</div>
         <div style="display:flex;gap:10px;font-family:var(--mono);font-size:16px;font-weight:700"><span style="color:var(--red)">${sc.red}</span><span style="color:var(--yellow)">${sc.yellow}</span><span style="color:var(--green)">${sc.green}</span></div>
         <div style="font-size:10px;color:var(--muted);margin-top:4px">${sp.length} פצועים</div></div>`;
     }).join('')}</div>`;
