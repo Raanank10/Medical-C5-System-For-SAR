@@ -640,7 +640,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.999</div>
+      <div class="demo-kicker">Demo V2.9910</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -739,7 +739,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.999</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9910</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -749,7 +749,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.999</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9910</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2503,7 +2503,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.9';
+const APP_VERSION = '2.99.10';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -7629,6 +7629,20 @@ function openPatient(id){
     if(['radial','radial_strong'].includes(bp)) return 'var(--green)';
     return 'var(--muted)';
   };
+  // Unlike SpO2/BP above, pulse has no existing threshold anywhere in this codebase -
+  // computeMstartTriage (src/domain/rules.js) never uses pulse. These are commonly-cited
+  // prehospital reference ranges (adult resting HR ~60-100 bpm; simplified pediatric
+  // ~70-140 bpm for the <8yo band C5Rules.isPediatricPatient already uses elsewhere in this
+  // app), not sourced from a specific validated protocol in this repo. NEW clinical judgment -
+  // flag for real clinical review before relying on this coloring in the field.
+  const pulsePediatric=C5Rules.isPediatricPatient(p);
+  const pulseZones=pulsePediatric
+    ? [{from:40,to:70,color:'var(--yellow)'},{from:70,to:140,color:'var(--green)'},{from:140,to:180,color:'var(--red)'}]
+    : [{from:40,to:60,color:'var(--yellow)'},{from:60,to:100,color:'var(--green)'},{from:100,to:180,color:'var(--red)'}];
+  const pulseCol=v=>{
+    if(v==null) return 'var(--muted)';
+    return pulsePediatric ? (v<70?'var(--yellow)':v>140?'var(--red)':'var(--green)') : (v<60?'var(--yellow)':v>100?'var(--red)':'var(--green)');
+  };
   const tq=tourniquetTimerLabel(p);
   document.getElementById('detail-body').innerHTML=`
     <div class="summary-card">
@@ -7661,7 +7675,7 @@ function openPatient(id){
         <button onclick="openQuickVitals('${p.id}')" style="background:var(--accent);border:none;color:white;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">עדכן מדדים</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        <div style="background:var(--surface2);border-radius:10px;padding:6px 10px 10px">${renderGaugeArc({value:p.vitals.pulse,min:40,max:180,label:'דופק bpm'})}</div>
+        <div style="background:var(--surface2);border-radius:10px;padding:6px 10px 10px">${renderGaugeArc({value:p.vitals.pulse,min:40,max:180,needleColor:pulseCol(p.vitals.pulse),zones:pulseZones,label:'דופק bpm'})}</div>
         <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:#f4a261">${p.vitals.rr ?? '—'}</div><div style="font-size:11px;color:var(--muted)">נשימות / דקה</div></div>
         <div style="background:var(--surface2);border-radius:10px;padding:6px 10px 10px">${renderGaugeArc({value:p.vitals.spo2||null,min:80,max:100,valueLabel:p.vitals.spo2?`${p.vitals.spo2}%`:null,needleColor:sCol(p.vitals.spo2),zones:[{from:80,to:94,color:'var(--red)'},{from:94,to:97,color:'var(--yellow)'},{from:97,to:100,color:'var(--green)'}],label:'SpO₂'})}</div>
         <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:13px;font-weight:700;color:${bpCol(p.vitals.bp_estimate)}">${BP_LABELS[p.vitals.bp_estimate]||'—'}</div><div style="font-size:11px;color:var(--muted)">לחץ דם</div></div>
