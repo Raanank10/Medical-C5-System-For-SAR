@@ -25,6 +25,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .header-subtitle{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;}
 .header-title{font-size:18px;font-weight:700;}
 .header-time{font-family:var(--mono);font-size:13px;color:var(--muted);}
+.header-right{display:flex;align-items:center;gap:10px;}
+.briefing-trigger{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:7px 12px;color:var(--text);font-family:var(--sans);font-size:12px;font-weight:800;cursor:pointer;}
+.briefing-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--red);color:#fff;font-family:var(--mono);font-size:10px;font-weight:700;}
 
 /* ── SCREENS ── */
 .screen{display:none;min-height:100dvh;padding-bottom:110px;}
@@ -614,7 +617,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.995</div>
+      <div class="demo-kicker">Demo V2.996</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -713,7 +716,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.995</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.996</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -723,7 +726,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.995</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.996</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -836,7 +839,12 @@ textarea{resize:vertical;min-height:70px;}
       <div class="header-subtitle">RESCUE // ACTIVE</div>
       <div class="header-title" id="site-name-header">אין מוקד פעיל</div>
     </div>
-    <div class="header-time" id="clock">--:--</div>
+    <div class="header-right">
+      <button class="briefing-trigger" onclick="openRoleBriefing('medic')" aria-haspopup="dialog">
+        <span>📖</span><span>תדריך תפקיד</span><span class="briefing-badge" id="medic-briefing-badge" style="display:none">0</span>
+      </button>
+      <div class="header-time" id="clock">--:--</div>
+    </div>
   </div>
 
   <div class="demo-strip">
@@ -863,6 +871,7 @@ textarea{resize:vertical;min-height:70px;}
     </button>
   </div>
   <div id="zone-context-bar" style="padding:0 16px 10px"></div>
+  <div id="medic-nba-banner" style="padding:0 16px 10px"></div>
 
   <!-- Stats -->
   <div class="stat-grid">
@@ -948,6 +957,8 @@ textarea{resize:vertical;min-height:70px;}
       </div>
       <div class="field-label">תיאור חופשי</div>
       <textarea id="site-description" placeholder="פרטים נוספים, סכנות ידועות..."></textarea>
+      <div class="field-label" style="margin-top:12px">הנחיות לתדריך תפקיד — יופיע לכל חובש/ת בפאנל "תדריך תפקיד"</div>
+      <textarea id="site-hazard-note" placeholder="לדוגמה: אי יציבות מבנית באזור 2 · תעדוף פינוי לשער 2" oninput="siteData.hazardNote=this.value"></textarea>
     </div>
   </div>
   <div class="site-section">
@@ -2085,6 +2096,16 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 
+<div id="role-briefing-modal" class="modal-overlay hidden" onclick="if(event.target===this) this.classList.add('hidden')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="role-briefing-title">תדריך תפקיד</div>
+    <div class="modal-sub" id="role-briefing-mission">—</div>
+    <div id="role-briefing-body"></div>
+    <button class="btn-secondary" style="margin-top:10px" onclick="document.getElementById('role-briefing-modal').classList.add('hidden')">סגור</button>
+  </div>
+</div>
+
 <div id="feedback-modal" class="modal-overlay hidden" onclick="if(event.target===this) closeFeedbackModal()">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
@@ -2459,7 +2480,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.5';
+const APP_VERSION = '2.99.6';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3338,7 +3359,7 @@ async function requestPasswordReset(){
 let siteData = {
   name:'', address:'', eventType:null, buildingType:null, description:'', externalReports:[],
   floorHint:'', apartmentHint:'', eta:'', currentZone:'', lastMechanism:'',
-  likelyMechanisms:[], sweepSessions:[],
+  likelyMechanisms:[], sweepSessions:[], hazardNote:'',
   initialEvacuatedGreen:0,
   initialEvacuation:{green:0,yellow:0,red:0,summary:'',source:null},
   expectedCasualties:{trapped:0,immobile:0,missing:0,severe:0}
@@ -3354,6 +3375,7 @@ function ensureSiteReadiness(){
   siteData.lastMechanism=siteData.lastMechanism||'';
   siteData.likelyMechanisms=siteData.likelyMechanisms||[];
   siteData.sweepSessions=siteData.sweepSessions||[];
+  siteData.hazardNote=siteData.hazardNote||'';
   siteData.initialEvacuatedGreen=siteData.initialEvacuation.green||0;
   return siteData;
 }
@@ -4833,7 +4855,15 @@ const DecisionSupportEngine=(()=>{
     const recommendations=evaluate(ctx).filter(r=>['CC','PC','Logistics'].includes(r.responsibleRole));
     return {recommendations,sectorRisk:SectorRiskScore(ctx),operationalPressure:OperationalPressureIndex(ctx)};
   }
-  return {evaluate,forPc,forCc,evaluateTourniquets,evaluateMedicCoverage,evaluateSupplyBurn,evaluateEvacuation,evaluatePatientDeterioration,SectorRiskScore,OperationalPressureIndex,rank};
+  function forMedic(){
+    const ctx={...defaultContext(),patients:roleScopedPatients('medic')};
+    const recommendations=rank([
+      ...evaluatePatientDeterioration(ctx),
+      ...evaluateTourniquets(ctx)
+    ]);
+    return {recommendations};
+  }
+  return {evaluate,forPc,forCc,forMedic,evaluateTourniquets,evaluateMedicCoverage,evaluateSupplyBurn,evaluateEvacuation,evaluatePatientDeterioration,SectorRiskScore,OperationalPressureIndex,rank};
 })();
 function renderRecommendationCard(r){
   const colors={INFO:'var(--muted)',LOW:'var(--green)',MEDIUM:'var(--yellow)',HIGH:'var(--orange)',CRITICAL:'var(--red)'};
@@ -4859,6 +4889,43 @@ function renderRecommendationCard(r){
       <button class="demo-mini-btn" onclick="acknowledgeRecommendation('${r.id}')" ${r.acknowledged?'disabled':''}>${r.acknowledged?'סומן בטיפול':'ACK · סמן בטיפול'}</button>
     </div>
   </div>`;
+}
+function renderRoleBriefingBody(role){
+  const cfg=roleConfig(role);
+  const resp=(cfg.responsibilities||[]).map(r=>roleRow(r)).join('');
+  const hazardText=(siteData.hazardNote||'').trim();
+  const hazardHtml=hazardText
+    ? `<div class="role-row" style="border-color:var(--orange)"><div class="role-row-title">⚠ הנחיות מבצעיות</div><div class="role-row-sub">${hazardText}</div></div>`
+    : roleRow('אין הנחיות מבצעיות מיוחדות כרגע','ניתן לעדכן הנחיה במסך המוקד — "הנחיות לתדריך תפקיד"');
+  const dse = role==='medic' ? DecisionSupportEngine.forMedic()
+    : role==='cc' ? DecisionSupportEngine.forCc()
+    : role==='pc' ? DecisionSupportEngine.forPc()
+    : {recommendations:[]};
+  return `
+    ${roleSection('תחומי אחריות', resp)}
+    ${roleSection('הנחיות מבצעיות נוכחיות', hazardHtml)}
+    ${renderRecommendationPanel(`Top 3 Recommendations — ${ROLE_LABELS[role]||cfg.title}`, dse.recommendations)}
+  `;
+}
+function openRoleBriefing(role){
+  const cfg=roleConfig(role);
+  document.getElementById('role-briefing-title').textContent=`תדריך תפקיד — ${cfg.title}`;
+  document.getElementById('role-briefing-mission').textContent=cfg.actor||'';
+  document.getElementById('role-briefing-body').innerHTML=renderRoleBriefingBody(role);
+  document.getElementById('role-briefing-modal').classList.remove('hidden');
+}
+function renderMedicNbaBanner(dse){
+  const el=document.getElementById('medic-nba-banner');
+  if(!el) return;
+  const top=(dse.recommendations||[])[0];
+  el.innerHTML=top ? `<div class="section-label" style="padding:0 0 4px">💡 המהלך הבא המומלץ</div>${renderRecommendationCard(top)}` : '';
+}
+function updateMedicBriefingBadge(dse){
+  const badge=document.getElementById('medic-briefing-badge');
+  if(!badge) return;
+  const count=(dse.recommendations||[]).filter(r=>!r.acknowledged).length;
+  badge.textContent=count;
+  badge.style.display=count?'inline-flex':'none';
 }
 function renderRecommendationPanel(title, recommendations){
   const open=focusedRecommendations(recommendations||[]).filter(r=>!r.acknowledged).slice(0,3);
@@ -5791,6 +5858,7 @@ function goTo(screen){
     const name=document.getElementById('site-name-input'); if(name && !name.value) name.value=siteData.name||'';
     const addr=document.getElementById('site-address'); if(addr && !addr.value) addr.value=siteData.address||'';
     const desc=document.getElementById('site-description'); if(desc && !desc.value) desc.value=siteData.description||'';
+    const hazard=document.getElementById('site-hazard-note'); if(hazard && !hazard.value) hazard.value=siteData.hazardNote||'';
   }
   if(screen==='step2')     { const b=document.querySelector('#screen-step2 .btn-back'); if(b) b.setAttribute('onclick', `goTo('${state.triage==='black'?'step5':state.flowMode==='quick'?'step6':'step7'}')`); }
   if(screen==='step3')     { const b=document.querySelector('#screen-step3 .btn-back'); if(b) b.setAttribute('onclick', "goTo('step1')"); }
@@ -5853,6 +5921,9 @@ function renderDashboard(){
   document.getElementById('count-black').textContent=c.black;
   document.getElementById('site-name-header').textContent=siteData.name||'אין מוקד פעיל';
   updateZoneContextBar();
+  const medicDse=DecisionSupportEngine.forMedic();
+  renderMedicNbaBanner(medicDse);
+  updateMedicBriefingBadge(medicDse);
 
   const evacTotal=(siteData.initialEvacuation.green||0)+(siteData.initialEvacuation.yellow||0)+(siteData.initialEvacuation.red||0);
   const sourceLabel={civilian:'אזרח',fire:'כב״א',mda:'מד״א',police:'משטרה',other:'אחר'}[siteData.initialEvacuation.source]||'לא צוין';
@@ -7396,6 +7467,7 @@ function saveSite(){
   siteData.name=document.getElementById('site-name-input').value||siteData.name;
   siteData.address=document.getElementById('site-address').value;
   siteData.description=document.getElementById('site-description')?.value||siteData.description;
+  siteData.hazardNote=document.getElementById('site-hazard-note')?.value||siteData.hazardNote;
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   goTo('dashboard');
 }
