@@ -640,7 +640,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9910</div>
+      <div class="demo-kicker">Demo V2.9912</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -739,7 +739,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9910</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9912</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -749,7 +749,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9910</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9912</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -1105,15 +1105,25 @@ textarea{resize:vertical;min-height:70px;}
 
     <div class="field-label">קבוצת גיל</div>
     <div class="tap-grid tap-grid-2" id="age-grid">
-      <button class="tap-btn selected" onclick="selectAgeGroup(this,'adult')">
+      <button class="tap-btn" onclick="selectAgeBand(this,'infant')">
+        <span class="icon">🍼</span>
+        <div style="font-weight:700">תינוק (0-1)</div>
+        <div style="font-size:11px;color:var(--muted)">מפעיל הגנות מינון ילדים</div>
+      </button>
+      <button class="tap-btn" onclick="selectAgeBand(this,'child')">
+        <span class="icon">🧒</span>
+        <div style="font-weight:700">ילד (1-8)</div>
+        <div style="font-size:11px;color:var(--muted)">מפעיל הגנות מינון ילדים</div>
+      </button>
+      <button class="tap-btn selected" onclick="selectAgeBand(this,'adult')">
         <span class="icon">🧑</span>
-        <div style="font-weight:700">מבוגר / 8+</div>
+        <div style="font-weight:700">מבוגר (8-65)</div>
         <div style="font-size:11px;color:var(--muted)">ברירת מחדל למינונים רגילים</div>
       </button>
-      <button class="tap-btn" onclick="selectAgeGroup(this,'pediatric')">
-        <span class="icon">🧒</span>
-        <div style="font-weight:700">ילד מתחת 8</div>
-        <div style="font-size:11px;color:var(--muted)">מפעיל הגנות מינון ילדים</div>
+      <button class="tap-btn" onclick="selectAgeBand(this,'elderly')">
+        <span class="icon">🧓</span>
+        <div style="font-weight:700">קשיש (65+)</div>
+        <div style="font-size:11px;color:var(--muted)">מדדים תקינים אינם שוללים הלם</div>
       </button>
     </div>
     <div class="peds-estimate" id="peds-estimate-panel">
@@ -2503,7 +2513,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.10';
+const APP_VERSION = '2.99.12';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -2720,6 +2730,14 @@ const STATUS_LABELS = {
   evacuated:'מחולץ'
 };
 const TRIAGE_LABELS = {red:'קשה — אדום', yellow:'בינוני — צהוב', green:'קל — ירוק', black:'לא בר הצלה — שחור', pending:'ממתין — חסר נתונים', unknown:'לא ידוע'};
+// Four age bands, additive on top of the existing binary patientAgeGroup ('pediatric'/'adult')
+// which everything else (dosing, weight estimate, pediatric safety UI) still reads unchanged -
+// infant/child both map to patientAgeGroup='pediatric', adult/elderly both map to 'adult'.
+// This keeps all existing pediatric-dosing logic working without modification.
+const AGE_BAND_LABELS = {infant:'תינוק (0-1)', child:'ילד (1-8)', adult:'מבוגר (8-65)', elderly:'קשיש (65+)'};
+const AGE_BAND_TO_GROUP = {infant:'pediatric', child:'pediatric', adult:'adult', elderly:'adult'};
+const AGE_BAND_DEFAULT_AGE = {infant:1, child:7, adult:null, elderly:70};
+function ageBandOf(p={}){ return p.patientAgeBand || (p.patientAgeGroup==='pediatric'?'child':'adult'); }
 const INT_LABELS = {bandage:'חבישה', tourniquet:'חסם עורקים', iv:'פתיחת וריד', morphine:'מורפיום', fluids:'נוזלים IV', airway_mgmt:'פתיחת נ"א', cpr:'החייאה', atq:'אקטיק', other_tx:'אחר'};
 const MEDICATION_LABELS = {morphine:'Morphine', atq:'Actiq/Fentanyl'};
 const MEDICATION_ROUTES = {morphine:'IV', atq:'PO/BUCCAL'};
@@ -3413,7 +3431,7 @@ function freshState(){
     patientDraftId:`draft-${Date.now()}-${uid()}`,
     buildingType:null, locFloor:'', locApt:'', locRoom:'', locFree:'', wearingDesc:'',
     accessibility:null, trapStatus:null,
-    flowMode:'extended', patientAgeGroup:'adult', patientAge:null,
+    flowMode:'extended', patientAgeGroup:'adult', patientAgeBand:'adult', patientAge:null,
     injury:null, injuryZones:new Set(), patientStatus:'identified',
     rapidWalking:null, rapidMajorBleeding:null, rapidAutoFilled:false,
     interventions:new Set(), triage:null,
@@ -3730,6 +3748,7 @@ function demoPatient(id, triage, accessibility, location, injury, patientStatus,
     needsFullAssessment:!!extra.needsFullAssessment,
     unsyncedEvents:extra.unsyncedEvents||0,
     patientAgeGroup:extra.patientAgeGroup||'adult',
+    patientAgeBand:extra.patientAgeBand||(extra.patientAgeGroup==='pediatric'?'child':'adult'),
     patientAge:extra.patientAge||null,
     fullName:extra.fullName||'לא מזוהה',
     identityStatus:extra.identityStatus||'unknown',
@@ -5994,7 +6013,7 @@ function renderDashboard(){
   const evacTotal=(siteData.initialEvacuation.green||0)+(siteData.initialEvacuation.yellow||0)+(siteData.initialEvacuation.red||0);
   const sourceLabel={civilian:'אזרח',fire:'כב״א',mda:'מד״א',police:'משטרה',other:'אחר'}[siteData.initialEvacuation.source]||'לא צוין';
   const evacNote=evacTotal ? `<div class="patient-card green" style="cursor:default"><div class="patient-id">MASS</div><div class="patient-info"><div style="font-weight:700">פינוי ראשוני לפני הגעת כוח רפואי</div><div style="font-size:12px;color:var(--muted);margin-top:2px">קל ${siteData.initialEvacuation.green||0} · בינוני ${siteData.initialEvacuation.yellow||0} · קשה ${siteData.initialEvacuation.red||0} · מקור: ${sourceLabel}</div><div style="font-size:12px;color:var(--muted);margin-top:2px">${siteData.initialEvacuation.summary||'ללא יעד פינוי קצר'}</div><div class="patient-badges"><span class="triage-pill green">מונה מוקד</span><span class="badge badge-muted">לא רשומת פצוע</span></div></div></div>` : '';
-  const active=sortedPatients(patients.filter(p=>!['evacuating','evacuated','handed_over'].includes(p.patientStatus)).filter(patientMatchesBoardFilter));
+  const active=sortedPatientsByColorThenUrgency(patients.filter(p=>!['evacuating','evacuated','handed_over'].includes(p.patientStatus)).filter(patientMatchesBoardFilter));
   document.getElementById('patient-list').innerHTML=evacNote+active.map(p=>{
     const timer=vitalsTimerLabel(p);
     const tq=tourniquetTimerLabel(p);
@@ -6002,6 +6021,7 @@ function renderDashboard(){
     const trend=deteriorationIndex(p);
     const triage=triageKey(p.triage);
     const activeAlert=p.alert===true && !p.alertAcknowledgedAt;
+    const ageBand=ageBandOf(p);
     return `<div class="patient-card ${triage} ${activeAlert?'active-alert':''}" onclick="openPatient('${p.id}')">
       <div class="patient-id">${p.visualId||p.id}</div>
       <div class="patient-info">
@@ -6013,7 +6033,7 @@ function renderDashboard(){
           <span class="badge badge-muted">${TRAP_LABELS[normalizeTrapStatus(p)]||'לא תועד'}</span>
           ${p.needsFullAssessment?'<span class="badge badge-orange">חסר הערכה</span>':''}
           ${patientHasFieldConflict(p)?'<span class="badge badge-orange">⚠ עדכון תפקידי</span>':''}
-          ${p.patientAgeGroup==='pediatric'?'<span class="badge badge-yellow">ילד</span>':''}
+          ${ageBand==='infant'?'<span class="badge badge-yellow">תינוק</span>':ageBand==='child'?'<span class="badge badge-yellow">ילד</span>':ageBand==='elderly'?'<span class="badge badge-orange">קשיש</span>':''}
           ${p.unsyncedEvents?`<span class="badge badge-accent">${p.unsyncedEvents} unsynced</span>`:''}
           ${timer?`<span class="vitals-timer ${timer.cls}" onclick="event.stopPropagation();openQuickVitals('${p.id}')">${timer.label}</span>`:''}
           ${tq?`<span class="tq-timer ${tq.cls}">${tq.label}</span>`:''}
@@ -6024,6 +6044,7 @@ function renderDashboard(){
           <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${p.time}</span>
         </div>
         <div style="font-size:11px;color:var(--muted);margin-top:3px">${trend.detail}</div>
+        ${ageBand==='elderly'?'<div style="font-size:10px;color:var(--orange);margin-top:2px">⚠ קשיש — מדדים תקינים אינם שוללים הלם</div>':''}
         ${ticketMetaHtml(p,'medic')}
         <button class="demo-mini-btn" onclick="event.stopPropagation();openMedicResupplySheet('${p.id}','manual_request')" style="margin-top:8px;background:var(--surface2);border-color:var(--border);color:var(--muted)">חסר לי ציוד</button>
       </div>
@@ -6203,6 +6224,37 @@ function patientPriorityScore(p){
 }
 function sortedPatients(list=patients){
   return [...list].sort((a,b)=>patientPriorityScore(a)-patientPriorityScore(b) || String(a.id).localeCompare(String(b.id)));
+}
+// Medic board only: strict two-level sort - triage color is always the primary key (red < yellow
+// < green < black/pending), therapeutic urgency only breaks ties within the same color and can
+// never let a lower-color patient outrank a higher one. Reuses the exact same urgency signals
+// patientPriorityScore already computes (active alert, deterioration, tourniquet, trapped, stale
+// vitals, needs full assessment) - just restructured so color always wins first. Other screens
+// (PC/CC boards, roleScopedPatients, command patient table) keep using the blended
+// patientPriorityScore/sortedPatients above, unchanged.
+function medicBoardUrgencyScore(p){
+  const activeAlert = p.alert===true && !p.alertAcknowledgedAt;
+  const hasDeter    = p.deterioration && p.deterioration.length > 0;
+  const hasTq       = !!p.tourniquet;
+  const isTrapped   = normalizeTrapStatus(p)==='trapped';
+  const stale       = isVitalsOverdue(p);
+  if(activeAlert && hasDeter) return 0;
+  if(activeAlert)             return 1;
+  if(hasTq && stale)          return 2;
+  if(hasTq)                   return 3;
+  if(isTrapped)                return 4;
+  if(stale)                    return 5;
+  if(p.needsFullAssessment)    return 6;
+  if(hasDeter)                  return 7;
+  return 8;
+}
+function medicBoardSortScore(p){
+  const colorOrder = {red:0, yellow:1, green:2, black:3, pending:4, unknown:4};
+  const color = colorOrder[triageKey(p.triage)] ?? 4;
+  return color*10 + medicBoardUrgencyScore(p);
+}
+function sortedPatientsByColorThenUrgency(list=patients){
+  return [...list].sort((a,b)=>medicBoardSortScore(a)-medicBoardSortScore(b) || String(a.id).localeCompare(String(b.id)));
 }
 function deteriorationIndex(p){
   const h=p.vitalsHistory||[];
@@ -7312,6 +7364,7 @@ function saveImmediateCasualtyAndContinue(){
     needsFullAssessment:triage!=='black',
     unsyncedEvents:1,
     patientAgeGroup:state.patientAgeGroup||'adult',
+    patientAgeBand:state.patientAgeBand||'adult',
     patientAge:state.patientAge||null,
     fullName:'לא מזוהה',
     identityStatus:'unknown',
@@ -7652,8 +7705,10 @@ function openPatient(id){
       <div class="summary-row"><span class="summary-key">חילוץ</span><span class="summary-val">${TRAP_LABELS[normalizeTrapStatus(p)]||'לא תועד'}</span></div>
       <div class="summary-row"><span class="summary-key">פציעה</span><span class="summary-val">${p.injury}</span></div>
       <div class="summary-row"><span class="summary-key">מצב</span><span class="summary-val">${STATUS_LABELS[p.patientStatus]||''}</span></div>
+      <div class="summary-row"><span class="summary-key">קבוצת גיל</span><span class="summary-val">${AGE_BAND_LABELS[ageBandOf(p)]}</span></div>
       ${tq?`<div class="summary-row"><span class="summary-key">חסם עורקים</span><span class="summary-val"><span class="tq-timer ${tq.cls}">${tq.label}</span></span></div>`:''}
     </div>
+    ${ageBandOf(p)==='elderly'?`<div class="summary-card" style="border-color:var(--orange);background:rgba(255,107,53,0.08)"><div style="font-weight:700;font-size:12px;color:var(--orange)">⚠ קשיש</div><div style="font-size:12px;margin-top:3px">מדדים תקינים לא שוללים הלם — פרפוזיה עלולה להיפגע ללא עלייה בדופק (חוסמי בטא, שינויים אוטונומיים). אל תסתמך על דופק/לחץ דם תקינים לבד.</div></div>`:''}
     <div class="summary-card">
       <div style="font-weight:700;font-size:14px;margin-bottom:8px">זיהוי (אופציונלי)</div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:10px">לא חובה למלא. ניתן להשלים בכל שלב, כשיש זמן.</div>
@@ -8025,12 +8080,13 @@ function startNewPatient(mode='extended'){
   goTo('step1');
 }
 
-function selectAgeGroup(btn, val){
+function selectAgeBand(btn, band){
   document.querySelectorAll('#age-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
-  state.patientAgeGroup = val;
-  state.patientAge = val === 'pediatric' ? 7 : null;
-  if(val==='pediatric') applyPediatricSafeDefaults();
+  state.patientAgeBand = band;
+  state.patientAgeGroup = AGE_BAND_TO_GROUP[band];
+  state.patientAge = AGE_BAND_DEFAULT_AGE[band];
+  if(state.patientAgeGroup==='pediatric') applyPediatricSafeDefaults();
   else { doses.morphine=5; const el=document.getElementById('dose-morphine'); if(el) el.textContent='5'; }
   updatePediatricEstimatePanel();
   updatePediatricTreatmentUi();
@@ -8261,7 +8317,7 @@ function checkStep6(){
   document.getElementById('btn-step6').disabled = false;
 }
 function patientSafetyProfile(){
-  return {patientAgeGroup:state.patientAgeGroup, patientAge:state.patientAge};
+  return {patientAgeGroup:state.patientAgeGroup, patientAgeBand:state.patientAgeBand, patientAge:state.patientAge};
 }
 function estimatedPediatricWeight(){
   const hasAge=state.patientAge !== null && state.patientAge !== '';
@@ -8656,7 +8712,7 @@ function renderSummary(){
     <div class="summary-row"><span class="summary-key">לבוש / זיהוי</span><span class="summary-val">${state.wearingDesc||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">חילוץ</span><span class="summary-val">${TRAP_LABELS[state.trapStatus]||'לא תועד'}</span></div>
     <div class="summary-row"><span class="summary-key">מסלול</span><span class="summary-val">${state.flowMode==='quick'?'מסלול מהיר — יש לקחת מדדים':'מסלול מלא — לאחר ייצוב'}</span></div>
-    <div class="summary-row"><span class="summary-key">גיל</span><span class="summary-val">${state.patientAgeGroup==='pediatric'?'ילד מתחת 8':'מבוגר / 8+'}</span></div>
+    <div class="summary-row"><span class="summary-key">גיל</span><span class="summary-val">${AGE_BAND_LABELS[state.patientAgeBand]||AGE_BAND_LABELS.adult}</span></div>
     <div class="summary-row"><span class="summary-key">דופק</span><span class="summary-val" style="font-family:var(--mono)">${flowVitals.pulse ?? '—'}${flowVitals.pulse?' bpm':''}</span></div>
     <div class="summary-row"><span class="summary-key">SpO₂</span><span class="summary-val" style="font-family:var(--mono)">${flowVitals.spo2||'לא נמדד'}</span></div>
     <div class="summary-row"><span class="summary-key">לחץ דם</span><span class="summary-val">${BP_LABELS[flowVitals.bp_estimate]||'—'}</span></div>
@@ -8722,6 +8778,7 @@ function savePatient(){
     injury:effectiveInjury, injuryZones:[...state.injuryZones], patientStatus:effectiveStatus,
     needsFullAssessment:state.needsFullAssessment,
     patientAgeGroup:state.patientAgeGroup,
+    patientAgeBand:state.patientAgeBand||'adult',
     patientAge:state.patientAge,
     fullName:'לא מזוהה',
     identityStatus:'unknown',
