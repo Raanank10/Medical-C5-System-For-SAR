@@ -72,6 +72,14 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
+// Structured logging (docs/OBSERVABILITY_REVIEW.md): outcome + non-sensitive ids only. Never
+// log the secret (s), the token_hash, patient visual_id, or MIST clinical text - only the
+// patient_id uuid (already used as a bare key throughout sync_ingestion_errors/watchdog_alerts/
+// conflict_log in this schema, not treated as sensitive on its own in this system's model).
+function logEvent(event: string, fields: Record<string, unknown>) {
+  console.log(JSON.stringify({ event, fn: "handover-consume", ...fields }));
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: CORS_HEADERS });
@@ -84,22 +92,32 @@ Deno.serve(async (req: Request) => {
   const h = url.searchParams.get("h");
   const s = url.searchParams.get("s");
   if (!h || !s) {
+    logEvent("missing_params", {});
     return html(page("קישור לא תקין", `<div class="row">חסרים פרמטרים בקישור.</div>`, "error"), 400);
   }
 
   const serviceClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-  const { data: tokenRow, error: tokenErr } = await serviceClient
-    .from("patient_handover_tokens")
-    .select("id, patient_id, incident_id, source_event_id, destination_facility, receiving_unit_transport, token_hash, expires_at, consumed_at")
-    .eq("token_hash", h)
-    .maybeSingle();
+  // deno-lint-ignore no-explicit-any
+  let tokenRow: any, tokenErr: any;
+  try {
+    ({ data: tokenRow, error: tokenErr } = await serviceClient
+      .from("patient_handover_tokens")
+      .select("id, patient_id, incident_id, source_event_id, destination_facility, receiving_unit_transport, token_hash, expires_at, consumed_at")
+      .eq("token_hash", h)
+      .maybeSingle());
+  } catch (e) {
+    logEvent("unhandled_exception", { message: e instanceof Error ? e.message : String(e) });
+    return html(page("שגיאת מערכת", `<div class="row">אירעה שגיאה בלתי צפויה.</div>`, "error"), 500);
+  }
 
   if (tokenErr) {
+    logEvent("token_lookup_failed", { message: tokenErr.message });
     return html(page("שגיאת מערכת", `<div class="row">${escapeHtml(tokenErr.message)}</div>`, "error"), 500);
   }
   if (!tokenRow) {
     // Honest offline-first failure mode: the sending device may simply not have synced yet.
+    logEvent("token_not_found", {});
     return html(
       page(
         "הקישור טרם פעיל",
@@ -116,10 +134,12 @@ Deno.serve(async (req: Request) => {
   const hashBuf = await crypto.subtle.digest("SHA-256", secretBytes);
   const recomputedHash = Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, "0")).join("");
   if (!timingSafeEqual(recomputedHash, tokenRow.token_hash)) {
+    logEvent("verification_failed", { token_id: tokenRow.id, patient_id: tokenRow.patient_id });
     return html(page("קישור לא תקין", `<div class="row">אימות נכשל.</div>`, "error"), 403);
   }
 
   if (tokenRow.consumed_at) {
+    logEvent("already_consumed", { token_id: tokenRow.id, patient_id: tokenRow.patient_id });
     return html(
       page(
         "כבר נמסר",
@@ -130,6 +150,7 @@ Deno.serve(async (req: Request) => {
     );
   }
   if (new Date(tokenRow.expires_at).getTime() < Date.now()) {
+    logEvent("expired", { token_id: tokenRow.id, patient_id: tokenRow.patient_id });
     return html(
       page("הקישור פג תוקף", `<div class="row">בקש מהצוות השולח קישור חדש.</div>`, "error"),
       410,
@@ -167,6 +188,8 @@ Deno.serve(async (req: Request) => {
   }
     <div class="row" style="color:#34c759;font-weight:800">✓ נמסר בהצלחה · ${new Date().toLocaleString("he-IL")}</div>
   `;
+
+  logEvent("consumed", { token_id: tokenRow.id, patient_id: tokenRow.patient_id, incident_id: tokenRow.incident_id });
 
   return html(page("מסירת פצוע אושרה", bodyHtml, "ok"));
 });

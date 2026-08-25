@@ -137,44 +137,61 @@ interface IncomingEvent {
   depends_on?: { device_id: string; local_event_id: string }[];
 }
 
+// Structured logging (docs/OBSERVABILITY_REVIEW.md): one JSON line per real decision point,
+// captured for free by Supabase's already-running edge_logs tier - no new dependency, no new
+// service. Never log patient names, free-text clinical fields, or event payload_json bodies -
+// counts, codes, ids, and roles only, matching this schema's existing privacy-minimization
+// stance (docs/PRIVACY_AND_DATA_MINIMIZATION_REVIEW.md).
+function logEvent(event: string, fields: Record<string, unknown>) {
+  console.log(JSON.stringify({ event, fn: "sync-log", ...fields }));
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: CORS_HEADERS });
   }
 
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) {
-    return json({ error: "missing_authorization" }, 401);
-  }
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return json({ error: "missing_authorization" }, 401);
+    }
 
-  const userClient = createClient(SUPABASE_URL, ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const serviceClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const serviceClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-  const { data: userData, error: userErr } = await userClient.auth.getUser();
-  if (userErr || !userData?.user) {
-    return json({ error: "invalid_session" }, 401);
-  }
-  const callerId = userData.user.id;
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user) {
+      return json({ error: "invalid_session" }, 401);
+    }
+    const callerId = userData.user.id;
 
-  const { data: profile, error: profileErr } = await userClient
-    .from("profiles")
-    .select("role, is_active")
-    .eq("id", callerId)
-    .single();
-  if (profileErr || !profile || !profile.is_active) {
-    return json({ error: "no_active_profile" }, 403);
-  }
-  const callerRole = profile.role as string;
+    const { data: profile, error: profileErr } = await userClient
+      .from("profiles")
+      .select("role, is_active")
+      .eq("id", callerId)
+      .single();
+    if (profileErr || !profile || !profile.is_active) {
+      logEvent("no_active_profile", { caller_id: callerId, method: req.method });
+      return json({ error: "no_active_profile" }, 403);
+    }
+    const callerRole = profile.role as string;
 
-  if (req.method === "POST") {
-    return handlePush(req, userClient, serviceClient, callerId, callerRole);
+    if (req.method === "POST") {
+      return await handlePush(req, userClient, serviceClient, callerId, callerRole);
+    }
+    if (req.method === "GET") {
+      return await handlePull(req, userClient, callerId);
+    }
+    return json({ error: "method_not_allowed" }, 405);
+  } catch (e) {
+    // Anything unexpected (auth-provider blip, thrown exception before any earlier catch) -
+    // previously silently became a bare 500 with no record anywhere. Logged, not just returned.
+    logEvent("unhandled_exception", { method: req.method, message: e instanceof Error ? e.message : String(e) });
+    return json({ error: "internal_error" }, 500);
   }
-  if (req.method === "GET") {
-    return handlePull(req, userClient);
-  }
-  return json({ error: "method_not_allowed" }, 405);
 });
 
 async function handlePush(
@@ -196,11 +213,13 @@ async function handlePush(
   try {
     body = await req.json();
   } catch {
+    logEvent("invalid_json_body", { caller_id: callerId, role: callerRole });
     return json({ error: "invalid_json_body" }, 400);
   }
 
   const { device_id, incident_id, events } = body;
   if (!device_id || !Array.isArray(events)) {
+    logEvent("missing_device_id_or_events", { caller_id: callerId, role: callerRole, incident_id: incident_id ?? null });
     return json({ error: "missing_device_id_or_events" }, 400);
   }
 
@@ -408,6 +427,20 @@ async function handlePush(
     ? Math.max(...cursors)
     : (body.last_known_server_cursor ?? body.last_pull_cursor ?? null);
 
+  logEvent("push_batch_completed", {
+    device_id,
+    incident_id: incident_id ?? null,
+    caller_id: callerId,
+    role: callerRole,
+    batch_size: events.length,
+    accepted: accepted.length,
+    duplicates: duplicates.length,
+    rejected: rejected.length,
+    blocked_dependency: blocked_dependency.length,
+    high_risk_flags: high_risk_flags.length,
+    field_conflicts: field_conflicts.length,
+  });
+
   return json({
     server_time: new Date().toISOString(),
     accepted,
@@ -421,7 +454,7 @@ async function handlePush(
 }
 
 // deno-lint-ignore no-explicit-any
-async function handlePull(req: Request, userClient: any): Promise<Response> {
+async function handlePull(req: Request, userClient: any, callerId: string): Promise<Response> {
   const url = new URL(req.url);
   const incident_id = url.searchParams.get("incident_id");
   const since_cursor = Number(url.searchParams.get("since_cursor") ?? "0");
@@ -429,6 +462,7 @@ async function handlePull(req: Request, userClient: any): Promise<Response> {
   const limit = Math.min(Math.max(Number.isFinite(limitParam) ? limitParam : 500, 1), 2000);
 
   if (!incident_id) {
+    logEvent("missing_incident_id", { caller_id: callerId });
     return json({ error: "missing_incident_id" }, 400);
   }
 
@@ -441,6 +475,7 @@ async function handlePull(req: Request, userClient: any): Promise<Response> {
     .limit(limit);
 
   if (error) {
+    logEvent("pull_query_failed", { caller_id: callerId, incident_id, message: error.message });
     return json({ error: "query_failed", message: error.message }, 400);
   }
 
@@ -458,6 +493,8 @@ async function handlePull(req: Request, userClient: any): Promise<Response> {
 
   const next_cursor = events.length > 0 ? events[events.length - 1].server_cursor : since_cursor;
   const has_more = events.length === limit;
+
+  logEvent("pull_batch_completed", { caller_id: callerId, incident_id, since_cursor, returned: events.length, has_more });
 
   return json({
     server_time: new Date().toISOString(),
