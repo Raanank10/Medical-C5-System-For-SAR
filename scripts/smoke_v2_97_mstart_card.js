@@ -21,8 +21,8 @@ for (const file of files) {
   const treatmentEnd = html.indexOf('function setSweepTourniquetLimb', treatmentStart);
   const treatmentBody = html.slice(treatmentStart, treatmentEnd);
 
-  assert(html.includes("const APP_VERSION = '2.99.11';"), `${rel}: APP_VERSION must be V2.9911`);
-  assert(html.includes('Demo V2.9911'), `${rel}: launcher label must be V2.9911`);
+  assert(html.includes("const APP_VERSION = '2.99.12';"), `${rel}: APP_VERSION must be V2.9912`);
+  assert(html.includes('Demo V2.9912'), `${rel}: launcher label must be V2.9912`);
   assert(renderBody.includes('M — דימום מסכן חיים'), `${rel}: missing immediate hemorrhage section`);
   assert(renderBody.indexOf('M — דימום מסכן חיים') < renderBody.indexOf('הולך?'), `${rel}: hemorrhage section must precede walking`);
   const breathingLabel = '<div class="field-label">נשימה</div>';
@@ -52,5 +52,5 @@ for (const file of files) {
   assert(html.includes('function renderCcCommandBoard'), `${rel}: CC board removed`);
   assert(html.includes('function renderAar'), `${rel}: AAR removed`);
 
-  console.log(`${rel}: V2.9911 MSTART card static smoke passed`);
+  console.log(`${rel}: V2.9912 MSTART card static smoke passed`);
 }

@@ -640,7 +640,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9911</div>
+      <div class="demo-kicker">Demo V2.9912</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -739,7 +739,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9911</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9912</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -749,7 +749,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9911</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9912</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2513,7 +2513,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.11';
+const APP_VERSION = '2.99.12';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -6012,7 +6012,7 @@ function renderDashboard(){
   const evacTotal=(siteData.initialEvacuation.green||0)+(siteData.initialEvacuation.yellow||0)+(siteData.initialEvacuation.red||0);
   const sourceLabel={civilian:'אזרח',fire:'כב״א',mda:'מד״א',police:'משטרה',other:'אחר'}[siteData.initialEvacuation.source]||'לא צוין';
   const evacNote=evacTotal ? `<div class="patient-card green" style="cursor:default"><div class="patient-id">MASS</div><div class="patient-info"><div style="font-weight:700">פינוי ראשוני לפני הגעת כוח רפואי</div><div style="font-size:12px;color:var(--muted);margin-top:2px">קל ${siteData.initialEvacuation.green||0} · בינוני ${siteData.initialEvacuation.yellow||0} · קשה ${siteData.initialEvacuation.red||0} · מקור: ${sourceLabel}</div><div style="font-size:12px;color:var(--muted);margin-top:2px">${siteData.initialEvacuation.summary||'ללא יעד פינוי קצר'}</div><div class="patient-badges"><span class="triage-pill green">מונה מוקד</span><span class="badge badge-muted">לא רשומת פצוע</span></div></div></div>` : '';
-  const active=sortedPatients(patients.filter(p=>!['evacuating','evacuated','handed_over'].includes(p.patientStatus)).filter(patientMatchesBoardFilter));
+  const active=sortedPatientsByColorThenUrgency(patients.filter(p=>!['evacuating','evacuated','handed_over'].includes(p.patientStatus)).filter(patientMatchesBoardFilter));
   document.getElementById('patient-list').innerHTML=evacNote+active.map(p=>{
     const timer=vitalsTimerLabel(p);
     const tq=tourniquetTimerLabel(p);
@@ -6223,6 +6223,37 @@ function patientPriorityScore(p){
 }
 function sortedPatients(list=patients){
   return [...list].sort((a,b)=>patientPriorityScore(a)-patientPriorityScore(b) || String(a.id).localeCompare(String(b.id)));
+}
+// Medic board only: strict two-level sort - triage color is always the primary key (red < yellow
+// < green < black/pending), therapeutic urgency only breaks ties within the same color and can
+// never let a lower-color patient outrank a higher one. Reuses the exact same urgency signals
+// patientPriorityScore already computes (active alert, deterioration, tourniquet, trapped, stale
+// vitals, needs full assessment) - just restructured so color always wins first. Other screens
+// (PC/CC boards, roleScopedPatients, command patient table) keep using the blended
+// patientPriorityScore/sortedPatients above, unchanged.
+function medicBoardUrgencyScore(p){
+  const activeAlert = p.alert===true && !p.alertAcknowledgedAt;
+  const hasDeter    = p.deterioration && p.deterioration.length > 0;
+  const hasTq       = !!p.tourniquet;
+  const isTrapped   = normalizeTrapStatus(p)==='trapped';
+  const stale       = isVitalsOverdue(p);
+  if(activeAlert && hasDeter) return 0;
+  if(activeAlert)             return 1;
+  if(hasTq && stale)          return 2;
+  if(hasTq)                   return 3;
+  if(isTrapped)                return 4;
+  if(stale)                    return 5;
+  if(p.needsFullAssessment)    return 6;
+  if(hasDeter)                  return 7;
+  return 8;
+}
+function medicBoardSortScore(p){
+  const colorOrder = {red:0, yellow:1, green:2, black:3, pending:4, unknown:4};
+  const color = colorOrder[triageKey(p.triage)] ?? 4;
+  return color*10 + medicBoardUrgencyScore(p);
+}
+function sortedPatientsByColorThenUrgency(list=patients){
+  return [...list].sort((a,b)=>medicBoardSortScore(a)-medicBoardSortScore(b) || String(a.id).localeCompare(String(b.id)));
 }
 function deteriorationIndex(p){
   const h=p.vitalsHistory||[];
