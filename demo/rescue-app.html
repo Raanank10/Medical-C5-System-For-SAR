@@ -640,7 +640,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9913</div>
+      <div class="demo-kicker">Demo V2.9914</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -698,7 +698,7 @@ textarea{resize:vertical;min-height:70px;}
     </div>
     <div class="demo-panel">
       <div class="demo-strip-title">שרשרת חילוץ — ראשונים בזירה</div>
-      <div class="demo-strip-sub">תמונה טקטית מוגבלת (ללא מדדים / זהות) + סמכות אתר עצמאית: פתיחת אירוע, סטטוס מבנה, אישור אתר נקי — ללא אישור רפואי.</div>
+      <div class="demo-strip-sub">תמונה טקטית מוגבלת (ללא מדדים) + סדר פינוי מומלץ + סמכות אתר עצמאית: פתיחת אירוע, סטטוס מבנה, אישור אתר נקי — ללא אישור רפואי.</div>
       <div class="demo-grid" style="margin-top:12px">
         <button class="demo-card" onclick="startRoleDashboard('rpc')">
           <div class="demo-icon">🪖</div>
@@ -739,7 +739,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9913</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9914</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -749,7 +749,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9913</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9914</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2516,7 +2516,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.13';
+const APP_VERSION = '2.99.14';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3700,18 +3700,29 @@ function displayPatientIdentity(p){
   const name=p.fullName&&p.fullName!=='לא מזוהה'?p.fullName:'לא מזוהה';
   return `${p.visualId||p.id} — ${name} · ${status}`;
 }
-// Rescue-chain (rpc/rcc) redacted view: tag + callsign only. Never route fullName,
-// vitals, txHistory, or temporaryDescription/locDetail (mechanism narrative) through here.
+// Rescue-chain (rpc/rcc) redacted view of the RESPONSIBLE MEDIC: callsign only, never their
+// full name. Never route vitals or txHistory/locDetail (mechanism narrative) through here either.
+// This is separate from the PATIENT's own identity, below, which rpc/rcc are allowed to see.
 function medicCallsign(idOrName){
   const user=userById(idOrName)||DEMO_USERS.find(u=>u.role==='medic' && u.fullName===idOrName);
   return user ? user.callsign : 'לא משויך';
+}
+// Rescue-chain (rpc/rcc) view of PATIENT identity: full name once reported/confirmed, falling
+// back to the physical description already used elsewhere for locating an unidentified patient
+// (temporaryDescription). rpc/rcc need this to physically pick out the right person in the
+// field - unlike vitals/treatment/injury mechanism, identity is in scope for these roles
+// (docs/ROLE_COMMAND_MODEL_v2.8.md).
+function rescueIdentityLine(p={}){
+  if(p.fullName && p.fullName!=='לא מזוהה') return p.fullName;
+  if(p.temporaryDescription) return p.temporaryDescription;
+  return 'לא מזוהה — אין תיאור זמני';
 }
 function tacticalPatientRow(p){
   const trap=TRAP_LABELS[p.trapStatus]||'לא תועד';
   const evac=STATUS_LABELS[p.patientStatus]||p.patientStatus||'—';
   const medic=medicCallsign(p.assignedMedicId||userIdFromMedic(p.medic||p.lastTouchedBy));
   return roleRow(
-    `${p.visualId||p.id} · ${TRIAGE_LABELS[p.triage]||p.triage}`,
+    `${p.visualId||p.id} · ${TRIAGE_LABELS[p.triage]||p.triage} · ${rescueIdentityLine(p)}`,
     `${p.location||'אזור לא תועד'} · ${trap} · ${evac} · ${p.time||''} מהאיתור`,
     `<span class="identity-chip">חובש אחראי: ${medic}</span>`
   );
@@ -4259,8 +4270,8 @@ function roleConfig(role){
     logistics:{title:'קצין לוגיסטיקה / Log-O', actor:'רס״ם אמיר דגן — Log-O', audience:'logistics', legacy:'logistics', responsibilities:['מלאי ציוד רפואי לפי מחלקה / מוקד','מענה לבקשות ציוד','הקצאת אספקה מחדש','מעקב burn rate','הצפת חוסר המשפיע על טיפול']},
     chamal:{title:'חמ״ל / מפעיל', actor:'חמ״ל — משתמש מחובר', audience:'chamal', legacy:'commander', responsibilities:['תמונת מצב כללית','אמינות נתונים ו-Sync','כפילויות ודיווחים חיצוניים','תמיכה בחוג"ד / מ״פ רפואה','ייצוא סיכום אירוע חי']},
     admin:{title:'מנהל דמו', actor:'מנהל דמו', audience:'chamal', legacy:'roles', responsibilities:['הפעלת תרחיש חתום','ניקוי דמו','ייצוא ניסוי','בדיקת הרשאות','הפרדת דמו מנתוני אמת']},
-    rpc:{title:'מ״מ — תמונת מצב טקטית וסמכות אתר', actor:'מ״מ — משתמש מחובר', audience:'rpc', legacy:'role-dashboard', responsibilities:['צפייה בתג, מיון, אזור, לכוד/נייד וסטטוס פינוי לפצועי המחלקה שלי בלבד','ראיית חובש אחראי לכל פצוע (כינוי קריאה בלבד, לא שם)','ספירות מיון מצטברות למחלקה','ללא גישה למדדים, טיפול, מנגנון פציעה או זהות פצוע','לא מגיש בקשות תגבור / אספקה','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה']},
-    rcc:{title:'מ״פ חילוץ — תמונת מצב מרוכזת וסמכות אתר', actor:'מ״פ חילוץ — משתמש מחובר', audience:'rcc', legacy:'role-dashboard', responsibilities:['תמונת מצב מרוכזת לפי מחלקות עבור הפלוגה שלי','ספירות מיון, לכודים וסטטוס פינוי לכל מחלקה','צפייה בבקשות אספקה פתוחות (לוגיסטיקת פלוגת חילוץ)','ללא גישה למדדים, טיפול, מנגנון פציעה או זהות פצוע','לא מגיש בקשות תגבור רפואי','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה']}
+    rpc:{title:'מ״מ — תמונת מצב טקטית וסמכות אתר', actor:'מ״מ — משתמש מחובר', audience:'rpc', legacy:'role-dashboard', responsibilities:['צפייה בתג, מיון, אזור, לכוד/נייד וסטטוס פינוי לפצועי המחלקה שלי בלבד','צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע — לזיהוי פיזי בשטח','ראיית חובש אחראי לכל פצוע (כינוי קריאה בלבד, לא שם)','סדר פינוי מומלץ למחלקה שלי, זהה למה שחוג"ד/מ״פ רפואה רואים','ספירות מיון מצטברות למחלקה','ללא גישה למדדים, טיפול או מנגנון פציעה','לא מגיש בקשות תגבור / אספקה','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה']},
+    rcc:{title:'מ״פ חילוץ — תמונת מצב מרוכזת וסמכות אתר', actor:'מ״פ חילוץ — משתמש מחובר', audience:'rcc', legacy:'role-dashboard', responsibilities:['תמונת מצב מרוכזת לפי מחלקות עבור הפלוגה שלי','צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע — לזיהוי פיזי בשטח','ספירות מיון, לכודים וסטטוס פינוי לכל מחלקה','סדר פינוי מומלץ לכלל הפלוגה, זהה למה שמ״פ רפואה רואה','צפייה בבקשות אספקה פתוחות (לוגיסטיקת פלוגת חילוץ)','ללא גישה למדדים, טיפול או מנגנון פציעה','לא מגיש בקשות תגבור רפואי','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה']}
   }[role] || roleConfig('medic');
 }
 function roleMetric(n,l){ return `<div class="role-metric"><div class="role-metric-num">${n}</div><div class="role-metric-label">${l}</div></div>`; }
@@ -5297,6 +5308,30 @@ function evacuationSortScore(p){
 function sortedPatientsByEvacPriority(list=patients){
   return [...list].sort((a,b)=>evacuationSortScore(a)-evacuationSortScore(b) || String(a.id).localeCompare(String(b.id)));
 }
+// rpc/rcc evacuation-order panel: same ranking/order PC/CC already use (sortedPatientsByEvacPriority),
+// so rescue-chain and medical command never disagree about who's evacuated first. The rank-0/1
+// (tourniquet) reason text is kept verbatim since tourniquet status is already something rpc/rcc
+// see and report themselves; rank-2's reason normally cites AVPU/respiratory rate, which is vitals
+// detail outside rpc/rcc's scope, so that one gets replaced with a non-clinical label.
+function rescueEvacReason(rank, reason){
+  if(rank===0 || rank===1) return reason;
+  if(rank===2) return 'אדום — פינוי בעדיפות';
+  if(rank===3) return 'צהוב מיוצב';
+  return 'מעקב רגיל';
+}
+function renderRescueEvacOrderPanel(pts, title){
+  const ordered=sortedPatientsByEvacPriority(pts);
+  const rows=ordered.map((p,i)=>{
+    const {rank,reason}=evacuationPriorityRank(p);
+    const triage=triageKey(p.triage);
+    return `<div class="role-row" style="border-color:var(--${triage==='black'?'muted':triage})">
+      <div class="role-row-title"><span style="font-family:var(--mono);color:var(--accent);font-weight:900">#${i+1}</span> · ${p.visualId||p.id} · ${TRIAGE_LABELS[p.triage]||p.triage}</div>
+      <div class="role-row-sub">${rescueIdentityLine(p)}</div>
+      <div class="role-row-sub" style="margin-top:2px;color:var(--muted)">${rescueEvacReason(rank,reason)} · ${p.location||'אזור לא תועד'} · ${STATUS_LABELS[p.patientStatus]||''}</div>
+    </div>`;
+  }).join('');
+  return roleSection(title, rows || roleRow('אין פצועים ברשימה',''));
+}
 function renderDeathCertificationChain(){
   const deathReqs=reinforcementRequests.filter(r=>r.resourceType==='doctor_death_cert' && isRequestOpen(r));
   const latest=deathReqs[0];
@@ -5703,6 +5738,9 @@ function renderRoleDashboard(role=activeRoleDashboard){
         <button class="demo-mini-btn" onclick="rescueConfirmSiteClear('${role}')" style="grid-column:1/-1">אשר אתר נקי</button>
       </div>
     </div>`:'';
+  const rescueEvacOrderPanel=role==='rpc'?renderRescueEvacOrderPanel(pts,'סדר פינוי מומלץ — מחלקה שלי')
+    :role==='rcc'?renderRescueEvacOrderPanel(pts,'סדר פינוי מומלץ — כלל הפלוגה')
+    :'';
   const reqHtml=requests.slice(0,8).map(r=>roleRow(
     `${r.id} · ${r.type==='resupply'?'השלמת ציוד':(REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType)}`,
     `${r.type==='resupply'?resupplyItemsText(r):r.targetLocation} · ${REINFORCEMENT_STATUS_LABELS[r.status]||r.status} · ${r.type==='resupply'?(r.truckAvailability==='available'?'זמין ברכב חוג״ד':'דורש מ״פ רפואה'):(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')}`
@@ -5720,8 +5758,9 @@ function renderRoleDashboard(role=activeRoleDashboard){
   const genericSections=`
     ${roleSection('האחריות שלי', responsibilities)}
     ${rescueAuthorityPanel}
+    ${rescueEvacOrderPanel}
     ${roleSection('התראות שדורשות פעולה ממני', alertHtml)}
-    ${roleSection(role==='pc'?'האובייקטים שלי: חובשים / פצועים / מוקדים':role==='cc'?'האובייקטים שלי: מחלקות / מוקדים / משאבים':role==='physician'?'תור סקירה רפואית':role==='logistics'?'מלאי ובקשות ציוד':role==='rpc'?'תמונה טקטית — מחלקה שלי (ללא מדדים / זהות)':role==='rcc'?'תמונה טקטית מרוכזת — פלוגה שלי (ללא מדדים / זהות)':'האובייקטים שלי', objects)}
+    ${roleSection(role==='pc'?'האובייקטים שלי: חובשים / פצועים / מוקדים':role==='cc'?'האובייקטים שלי: מחלקות / מוקדים / משאבים':role==='physician'?'תור סקירה רפואית':role==='logistics'?'מלאי ובקשות ציוד':role==='rpc'?'תמונה טקטית — מחלקה שלי (ללא מדדים)':role==='rcc'?'תמונה טקטית מרוכזת — פלוגה שלי (ללא מדדים)':'האובייקטים שלי', objects)}
     ${roleSection('בקשות / הקצאות פתוחות', reqHtml)}
     <div class="demo-actions" style="margin:0;grid-template-columns:1fr 1fr">${actions}</div>`;
   document.getElementById('role-dashboard-body').innerHTML=`

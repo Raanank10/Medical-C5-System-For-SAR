@@ -34,7 +34,7 @@ for (const file of files) {
     html.indexOf('function setBreathingAfterAirway')
   );
 
-  assert(html.includes("const APP_VERSION = '2.99.13';"), `${rel}: APP_VERSION must be V2.9913`);
+  assert(html.includes("const APP_VERSION = '2.99.14';"), `${rel}: APP_VERSION must be V2.9914`);
   assert(!html.includes('Demo V3.0') && !html.includes("const APP_VERSION = '3.0.0';"), `${rel}: V3.0 label/version must not be present`);
   assert(sweep.includes('M — דימום מסכן חיים') || sweep.includes('דימום מסכן חיים'), `${rel}: corrected hemorrhage block title missing`);
   assert(sweep.includes("right_arm:'יד ימין'") && sweep.includes("left_arm:'יד שמאל'") && sweep.includes("right_leg:'רגל ימין'") && sweep.includes("left_leg:'רגל שמאל'"), `${rel}: sweep TQ block must use current limb vocabulary`);
@@ -70,5 +70,5 @@ for (const file of files) {
   assert(html.includes("continueSweepAfterBlack('finish')"), `${rel}: black finish action removed`);
   assert(html.includes('function startNewPatient('), `${rel}: legacy fallback removed`);
 
-  console.log(`${rel}: V2.9913 TQ hardening static smoke passed`);
+  console.log(`${rel}: V2.9914 TQ hardening static smoke passed`);
 }

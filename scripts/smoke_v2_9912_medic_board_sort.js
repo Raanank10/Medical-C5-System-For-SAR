@@ -22,10 +22,10 @@ for (const rel of files) {
   const html = fs.readFileSync(path.join(root, rel), 'utf8');
   const dashboardFn = section(html, 'function renderDashboard(){', 'function needsVitals');
 
-  assert(html.includes("const APP_VERSION = '2.99.13';"), `${rel}: APP_VERSION must be V2.9913`);
-  assert(html.includes('Demo V2.9913'), `${rel}: launcher label must be Demo V2.9913`);
-  assert(html.includes('ROLE // V2.9913'), `${rel}: role header must be Demo V2.9913`);
-  assert(html.includes('Role-Based Medical Command System V2.9913'), `${rel}: role system strip must be Demo V2.9913`);
+  assert(html.includes("const APP_VERSION = '2.99.14';"), `${rel}: APP_VERSION must be V2.9914`);
+  assert(html.includes('Demo V2.9914'), `${rel}: launcher label must be Demo V2.9914`);
+  assert(html.includes('ROLE // V2.9914'), `${rel}: role header must be Demo V2.9914`);
+  assert(html.includes('Role-Based Medical Command System V2.9914'), `${rel}: role system strip must be Demo V2.9914`);
 
   // Medic board uses its own strict color-then-urgency sort, not the shared blended one
   assert(dashboardFn.includes('sortedPatientsByColorThenUrgency('), `${rel}: medic dashboard must use the strict color-then-urgency sort`);
@@ -49,5 +49,5 @@ for (const rel of files) {
     assert(html.includes(sig), `${rel}: medic board urgency scoring must reuse existing signal: ${sig}`);
   });
 
-  console.log(`${rel}: Demo V2.9913 medic board color-then-urgency sort static smoke passed`);
+  console.log(`${rel}: Demo V2.9914 medic board color-then-urgency sort static smoke passed`);
 }

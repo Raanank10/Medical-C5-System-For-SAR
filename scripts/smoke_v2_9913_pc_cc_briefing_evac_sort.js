@@ -25,10 +25,10 @@ for (const rel of files) {
   const pcBoardFn = section(html, 'function renderDedicatedPcCommandBoard(myPts){', 'function renderPcPatientTile(');
   const evacRankFn = section(html, 'function evacuationPriorityRank(p){', 'function companyEvacuationPriorityRows(pts=patients){');
 
-  assert(html.includes("const APP_VERSION = '2.99.13';"), `${rel}: APP_VERSION must be V2.9913`);
-  assert(html.includes('Demo V2.9913'), `${rel}: launcher label must be Demo V2.9913`);
-  assert(html.includes('ROLE // V2.9913'), `${rel}: role header must be Demo V2.9913`);
-  assert(html.includes('Role-Based Medical Command System V2.9913'), `${rel}: role system strip must be Demo V2.9913`);
+  assert(html.includes("const APP_VERSION = '2.99.14';"), `${rel}: APP_VERSION must be V2.9914`);
+  assert(html.includes('Demo V2.9914'), `${rel}: launcher label must be Demo V2.9914`);
+  assert(html.includes('ROLE // V2.9914'), `${rel}: role header must be Demo V2.9914`);
+  assert(html.includes('Role-Based Medical Command System V2.9914'), `${rel}: role system strip must be Demo V2.9914`);
 
   // Role Briefing on the shared PC/CC/chamal commander header, dynamic on commandRole
   assert(commanderHeader.includes('onclick="openRoleBriefing(commandRole)"'), `${rel}: commander header briefing button must target the live commandRole, not a hardcoded role`);
@@ -52,5 +52,5 @@ for (const rel of files) {
   assert(html.includes("rows.sort((a,b)=>a.evacRank-b.evacRank || ((b.tqMin||0)-(a.tqMin||0)));"), `${rel}: companyEvacuationPriorityRows sort must be unchanged`);
   assert(html.includes('rows.slice(0,8)'), `${rel}: companyEvacuationPriorityRows must still cap at 8`);
 
-  console.log(`${rel}: Demo V2.9913 PC/CC role briefing + evac-priority sort static smoke passed`);
+  console.log(`${rel}: Demo V2.9914 PC/CC role briefing + evac-priority sort static smoke passed`);
 }

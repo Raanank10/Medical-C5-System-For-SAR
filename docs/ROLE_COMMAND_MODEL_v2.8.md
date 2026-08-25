@@ -8,7 +8,7 @@ Rescue command and medical command are different chains of authority that both o
 
 ## RPC — מ״מ (Rescue Platoon Commander)
 
-Tactical picture for their own platoon only: tag, triage color, zone, trapped/mobile status, evac status, and which medic is responsible (callsign only, never full name). No vitals, treatment, mechanism of injury, or patient identity — this role never needs clinical detail to do its job.
+Tactical picture for their own platoon only: tag, triage color, zone, trapped/mobile status, evac status, patient identity (full name once reported/confirmed, otherwise the physical description used to locate an unidentified patient), and which medic is responsible (callsign only, never full name). No vitals, treatment, or mechanism of injury — this role never needs clinical detail to do its job, but it does need to know which physical person in the field is which patient, which is why identity (unlike vitals/treatment/mechanism) is in scope. See "Evacuation order visibility" below.
 
 RPC does **not** submit medical reinforcement or resupply requests — that stays with חוג״ד/מ״פ רפואה.
 
@@ -20,7 +20,13 @@ RPC **can**:
 
 Same tactical scope as RPC, rolled up across every platoon in their company: triage counts, trapped counts, and evac status per platoon, plus visibility into open resupply requests for the rescue company's own logistics (not medical resupply, which stays with חוג״ד/logistics).
 
-RCC has the same clinical-data restrictions and the same First Responder Quick Report and site-authority capabilities as RPC, scoped to the company instead of a single platoon.
+RCC has the same clinical-data restrictions (no vitals/treatment/mechanism; identity is visible, same as RPC) and the same First Responder Quick Report and site-authority capabilities as RPC, scoped to the company instead of a single platoon.
+
+## Evacuation order visibility (added after V2.8)
+
+RPC/RCC need to know which patient is evacuated first and what the order is after that — they're coordinating the physical vehicles/routes for the same evacuation sequence חוג״ד/מ״פ רפואה are prioritizing clinically. Their dashboards show an ordered "סדר פינוי מומלץ" list built from the exact same ranking PC/CC already use (tourniquet-window-closing can outrank triage color; otherwise sorted by triage color) — deliberately the same function and the same order, not a separately-computed one, so rescue command and medical command never disagree about sequence.
+
+One piece of that ranking's reasoning stays redacted for RPC/RCC: the tourniquet-based reason text is shown verbatim (tourniquet status is something RPC/RCC already see and report themselves), but the reason attached to a red patient without a tourniquet normally cites AVPU/respiratory rate — vitals detail outside RPC/RCC's scope — so that case is replaced with a non-clinical "אדום — פינוי בעדיפות" label instead.
 
 ## Site authority: final, without medical sign-off
 
@@ -67,8 +73,8 @@ A deliberately minimal intake form, distinct from the medic's MSTART sweep:
 
 | Role | Owns | Explicitly excluded |
 |---|---|---|
-| RPC (מ״מ) | Tactical picture for own platoon; site authority for own area; first-responder reports | Vitals, treatment, mechanism, identity; medical reinforcement/resupply requests |
-| RCC (מ״פ חילוץ) | Tactical picture rolled up across own company's platoons; site authority for own area; first-responder reports; rescue-company resupply visibility | Vitals, treatment, mechanism, identity; medical reinforcement requests |
+| RPC (מ״מ) | Tactical picture for own platoon; patient identity (name/description, for physical identification); recommended evacuation order for own platoon; site authority for own area; first-responder reports | Vitals, treatment, mechanism; medical reinforcement/resupply requests |
+| RCC (מ״פ חילוץ) | Tactical picture rolled up across own company's platoons; patient identity (name/description); recommended evacuation order across the company; site authority for own area; first-responder reports; rescue-company resupply visibility | Vitals, treatment, mechanism; medical reinforcement requests |
 | Physician (רופא) | מ״פ רפואה's full command-adjacent scope plus clinical event write access; senior review; real physician-only clinical death confirmation (`PATIENT_DEATH_CONFIRMED`, distinct from official/legal certification, which stays out of scope); top rank in the F3 conflict-authority tie-break | Creating new patient records (same restriction as מ״פ רפואה) |
 | Paramedic (פראמדיק) | Same field/clinical authority as physician (drugs, procedures, high-risk override confirmation); same patient-creation/vitals/treatment/triage-status scope as medic otherwise; ranks above מ״פ רפואה in the F3 conflict-authority tie-break | Physician-only clinical death confirmation; physician's command-adjacent scope (incident/sector management, device presence, patient identity) |
 | Admin | Full technical access: raw data, scenario load/clear, experiment export, version/sync checks | Not an operational command role — demo/test-running only, same as V2.7 |
