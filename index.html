@@ -617,7 +617,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.996</div>
+      <div class="demo-kicker">Demo V2.997</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -716,7 +716,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.996</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.997</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -726,7 +726,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.996</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.997</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2480,7 +2480,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.6';
+const APP_VERSION = '2.99.7';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -4942,10 +4942,11 @@ function renderSectorRiskScores(scores=[]){
 function renderOperationalPressureIndex(opi){
   if(!opi) return '';
   const color=opi.score>=75?'var(--red)':opi.score>=55?'var(--orange)':opi.score>=35?'var(--yellow)':'var(--green)';
+  const gauge=renderGaugeArc({value:opi.score,min:0,max:100,needleColor:color,zones:[{from:0,to:35,color:'var(--green)'},{from:35,to:55,color:'var(--yellow)'},{from:55,to:75,color:'var(--orange)'},{from:75,to:100,color:'var(--red)'}]});
   return `<div class="summary-card" style="border-color:${color};background:rgba(255,59,48,.04);margin-bottom:12px">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
       <div><div style="font-size:12px;color:var(--muted);font-weight:900">Operational Pressure Index</div><div style="font-size:18px;font-weight:900">${opi.label}</div></div>
-      <div style="font-size:34px;font-weight:900;color:${color};font-family:var(--mono)">${opi.score}</div>
+      <div style="min-width:92px">${gauge}</div>
     </div>
     <div class="chip-row" style="margin-top:8px">
       <span class="identity-chip">פצועים ${opi.components.totalCasualties}</span>
@@ -7587,9 +7588,9 @@ function openPatient(id){
         <button onclick="openQuickVitals('${p.id}')" style="background:var(--accent);border:none;color:white;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">עדכן מדדים</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--accent)">${p.vitals.pulse}</div><div style="font-size:11px;color:var(--muted)">דופק bpm</div></div>
+        <div style="background:var(--surface2);border-radius:10px;padding:6px 10px 10px">${renderGaugeArc({value:p.vitals.pulse,min:40,max:180,label:'דופק bpm'})}</div>
         <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:#f4a261">${p.vitals.rr ?? '—'}</div><div style="font-size:11px;color:var(--muted)">נשימות / דקה</div></div>
-        <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:${sCol(p.vitals.spo2)}">${p.vitals.spo2||'—'}${p.vitals.spo2?'%':''}</div><div style="font-size:11px;color:var(--muted)">SpO₂</div></div>
+        <div style="background:var(--surface2);border-radius:10px;padding:6px 10px 10px">${renderGaugeArc({value:p.vitals.spo2||null,min:80,max:100,valueLabel:p.vitals.spo2?`${p.vitals.spo2}%`:null,needleColor:sCol(p.vitals.spo2),zones:[{from:80,to:94,color:'var(--red)'},{from:94,to:97,color:'var(--yellow)'},{from:97,to:100,color:'var(--green)'}],label:'SpO₂'})}</div>
         <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:13px;font-weight:700">${BP_LABELS[p.vitals.bp_estimate]||'—'}</div><div style="font-size:11px;color:var(--muted)">לחץ דם</div></div>
         <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:${p.vitals.avpu==='A'?'var(--green)':p.vitals.avpu==='U'?'var(--red)':'var(--yellow)'}">${p.vitals.avpu||'—'}</div><div style="font-size:11px;color:var(--muted)">AVPU</div></div>
       </div>
@@ -7752,6 +7753,40 @@ function manualTriageOverride(id, triage){
   toast('סיווג פינוי עודכן ידנית · אירוע נרשם בלוג');
 }
 
+// Reusable 180° arc gauge (SVG). `zones` (optional) are semantic color bands drawn on an
+// existing threshold already used elsewhere in the app (e.g. SpO2's <94/<97 split, or OPI's
+// score bands) - this renderer does not define new clinical/operational thresholds itself,
+// callers must pass zones derived from logic that already exists.
+function renderGaugeArc({value, min, max, zones, needleColor, size=92, label, valueLabel}={}){
+  if(value==null || !isFinite(value)){
+    return `<div style="font-size:20px;font-weight:700;color:var(--muted);text-align:center;padding:14px 0">—</div>${label?`<div style="font-size:11px;color:var(--muted);text-align:center">${label}</div>`:''}`;
+  }
+  const W=size, H=Math.round(size*0.6), cx=W/2, cy=H-2, r=W/2-9;
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const frac=v=>clamp((v-min)/((max-min)||1),0,1);
+  const angleFor=f=>180-f*180;
+  const pt=(ang,rad)=>{const t=ang*Math.PI/180; return [cx+rad*Math.cos(t), cy-rad*Math.sin(t)];};
+  const arcPath=(a1,a2,rad)=>{
+    const [x1,y1]=pt(a1,rad), [x2,y2]=pt(a2,rad);
+    const large=Math.abs(a1-a2)>180?1:0;
+    return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${rad} ${rad} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+  };
+  const zoneArcs=(zones||[]).map(z=>`<path d="${arcPath(angleFor(frac(z.from)),angleFor(frac(z.to)),r)}" stroke="${z.color}" stroke-width="7" fill="none" opacity="0.9"/>`).join('');
+  const f=frac(value);
+  const [nx,ny]=pt(angleFor(f), r-10);
+  const nColor=needleColor||'var(--text)';
+  const displayVal=valueLabel!=null?valueLabel:Math.round(value);
+  return `<div style="text-align:center">
+    <svg width="${W}" height="${H+4}" viewBox="0 0 ${W} ${H+4}">
+      <path d="${arcPath(180,0,r)}" stroke="var(--border)" stroke-width="7" fill="none" stroke-linecap="round"/>
+      ${zoneArcs}
+      <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${nColor}" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="3.5" fill="${nColor}"/>
+    </svg>
+    <div style="font-family:var(--mono);font-size:16px;font-weight:800;margin-top:-2px">${displayVal}</div>
+    ${label?`<div style="font-size:10px;color:var(--muted)">${label}</div>`:''}
+  </div>`;
+}
 function buildTrendChart(history){
   if(!history||history.length<1) return '<div style="color:var(--muted);font-size:12px;text-align:center;padding:12px 0">אין מדידות עדיין</div>';
   const fmt=t=>{const d=new Date(t);return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');};
