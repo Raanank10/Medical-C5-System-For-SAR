@@ -640,7 +640,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9912</div>
+      <div class="demo-kicker">Demo V2.9913</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -739,7 +739,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9912</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9913</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -749,7 +749,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9912</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9913</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -1819,6 +1819,9 @@ textarea{resize:vertical;min-height:70px;}
       <div class="header-title" id="cmd-header-label">כל המוקדים</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
+      <button class="briefing-trigger" onclick="openRoleBriefing(commandRole)" aria-haspopup="dialog">
+        <span>📖</span><span>תדריך תפקיד</span><span class="briefing-badge" id="cmd-briefing-badge" style="display:none">0</span>
+      </button>
       <div class="header-time" id="cmd-clock">--:--</div>
       <button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goTo('dashboard')">✕</button>
     </div>
@@ -2513,7 +2516,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.12';
+const APP_VERSION = '2.99.13';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -4969,6 +4972,14 @@ function updateMedicBriefingBadge(dse){
   badge.textContent=count;
   badge.style.display=count?'inline-flex':'none';
 }
+function updateCmdBriefingBadge(){
+  const badge=document.getElementById('cmd-briefing-badge');
+  if(!badge) return;
+  const dse = commandRole==='cc' ? DecisionSupportEngine.forCc() : commandRole==='pc' ? DecisionSupportEngine.forPc() : {recommendations:[]};
+  const count=(dse.recommendations||[]).filter(r=>!r.acknowledged).length;
+  badge.textContent=count;
+  badge.style.display=count?'inline-flex':'none';
+}
 function renderRecommendationPanel(title, recommendations){
   const open=focusedRecommendations(recommendations||[]).filter(r=>!r.acknowledged).slice(0,3);
   return renderCollapsibleSection(`rec-${title.replace(/\s+/g,'-')}`, title, open.map(renderRecommendationCard).join('') || renderOperationalEmptyState('אין התראות פתוחות','Recommendation only – Human decision required'), open.length, {criticalCount:open.filter(r=>r.priority==='CRITICAL').length, emptyMessage:'אין התראות פתוחות'});
@@ -5139,7 +5150,7 @@ function renderDedicatedPcCommandBoard(myPts){
       <button class="demo-mini-btn" onclick="event.stopPropagation();openQuickVitals('${p.id}')">עדכן</button>
     </div>`;
   }).join('') : `<div class="cmd-matrix-row"><div class="cmd-matrix-sub">אין חסמי עורקים פעילים</div></div>`;
-  const cards=sortedPatients(myPts).map(p=>renderPcPatientTile(p)).join('') || renderOperationalEmptyState('אין פצועים במיקוד הנוכחי');
+  const cards=sortedPatientsByEvacPriority(myPts).map(p=>renderPcPatientTile(p)).join('') || renderOperationalEmptyState('אין פצועים במיקוד הנוכחי');
   const rhythm=stale.map(p=>`<div class="cmd-matrix-row"><div><div class="cmd-matrix-title">${p.visualId||p.id}</div><div class="cmd-matrix-sub">לא עודכן ${Math.floor(vitalsAgeMs(p)/60000)} דקות</div></div><button class="demo-mini-btn" onclick="remindMedicVitals('${p.id}')">תזכר לחובש</button></div>`).join('') || `<div class="cmd-matrix-row"><div class="cmd-matrix-sub">אין מדדים ישנים כרגע.</div></div>`;
   return `
     <div class="stat-grid">
@@ -5246,15 +5257,24 @@ function showRoleDrilldown(key){
   const el=document.getElementById('role-drilldown-body');
   if(el) el.innerHTML=pcDrilldownHtml(key);
 }
+// Evacuation-priority ranking: a hard physiological deadline (tourniquet nearing its 120-minute
+// window) can outrank triage color, because for medevac sequencing that clock matters more than
+// the overall triage bucket. Extracted unchanged from the original companyEvacuationPriorityRows
+// so its existing behavior (and the CC "תעדוף פינוי פלוגתי" panel that already ships it) is
+// untouched - only pulled out so PC/CC full patient-list sorting can reuse the same ranking.
+function evacuationPriorityRank(p){
+  const tqMin=p.tourniquet?.appliedAt ? Math.floor((Date.now()-p.tourniquet.appliedAt)/60000) : null;
+  const tqRemaining=tqMin!==null ? Math.max(0,120-tqMin) : null;
+  let rank=4, reason='מעקב רגיל';
+  if(tqMin!==null && tqRemaining<45){ rank=0; reason=`חסם פעיל · נותרו ${tqRemaining} דק׳ לחלון 120`; }
+  else if(tqMin!==null){ rank=1; reason=`חסם פעיל · ${tqMin} דק׳ מתוך 120`; }
+  else if(p.triage==='red' && (['P','U'].includes(p.vitals?.avpu) || (p.txHistory||[]).some(tx=>String(tx.text||'').includes('נתיב אוויר')) || Number(p.vitals?.rr||16)>30 || Number(p.vitals?.rr||16)<8)){ rank=2; reason='אדום · הכרה/נשימה/נתיב אוויר בסיכון'; }
+  else if(p.triage==='yellow' && ['observing','stabilizing'].includes(p.patientStatus)){ rank=3; reason='צהוב מיוצב'; }
+  return {rank, reason, tqMin, tqRemaining};
+}
 function companyEvacuationPriorityRows(pts=patients){
   const rows=pts.map(p=>{
-    const tqMin=p.tourniquet?.appliedAt ? Math.floor((Date.now()-p.tourniquet.appliedAt)/60000) : null;
-    const tqRemaining=tqMin!==null ? Math.max(0,120-tqMin) : null;
-    let rank=4, reason='מעקב רגיל';
-    if(tqMin!==null && tqRemaining<45){ rank=0; reason=`חסם פעיל · נותרו ${tqRemaining} דק׳ לחלון 120`; }
-    else if(tqMin!==null){ rank=1; reason=`חסם פעיל · ${tqMin} דק׳ מתוך 120`; }
-    else if(p.triage==='red' && (['P','U'].includes(p.vitals?.avpu) || (p.txHistory||[]).some(tx=>String(tx.text||'').includes('נתיב אוויר')) || Number(p.vitals?.rr||16)>30 || Number(p.vitals?.rr||16)<8)){ rank=2; reason='אדום · הכרה/נשימה/נתיב אוויר בסיכון'; }
-    else if(p.triage==='yellow' && ['observing','stabilizing'].includes(p.patientStatus)){ rank=3; reason='צהוב מיוצב'; }
+    const {rank,reason,tqMin,tqRemaining}=evacuationPriorityRank(p);
     return {...p, evacRank:rank, evacReason:reason, tqMin, tqRemaining};
   }).filter(p=>p.evacRank<4 && !['evacuating','evacuated','handed_over','deceased'].includes(p.patientStatus));
   rows.sort((a,b)=>a.evacRank-b.evacRank || ((b.tqMin||0)-(a.tqMin||0)));
@@ -5262,6 +5282,20 @@ function companyEvacuationPriorityRows(pts=patients){
     const label=p.evacRank===0?'עדיפות עליונה — חסם פחות מ־45 דק׳ לחלון':p.evacRank===1?'עדיפות 1 — חסם פעיל':p.evacRank===2?'עדיפות 2 — אדום הכרה / נשימה':'עדיפות 3 — צהוב מיוצב';
     return roleRow(`${label} · ${p.visualId||p.id}`,`${p.evacReason} · ${p.location} · ${TRIAGE_LABELS[p.triage]||p.triage}`,`<span class="identity-chip">פעולה: שייך אמבולנס / אשר עיכוב / העבר למוקד פינוי</span>`);
   }).join('');
+}
+// Full-list evac-priority sort for PC/CC patient tile grids (as opposed to
+// companyEvacuationPriorityRows' top-8 highlight list): same ranking, extended to a total order.
+// Patients outside the four ranked tiers ("routine") are sub-ordered by triage color so the tail
+// of the list still reads sensibly.
+const EVAC_COLOR_ORDER = {red:0, yellow:1, green:2, black:3, pending:4, unknown:4};
+function evacuationSortScore(p){
+  const {rank, tqMin} = evacuationPriorityRank(p);
+  if(rank<4) return rank*1000 - (tqMin||0);
+  const color = EVAC_COLOR_ORDER[triageKey(p.triage)] ?? 4;
+  return 4000 + color;
+}
+function sortedPatientsByEvacPriority(list=patients){
+  return [...list].sort((a,b)=>evacuationSortScore(a)-evacuationSortScore(b) || String(a.id).localeCompare(String(b.id)));
 }
 function renderDeathCertificationChain(){
   const deathReqs=reinforcementRequests.filter(r=>r.resourceType==='doctor_death_cert' && isRequestOpen(r));
@@ -9988,6 +10022,7 @@ function renderCommandOperationalPanels(pts, site){
 }
 function renderCmdContent(){
   ensureSiteReadiness();
+  updateCmdBriefingBadge();
   const pts=getSitePatients(cmdActiveSite);
   const site=allSites.find(s=>s.id===cmdActiveSite)||allSites[0];
   const hdr=document.getElementById('cmd-header-label');
@@ -10066,20 +10101,15 @@ function renderCmdContent(){
 function renderCmdPatients(){
   const pts=getSitePatients(cmdActiveSite);
   if(commandRole==='pc'){
-    document.getElementById('cmd-patient-table').innerHTML=sortedPatients(pts).map(p=>renderPcPatientTile(p)).join('') || '<div style="color:var(--muted);font-size:13px;text-align:center;padding:14px">אין פצועים בסינון זה</div>';
+    document.getElementById('cmd-patient-table').innerHTML=sortedPatientsByEvacPriority(pts).map(p=>renderPcPatientTile(p)).join('') || '<div style="color:var(--muted);font-size:13px;text-align:center;padding:14px">אין פצועים בסינון זה</div>';
     return;
   }
-  const pri={red:0,yellow:1,green:2,black:3};
   let list=[...pts];
   if(cmdFilter==='red') list=list.filter(p=>p.triage==='red');
   else if(cmdFilter==='yellow') list=list.filter(p=>p.triage==='yellow');
   else if(cmdFilter==='trapped') list=list.filter(p=>normalizeTrapStatus(p)==='trapped');
   else if(cmdFilter==='alerts') list=list.filter(p=>(p.deterioration&&p.deterioration.length)||(isVitalsOverdue(p)));
-  list.sort((a,b)=>{
-    const ad=(a.deterioration&&a.deterioration.length)?0:1, bd=(b.deterioration&&b.deterioration.length)?0:1;
-    if(ad!==bd) return ad-bd;
-    return (pri[a.triage]||0)-(pri[b.triage]||0);
-  });
+  list=sortedPatientsByEvacPriority(list);
   if(!list.length){ document.getElementById('cmd-patient-table').innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:14px">אין פצועים בסינון זה</div>'; return; }
   const trapIcon={trapped:'⛓️',not_trapped:'🚶'};
   const sCol=s=>!s?'var(--muted)':s<94?'var(--red)':s<97?'var(--yellow)':'var(--green)';
