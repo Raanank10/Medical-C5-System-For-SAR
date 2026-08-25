@@ -646,7 +646,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9916</div>
+      <div class="demo-kicker">Demo V2.9917</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -745,7 +745,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9916</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9917</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -755,7 +755,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9916</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9917</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2540,7 +2540,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.16';
+const APP_VERSION = '2.99.17';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -10051,22 +10051,36 @@ function renderCommandOperationalPanels(pts, site){
   ].map(x=>`<div class="cmd-priority-card ${x.c}"${x.full?' style="grid-column:1/-1"':''}><div class="cmd-priority-icon">${x.i}</div><div class="cmd-priority-num">${x.n}</div><div class="cmd-priority-label">${x.l}</div></div>`).join('');
   renderReinforcementPanel();
 
-  const commandState=buildIncidentCommandStateSnapshot(pts, site);
-  document.getElementById('cmd-heatmap').innerHTML=commandState.sectors.map(s=>{
-    const logistics=Object.entries(s.inventory).map(([item,count])=>{
+  // Sector heatmap: prefer the real server-computed breakdown (incident_command_state.
+  // state_json.sectors, sourced from vw_command_spatial_heatmap - database/030) as the
+  // primary source when connected and synced, matching docs/PRODUCTION_READINESS.md's
+  // "shift command dashboard to incident_command_state as primary source". Falls back to
+  // the locally-computed snapshot only when offline or in local-demo mode (no server data
+  // exists to prefer) - offline-first means a device must still show *something* without a
+  // connection, but that fallback is now genuinely the fallback, not the only path.
+  // Per-sector inventory has no server-side equivalent (see database/030's own scope note)
+  // so it's shown only in the local-fallback rendering, never mislabeled as server data.
+  const localState=buildIncidentCommandStateSnapshot(pts, site);
+  const remoteSectorsRaw=currentUser ? _remoteCommandState[SITE_TO_INCIDENT_ID[site.id]]?.state_json?.sectors : null;
+  const sectorSource=(remoteSectorsRaw && remoteSectorsRaw.length) ? 'server' : 'local';
+  const sectorRows=sectorSource==='server'
+    ? remoteSectorsRaw.map(s=>({building:s.building_id, floor:s.floor_id, total:s.total_patients_on_site, red:s.count_red_triage, yellow:s.count_yellow_triage, green:s.count_green_triage, black:s.count_deceased, critical:s.structural_alert_state==='high_danger', inventory:null}))
+    : localState.sectors;
+  document.getElementById('cmd-heatmap').innerHTML=sectorRows.map(s=>{
+    const logistics=s.inventory ? Object.entries(s.inventory).map(([item,count])=>{
       const cls=count<=0?'empty':count<=1?'low':'';
       return `<span class="${cls}">${SUPPLY_LABELS[item]||item}: ${count}</span>`;
-    }).join('');
+    }).join('') : '';
     return `<div class="cmd-matrix-row ${s.critical?'critical':''}">
       <div>
         <div class="cmd-matrix-title">SECTOR: בניין ${s.building} · קומה ${s.floor}</div>
-        <div class="cmd-matrix-sub">${s.total} פצועים · ${s.critical?'CRITICAL':'STABLE'} · incident_command_state cache</div>
-        <div class="cmd-logistics">${logistics}</div>
+        <div class="cmd-matrix-sub">${s.total} פצועים · ${s.critical?'CRITICAL':'STABLE'} · ${sectorSource==='server'?'incident_command_state (שרת)':'מקומי · לא מסונכרן / דמו'}</div>
+        ${logistics?`<div class="cmd-logistics">${logistics}</div>`:''}
       </div>
       <div class="cmd-matrix-counts"><span style="color:var(--red)">${s.red}R</span><span style="color:var(--yellow)">${s.yellow}Y</span><span style="color:var(--green)">${s.green}G</span><span style="color:var(--muted)">${s.black}B</span></div>
     </div>`;
   }).join('') || '<div class="cmd-matrix-row"><div class="cmd-matrix-sub">אין פצועים פעילים למיפוי.</div></div>';
-  setCmdPanelMeta('heatmap', `${commandState.sectors.length} מגזרים`);
+  setCmdPanelMeta('heatmap', `${sectorRows.length} מגזרים · ${sectorSource==='server'?'שרת':'מקומי'}`);
 
   // Real device_presence rows when logged in and available; local-demo mode (no login, so
   // _remoteDevicePresence never populates) falls back to inferring devices from locally-known
@@ -10097,10 +10111,13 @@ function renderCommandOperationalPanels(pts, site){
   setCmdPanelMeta('devices', `${[...deviceMap.values()].filter(d=>C5Rules.isDeviceSilent(d.last)).length} שקטים מתוך ${deviceMap.size} מכשירים`);
 
   // Real command-dashboard read: incident_command_state via get_incident_command_state RPC
-  // (database/014_command_dashboard_state_rpc.sql). A genuine server-authoritative cross-check
-  // next to the locally-computed priority cards above, not a replacement for them — most of
-  // those cards (reinforcement requests, device/sync counts, per-patient watchdog detail) have
-  // no equivalent in this aggregate snapshot.
+  // (database/014_command_dashboard_state_rpc.sql). This numeric snapshot is a genuine
+  // server-authoritative cross-check next to the locally-computed priority cards above,
+  // not a replacement for them — most of those cards (reinforcement requests, device/sync
+  // counts, per-patient watchdog detail) have no equivalent in this aggregate snapshot.
+  // The sector heatmap above is the one panel that now reads this same snapshot's
+  // state_json.sectors as its primary source (database/030) rather than just a cross-check
+  // — see the heatmap block above for why the other panels stay local-primary.
   const serverStateEl=document.getElementById('cmd-server-state');
   if(serverStateEl){
     const remote=currentUser ? _remoteCommandState[SITE_TO_INCIDENT_ID[site.id]] : null;
