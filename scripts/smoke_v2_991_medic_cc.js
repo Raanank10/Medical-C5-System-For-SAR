@@ -21,9 +21,9 @@ for (const file of files) {
   const ccEnd = html.indexOf('function renderCcCommandBoard', ccStart);
   const ccHero = html.slice(ccStart, ccEnd);
 
-  assert(html.includes("const APP_VERSION = '2.99.7';"), `${rel}: APP_VERSION must be V2.997`);
-  assert(html.includes('Demo V2.997'), `${rel}: launcher label must be V2.997`);
-  assert(html.includes('ROLE // V2.997'), `${rel}: role label must be V2.997`);
+  assert(html.includes("const APP_VERSION = '2.99.8';"), `${rel}: APP_VERSION must be V2.998`);
+  assert(html.includes('Demo V2.998'), `${rel}: launcher label must be V2.998`);
+  assert(html.includes('ROLE // V2.998'), `${rel}: role label must be V2.998`);
   assert(!html.includes('Demo V3.0') && !html.includes("const APP_VERSION = '3.0.0';"), `${rel}: V3.0 must not be present`);
 
   assert(sweep.includes('${triageBand(p.triage,p)}'), `${rel}: top triage band removed`);
@@ -42,7 +42,8 @@ for (const file of files) {
   assert(ccHero.includes('מה להזיז, לאן, ולמה'), `${rel}: CC hero subtitle missing`);
   assert(ccHero.includes('העבר חובש') && ccHero.includes('שייך רופא / פראמדיק'), `${rel}: CC hero resource/doctor cards missing`);
   assert(ccHero.includes('צוואר בקבוק פינוי') && ccHero.includes('ציוד שמשפיע על טיפול'), `${rel}: CC hero bottleneck cards missing`);
-  assert(ccHero.includes('<table class="auth-table">'), `${rel}: CC platoon comparison table missing`);
+  assert(html.includes('function renderCcPlatoonPanel('), `${rel}: CC platoon panel renderer missing`);
+  assert(ccHero.includes('class="panel-grid"') && ccHero.includes('platoonPanels'), `${rel}: CC hero must render per-platoon panels`);
   assert(html.includes('${renderCcHeroDashboard({openReqs,doctorReqs,deathReqs,blockedEvac,overloaded,ineffectiveTqs,tqPatients})}'), `${rel}: CC hero not rendered at top of CC board`);
 
   assert(html.includes('LEGACY_FULL_ASSESSMENT_DO_NOT_DELETE_WITHOUT_TESTS'), `${rel}: legacy guard comment missing`);
@@ -55,5 +56,5 @@ for (const file of files) {
   assert(html.includes('function renderAar'), `${rel}: AAR renderer missing`);
   assert(html.includes('function confirmSuspectedNotSalvageable'), `${rel}: black/death-cert flow missing`);
 
-  console.log(`${rel}: V2.997 medic speed + CC hero static smoke passed`);
+  console.log(`${rel}: V2.998 medic speed + CC hero static smoke passed`);
 }

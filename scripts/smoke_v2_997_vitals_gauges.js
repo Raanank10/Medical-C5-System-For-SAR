@@ -23,10 +23,10 @@ for (const rel of files) {
   const openPatientFn = section(html, 'function openPatient(id){', 'function markPatientAtCollectionPoint');
   const opiFn = section(html, 'function renderOperationalPressureIndex(opi){', 'function renderPcNowTaskBoard');
 
-  assert(html.includes("const APP_VERSION = '2.99.7';"), `${rel}: APP_VERSION must be V2.997`);
-  assert(html.includes('Demo V2.997'), `${rel}: launcher label must be Demo V2.997`);
-  assert(html.includes('ROLE // V2.997'), `${rel}: role header must be Demo V2.997`);
-  assert(html.includes('Role-Based Medical Command System V2.997'), `${rel}: role system strip must be Demo V2.997`);
+  assert(html.includes("const APP_VERSION = '2.99.8';"), `${rel}: APP_VERSION must be V2.998`);
+  assert(html.includes('Demo V2.998'), `${rel}: launcher label must be Demo V2.998`);
+  assert(html.includes('ROLE // V2.998'), `${rel}: role header must be Demo V2.998`);
+  assert(html.includes('Role-Based Medical Command System V2.998'), `${rel}: role system strip must be Demo V2.998`);
 
   assert(html.includes('function renderGaugeArc('), `${rel}: reusable gauge component missing`);
 
@@ -38,5 +38,5 @@ for (const rel of files) {
   assert(opiFn.includes('renderGaugeArc({value:opi.score'), `${rel}: PC dashboard Operational Pressure Index must use the gauge`);
   assert(opiFn.includes("from:75,to:100,color:'var(--red)'"), `${rel}: OPI gauge zones must match the existing score thresholds (35/55/75), not new ones`);
 
-  console.log(`${rel}: Demo V2.997 vitals/OPI gauge static smoke passed`);
+  console.log(`${rel}: Demo V2.998 vitals/OPI gauge static smoke passed`);
 }
