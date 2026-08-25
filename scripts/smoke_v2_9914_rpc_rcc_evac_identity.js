@@ -26,10 +26,10 @@ for (const rel of files) {
   const roleDashboardFn = section(html, 'function renderRoleDashboard(role=activeRoleDashboard){', 'function reassignPatient(');
   const rpcConfig = section(html, "rpc:{title:'מ״מ", "rcc:{title:'מ״פ חילוץ");
 
-  assert(html.includes("const APP_VERSION = '2.99.14';"), `${rel}: APP_VERSION must be V2.9914`);
-  assert(html.includes('Demo V2.9914'), `${rel}: launcher label must be Demo V2.9914`);
-  assert(html.includes('ROLE // V2.9914'), `${rel}: role header must be Demo V2.9914`);
-  assert(html.includes('Role-Based Medical Command System V2.9914'), `${rel}: role system strip must be Demo V2.9914`);
+  assert(html.includes("const APP_VERSION = '2.99.15';"), `${rel}: APP_VERSION must be V2.9915`);
+  assert(html.includes('Demo V2.9915'), `${rel}: launcher label must be Demo V2.9915`);
+  assert(html.includes('ROLE // V2.9915'), `${rel}: role header must be Demo V2.9915`);
+  assert(html.includes('Role-Based Medical Command System V2.9915'), `${rel}: role system strip must be Demo V2.9915`);
 
   // Patient identity is now in scope for rpc/rcc (per user correction to the earlier
   // "no identity" design) - name once reported/confirmed, else the physical description
@@ -70,5 +70,5 @@ for (const rel of files) {
   assert(rpcConfig.includes('צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע'), `${rel}: rpc responsibilities must list identity visibility`);
   assert(rpcConfig.includes('ללא גישה למדדים, טיפול או מנגנון פציעה'), `${rel}: rpc responsibilities must no longer claim identity is excluded`);
 
-  console.log(`${rel}: Demo V2.9914 rpc/rcc evacuation order + identity visibility static smoke passed`);
+  console.log(`${rel}: Demo V2.9915 rpc/rcc evacuation order + identity visibility static smoke passed`);
 }
