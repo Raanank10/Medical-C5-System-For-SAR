@@ -23,10 +23,10 @@ for (const rel of files) {
   const engine = section(html, 'const DecisionSupportEngine=(()=>', 'function renderRecommendationCard');
   const dashboardScreen = section(html, '<div id="screen-dashboard" class="screen">', 'id="screen-site"');
 
-  assert(html.includes("const APP_VERSION = '2.99.15';"), `${rel}: APP_VERSION must be V2.9915`);
-  assert(html.includes('Demo V2.9915'), `${rel}: launcher label must be Demo V2.9915`);
-  assert(html.includes('ROLE // V2.9915'), `${rel}: role header must be Demo V2.9915`);
-  assert(html.includes('Role-Based Medical Command System V2.9915'), `${rel}: role system strip must be Demo V2.9915`);
+  assert(html.includes("const APP_VERSION = '2.99.16';"), `${rel}: APP_VERSION must be V2.9916`);
+  assert(html.includes('Demo V2.9916'), `${rel}: launcher label must be Demo V2.9916`);
+  assert(html.includes('ROLE // V2.9916'), `${rel}: role header must be Demo V2.9916`);
+  assert(html.includes('Role-Based Medical Command System V2.9916'), `${rel}: role system strip must be Demo V2.9916`);
 
   assert(engine.includes('function forMedic()'), `${rel}: DecisionSupportEngine.forMedic missing`);
   assert(engine.includes("patients:roleScopedPatients('medic')"), `${rel}: forMedic must scope recommendations to the logged-in medic's own patients`);
@@ -50,5 +50,5 @@ for (const rel of files) {
   assert(html.includes('id="site-hazard-note"'), `${rel}: Site screen must expose an editable hazard-note field`);
   assert(html.includes("siteData.hazardNote=document.getElementById('site-hazard-note')"), `${rel}: saveSite must persist the hazard note`);
 
-  console.log(`${rel}: Demo V2.9915 role briefing static smoke passed`);
+  console.log(`${rel}: Demo V2.9916 role briefing static smoke passed`);
 }
