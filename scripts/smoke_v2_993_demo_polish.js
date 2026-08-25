@@ -25,10 +25,10 @@ for (const rel of files) {
   const commanderBrief = sliceBetween(html, 'function playMedicCommanderSequence', 'function playDeathCertificationSequence', rel);
   const tqWithLimb = sliceBetween(html, 'function recordSweepTourniquetWithLimb', 'function renderSweepTourniquetCard', rel);
 
-  assert(html.includes("const APP_VERSION = '2.99.10';"), `${rel}: APP_VERSION must be 2.99.10`);
-  assert(html.includes('Demo V2.9910'), `${rel}: launcher label must be Demo V2.9910`);
-  assert(html.includes('ROLE // V2.9910'), `${rel}: role header must be V2.9910`);
-  assert(html.includes('Role-Based Medical Command System V2.9910'), `${rel}: role strip must be V2.9910`);
+  assert(html.includes("const APP_VERSION = '2.99.11';"), `${rel}: APP_VERSION must be 2.99.11`);
+  assert(html.includes('Demo V2.9911'), `${rel}: launcher label must be Demo V2.9911`);
+  assert(html.includes('ROLE // V2.9911'), `${rel}: role header must be V2.9911`);
+  assert(html.includes('Role-Based Medical Command System V2.9911'), `${rel}: role strip must be V2.9911`);
   assert(!html.includes('2.992V') && !html.includes("const APP_VERSION = '2.99.2';"), `${rel}: stale V2.992 label remains`);
   assert(!html.includes('localStorage.clear('), `${rel}: must not use localStorage.clear()`);
   assert(html.includes('const DEMO_KEYS_TO_PURGE = Object.freeze'), `${rel}: scoped demo reset key list missing`);
@@ -100,5 +100,5 @@ for (const rel of files) {
   assert(roleDashboard.includes("role==='medic'?'הערכה מורחבת':'פתח מסך עבודה מלא'"), `${rel}: medic legacy action must be demoted as extended assessment`);
   assert(!roleDashboard.includes('startMedicTreatmentNow()">התחל טיפול עכשיו'), `${rel}: old primary medic wizard action still visible`);
 
-  console.log(`${rel}: V2.9910 demo polish static smoke passed`);
+  console.log(`${rel}: V2.9911 demo polish static smoke passed`);
 }

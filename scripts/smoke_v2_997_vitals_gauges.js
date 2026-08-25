@@ -23,10 +23,10 @@ for (const rel of files) {
   const openPatientFn = section(html, 'function openPatient(id){', 'function markPatientAtCollectionPoint');
   const opiFn = section(html, 'function renderOperationalPressureIndex(opi){', 'function renderPcNowTaskBoard');
 
-  assert(html.includes("const APP_VERSION = '2.99.10';"), `${rel}: APP_VERSION must be V2.9910`);
-  assert(html.includes('Demo V2.9910'), `${rel}: launcher label must be Demo V2.9910`);
-  assert(html.includes('ROLE // V2.9910'), `${rel}: role header must be Demo V2.9910`);
-  assert(html.includes('Role-Based Medical Command System V2.9910'), `${rel}: role system strip must be Demo V2.9910`);
+  assert(html.includes("const APP_VERSION = '2.99.11';"), `${rel}: APP_VERSION must be V2.9911`);
+  assert(html.includes('Demo V2.9911'), `${rel}: launcher label must be Demo V2.9911`);
+  assert(html.includes('ROLE // V2.9911'), `${rel}: role header must be Demo V2.9911`);
+  assert(html.includes('Role-Based Medical Command System V2.9911'), `${rel}: role system strip must be Demo V2.9911`);
 
   assert(html.includes('function renderGaugeArc('), `${rel}: reusable gauge component missing`);
 
@@ -46,5 +46,5 @@ for (const rel of files) {
   assert(openPatientFn.includes('C5Rules.isPediatricPatient(p)'), `${rel}: pulse coloring must branch on the existing pediatric check, not use one flat adult range`);
   assert(openPatientFn.includes('renderGaugeArc({value:p.vitals.pulse,min:40,max:180,needleColor:pulseCol(p.vitals.pulse),zones:pulseZones'), `${rel}: pulse gauge must be wired to the new pediatric-aware zones/color`);
 
-  console.log(`${rel}: Demo V2.9910 vitals/OPI gauge static smoke passed`);
+  console.log(`${rel}: Demo V2.9911 vitals/OPI gauge static smoke passed`);
 }
