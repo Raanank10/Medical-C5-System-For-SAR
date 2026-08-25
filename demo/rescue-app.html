@@ -25,6 +25,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .header-subtitle{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;}
 .header-title{font-size:18px;font-weight:700;}
 .header-time{font-family:var(--mono);font-size:13px;color:var(--muted);}
+.header-right{display:flex;align-items:center;gap:10px;}
+.briefing-trigger{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:7px 12px;color:var(--text);font-family:var(--sans);font-size:12px;font-weight:800;cursor:pointer;}
+.briefing-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--red);color:#fff;font-family:var(--mono);font-size:10px;font-weight:700;}
 
 /* ── SCREENS ── */
 .screen{display:none;min-height:100dvh;padding-bottom:110px;}
@@ -487,6 +490,29 @@ input[type=range]{width:100%;accent-color:var(--orange);}
 .role-list{display:grid;gap:7px;}
 .role-row{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 10px;}
 .role-row-title{font-size:13px;font-weight:800;}
+.panel-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.panel{background:var(--surface2);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;}
+.panel.status-critical{border-color:var(--red);}
+.panel.status-stable{border-color:var(--orange);}
+.panel.status-ok{border-color:var(--green);}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;background:var(--surface3,var(--surface));border-bottom:1px solid var(--border);}
+.panel-name{font-weight:800;font-size:13px;}
+.panel-status{font-family:var(--mono);font-size:9px;font-weight:800;letter-spacing:.5px;border-radius:999px;padding:3px 8px;white-space:nowrap;}
+.panel-status.ok{color:var(--green);background:rgba(52,199,89,.12);}
+.panel-status.stable{color:var(--orange);background:rgba(255,107,53,.14);}
+.panel-status.critical{color:var(--red);background:rgba(255,59,48,.14);}
+.panel-body{padding:10px 12px 12px;display:flex;flex-direction:column;gap:9px;flex:1;}
+.panel-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+.pm{text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 2px;}
+.pm-n{font-family:var(--mono);font-size:14px;font-weight:800;}
+.pm-n.warn{color:var(--orange);}
+.pm-n.crit{color:var(--red);}
+.pm-l{font-size:9px;color:var(--muted);margin-top:2px;}
+.panel-sub{font-size:11px;color:var(--muted);line-height:1.5;}
+.panel-actions{display:flex;gap:6px;margin-top:auto;}
+.p-btn{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--sans);font-weight:700;font-size:11.5px;padding:8px 6px;cursor:pointer;}
+.p-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+@media (max-width:420px){.panel-grid{grid-template-columns:1fr;}}
 .role-row-sub{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35;}
 .identity-chip{display:inline-flex;gap:5px;align-items:center;border:1px solid var(--border);border-radius:999px;padding:3px 7px;font-size:10px;color:var(--muted);margin-top:5px;}
 .demo-icon{width:42px;height:42px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
@@ -614,7 +640,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.995</div>
+      <div class="demo-kicker">Demo V2.998</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -713,7 +739,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.995</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.998</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -723,7 +749,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.995</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.998</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -836,7 +862,12 @@ textarea{resize:vertical;min-height:70px;}
       <div class="header-subtitle">RESCUE // ACTIVE</div>
       <div class="header-title" id="site-name-header">אין מוקד פעיל</div>
     </div>
-    <div class="header-time" id="clock">--:--</div>
+    <div class="header-right">
+      <button class="briefing-trigger" onclick="openRoleBriefing('medic')" aria-haspopup="dialog">
+        <span>📖</span><span>תדריך תפקיד</span><span class="briefing-badge" id="medic-briefing-badge" style="display:none">0</span>
+      </button>
+      <div class="header-time" id="clock">--:--</div>
+    </div>
   </div>
 
   <div class="demo-strip">
@@ -863,6 +894,7 @@ textarea{resize:vertical;min-height:70px;}
     </button>
   </div>
   <div id="zone-context-bar" style="padding:0 16px 10px"></div>
+  <div id="medic-nba-banner" style="padding:0 16px 10px"></div>
 
   <!-- Stats -->
   <div class="stat-grid">
@@ -948,6 +980,8 @@ textarea{resize:vertical;min-height:70px;}
       </div>
       <div class="field-label">תיאור חופשי</div>
       <textarea id="site-description" placeholder="פרטים נוספים, סכנות ידועות..."></textarea>
+      <div class="field-label" style="margin-top:12px">הנחיות לתדריך תפקיד — יופיע לכל חובש/ת בפאנל "תדריך תפקיד"</div>
+      <textarea id="site-hazard-note" placeholder="לדוגמה: אי יציבות מבנית באזור 2 · תעדוף פינוי לשער 2" oninput="siteData.hazardNote=this.value"></textarea>
     </div>
   </div>
   <div class="site-section">
@@ -2085,6 +2119,16 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 
+<div id="role-briefing-modal" class="modal-overlay hidden" onclick="if(event.target===this) this.classList.add('hidden')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="role-briefing-title">תדריך תפקיד</div>
+    <div class="modal-sub" id="role-briefing-mission">—</div>
+    <div id="role-briefing-body"></div>
+    <button class="btn-secondary" style="margin-top:10px" onclick="document.getElementById('role-briefing-modal').classList.add('hidden')">סגור</button>
+  </div>
+</div>
+
 <div id="feedback-modal" class="modal-overlay hidden" onclick="if(event.target===this) closeFeedbackModal()">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
@@ -2459,7 +2503,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.5';
+const APP_VERSION = '2.99.8';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3339,7 +3383,7 @@ async function requestPasswordReset(){
 let siteData = {
   name:'', address:'', eventType:null, buildingType:null, description:'', externalReports:[],
   floorHint:'', apartmentHint:'', eta:'', currentZone:'', lastMechanism:'',
-  likelyMechanisms:[], sweepSessions:[],
+  likelyMechanisms:[], sweepSessions:[], hazardNote:'',
   initialEvacuatedGreen:0,
   initialEvacuation:{green:0,yellow:0,red:0,summary:'',source:null},
   expectedCasualties:{trapped:0,immobile:0,missing:0,severe:0}
@@ -3355,6 +3399,7 @@ function ensureSiteReadiness(){
   siteData.lastMechanism=siteData.lastMechanism||'';
   siteData.likelyMechanisms=siteData.likelyMechanisms||[];
   siteData.sweepSessions=siteData.sweepSessions||[];
+  siteData.hazardNote=siteData.hazardNote||'';
   siteData.initialEvacuatedGreen=siteData.initialEvacuation.green||0;
   return siteData;
 }
@@ -4834,7 +4879,15 @@ const DecisionSupportEngine=(()=>{
     const recommendations=evaluate(ctx).filter(r=>['CC','PC','Logistics'].includes(r.responsibleRole));
     return {recommendations,sectorRisk:SectorRiskScore(ctx),operationalPressure:OperationalPressureIndex(ctx)};
   }
-  return {evaluate,forPc,forCc,evaluateTourniquets,evaluateMedicCoverage,evaluateSupplyBurn,evaluateEvacuation,evaluatePatientDeterioration,SectorRiskScore,OperationalPressureIndex,rank};
+  function forMedic(){
+    const ctx={...defaultContext(),patients:roleScopedPatients('medic')};
+    const recommendations=rank([
+      ...evaluatePatientDeterioration(ctx),
+      ...evaluateTourniquets(ctx)
+    ]);
+    return {recommendations};
+  }
+  return {evaluate,forPc,forCc,forMedic,evaluateTourniquets,evaluateMedicCoverage,evaluateSupplyBurn,evaluateEvacuation,evaluatePatientDeterioration,SectorRiskScore,OperationalPressureIndex,rank};
 })();
 function renderRecommendationCard(r){
   const colors={INFO:'var(--muted)',LOW:'var(--green)',MEDIUM:'var(--yellow)',HIGH:'var(--orange)',CRITICAL:'var(--red)'};
@@ -4861,6 +4914,43 @@ function renderRecommendationCard(r){
     </div>
   </div>`;
 }
+function renderRoleBriefingBody(role){
+  const cfg=roleConfig(role);
+  const resp=(cfg.responsibilities||[]).map(r=>roleRow(r)).join('');
+  const hazardText=(siteData.hazardNote||'').trim();
+  const hazardHtml=hazardText
+    ? `<div class="role-row" style="border-color:var(--orange)"><div class="role-row-title">⚠ הנחיות מבצעיות</div><div class="role-row-sub">${hazardText}</div></div>`
+    : roleRow('אין הנחיות מבצעיות מיוחדות כרגע','ניתן לעדכן הנחיה במסך המוקד — "הנחיות לתדריך תפקיד"');
+  const dse = role==='medic' ? DecisionSupportEngine.forMedic()
+    : role==='cc' ? DecisionSupportEngine.forCc()
+    : role==='pc' ? DecisionSupportEngine.forPc()
+    : {recommendations:[]};
+  return `
+    ${roleSection('תחומי אחריות', resp)}
+    ${roleSection('הנחיות מבצעיות נוכחיות', hazardHtml)}
+    ${renderRecommendationPanel(`Top 3 Recommendations — ${ROLE_LABELS[role]||cfg.title}`, dse.recommendations)}
+  `;
+}
+function openRoleBriefing(role){
+  const cfg=roleConfig(role);
+  document.getElementById('role-briefing-title').textContent=`תדריך תפקיד — ${cfg.title}`;
+  document.getElementById('role-briefing-mission').textContent=cfg.actor||'';
+  document.getElementById('role-briefing-body').innerHTML=renderRoleBriefingBody(role);
+  document.getElementById('role-briefing-modal').classList.remove('hidden');
+}
+function renderMedicNbaBanner(dse){
+  const el=document.getElementById('medic-nba-banner');
+  if(!el) return;
+  const top=(dse.recommendations||[])[0];
+  el.innerHTML=top ? `<div class="section-label" style="padding:0 0 4px">💡 המהלך הבא המומלץ</div>${renderRecommendationCard(top)}` : '';
+}
+function updateMedicBriefingBadge(dse){
+  const badge=document.getElementById('medic-briefing-badge');
+  if(!badge) return;
+  const count=(dse.recommendations||[]).filter(r=>!r.acknowledged).length;
+  badge.textContent=count;
+  badge.style.display=count?'inline-flex':'none';
+}
 function renderRecommendationPanel(title, recommendations){
   const open=focusedRecommendations(recommendations||[]).filter(r=>!r.acknowledged).slice(0,3);
   return renderCollapsibleSection(`rec-${title.replace(/\s+/g,'-')}`, title, open.map(renderRecommendationCard).join('') || renderOperationalEmptyState('אין התראות פתוחות','Recommendation only – Human decision required'), open.length, {criticalCount:open.filter(r=>r.priority==='CRITICAL').length, emptyMessage:'אין התראות פתוחות'});
@@ -4876,10 +4966,11 @@ function renderSectorRiskScores(scores=[]){
 function renderOperationalPressureIndex(opi){
   if(!opi) return '';
   const color=opi.score>=75?'var(--red)':opi.score>=55?'var(--orange)':opi.score>=35?'var(--yellow)':'var(--green)';
+  const gauge=renderGaugeArc({value:opi.score,min:0,max:100,needleColor:color,zones:[{from:0,to:35,color:'var(--green)'},{from:35,to:55,color:'var(--yellow)'},{from:55,to:75,color:'var(--orange)'},{from:75,to:100,color:'var(--red)'}]});
   return `<div class="summary-card" style="border-color:${color};background:rgba(255,59,48,.04);margin-bottom:12px">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
       <div><div style="font-size:12px;color:var(--muted);font-weight:900">Operational Pressure Index</div><div style="font-size:18px;font-weight:900">${opi.label}</div></div>
-      <div style="font-size:34px;font-weight:900;color:${color};font-family:var(--mono)">${opi.score}</div>
+      <div style="min-width:92px">${gauge}</div>
     </div>
     <div class="chip-row" style="margin-top:8px">
       <span class="identity-chip">פצועים ${opi.components.totalCasualties}</span>
@@ -4955,9 +5046,30 @@ function renderPcNowTaskBoard(myPts){
     ${group('pc-now-operational','מבצעי',operational,'var(--orange)')}
     ${group('pc-now-completion','השלמה',completion,'var(--yellow)')}`;
 }
+function renderPcMedicPanel(m){
+  const statusCls=m.status==='עמוס'?'stable':m.status==='שקט'?'critical':'ok';
+  const actionBtn=m.silent
+    ? `<button class="p-btn primary" onclick="toast('נרשם: בדיקת קשר עם ${escAttr(m.name)}')">בדוק קשר</button>`
+    : m.overloaded
+      ? `<button class="p-btn primary" onclick="demoReassignWithinPlatoon()">הקצה מחדש</button>`
+      : `<button class="p-btn" onclick='setDashboardFocus(${JSON.stringify(m.focus).replace(/'/g,'&#39;')})'>מקד</button>`;
+  return `<div class="panel status-${statusCls}">
+    <div class="panel-head"><span class="panel-name">${m.name}</span><span class="panel-status ${statusCls}">${m.status}</span></div>
+    <div class="panel-body">
+      <div class="panel-metrics">
+        <div class="pm"><div class="pm-n">${m.pts}</div><div class="pm-l">פצועים</div></div>
+        <div class="pm"><div class="pm-n${m.red?' crit':''}">${m.red}</div><div class="pm-l">אדום</div></div>
+        <div class="pm"><div class="pm-n${m.trapped?' warn':''}">${m.trapped}</div><div class="pm-l">לכודים</div></div>
+        <div class="pm"><div class="pm-n${m.tqs?' warn':''}">${m.tqs}</div><div class="pm-l">חסמים</div></div>
+      </div>
+      <div class="panel-sub">${m.mins===null?'אין עדכון':`עדכון לפני ${m.mins} דק׳`}</div>
+      <div class="panel-actions">${actionBtn}</div>
+    </div>
+  </div>`;
+}
 function renderPcMedicLoadBoard(myPts){
   const medics=focusFilteredList(DEMO_USERS.filter(u=>u.role==='medic' && u.platoonId==='PLT-A'), focusMatchesMedic);
-  const rows=medics.map(u=>{
+  const panels=medics.map(u=>{
     const pts=myPts.filter(p=>(p.assignedMedicId||userIdFromMedic(p.medic||p.lastTouchedBy))===u.userId);
     const red=pts.filter(p=>p.triage==='red').length;
     const trapped=pts.filter(p=>normalizeTrapStatus(p)==='trapped').length;
@@ -4967,10 +5079,11 @@ function renderPcMedicLoadBoard(myPts){
     const overloaded=pts.length>=4||red>=2;
     const silent=C5Rules.isDeviceSilent(lastMs);
     const status=overloaded?'עמוס':silent?'שקט':'פעיל';
-    const action=silent?pcTaskAction('בדוק קשר',`toast('נרשם: בדיקת קשר עם ${displayUser(u.userId)}')`):overloaded?pcTaskAction('הקצה מחדש',`demoReassignWithinPlatoon()`):'';
-    return roleRow(displayUser(u.userId),`${status} · ${pts.length} פצועים · ${red} אדומים · ${trapped} לכודים · ${tqs} חסמים · ${mins===null?'אין עדכון':`עדכון לפני ${mins} דק׳`}`,action);
+    const focus={role:'pc',type:'cc_decision',id:`medic-${u.userId}`,label:displayUser(u.userId),patientIds:pts.map(p=>p.id)};
+    return renderPcMedicPanel({name:displayUser(u.userId),pts:pts.length,red,trapped,tqs,mins,overloaded,silent,status,focus});
   }).join('');
-  return renderCollapsibleSection('pc-medic-load','עומס חובשים',rows || renderOperationalEmptyState('אין פצועים במיקוד הנוכחי'), medics.length, {emptyMessage:'אין פצועים במיקוד הנוכחי'});
+  const grid=panels?`<div class="panel-grid">${panels}</div>`:'';
+  return renderCollapsibleSection('pc-medic-load','עומס חובשים',grid || renderOperationalEmptyState('אין פצועים במיקוד הנוכחי'), medics.length, {emptyMessage:'אין פצועים במיקוד הנוכחי'});
 }
 function renderPcResponsibilityBoard(){
   const medics=focusFilteredList(DEMO_USERS.filter(u=>u.role==='medic' && u.platoonId==='PLT-A'), focusMatchesMedic);
@@ -5197,6 +5310,31 @@ function fulfillReinforcementRequest(requestId){
   renderCommander();
   toast(`בקשה אושרה · ${requestId}`);
 }
+function renderCcPlatoonPanel(pl){
+  const color=pl.score>=8?'var(--red)':pl.score>=3?'var(--orange)':'var(--green)';
+  const statusCls=pl.score>=8?'critical':pl.score>=3?'stable':'ok';
+  const focus={role:'cc',type:'cc_decision',id:`platoon-${pl.platoonId}`,label:pl.name,platoonIds:[pl.platoonId]};
+  return `<div class="panel status-${statusCls}">
+    <div class="panel-head"><span class="panel-name">${pl.name}</span><span class="panel-status ${statusCls}">${pl.status}</span></div>
+    <div class="panel-body">
+      <div style="display:flex;align-items:center;gap:10px">
+        ${renderGaugeArc({value:pl.score,min:0,max:20,needleColor:color,size:64,label:'עומס'})}
+        <div class="panel-sub">${pl.activeMedics} חובשים פעילים</div>
+      </div>
+      <div class="panel-metrics">
+        <div class="pm"><div class="pm-n">${pl.pts.length}</div><div class="pm-l">פצועים</div></div>
+        <div class="pm"><div class="pm-n${pl.red?' crit':''}">${pl.red}</div><div class="pm-l">אדום</div></div>
+        <div class="pm"><div class="pm-n${pl.trapped?' warn':''}">${pl.trapped}</div><div class="pm-l">לכודים</div></div>
+        <div class="pm"><div class="pm-n${pl.tqs?' warn':''}">${pl.tqs}</div><div class="pm-l">חסמים</div></div>
+      </div>
+      <div class="panel-sub">${pl.noVitals} ללא מדדים מלאים · ${pl.openReqs} בקשות פתוחות</div>
+      <div class="panel-actions">
+        <button class="p-btn" onclick='setDashboardFocus(${JSON.stringify(focus).replace(/'/g,'&#39;')})'>מקד</button>
+        <button class="p-btn primary" onclick="demoReassignBetweenPlatoons()">העבר חובש</button>
+      </div>
+    </div>
+  </div>`;
+}
 function renderCcHeroDashboard(ctx={}){
   const dse=DecisionSupportEngine.forCc();
   const platoons=DEMO_PLATOONS.map(pl=>{
@@ -5263,21 +5401,15 @@ function renderCcHeroDashboard(ctx={}){
       <button class="demo-mini-btn" onclick="${c.onclick}">${c.action}</button>
     </div>
   </div>`).join('');
-  const tableRows=platoons.map(pl=>`<tr>
-    <td>${pl.name}</td><td>${pl.activeMedics}</td><td>${pl.pts.length}</td><td>${pl.red}</td><td>${pl.trapped}</td><td>${pl.tqs}</td><td>${pl.noVitals}</td><td>${pl.openReqs}</td><td>${pl.status}</td>
-  </tr>`).join('');
+  const platoonPanels=platoons.map(renderCcPlatoonPanel).join('');
   return `<div class="summary-card" style="border-color:var(--red);background:rgba(255,59,48,.06);margin-bottom:12px">
     <div style="font-size:20px;font-weight:900">מ״פ רפואה — החלטות עכשיו</div>
     <div style="font-size:13px;color:var(--muted);margin-top:4px">מה להזיז, לאן, ולמה</div>
     ${renderOperationalPressureIndex(dse.operationalPressure)}
     ${renderRecommendationPanel('Top 3 Recommendations — מ״פ רפואה', dse.recommendations)}
     <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px">${cards}</div>
-    <div style="overflow-x:auto;margin-top:12px">
-      <table class="auth-table">
-        <thead><tr><th>מחלקה</th><th>חובשים</th><th>פצועים</th><th>אדום</th><th>לכודים</th><th>חסמים</th><th>ללא מדדים</th><th>בקשות</th><th>סטטוס</th></tr></thead>
-        <tbody>${tableRows}</tbody>
-      </table>
-    </div>
+    <div class="section-label" style="padding:12px 0 8px">עומס מחלקות</div>
+    <div class="panel-grid">${platoonPanels}</div>
   </div>`;
 }
 function renderCcCommandBoard(){
@@ -5792,6 +5924,7 @@ function goTo(screen){
     const name=document.getElementById('site-name-input'); if(name && !name.value) name.value=siteData.name||'';
     const addr=document.getElementById('site-address'); if(addr && !addr.value) addr.value=siteData.address||'';
     const desc=document.getElementById('site-description'); if(desc && !desc.value) desc.value=siteData.description||'';
+    const hazard=document.getElementById('site-hazard-note'); if(hazard && !hazard.value) hazard.value=siteData.hazardNote||'';
   }
   if(screen==='step2')     { const b=document.querySelector('#screen-step2 .btn-back'); if(b) b.setAttribute('onclick', `goTo('${state.triage==='black'?'step5':state.flowMode==='quick'?'step6':'step7'}')`); }
   if(screen==='step3')     { const b=document.querySelector('#screen-step3 .btn-back'); if(b) b.setAttribute('onclick', "goTo('step1')"); }
@@ -5854,6 +5987,9 @@ function renderDashboard(){
   document.getElementById('count-black').textContent=c.black;
   document.getElementById('site-name-header').textContent=siteData.name||'אין מוקד פעיל';
   updateZoneContextBar();
+  const medicDse=DecisionSupportEngine.forMedic();
+  renderMedicNbaBanner(medicDse);
+  updateMedicBriefingBadge(medicDse);
 
   const evacTotal=(siteData.initialEvacuation.green||0)+(siteData.initialEvacuation.yellow||0)+(siteData.initialEvacuation.red||0);
   const sourceLabel={civilian:'אזרח',fire:'כב״א',mda:'מד״א',police:'משטרה',other:'אחר'}[siteData.initialEvacuation.source]||'לא צוין';
@@ -7397,6 +7533,7 @@ function saveSite(){
   siteData.name=document.getElementById('site-name-input').value||siteData.name;
   siteData.address=document.getElementById('site-address').value;
   siteData.description=document.getElementById('site-description')?.value||siteData.description;
+  siteData.hazardNote=document.getElementById('site-hazard-note')?.value||siteData.hazardNote;
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   goTo('dashboard');
 }
@@ -7516,9 +7653,9 @@ function openPatient(id){
         <button onclick="openQuickVitals('${p.id}')" style="background:var(--accent);border:none;color:white;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">עדכן מדדים</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--accent)">${p.vitals.pulse}</div><div style="font-size:11px;color:var(--muted)">דופק bpm</div></div>
+        <div style="background:var(--surface2);border-radius:10px;padding:6px 10px 10px">${renderGaugeArc({value:p.vitals.pulse,min:40,max:180,label:'דופק bpm'})}</div>
         <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:#f4a261">${p.vitals.rr ?? '—'}</div><div style="font-size:11px;color:var(--muted)">נשימות / דקה</div></div>
-        <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:${sCol(p.vitals.spo2)}">${p.vitals.spo2||'—'}${p.vitals.spo2?'%':''}</div><div style="font-size:11px;color:var(--muted)">SpO₂</div></div>
+        <div style="background:var(--surface2);border-radius:10px;padding:6px 10px 10px">${renderGaugeArc({value:p.vitals.spo2||null,min:80,max:100,valueLabel:p.vitals.spo2?`${p.vitals.spo2}%`:null,needleColor:sCol(p.vitals.spo2),zones:[{from:80,to:94,color:'var(--red)'},{from:94,to:97,color:'var(--yellow)'},{from:97,to:100,color:'var(--green)'}],label:'SpO₂'})}</div>
         <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:13px;font-weight:700">${BP_LABELS[p.vitals.bp_estimate]||'—'}</div><div style="font-size:11px;color:var(--muted)">לחץ דם</div></div>
         <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:${p.vitals.avpu==='A'?'var(--green)':p.vitals.avpu==='U'?'var(--red)':'var(--yellow)'}">${p.vitals.avpu||'—'}</div><div style="font-size:11px;color:var(--muted)">AVPU</div></div>
       </div>
@@ -7681,6 +7818,40 @@ function manualTriageOverride(id, triage){
   toast('סיווג פינוי עודכן ידנית · אירוע נרשם בלוג');
 }
 
+// Reusable 180° arc gauge (SVG). `zones` (optional) are semantic color bands drawn on an
+// existing threshold already used elsewhere in the app (e.g. SpO2's <94/<97 split, or OPI's
+// score bands) - this renderer does not define new clinical/operational thresholds itself,
+// callers must pass zones derived from logic that already exists.
+function renderGaugeArc({value, min, max, zones, needleColor, size=92, label, valueLabel}={}){
+  if(value==null || !isFinite(value)){
+    return `<div style="font-size:20px;font-weight:700;color:var(--muted);text-align:center;padding:14px 0">—</div>${label?`<div style="font-size:11px;color:var(--muted);text-align:center">${label}</div>`:''}`;
+  }
+  const W=size, H=Math.round(size*0.6), cx=W/2, cy=H-2, r=W/2-9;
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const frac=v=>clamp((v-min)/((max-min)||1),0,1);
+  const angleFor=f=>180-f*180;
+  const pt=(ang,rad)=>{const t=ang*Math.PI/180; return [cx+rad*Math.cos(t), cy-rad*Math.sin(t)];};
+  const arcPath=(a1,a2,rad)=>{
+    const [x1,y1]=pt(a1,rad), [x2,y2]=pt(a2,rad);
+    const large=Math.abs(a1-a2)>180?1:0;
+    return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${rad} ${rad} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+  };
+  const zoneArcs=(zones||[]).map(z=>`<path d="${arcPath(angleFor(frac(z.from)),angleFor(frac(z.to)),r)}" stroke="${z.color}" stroke-width="7" fill="none" opacity="0.9"/>`).join('');
+  const f=frac(value);
+  const [nx,ny]=pt(angleFor(f), r-10);
+  const nColor=needleColor||'var(--text)';
+  const displayVal=valueLabel!=null?valueLabel:Math.round(value);
+  return `<div style="text-align:center">
+    <svg width="${W}" height="${H+4}" viewBox="0 0 ${W} ${H+4}">
+      <path d="${arcPath(180,0,r)}" stroke="var(--border)" stroke-width="7" fill="none" stroke-linecap="round"/>
+      ${zoneArcs}
+      <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${nColor}" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="3.5" fill="${nColor}"/>
+    </svg>
+    <div style="font-family:var(--mono);font-size:16px;font-weight:800;margin-top:-2px">${displayVal}</div>
+    ${label?`<div style="font-size:10px;color:var(--muted)">${label}</div>`:''}
+  </div>`;
+}
 function buildTrendChart(history){
   if(!history||history.length<1) return '<div style="color:var(--muted);font-size:12px;text-align:center;padding:12px 0">אין מדידות עדיין</div>';
   const fmt=t=>{const d=new Date(t);return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');};
