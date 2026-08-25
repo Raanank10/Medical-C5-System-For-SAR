@@ -23,10 +23,10 @@ for (const rel of files) {
   const ccHero = section(html, 'function renderCcHeroDashboard', 'function renderCcCommandBoard');
   const pcLoadBoard = section(html, 'function renderPcMedicLoadBoard', 'function renderPcResponsibilityBoard');
 
-  assert(html.includes("const APP_VERSION = '2.99.14';"), `${rel}: APP_VERSION must be V2.9914`);
-  assert(html.includes('Demo V2.9914'), `${rel}: launcher label must be Demo V2.9914`);
-  assert(html.includes('ROLE // V2.9914'), `${rel}: role header must be Demo V2.9914`);
-  assert(html.includes('Role-Based Medical Command System V2.9914'), `${rel}: role system strip must be Demo V2.9914`);
+  assert(html.includes("const APP_VERSION = '2.99.15';"), `${rel}: APP_VERSION must be V2.9915`);
+  assert(html.includes('Demo V2.9915'), `${rel}: launcher label must be Demo V2.9915`);
+  assert(html.includes('ROLE // V2.9915'), `${rel}: role header must be Demo V2.9915`);
+  assert(html.includes('Role-Based Medical Command System V2.9915'), `${rel}: role system strip must be Demo V2.9915`);
 
   assert(html.includes('.panel-grid{'), `${rel}: panel-grid CSS missing`);
   assert(html.includes('.panel-status.critical{') && html.includes('.panel-status.stable{') && html.includes('.panel-status.ok{'), `${rel}: panel status color classes missing`);
@@ -40,5 +40,5 @@ for (const rel of files) {
   assert(pcLoadBoard.includes('class="panel-grid"') && pcLoadBoard.includes('renderPcMedicPanel('), `${rel}: PC medic-load board must render a medic panel grid instead of flat rows`);
   assert(pcLoadBoard.includes("overloaded=pts.length>=4||red>=2") && pcLoadBoard.includes('C5Rules.isDeviceSilent(lastMs)'), `${rel}: PC medic panel status must reuse the existing overloaded/silent logic, not new thresholds`);
 
-  console.log(`${rel}: Demo V2.9914 command panel grid static smoke passed`);
+  console.log(`${rel}: Demo V2.9915 command panel grid static smoke passed`);
 }

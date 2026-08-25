@@ -28,6 +28,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .header-right{display:flex;align-items:center;gap:10px;}
 .briefing-trigger{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:7px 12px;color:var(--text);font-family:var(--sans);font-size:12px;font-weight:800;cursor:pointer;}
 .briefing-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--red);color:#fff;font-family:var(--mono);font-size:10px;font-weight:700;}
+#sync-confirm-stack{position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:500;display:flex;flex-direction:column;gap:8px;align-items:center;}
+.sync-confirm-toast{padding:10px 14px;border-radius:12px;font-size:12.5px;font-weight:800;box-shadow:0 10px 30px rgba(0,0,0,0.35);display:flex;align-items:center;gap:8px;white-space:nowrap;font-family:var(--sans);}
+.sync-confirm-toast.ok{background:var(--accent);color:#fff;}
+.sync-confirm-toast.pending{background:var(--surface2);color:var(--orange);border:1px solid var(--orange);}
+.sync-confirm-toast.rejected{background:var(--surface2);color:var(--red);border:1px solid var(--red);}
+.sync-confirm-retry{background:var(--orange);color:#1a0f00;border:none;border-radius:8px;font-family:var(--sans);font-weight:800;font-size:11px;padding:5px 10px;cursor:pointer;}
 
 /* ── SCREENS ── */
 .screen{display:none;min-height:100dvh;padding-bottom:110px;}
@@ -640,7 +646,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9914</div>
+      <div class="demo-kicker">Demo V2.9915</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -739,7 +745,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9914</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9915</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -749,7 +755,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9914</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9915</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -1803,9 +1809,12 @@ textarea{resize:vertical;min-height:70px;}
 
 <!-- ══════════════════════ PATIENT DETAIL ══ -->
 <div id="screen-patient" class="screen">
-  <div class="flow-header">
-    <button class="btn-back" onclick="goTo('dashboard')">←</button>
-    <div><div class="flow-step">פרטי פצוע</div><div class="flow-title" id="detail-pid">P001</div></div>
+  <div class="flow-header" style="justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="btn-back" onclick="goTo('dashboard')">←</button>
+      <div><div class="flow-step">פרטי פצוע</div><div class="flow-title" id="detail-pid">P001</div></div>
+    </div>
+    <div class="sync-pill" id="sync-pill-detail">SYNC</div>
   </div>
   <div style="padding:16px" id="detail-body"></div>
   <div class="bottom-bar" id="detail-bottom-bar"></div>
@@ -2516,7 +2525,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.14';
+const APP_VERSION = '2.99.15';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -4238,7 +4247,7 @@ function updateDemoStatus(){
   let label = demoSyncMode==='fresh' ? `Fresh · ${timeAgoLabel(lastSyncAt)}` : demoSyncMode==='stale' ? `Stale · ${timeAgoLabel(lastSyncAt)}` : `Offline · ${timeAgoLabel(lastSyncAt)}`;
   const rejected=rejectedOutboxCount();
   if(rejected) label += ` · ${rejected} נדחו`;
-  ['sync-pill-dashboard','sync-pill-command','sync-pill-aar','sync-pill-logistics','sync-pill-roles'].forEach(id=>{
+  ['sync-pill-dashboard','sync-pill-command','sync-pill-aar','sync-pill-logistics','sync-pill-roles','sync-pill-detail'].forEach(id=>{
     const el=document.getElementById(id); if(!el) return;
     el.textContent=label;
     el.className='sync-pill '+(demoSyncMode==='fresh'?'':demoSyncMode);
@@ -7841,6 +7850,7 @@ function openPatient(id){
 
   const showCollectionPointBtn = p.patientStatus!=='evacuating' && C5Rules.canChangePatientStatus(p);
   document.getElementById('detail-bottom-bar').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn-primary" onclick="openQuickVitals('${p.id}')">📊 עדכן מדדים</button><button class="btn-primary" style="background:var(--accent)" onclick="speakMist('${p.id}')">🔊 הקרא MIST</button></div><div style="display:grid;grid-template-columns:${showCollectionPointBtn?'1fr 1fr':'1fr'};gap:8px;margin-top:8px">${showCollectionPointBtn?`<button class="btn-primary" style="background:var(--orange)" onclick="markPatientAtCollectionPoint('${p.id}')">🚶 יצא לנקודת איסוף</button>`:''}<button class="btn-primary" style="background:var(--green)" onclick="handoverPatient('${p.id}')">הועבר למד״א — עכשיו</button></div>`;
+  updateDemoStatus();
   goTo('patient');
 }
 
@@ -10498,6 +10508,59 @@ function saveLocalEvent(event){
   getOutbox().push(entry);
   persistOutbox();
   if(!entry.synced) scheduleSyncPush();
+  trackHighStakesSync(entry);
+}
+
+// ── Post-event sync confirmation ──
+// A permanent "Sync Now" button on every screen would mostly invite redundant taps against a
+// system that already auto-syncs every 45s (see setInterval below) - see the sync-indicator
+// concept this shipped from. Instead, only the highest-stakes clinical events get a one-off
+// confirmation: reuses toast()'s visual language for the fast path (already pushed within one
+// debounce+network round trip), and only escalates to a persistent retry chip when the push is
+// genuinely still pending after that window.
+const HIGH_STAKES_SYNC_EVENT_TYPES = new Set(['TOURNIQUET_APPLIED','PATIENT_TRIAGED_EXPECTANT','PATIENT_HANDED_OVER']);
+const HIGH_STAKES_SYNC_LABELS = {TOURNIQUET_APPLIED:'חסם עורקים', PATIENT_TRIAGED_EXPECTANT:'מיון שחור', PATIENT_HANDED_OVER:'מסירה'};
+function ensureSyncConfirmStack(){
+  let stack=document.getElementById('sync-confirm-stack');
+  if(!stack){
+    stack=document.createElement('div');
+    stack.id='sync-confirm-stack';
+    document.body.appendChild(stack);
+  }
+  return stack;
+}
+function trackHighStakesSync(entry){
+  if(!currentUser) return; // local-demo mode never pushes to the network - nothing to confirm
+  if(!HIGH_STAKES_SYNC_EVENT_TYPES.has(entry.type)) return;
+  const label=HIGH_STAKES_SYNC_LABELS[entry.type]||'אירוע';
+  const el=document.createElement('div');
+  el.id='sync-confirm-'+entry.local_event_id;
+  el.className='sync-confirm-toast pending';
+  el.innerHTML=`<span>⏳ ${label} · ממתין לסנכרון</span>`;
+  ensureSyncConfirmStack().appendChild(el);
+  setTimeout(()=>checkHighStakesSyncStatus(entry.local_event_id, label), 2600);
+}
+function checkHighStakesSyncStatus(localEventId, label){
+  const el=document.getElementById('sync-confirm-'+localEventId);
+  if(!el) return; // already dismissed/removed
+  const entry=getOutbox().find(e=>e.local_event_id===localEventId);
+  if(entry && entry.synced && !entry.syncRejected){
+    el.className='sync-confirm-toast ok';
+    el.innerHTML=`<span>✓ ${label} · נשלח לסנכרון</span>`;
+    setTimeout(()=>el.remove(),2200);
+    return;
+  }
+  if(entry && entry.syncRejected){
+    el.className='sync-confirm-toast rejected';
+    el.innerHTML=`<span>⚠ ${label} · נדחה בסנכרון — ראה פאנל אירועים חסומים</span>`;
+    return;
+  }
+  el.className='sync-confirm-toast pending';
+  el.innerHTML=`<span>⏳ ${label} · ממתין לסנכרון (רשת חלשה)</span><button class="sync-confirm-retry" onclick="retryHighStakesSync('${localEventId}','${label.replace(/'/g,"\\'")}')">סנכרן עכשיו</button>`;
+}
+async function retryHighStakesSync(localEventId, label){
+  await syncPush();
+  checkHighStakesSyncStatus(localEventId, label);
 }
 
 // ── Sync push: outbox → deployed /sync/log Edge Function ──
