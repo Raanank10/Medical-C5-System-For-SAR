@@ -23,10 +23,10 @@ for (const rel of files) {
   const openPatientFn = section(html, 'function openPatient(id){', 'function markPatientAtCollectionPoint');
   const dashboardFn = section(html, 'function renderDashboard(){', 'function needsVitals');
 
-  assert(html.includes("const APP_VERSION = '2.99.12';"), `${rel}: APP_VERSION must be V2.9912`);
-  assert(html.includes('Demo V2.9912'), `${rel}: launcher label must be Demo V2.9912`);
-  assert(html.includes('ROLE // V2.9912'), `${rel}: role header must be Demo V2.9912`);
-  assert(html.includes('Role-Based Medical Command System V2.9912'), `${rel}: role system strip must be Demo V2.9912`);
+  assert(html.includes("const APP_VERSION = '2.99.13';"), `${rel}: APP_VERSION must be V2.9913`);
+  assert(html.includes('Demo V2.9913'), `${rel}: launcher label must be Demo V2.9913`);
+  assert(html.includes('ROLE // V2.9913'), `${rel}: role header must be Demo V2.9913`);
+  assert(html.includes('Role-Based Medical Command System V2.9913'), `${rel}: role system strip must be Demo V2.9913`);
 
   // Four age bands, additive on top of the existing binary patientAgeGroup
   assert(html.includes("const AGE_BAND_LABELS = {infant:"), `${rel}: AGE_BAND_LABELS missing`);
@@ -55,5 +55,5 @@ for (const rel of files) {
   assert(openPatientFn.includes('AGE_BAND_LABELS[ageBandOf(p)]'), `${rel}: patient detail must show the age band`);
   assert(openPatientFn.includes("ageBandOf(p)==='elderly'?"), `${rel}: patient detail must show an elderly caution banner`);
 
-  console.log(`${rel}: Demo V2.9912 age bands static smoke passed`);
+  console.log(`${rel}: Demo V2.9913 age bands static smoke passed`);
 }
