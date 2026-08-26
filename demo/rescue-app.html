@@ -646,7 +646,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9919</div>
+      <div class="demo-kicker">Demo V2.9920</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -745,7 +745,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9919</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9920</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -755,7 +755,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9919</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9920</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -1679,6 +1679,23 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 
+<!-- ══════════════════════ LOGISTICS DISPATCH RUNNER MODAL ══ -->
+<div class="modal-overlay hidden" id="dispatch-runner-modal" onclick="closeDispatchRunnerModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="field-label">שיוך רץ להשלמה</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.55;margin-bottom:14px" id="dispatch-runner-summary">—</div>
+    <div class="field-label">שם הרץ</div>
+    <input type="text" id="dispatch-runner-name" placeholder="לדוגמה: דוד כהן" style="margin-bottom:12px">
+    <div class="field-label">זמן הגעה משוער (דק׳)</div>
+    <input type="number" id="dispatch-runner-eta" placeholder="15" min="1">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+      <button class="btn-primary" onclick="submitDispatchRunner()">שלח ציוד</button>
+      <button class="btn-secondary" onclick="hideDispatchRunnerModal()">ביטול</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════════ SUPPLY USED CONFIRMATION SHEET ══ -->
 <div class="modal-overlay hidden" id="supply-used-modal" onclick="closeSupplyUsedModal(event)">
   <div class="modal-sheet supply-sheet">
@@ -2542,7 +2559,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.19';
+const APP_VERSION = '2.99.20';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -9454,13 +9471,16 @@ function renderLogisticsOfficer(){
   if(taskBoard) taskBoard.innerHTML=dashboardFocusBanner()+renderLogisticsTaskBoard();
   const realQueueEl=document.getElementById('logistics-real-queue');
   if(realQueueEl){
-    const realQueue=_supplyRequestQueue[SITE_TO_INCIDENT_ID[currentSiteId()]]||[];
+    const realQueueIncidentId=SITE_TO_INCIDENT_ID[currentSiteId()];
+    const realQueue=_supplyRequestQueue[realQueueIncidentId]||[];
     const realQueueRows=realQueue.map(r=>{
       const f=formatSupplyRequestRow(r);
+      const actions=supplyRequestDispatchActions(r, realQueueIncidentId);
       return `<div class="cmd-matrix-row${r.status==='requested'?' critical':''}">
         <div>
           <div class="cmd-matrix-title">${f.title}</div>
           <div class="cmd-matrix-sub">${f.sub}</div>
+          ${actions}
         </div>
       </div>`;
     }).join('') || renderOperationalEmptyState('אין בקשות ציוד בתור האמיתי','נתון חוצה-מכשירים מ-supply_requests (database/033) — יתעדכן ברגע שחובש/חוג״ד יוצר בקשה');
@@ -11042,6 +11062,90 @@ function renderRealSupplyQueueRoleSection(incidentId){
   const rows=(_supplyRequestQueue[incidentId]||[]).filter(r=>!['delivered','cancelled'].includes(r.status));
   const body=rows.map(r=>{ const f=formatSupplyRequestRow(r); return roleRow(f.title,f.sub); }).join('');
   return roleSection('תור בקשות ציוד — Real-time · כל המכשירים', body || roleRow('אין בקשות ציוד פתוחות בתור האמיתי','נתון חוצה-מכשירים מ-supply_requests, לא מה-outbox המקומי'));
+}
+
+// ── Logistics dispatch/runner-assign write actions (PR3) ──
+// Writes SUPPLY_REQUEST_DISPATCHED/IN_TRANSIT/RECEIVED - the schema-native event types
+// SUPPLY_LOGISTICS_EVENTS already allow-listed for logistics_officer, and database/034's
+// project_supply_request_event() resolves by the real payload_json.supply_request_id (the
+// server UUID this device only has because it already pulled the row via
+// get_supply_request_queue) rather than by originating device - required here specifically
+// because the dispatching device is essentially never the same device that created the
+// request (database/034's own commit message covers the bug this fixes). Screen-scoped, not
+// separately role-checked client-side: this UI only renders inside renderLogisticsOfficer,
+// and the real gate is server-side (SUPPLY_LOGISTICS_EVENTS/RLS), same as every other
+// role-scoped action in this file.
+function supplyRequestDispatchActions(r, incidentId){
+  if(r.status==='requested' || r.status==='approved'){
+    return `<div style="display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px">
+      <button class="demo-mini-btn" onclick="showDispatchRunnerModal('${r.id}','${incidentId}')">שלח ציוד + הקצה רץ</button>
+    </div>`;
+  }
+  if(r.status==='dispatched'){
+    return `<div style="display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px">
+      <button class="demo-mini-btn" onclick="markSupplyRequestInTransit('${r.id}','${incidentId}')">סמן בדרך</button>
+    </div>`;
+  }
+  if(r.status==='in_transit'){
+    return `<div style="display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px">
+      <button class="demo-mini-btn" onclick="markSupplyRequestDelivered('${r.id}','${incidentId}')">סמן נמסר</button>
+    </div>`;
+  }
+  return '';
+}
+function updateLocalSupplyRequestOptimistic(incidentId, requestId, patch){
+  const rows=_supplyRequestQueue[incidentId];
+  if(!Array.isArray(rows)) return;
+  const row=rows.find(r=>r.id===requestId);
+  if(row) Object.assign(row, patch);
+}
+let dispatchRunnerTarget=null;
+function showDispatchRunnerModal(requestId, incidentId){
+  const row=(_supplyRequestQueue[incidentId]||[]).find(r=>r.id===requestId);
+  if(!row) return;
+  dispatchRunnerTarget={requestId, incidentId};
+  const summary=document.getElementById('dispatch-runner-summary');
+  if(summary) summary.textContent=formatSupplyRequestRow(row).title;
+  const nameEl=document.getElementById('dispatch-runner-name');
+  if(nameEl) nameEl.value=row.assigned_runner_name||'';
+  const etaEl=document.getElementById('dispatch-runner-eta');
+  if(etaEl) etaEl.value=row.eta_minutes||'';
+  document.getElementById('dispatch-runner-modal')?.classList.remove('hidden');
+}
+function hideDispatchRunnerModal(){
+  document.getElementById('dispatch-runner-modal')?.classList.add('hidden');
+  dispatchRunnerTarget=null;
+}
+function closeDispatchRunnerModal(e){ if(e.target.id==='dispatch-runner-modal') hideDispatchRunnerModal(); }
+function submitDispatchRunner(){
+  if(!dispatchRunnerTarget) return;
+  const {requestId, incidentId}=dispatchRunnerTarget;
+  const runnerName=(document.getElementById('dispatch-runner-name')?.value||'').trim();
+  if(!runnerName){ toast('נא להזין שם רץ'); return; }
+  const etaRaw=document.getElementById('dispatch-runner-eta')?.value;
+  const etaMinutes=etaRaw?Math.max(1,Math.round(Number(etaRaw))):null;
+  saveLocalEvent({
+    type:'SUPPLY_REQUEST_DISPATCHED',
+    detail:`נשלח רץ · ${runnerName}${etaMinutes?` · ETA ${etaMinutes} דק׳`:''}`,
+    warn:false,
+    payload_json:{supply_request_id:requestId, runner_name:runnerName, eta_minutes:etaMinutes}
+  });
+  updateLocalSupplyRequestOptimistic(incidentId, requestId, {status:'dispatched', assigned_runner_name:runnerName, eta_minutes:etaMinutes, dispatched_at:new Date().toISOString()});
+  hideDispatchRunnerModal();
+  toast('ציוד נשלח · הוקצה רץ');
+  renderLogisticsOfficer();
+}
+function markSupplyRequestInTransit(requestId, incidentId){
+  saveLocalEvent({type:'SUPPLY_REQUEST_IN_TRANSIT',detail:`בדרך · ${requestId}`,warn:false,payload_json:{supply_request_id:requestId}});
+  updateLocalSupplyRequestOptimistic(incidentId, requestId, {status:'in_transit', in_transit_at:new Date().toISOString()});
+  toast('סומן כבדרך');
+  renderLogisticsOfficer();
+}
+function markSupplyRequestDelivered(requestId, incidentId){
+  saveLocalEvent({type:'SUPPLY_REQUEST_RECEIVED',detail:`נמסר · ${requestId}`,warn:false,payload_json:{supply_request_id:requestId}});
+  updateLocalSupplyRequestOptimistic(incidentId, requestId, {status:'delivered', delivered_at:new Date().toISOString()});
+  toast('סומן כנמסר');
+  renderLogisticsOfficer();
 }
 
 // ── Poison-event quarantine review: sync_ingestion_errors, command-role only ──
