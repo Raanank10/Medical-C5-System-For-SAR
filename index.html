@@ -646,7 +646,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9921</div>
+      <div class="demo-kicker">Demo V2.9922</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -745,7 +745,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9921</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9922</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -755,7 +755,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9921</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9922</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -1696,6 +1696,23 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 
+<!-- ══════════════════════ KIT TEMPLATE CREATE/EDIT MODAL ══ -->
+<div class="modal-overlay hidden" id="kit-template-modal" onclick="closeKitTemplateModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="field-label">שם הקיט</div>
+    <input type="text" id="kit-template-name" placeholder="לדוגמה: קיט חובש בסיסי" style="margin-bottom:12px">
+    <div class="field-label">תיאור</div>
+    <textarea id="kit-template-description" placeholder="אופציונלי" style="margin-bottom:14px"></textarea>
+    <div class="field-label">פריטים בקיט · כמות</div>
+    <div id="kit-template-items-grid" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+      <button class="btn-primary" onclick="submitKitTemplate()">שמור קיט</button>
+      <button class="btn-secondary" onclick="hideKitTemplateModal()">ביטול</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════════ SUPPLY USED CONFIRMATION SHEET ══ -->
 <div class="modal-overlay hidden" id="supply-used-modal" onclick="closeSupplyUsedModal(event)">
   <div class="modal-sheet supply-sheet">
@@ -1935,6 +1952,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div id="logistics-task-board" style="padding:12px 16px 0"></div>
   <div id="logistics-real-queue" style="padding:12px 16px 0"></div>
+  <div id="logistics-kit-templates-link" style="padding:0 16px"></div>
   <div id="logistics-burn-predictions" style="padding:12px 16px 0"></div>
   <div id="logistics-summary" class="cmd-priority-grid"></div>
   <div style="padding:12px 16px 0">
@@ -1945,6 +1963,30 @@ textarea{resize:vertical;min-height:70px;}
     <div id="logistics-quick-restock" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"></div>
   </div>
   <div id="logistics-companies" class="cmd-status-matrix" style="padding-bottom:90px"></div>
+</div>
+
+<!-- ══════════════════════ KIT TEMPLATES (standalone management screen) ══ -->
+<div id="screen-kit-templates" class="screen">
+  <div class="header">
+    <div class="header-left">
+      <div class="header-subtitle">KIT TEMPLATES // REFERENCE</div>
+      <div class="header-title">קיטים מוגדרים מראש</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goTo('dashboard')">✕</button>
+    </div>
+  </div>
+  <div class="demo-strip">
+    <div>
+      <div class="demo-strip-title">ניהול תבניות קיט</div>
+      <div class="demo-strip-sub">זמין לצפייה לכולם · עריכה זמינה לחוג״ד, מ״פ רפואה, לוגיסטיקה ומנהל מערכת בלבד</div>
+    </div>
+  </div>
+  <div id="kit-templates-lock-note" style="display:none;padding:10px 16px;margin:10px 16px 0;background:rgba(244,162,97,.12);border:1px solid var(--yellow);border-radius:10px;font-size:13px;color:var(--yellow)">עריכת קיטים אפשרית רק כאשר האירוע אינו פעיל (טיוטה / staging / סגור).</div>
+  <div style="padding:12px 16px 0">
+    <button id="kit-templates-create-btn" class="btn-primary" style="display:none" onclick="showKitTemplateModal()">+ קיט חדש</button>
+  </div>
+  <div id="kit-templates-list" style="padding:12px 16px 90px"></div>
 </div>
 
 <!-- ══════════════════════ ROLES / AUTHORIZATION ══ -->
@@ -2560,7 +2602,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.21';
+const APP_VERSION = '2.99.22';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -6090,6 +6132,7 @@ function goTo(screen){
   if(screen==='step8')     renderSummary();
   if(screen==='commander') renderCommander();
   if(screen==='logistics') renderLogisticsOfficer();
+  if(screen==='kit-templates') renderKitTemplates();
   if(screen==='roles')     renderRolesAuthorization();
   if(screen==='role-dashboard') renderRoleDashboard(activeRoleDashboard);
   if(screen==='enroute') {
@@ -9498,6 +9541,8 @@ function renderLogisticsOfficer(){
     }).join('') || renderOperationalEmptyState('אין בקשות ציוד בתור האמיתי','נתון חוצה-מכשירים מ-supply_requests (database/033) — יתעדכן ברגע שחובש/חוג״ד יוצר בקשה');
     realQueueEl.innerHTML=renderCollapsibleSection('logistics-real-queue-section','תור בקשות ציוד — Real-time · כל המכשירים',realQueueRows,realQueue.length,{criticalCount:realQueue.filter(r=>r.status==='requested').length,emptyMessage:'אין בקשות ציוד בתור האמיתי'});
   }
+  const kitLinkEl=document.getElementById('logistics-kit-templates-link');
+  if(kitLinkEl) kitLinkEl.innerHTML=canManageKitTemplates()?`<button class="demo-mini-btn" onclick="goTo('kit-templates')">ניהול קיטים מוגדרים מראש</button>`:'';
   const burnPredictionsEl=document.getElementById('logistics-burn-predictions');
   if(burnPredictionsEl) burnPredictionsEl.innerHTML=renderRecommendationPanel('חיזוי צריכה — קצב שריפה (Top 3)', DecisionSupportEngine.forLogistics().recommendations);
   const companies=logisticsCompanies();
@@ -11075,7 +11120,8 @@ function formatSupplyRequestRow(r){
 function renderRealSupplyQueueRoleSection(incidentId){
   const rows=(_supplyRequestQueue[incidentId]||[]).filter(r=>!['delivered','cancelled'].includes(r.status));
   const body=rows.map(r=>{ const f=formatSupplyRequestRow(r); return roleRow(f.title,f.sub); }).join('');
-  return roleSection('תור בקשות ציוד — Real-time · כל המכשירים', body || roleRow('אין בקשות ציוד פתוחות בתור האמיתי','נתון חוצה-מכשירים מ-supply_requests, לא מה-outbox המקומי'));
+  const kitLink=canManageKitTemplates()?`<div style="padding:0 16px 10px"><button class="demo-mini-btn" onclick="goTo('kit-templates')">ניהול קיטים מוגדרים מראש</button></div>`:'';
+  return roleSection('תור בקשות ציוד — Real-time · כל המכשירים', body || roleRow('אין בקשות ציוד פתוחות בתור האמיתי','נתון חוצה-מכשירים מ-supply_requests, לא מה-outbox המקומי')) + kitLink;
 }
 
 // ── Logistics dispatch/runner-assign write actions (PR3) ──
@@ -11162,6 +11208,153 @@ function markSupplyRequestDelivered(requestId, incidentId){
   renderLogisticsOfficer();
 }
 
+// ── Kit templates (PR3 of the kit-templates scope): standalone management screen ──
+// kit_templates/kit_template_items (database/001) are plain reference/config tables, not part
+// of the append-only events log - RLS (database/005/036) is the real enforcement, direct
+// supabase-js CRUD is the correct pattern here (same as device_presence's upsert), not an
+// event-sourced write. client_item_key (database/035) is the join between these rows'
+// item_id (inventory_items.id) and the client's real 7-item vocabulary. Not incident-scoped,
+// so a flat 45s poll (no per-incident RPC) like get_incident_command_state needs.
+let _kitTemplates=[];
+let _kitTemplateItems=[];
+let _kitCatalogItems=[]; // inventory_items rows with client_item_key set - the 7 kit-eligible items
+async function pullKitTemplates(){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  try{
+    const [templatesResult, itemsResult, catalogResult] = await Promise.all([
+      client.from('kit_templates').select('id,name,description,is_active,created_by,updated_at,version').order('name'),
+      client.from('kit_template_items').select('id,kit_template_id,item_id,quantity'),
+      client.from('inventory_items').select('id,sku,name,client_item_key').not('client_item_key','is',null)
+    ]);
+    if(!templatesResult.error && Array.isArray(templatesResult.data)) _kitTemplates=templatesResult.data;
+    if(!itemsResult.error && Array.isArray(itemsResult.data)) _kitTemplateItems=itemsResult.data;
+    if(!catalogResult.error && Array.isArray(catalogResult.data)) _kitCatalogItems=catalogResult.data;
+  }catch(e){} // offline/network failure — next interval retries
+  if(document.getElementById('screen-kit-templates')?.classList.contains('active')) renderKitTemplates();
+}
+setInterval(()=>{ if(currentUser) pullKitTemplates(); }, 45000);
+
+// AUTH_MATRIX's "Manage kit templates" row (pc/cc/logistics_officer/admin - physician
+// deliberately excluded, database/036) - mirrors it here rather than reading the table, same
+// as every other role-gated action in this file.
+function canManageKitTemplates(){
+  return !!currentUser && ['pc','cc','logistics_officer','admin'].includes(currentUser.role);
+}
+// C5_SENTINEL_SAR_MVP_SPEC_v1.2.md sec 5.6: "editable only in staging/non-active incident
+// mode." Unknown status (not yet pulled, or offline) is treated as locked - fail-safe, not
+// fail-open, for a config-change gate. Real incident status via database/037's extension to
+// incident_command_state, not the local-only siteData.incidentStatus (different, unsynced
+// vocabulary).
+function kitTemplatesEditLocked(){
+  const status=_remoteCommandState[SITE_TO_INCIDENT_ID[currentSiteId()]]?.status;
+  return !status || status==='active';
+}
+let kitTemplateEditTarget=null; // null = creating new; else the kit_templates.id being edited
+function showKitTemplateModal(templateId=null){
+  if(!canManageKitTemplates()){ toast('אין הרשאה לניהול קיטים'); return; }
+  if(kitTemplatesEditLocked()){ toast('ניתן לערוך קיטים רק כשהאירוע אינו פעיל (טיוטה / staging / סגור)'); return; }
+  kitTemplateEditTarget=templateId;
+  const template=templateId?_kitTemplates.find(t=>t.id===templateId):null;
+  const nameEl=document.getElementById('kit-template-name'); if(nameEl) nameEl.value=template?.name||'';
+  const descEl=document.getElementById('kit-template-description'); if(descEl) descEl.value=template?.description||'';
+  const existingQty={};
+  if(template){
+    _kitTemplateItems.filter(x=>x.kit_template_id===template.id).forEach(x=>{
+      const cat=_kitCatalogItems.find(c=>c.id===x.item_id);
+      if(cat) existingQty[cat.client_item_key]=x.quantity;
+    });
+  }
+  const grid=document.getElementById('kit-template-items-grid');
+  if(grid) grid.innerHTML=_kitCatalogItems.map(item=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <span>${SUPPLY_LABELS[item.client_item_key]||item.name}</span>
+      <input type="number" min="0" id="kit-item-qty-${item.client_item_key}" style="width:70px" value="${existingQty[item.client_item_key]||0}">
+    </div>
+  `).join('') || '<div style="color:var(--muted);font-size:13px">קטלוג הפריטים עדיין לא נטען</div>';
+  document.getElementById('kit-template-modal')?.classList.remove('hidden');
+}
+function hideKitTemplateModal(){
+  document.getElementById('kit-template-modal')?.classList.add('hidden');
+  kitTemplateEditTarget=null;
+}
+function closeKitTemplateModal(e){ if(e.target.id==='kit-template-modal') hideKitTemplateModal(); }
+async function submitKitTemplate(){
+  if(!canManageKitTemplates() || kitTemplatesEditLocked()) return; // defense in depth - the modal shouldn't be reachable otherwise
+  const client=getSupabaseClient();
+  if(!client || !currentUser) return;
+  const name=(document.getElementById('kit-template-name')?.value||'').trim();
+  if(!name){ toast('נא להזין שם קיט'); return; }
+  const description=(document.getElementById('kit-template-description')?.value||'').trim();
+  const desiredItems=_kitCatalogItems.map(item=>({
+    item_id:item.id,
+    quantity:Math.max(0,Math.round(Number(document.getElementById(`kit-item-qty-${item.client_item_key}`)?.value)||0))
+  })).filter(x=>x.quantity>0);
+  try{
+    let templateId=kitTemplateEditTarget;
+    if(templateId){
+      const {error}=await client.from('kit_templates').update({name, description}).eq('id', templateId);
+      if(error){ toast('שגיאה בשמירת הקיט'); return; }
+      const {error:delErr}=await client.from('kit_template_items').delete().eq('kit_template_id', templateId);
+      if(delErr){ toast('שגיאה בעדכון פריטי הקיט'); return; }
+    }else{
+      const {data, error}=await client.from('kit_templates').insert({name, description, created_by:currentUser.id}).select('id').single();
+      if(error || !data){ toast('שגיאה ביצירת הקיט'); return; }
+      templateId=data.id;
+    }
+    if(desiredItems.length){
+      const {error:itemsError}=await client.from('kit_template_items').insert(desiredItems.map(x=>({kit_template_id:templateId, item_id:x.item_id, quantity:x.quantity})));
+      if(itemsError){ toast('הקיט נשמר אך פריטים לא נשמרו במלואם'); }
+    }
+    hideKitTemplateModal();
+    toast('הקיט נשמר');
+    await pullKitTemplates();
+    renderKitTemplates();
+  }catch(e){ toast('שגיאה בשמירת הקיט'); }
+}
+async function toggleKitTemplateActive(templateId){
+  if(!canManageKitTemplates()){ toast('אין הרשאה לניהול קיטים'); return; }
+  if(kitTemplatesEditLocked()){ toast('ניתן לערוך קיטים רק כשהאירוע אינו פעיל (טיוטה / staging / סגור)'); return; }
+  const client=getSupabaseClient();
+  if(!client) return;
+  const template=_kitTemplates.find(t=>t.id===templateId);
+  if(!template) return;
+  const {error}=await client.from('kit_templates').update({is_active:!template.is_active}).eq('id', templateId);
+  if(error){ toast('שגיאה בעדכון הקיט'); return; }
+  await pullKitTemplates();
+  renderKitTemplates();
+  toast(template.is_active?'קיט הושבת':'קיט הופעל');
+}
+function renderKitTemplates(){
+  const canManage=canManageKitTemplates();
+  const locked=kitTemplatesEditLocked();
+  const createBtn=document.getElementById('kit-templates-create-btn');
+  if(createBtn){ createBtn.style.display=canManage?'block':'none'; createBtn.disabled=locked; }
+  const lockNoteEl=document.getElementById('kit-templates-lock-note');
+  if(lockNoteEl) lockNoteEl.style.display=(canManage && locked)?'block':'none';
+  const listEl=document.getElementById('kit-templates-list');
+  if(!listEl) return;
+  const rows=_kitTemplates.map(t=>{
+    const items=_kitTemplateItems.filter(x=>x.kit_template_id===t.id).map(x=>{
+      const cat=_kitCatalogItems.find(c=>c.id===x.item_id);
+      return cat?`${SUPPLY_LABELS[cat.client_item_key]||cat.name} x${x.quantity}`:null;
+    }).filter(Boolean).join(' · ') || 'אין פריטים';
+    const actions=canManage?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+      <button class="demo-mini-btn" ${locked?'disabled':''} onclick="showKitTemplateModal('${t.id}')">ערוך</button>
+      <button class="demo-mini-btn" ${locked?'disabled':''} onclick="toggleKitTemplateActive('${t.id}')">${t.is_active?'השבת':'הפעל'}</button>
+    </div>`:'';
+    return `<div class="cmd-matrix-row${t.is_active?'':' critical'}">
+      <div>
+        <div class="cmd-matrix-title">${t.name}${t.is_active?'':' · לא פעיל'}</div>
+        <div class="cmd-matrix-sub">${t.description||'—'}<br>${items}</div>
+        ${actions}
+      </div>
+    </div>`;
+  }).join('') || renderOperationalEmptyState('אין קיטים מוגדרים','לחץ על "קיט חדש" כדי להגדיר קיט ראשון');
+  listEl.innerHTML=renderCollapsibleSection('kit-templates-list-section','קיטים מוגדרים', rows, _kitTemplates.length, {criticalCount:_kitTemplates.filter(t=>!t.is_active).length, emptyMessage:'אין קיטים מוגדרים'});
+}
+
 // ── Poison-event quarantine review: sync_ingestion_errors, command-role only ──
 // The "poison event quarantine" concept (CLAUDE.md, docs/API_SURFACE_v1.2.md's Atomic
 // Individual Event Processing) has always been real server-side — malformed/dependency-blocked
@@ -11236,6 +11429,7 @@ function refreshActiveScreenData(){
   else if(screen==='logistics') renderLogisticsOfficer();
   else if(screen==='role-dashboard') renderRoleDashboard(activeRoleDashboard);
   else if(screen==='aar') renderAar();
+  else if(screen==='kit-templates') renderKitTemplates();
   updateDemoStatus();
 }
 
