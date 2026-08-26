@@ -646,7 +646,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9915</div>
+      <div class="demo-kicker">Demo V2.9917</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -745,7 +745,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9915</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9917</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -755,7 +755,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9915</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9917</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2151,6 +2151,21 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 
+<div id="handover-qr-modal" class="modal-overlay hidden" onclick="if(event.target===this) this.classList.add('hidden')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🔗 מסירה מאובטחת — קישור לצוות הקולט</div>
+    <div class="modal-sub">הצג את הקישור לצוות הקולט (או שתף). הקישור חד-פעמי ותקף 15 דקות — ראה טופס MIST ידני מוקרא כגיבוי אם אין קליטה.</div>
+    <div id="handover-qr-link" style="font-family:var(--mono);font-size:12px;word-break:break-all;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin:10px 0;color:var(--accent)"></div>
+    <div id="handover-qr-expiry" style="font-size:12px;color:var(--muted);margin-bottom:10px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button class="demo-mini-btn" onclick="copyHandoverQrLink()">📋 העתק קישור</button>
+      <button class="demo-mini-btn" onclick="shareHandoverQrLink()">📤 שתף</button>
+    </div>
+    <button class="btn-secondary" style="margin-top:10px" onclick="document.getElementById('handover-qr-modal').classList.add('hidden');goTo('dashboard')">סגור</button>
+  </div>
+</div>
+
 <div id="feedback-modal" class="modal-overlay hidden" onclick="if(event.target===this) closeFeedbackModal()">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
@@ -2525,7 +2540,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.15';
+const APP_VERSION = '2.99.17';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3000,6 +3015,8 @@ function getSupabaseClient(){
 let _localEncKey=null; // CryptoKey, extractable:false, in-memory only — never localStorage/sessionStorage/IndexedDB
 function bytesToB64(bytes){ return btoa(String.fromCharCode(...bytes)); }
 function b64ToBytes(str){ return Uint8Array.from(atob(str), c=>c.charCodeAt(0)); }
+function bytesToHex(bytes){ return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0')).join(''); }
+function bytesToB64Url(bytes){ return bytesToB64(bytes).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
 async function deriveKeyFromPin(pin, saltBytes, iterations=PIN_KDF_ITERATIONS){
   const baseKey=await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey(
@@ -7849,7 +7866,7 @@ function openPatient(id){
     <div style="height:80px"></div>`;
 
   const showCollectionPointBtn = p.patientStatus!=='evacuating' && C5Rules.canChangePatientStatus(p);
-  document.getElementById('detail-bottom-bar').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn-primary" onclick="openQuickVitals('${p.id}')">📊 עדכן מדדים</button><button class="btn-primary" style="background:var(--accent)" onclick="speakMist('${p.id}')">🔊 הקרא MIST</button></div><div style="display:grid;grid-template-columns:${showCollectionPointBtn?'1fr 1fr':'1fr'};gap:8px;margin-top:8px">${showCollectionPointBtn?`<button class="btn-primary" style="background:var(--orange)" onclick="markPatientAtCollectionPoint('${p.id}')">🚶 יצא לנקודת איסוף</button>`:''}<button class="btn-primary" style="background:var(--green)" onclick="handoverPatient('${p.id}')">הועבר למד״א — עכשיו</button></div>`;
+  document.getElementById('detail-bottom-bar').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn-primary" onclick="openQuickVitals('${p.id}')">📊 עדכן מדדים</button><button class="btn-primary" style="background:var(--accent)" onclick="speakMist('${p.id}')">🔊 הקרא MIST</button></div><div style="display:grid;grid-template-columns:${showCollectionPointBtn?'1fr 1fr':'1fr'};gap:8px;margin-top:8px">${showCollectionPointBtn?`<button class="btn-primary" style="background:var(--orange)" onclick="markPatientAtCollectionPoint('${p.id}')">🚶 יצא לנקודת איסוף</button>`:''}<button class="btn-primary" style="background:var(--green)" onclick="handoverPatient('${p.id}')">הועבר למד״א — עכשיו</button></div><div style="margin-top:8px">${C5Rules.canChangePatientStatus(p)?`<button class="btn-secondary" onclick="generateQrHandover('${p.id}')">🔗 מסירה מאובטחת — קישור QR</button>`:''}</div>`;
   updateDemoStatus();
   goTo('patient');
 }
@@ -7906,6 +7923,76 @@ function handoverPatient(id){
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   toast('הועבר למד״א · הוסר מהלוח הפעיל');
   goTo('dashboard');
+}
+// Secure QR handover (docs/API_SURFACE_v1.2.md's "Medical Handover Event" secure_qr_token
+// path, supabase/functions/handover-consume). The secret itself never leaves this device
+// except inside the link shown to the receiving crew - only its SHA-256 hash travels through
+// the normal offline-first sync pipeline, as part of the ordinary PATIENT_HANDED_OVER event
+// (no live network call needed to "issue" a token, preserving offline-first: the link can be
+// shown immediately, and simply won't validate at the consume endpoint until that event has
+// actually synced). token_hash doubles as patient_handover_tokens' lookup key (unique
+// constraint), so the link is fully known client-side with no round trip.
+// token_signature is HMAC-SHA256 over token_hash using the public Supabase anon key as HMAC
+// key material - this is defense-in-depth ("minted by a real copy of this app"), NOT the
+// actual security boundary, since the anon key is intentionally public (docs/THREAT_MODEL.md
+// T7). The real boundary is the random secret itself: only someone holding it can reproduce
+// the stored hash, which is what supabase/functions/handover-consume checks.
+async function generateHandoverToken(){
+  const secretBytes=crypto.getRandomValues(new Uint8Array(24));
+  const secret=bytesToB64Url(secretBytes);
+  const hashBuf=await crypto.subtle.digest('SHA-256', secretBytes);
+  const tokenHash=bytesToHex(new Uint8Array(hashBuf));
+  const hmacKey=await crypto.subtle.importKey('raw', new TextEncoder().encode(SUPABASE_ANON_KEY), {name:'HMAC', hash:'SHA-256'}, false, ['sign']);
+  const sigBuf=await crypto.subtle.sign('HMAC', hmacKey, new TextEncoder().encode(tokenHash));
+  const tokenSignature=bytesToHex(new Uint8Array(sigBuf));
+  const expiresAt=new Date(Date.now()+15*60000).toISOString();
+  return {secret, tokenHash, tokenSignature, expiresAt};
+}
+async function generateQrHandover(id){
+  const p=patients.find(x=>x.id===id); if(!p) return;
+  if(!C5Rules.canChangePatientStatus(p)){ toast('כבר נרשמה מסירה — לא ניתן לשלוח שוב'); return; }
+  const {secret, tokenHash, tokenSignature, expiresAt}=await generateHandoverToken();
+  const deviceId=getDeviceId();
+  p.patientStatus='handed_over';
+  p.needsFullAssessment=false;
+  p.lastTouchedBy=deviceId;
+  p.lastModifiedAt=new Date().toISOString();
+  p.unsyncedEvents=(p.unsyncedEvents||0)+1;
+  const event={
+    type:'PATIENT_HANDED_OVER',
+    time:nowT(),
+    detail:'הועבר למד״א — קישור QR מאובטח נוצר',
+    warn:false,
+    payload_json:{
+      handover_method:'secure_qr_token',
+      destination_facility:'pending',
+      receiving_unit_transport:'pending',
+      token_hash:tokenHash,
+      token_signature:tokenSignature,
+      token_expires_at:expiresAt,
+      mist_summary:{mechanism:p.injury, injuries:p.injury, signs:`HR ${p.vitals.pulse}, RR ${p.vitals.rr}, AVPU=${p.vitals.avpu||'—'}`, treatment:(p.txHistory||[]).map(tx=>tx.text).join('; ')||'none recorded'}
+    }
+  };
+  p.events.push(event);
+  saveLocalEvent({...event, patient_id:p.id});
+  lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
+  const link=`${SUPABASE_URL}/functions/v1/handover-consume?h=${tokenHash}&s=${secret}`;
+  document.getElementById('handover-qr-link').textContent=link;
+  document.getElementById('handover-qr-link').dataset.link=link;
+  document.getElementById('handover-qr-expiry').textContent=`תקף עד ${new Date(expiresAt).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})} · חד-פעמי`;
+  document.getElementById('handover-qr-modal').classList.remove('hidden');
+}
+function copyHandoverQrLink(){
+  const link=document.getElementById('handover-qr-link')?.dataset.link;
+  if(!link) return;
+  navigator.clipboard?.writeText(link);
+  toast('קישור הועתק');
+}
+function shareHandoverQrLink(){
+  const link=document.getElementById('handover-qr-link')?.dataset.link;
+  if(!link) return;
+  if(navigator.share){ navigator.share({title:'מסירת פצוע', url:link}).catch(()=>{}); }
+  else copyHandoverQrLink();
 }
 function mistTextForPatient(p){
   return `פצוע ${p.visualId||p.id}. מנגנון: ${p.injury||'לא ידוע'}. פציעות: ${p.injury||'לא תועד'}. סימנים: דופק ${p.vitals?.pulse||'לא נמדד'}, נשימות ${p.vitals?.rr??'לא נמדד'}, הכרה ${p.vitals?.avpu||'לא נמדד'}, לחץ דם ${BP_LABELS[p.vitals?.bp_estimate]||'לא נמדד'}. טיפול: ${(p.txHistory||[]).map(tx=>tx.text).join(', ')||'לא תועד'}. מיקום: ${p.location||''} ${p.locDetail||''}.`;
@@ -9964,22 +10051,36 @@ function renderCommandOperationalPanels(pts, site){
   ].map(x=>`<div class="cmd-priority-card ${x.c}"${x.full?' style="grid-column:1/-1"':''}><div class="cmd-priority-icon">${x.i}</div><div class="cmd-priority-num">${x.n}</div><div class="cmd-priority-label">${x.l}</div></div>`).join('');
   renderReinforcementPanel();
 
-  const commandState=buildIncidentCommandStateSnapshot(pts, site);
-  document.getElementById('cmd-heatmap').innerHTML=commandState.sectors.map(s=>{
-    const logistics=Object.entries(s.inventory).map(([item,count])=>{
+  // Sector heatmap: prefer the real server-computed breakdown (incident_command_state.
+  // state_json.sectors, sourced from vw_command_spatial_heatmap - database/030) as the
+  // primary source when connected and synced, matching docs/PRODUCTION_READINESS.md's
+  // "shift command dashboard to incident_command_state as primary source". Falls back to
+  // the locally-computed snapshot only when offline or in local-demo mode (no server data
+  // exists to prefer) - offline-first means a device must still show *something* without a
+  // connection, but that fallback is now genuinely the fallback, not the only path.
+  // Per-sector inventory has no server-side equivalent (see database/030's own scope note)
+  // so it's shown only in the local-fallback rendering, never mislabeled as server data.
+  const localState=buildIncidentCommandStateSnapshot(pts, site);
+  const remoteSectorsRaw=currentUser ? _remoteCommandState[SITE_TO_INCIDENT_ID[site.id]]?.state_json?.sectors : null;
+  const sectorSource=(remoteSectorsRaw && remoteSectorsRaw.length) ? 'server' : 'local';
+  const sectorRows=sectorSource==='server'
+    ? remoteSectorsRaw.map(s=>({building:s.building_id, floor:s.floor_id, total:s.total_patients_on_site, red:s.count_red_triage, yellow:s.count_yellow_triage, green:s.count_green_triage, black:s.count_deceased, critical:s.structural_alert_state==='high_danger', inventory:null}))
+    : localState.sectors;
+  document.getElementById('cmd-heatmap').innerHTML=sectorRows.map(s=>{
+    const logistics=s.inventory ? Object.entries(s.inventory).map(([item,count])=>{
       const cls=count<=0?'empty':count<=1?'low':'';
       return `<span class="${cls}">${SUPPLY_LABELS[item]||item}: ${count}</span>`;
-    }).join('');
+    }).join('') : '';
     return `<div class="cmd-matrix-row ${s.critical?'critical':''}">
       <div>
         <div class="cmd-matrix-title">SECTOR: בניין ${s.building} · קומה ${s.floor}</div>
-        <div class="cmd-matrix-sub">${s.total} פצועים · ${s.critical?'CRITICAL':'STABLE'} · incident_command_state cache</div>
-        <div class="cmd-logistics">${logistics}</div>
+        <div class="cmd-matrix-sub">${s.total} פצועים · ${s.critical?'CRITICAL':'STABLE'} · ${sectorSource==='server'?'incident_command_state (שרת)':'מקומי · לא מסונכרן / דמו'}</div>
+        ${logistics?`<div class="cmd-logistics">${logistics}</div>`:''}
       </div>
       <div class="cmd-matrix-counts"><span style="color:var(--red)">${s.red}R</span><span style="color:var(--yellow)">${s.yellow}Y</span><span style="color:var(--green)">${s.green}G</span><span style="color:var(--muted)">${s.black}B</span></div>
     </div>`;
   }).join('') || '<div class="cmd-matrix-row"><div class="cmd-matrix-sub">אין פצועים פעילים למיפוי.</div></div>';
-  setCmdPanelMeta('heatmap', `${commandState.sectors.length} מגזרים`);
+  setCmdPanelMeta('heatmap', `${sectorRows.length} מגזרים · ${sectorSource==='server'?'שרת':'מקומי'}`);
 
   // Real device_presence rows when logged in and available; local-demo mode (no login, so
   // _remoteDevicePresence never populates) falls back to inferring devices from locally-known
@@ -10010,10 +10111,13 @@ function renderCommandOperationalPanels(pts, site){
   setCmdPanelMeta('devices', `${[...deviceMap.values()].filter(d=>C5Rules.isDeviceSilent(d.last)).length} שקטים מתוך ${deviceMap.size} מכשירים`);
 
   // Real command-dashboard read: incident_command_state via get_incident_command_state RPC
-  // (database/014_command_dashboard_state_rpc.sql). A genuine server-authoritative cross-check
-  // next to the locally-computed priority cards above, not a replacement for them — most of
-  // those cards (reinforcement requests, device/sync counts, per-patient watchdog detail) have
-  // no equivalent in this aggregate snapshot.
+  // (database/014_command_dashboard_state_rpc.sql). This numeric snapshot is a genuine
+  // server-authoritative cross-check next to the locally-computed priority cards above,
+  // not a replacement for them — most of those cards (reinforcement requests, device/sync
+  // counts, per-patient watchdog detail) have no equivalent in this aggregate snapshot.
+  // The sector heatmap above is the one panel that now reads this same snapshot's
+  // state_json.sectors as its primary source (database/030) rather than just a cross-check
+  // — see the heatmap block above for why the other panels stay local-primary.
   const serverStateEl=document.getElementById('cmd-server-state');
   if(serverStateEl){
     const remote=currentUser ? _remoteCommandState[SITE_TO_INCIDENT_ID[site.id]] : null;

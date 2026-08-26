@@ -92,6 +92,27 @@ Verified live, not just by inspection:
 - A real deactivated synthetic profile (`ce6b292c-7cc3-4330-9040-b24e9a832a55`, seed data, `is_active=false`) was given a real `incident_memberships` row for a real incident inside an explicit `begin; ... rollback;` block, impersonated via `set_config('request.jwt.claims', ...)` + `set local role authenticated` (no data persisted — confirmed via a post-rollback row count): reading `incidents` for that incident returned **0 rows** — correctly denied.
 - The same test against a real *active* profile with a real membership row returned **1 row** — confirms the fix didn't regress legitimate access.
 
+## Follow-up: two functions added after this audit, plus the two "RLS enabled, no policy" INFO findings
+
+`docs/PRODUCTION_READINESS.md` flagged two loose ends this audit didn't originally cover — both closed out here, live, per this doc's own recommendation ("re-run after any schema change that adds a new table, policy, or `SECURITY DEFINER` function").
+
+**`finalize_incident_aar(p_incident_id)` and `update_patient_identity(p_patient_id, p_name, p_identifying_description)`** — both postdate this audit (added with the patient-identity-lifecycle work, `database/018`) and both trip the same `get_advisors` WARN class as `get_incident_command_state` above ("signed-in users can execute a `SECURITY DEFINER` function"). Checked their live bodies via `pg_get_functiondef`:
+
+| Function | Verdict | Why |
+|---|---|---|
+| `finalize_incident_aar(p_incident_id)` | PASS | Checks `app.can_access_incident(p_incident_id)` **and** `app.is_command_role()` before touching anything, raising `42501` on either failure. Only then clears `patients.optional_name`/`identifying_description` for the incident and stamps `incidents.aar_finalized_at/by`. |
+| `update_patient_identity(p_patient_id, p_name, p_identifying_description)` | PASS | Resolves the patient's `incident_id` first, checks `app.can_access_incident()`, then gates on an explicit role allowlist (`medic, paramedic, pc, cc, physician, chamal, admin`) — `rpc`/`rcc`/`logistics` correctly excluded, consistent with identity being a rescue-chain *read*, not *write*, capability (`docs/ROLE_COMMAND_MODEL_v2.8.md`'s "Evacuation order visibility" addendum). |
+
+Same false-positive class as `get_incident_command_state` — the lint can't see inside the function body, so it flags any `authenticated`-callable `SECURITY DEFINER` function regardless of what that function actually checks. No fix needed; documenting here so a future pass doesn't "fix" it by loosening the grant.
+
+**`patient_handover_tokens`/`realtime_outbox` — "RLS Enabled No Policy" (INFO)**. `docs/PRODUCTION_READINESS.md` carried this as "believed intentional... hasn't had a dedicated design review." Verified live, not just believed:
+
+- `information_schema.role_table_grants` for both tables: only `postgres` and `service_role` have any grant at all (`SELECT`/`INSERT`/`UPDATE`/`DELETE`/etc.) — `anon` and `authenticated` have **zero** grants on either table. PostgREST/RLS never even gets evaluated for a role with no grant in the first place.
+- `pg_roles`: `service_role.rolbypassrls = true` (and `postgres.rolbypassrls = true`) — the `sync-log` Edge Function's service-role client (the only real writer to either table) bypasses RLS entirely by design, which is how it can read/write these tables with zero policies defined.
+- For completeness: even if `anon`/`authenticated` were later granted access by mistake, Postgres's own RLS semantics mean "RLS enabled, zero policies" is a **default-deny** for any non-bypass role, not default-allow — so the current state is safe in both the grant dimension and the policy dimension, not just one.
+
+Verdict: **PASS (by design)**, same as `incident_command_state`'s "RLS deliberately disabled + grants revoked" pattern documented above — just the RLS-enabled-instead-of-disabled variant of the same idea. No fix needed; `docs/PRODUCTION_READINESS.md` updated to reflect this is now reviewed, not just assumed.
+
 ## Explicitly not re-litigated here
 
 - T6 (leaked-password protection) and T5 (service-role key handling) — out of scope, not RLS/authorization, already tracked in `docs/THREAT_MODEL.md`.

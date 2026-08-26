@@ -25,10 +25,10 @@ for (const rel of files) {
   const trackFn = section(html, 'function trackHighStakesSync(entry){', 'function checkHighStakesSyncStatus(');
   const checkFn = section(html, 'function checkHighStakesSyncStatus(localEventId, label){', 'async function retryHighStakesSync(');
 
-  assert(html.includes("const APP_VERSION = '2.99.15';"), `${rel}: APP_VERSION must be V2.9915`);
-  assert(html.includes('Demo V2.9915'), `${rel}: launcher label must be Demo V2.9915`);
-  assert(html.includes('ROLE // V2.9915'), `${rel}: role header must be Demo V2.9915`);
-  assert(html.includes('Role-Based Medical Command System V2.9915'), `${rel}: role system strip must be Demo V2.9915`);
+  assert(html.includes("const APP_VERSION = '2.99.16';"), `${rel}: APP_VERSION must be V2.9916`);
+  assert(html.includes('Demo V2.9916'), `${rel}: launcher label must be Demo V2.9916`);
+  assert(html.includes('ROLE // V2.9916'), `${rel}: role header must be Demo V2.9916`);
+  assert(html.includes('Role-Based Medical Command System V2.9916'), `${rel}: role system strip must be Demo V2.9916`);
 
   // Patient detail screen was the one screen missing a live sync indicator - now has one,
   // reusing the same .sync-pill component/fresh-stale-offline styling as every other screen.
@@ -56,5 +56,5 @@ for (const rel of files) {
   assert(html.includes('#sync-confirm-stack{'), `${rel}: sync-confirm-stack container CSS missing`);
   assert(html.includes('.sync-confirm-toast.ok{') && html.includes('.sync-confirm-toast.pending{') && html.includes('.sync-confirm-toast.rejected{'), `${rel}: sync-confirm-toast must style ok/pending/rejected distinctly`);
 
-  console.log(`${rel}: Demo V2.9915 sync confirmation + patient-detail indicator static smoke passed`);
+  console.log(`${rel}: Demo V2.9916 sync confirmation + patient-detail indicator static smoke passed`);
 }
