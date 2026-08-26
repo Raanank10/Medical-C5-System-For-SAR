@@ -34,7 +34,21 @@ export SUPABASE_SERVICE_ROLE_KEY=...   # Supabase dashboard: Project Settings ->
 python export_live_incident.py --incident-id <incident-uuid> --out live_incident.db
 ```
 
-Then use `live_incident.db` exactly like `rescue_demo_v1_1.db` below. Stdlib-only (`urllib.request`), no new dependency. See `export_live_incident.py`'s module docstring for exactly which tables/columns are exported and the handful of documented best-effort mappings where the live and analytics schemas don't line up 1:1 (e.g. `inventory_ledger` is exported from the live `inventory_ledger_v12` table). `incident_command_state` is deliberately not exported — its live and SQLite schemas don't match, and `KPIEngine.command_summary()` already falls back to computing the same aggregates from real exported `patients`/`watchdog_alerts` data when it's empty.
+Then use `live_incident.db` exactly like `rescue_demo_v1_1.db` below.
+
+### Larger synthetic MCI rehearsal scenario
+
+```bash
+python seed_mci_rehearsal_scenario_v1.py
+```
+
+Creates `rescue_mci_rehearsal_v1.db` — a bigger sibling scenario for `docs/FIELD_USABILITY_TEST_PLAN.md`'s
+"Session 4: Synthetic Mass-Casualty Scenario Rehearsal": 26 synthetic casualties across 3 sites (a primary
+structural-collapse building, a partial-collapse building, and a walking-wounded assembly point), staffed by
+3 medics, 1 pc, 1 cc, and 1 logistics profile — the session's minimum-staffing bar. It reuses `seed_demo_db.py`'s
+schema unmodified, so it loads with `DB`/`KPIEngine`/`ReportGenerator` exactly like `rescue_demo_v1_1.db` below —
+just point `DB(...)` at `"rescue_mci_rehearsal_v1.db"` instead. It's a separate scenario file, not a replacement
+for the small one the pytest suite and notebook depend on. Stdlib-only (`urllib.request`), no new dependency. See `export_live_incident.py`'s module docstring for exactly which tables/columns are exported and the handful of documented best-effort mappings where the live and analytics schemas don't line up 1:1 (e.g. `inventory_ledger` is exported from the live `inventory_ledger_v12` table). `incident_command_state` is deliberately not exported — its live and SQLite schemas don't match, and `KPIEngine.command_summary()` already falls back to computing the same aggregates from real exported `patients`/`watchdog_alerts` data when it's empty.
 
 Then:
 
@@ -67,6 +81,7 @@ Tests seed a fresh temporary database per test (via `seed_demo_db.main()`) rathe
 - `charts.py` — tactical/dark charts
 - `report.py` — self-contained HTML report generator
 - `seed_demo_db.py` — creates `rescue_demo_v1_1.db`
+- `seed_mci_rehearsal_scenario_v1.py` — creates `rescue_mci_rehearsal_v1.db`, the larger 26-patient / 3-site / 3-medic Field Usability Session 4 scenario
 - `export_live_incident.py` — exports a real incident from the live Supabase Postgres database into a local SQLite file shaped like `seed_demo_db.py`'s schema
 - `analytics_demo.ipynb` — quick demo notebook
 - `tests/` — pytest suite for `db.py`/`kpis.py`/`charts.py`/`report.py`
