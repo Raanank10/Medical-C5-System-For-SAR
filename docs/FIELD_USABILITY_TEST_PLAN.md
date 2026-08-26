@@ -12,6 +12,8 @@ An observer with any device on the synthetic incident can log a timestamped note
 
 When a session ends, use the AAR screen's "ייצוא סיכום" button (`exportExperimentLog()`) to download `rescue_incident_export.json` — it bundles `experiment_events`, `patients_summary`, `aar_metrics`, and `observer_notes` together (plus the same data pre-formatted as `observer_notes.csv` etc. under the file's `csv` key), so every recorded note lines up with the real events around it. This export is the raw material for "What Findings Feed Into" below — it is not itself the write-up.
 
+`docs/FIELD_USABILITY_OBSERVER_SHEET.md` is a fillable paper/parallel recording template built from this plan's own "what to record" fields, one table per session — useful when the observer's hands are also gloved (Session 1) or when a second observer is watching a screen they aren't logged into.
+
 ## Test Sessions
 
 ### Session 1: Gloved / One-Handed / Low-Light Medic Workflow
