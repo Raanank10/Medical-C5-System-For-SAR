@@ -76,7 +76,9 @@ begin
       new.payload_json->>'freeText',
       new.device_id, origin_client_id, new.local_timestamp
     )
-    on conflict (origin_device_id, origin_client_request_id) do nothing;
+    on conflict (origin_device_id, origin_client_request_id)
+    where origin_device_id is not null and origin_client_request_id is not null
+    do nothing;
     return new;
   end if;
 
@@ -126,6 +128,12 @@ drop trigger if exists trg_project_supply_request_event on events;
 create trigger trg_project_supply_request_event
 after insert on events
 for each row execute function project_supply_request_event();
+
+-- Live-verified gap (Supabase security advisor, not caught by inspection): PostgREST exposes
+-- every function in the public schema as an RPC by default, trigger functions included, even
+-- though calling one directly outside trigger context is meaningless (NEW/OLD aren't defined).
+-- Same fix already applied to project_patient_state()/apply_event_projection_and_outbox() (013).
+revoke execute on function project_supply_request_event() from public, anon, authenticated;
 
 -- Read side: same access-check/grant pattern as get_incident_command_state() (014). Plural
 -- result (a queue, not one snapshot row), so plpgsql + RETURN QUERY rather than 014's plain SQL
