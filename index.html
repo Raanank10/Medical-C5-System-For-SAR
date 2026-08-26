@@ -646,7 +646,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9918</div>
+      <div class="demo-kicker">Demo V2.9919</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -745,7 +745,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9918</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9919</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -755,7 +755,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9918</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9919</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -1917,6 +1917,7 @@ textarea{resize:vertical;min-height:70px;}
     <div class="sync-pill" id="sync-pill-logistics">LEDGER</div>
   </div>
   <div id="logistics-task-board" style="padding:12px 16px 0"></div>
+  <div id="logistics-real-queue" style="padding:12px 16px 0"></div>
   <div id="logistics-summary" class="cmd-priority-grid"></div>
   <div style="padding:12px 16px 0">
     <div class="section-label" style="padding:0 0 8px">צריכה אחרונה</div>
@@ -2541,7 +2542,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.18';
+const APP_VERSION = '2.99.19';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -4435,7 +4436,8 @@ function renderPcResupplyBoard(){
     return roleRow(`${r.requestedByName} · ${resupplyItemsText(r)}`,`${r.zone||zoneLabel()} · ${REINFORCEMENT_URGENCY_LABELS[r.urgency]||r.urgency} · ${availability} · ${status}${r.linkedPatientId?' · '+r.linkedPatientId:''} · חובש ${medicRemain} · רכב ${truckRemain}`,actions);
   }).join('');
   const truckWarnings=Object.entries(pcTruckStock).filter(([key,value])=>value<=(PC_TRUCK_LOW_THRESHOLDS[key]??1)).map(([key,value])=>roleRow(`רכב חוג״ד · ${supplyLabel(key)}`,`${value} נותרו · אם יש טיפול פעיל יוסלם למ״פ רפואה`)).join('');
-  return renderCollapsibleSection('pc-resupply','השלמות ציוד מהחובשים', `${renderPcTruckStockChips()}${rows}${truckWarnings}` || renderOperationalEmptyState('אין בקשות במיקוד הנוכחי','רכב חוג״ד הוא מקור ההשלמה הראשון לפני מ״פ רפואה / לוגיסטיקה.'), requests.length, {criticalCount:requests.filter(r=>r.urgency==='immediate').length, emptyMessage:'אין בקשות במיקוד הנוכחי'});
+  return renderCollapsibleSection('pc-resupply','השלמות ציוד מהחובשים', `${renderPcTruckStockChips()}${rows}${truckWarnings}` || renderOperationalEmptyState('אין בקשות במיקוד הנוכחי','רכב חוג״ד הוא מקור ההשלמה הראשון לפני מ״פ רפואה / לוגיסטיקה.'), requests.length, {criticalCount:requests.filter(r=>r.urgency==='immediate').length, emptyMessage:'אין בקשות במיקוד הנוכחי'})
+    + renderRealSupplyQueueRoleSection(SITE_TO_INCIDENT_ID[currentSiteId()]);
 }
 function pcTaskAction(label, onclick){
   return `<button class="demo-mini-btn" style="min-height:56px;touch-action:manipulation" onclick="${onclick}">${label}</button>`;
@@ -5403,7 +5405,7 @@ function renderCcResupplyCommandBoard(){
     `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','fulfilled_by_company')">אשר השלמה פלוגתית</button><button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','closed')">סגור</button><button class="demo-mini-btn" onclick="toast('ציוד נותב מרכב חוג״ד אחר')">נתב בין רכבים</button><button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','unavailable_at_truck')">סמן לא זמין</button></div>`
   )).join('');
   const impact=escalated.length?roleRow('השפעת חוסר על טיפול',`${escalated.length} בקשות ציוד הוסלמו · ${activeCritical} פצועים אדום/צהוב עשויים להיות מושפעים`):'';
-  return `${roleSection('סטטוס רכב חוג״ד לפי מחלקה', truckRows)}${roleSection('חוסרי ציוד שהוסלמו למ״פ רפואה', reqRows || roleRow('אין חוסר ציוד מחלקתי פתוח','מ״פ רפואה רואה כאן רק חוסרים שלא נפתרו ברכב חוג״ד.'))}${roleSection('השפעת חוסר על טיפול', impact)}`;
+  return `${roleSection('סטטוס רכב חוג״ד לפי מחלקה', truckRows)}${roleSection('חוסרי ציוד שהוסלמו למ״פ רפואה', reqRows || roleRow('אין חוסר ציוד מחלקתי פתוח','מ״פ רפואה רואה כאן רק חוסרים שלא נפתרו ברכב חוג״ד.'))}${roleSection('השפעת חוסר על טיפול', impact)}${renderRealSupplyQueueRoleSection(SITE_TO_INCIDENT_ID[currentSiteId()])}`;
 }
 function assignReinforcementRequest(requestId){
   const rr=reinforcementRequests.find(x=>x.id===requestId);
@@ -9450,6 +9452,20 @@ function renderLogisticsOfficer(){
   updateClock();
   const taskBoard=document.getElementById('logistics-task-board');
   if(taskBoard) taskBoard.innerHTML=dashboardFocusBanner()+renderLogisticsTaskBoard();
+  const realQueueEl=document.getElementById('logistics-real-queue');
+  if(realQueueEl){
+    const realQueue=_supplyRequestQueue[SITE_TO_INCIDENT_ID[currentSiteId()]]||[];
+    const realQueueRows=realQueue.map(r=>{
+      const f=formatSupplyRequestRow(r);
+      return `<div class="cmd-matrix-row${r.status==='requested'?' critical':''}">
+        <div>
+          <div class="cmd-matrix-title">${f.title}</div>
+          <div class="cmd-matrix-sub">${f.sub}</div>
+        </div>
+      </div>`;
+    }).join('') || renderOperationalEmptyState('אין בקשות ציוד בתור האמיתי','נתון חוצה-מכשירים מ-supply_requests (database/033) — יתעדכן ברגע שחובש/חוג״ד יוצר בקשה');
+    realQueueEl.innerHTML=renderCollapsibleSection('logistics-real-queue-section','תור בקשות ציוד — Real-time · כל המכשירים',realQueueRows,realQueue.length,{criticalCount:realQueue.filter(r=>r.status==='requested').length,emptyMessage:'אין בקשות ציוד בתור האמיתי'});
+  }
   const companies=logisticsCompanies();
   const totalLow=companies.reduce((sum,c)=>sum+c.lowItems.length,0);
   const totalStock=companies.reduce((sum,c)=>sum+Object.values(c.inventory).reduce((a,b)=>a+Number(b||0),0),0);
@@ -10974,6 +10990,59 @@ async function pullIncidentCommandStateAll(){
   if(currentUser) refreshActiveScreenData();
 }
 setInterval(()=>{ if(currentUser) pullIncidentCommandStateAll(); }, 45000);
+
+// ── Real cross-device resupply queue: supply_requests via get_supply_request_queue RPC ──
+// See database/033_supply_request_projection.sql: a trigger on events projects the medic's
+// existing resupply-request events (creation/escalation today; SUPPLY_REQUEST_DISPATCHED/
+// IN_TRANSIT/RECEIVED once a dispatch/runner UI emits them) into real supply_requests rows.
+// This RPC reads them back through the same app.can_access_incident() gate as
+// get_incident_command_state() above. Read-only for now (PR2 of the resupply queue/dispatch
+// scope) - replaces reinforcementRequests' local-only view of resupply requests, which never
+// reflected another device's requests at all. Dispatch/runner-assign actions are a follow-up.
+let _supplyRequestQueue={}; // incidentId -> rows, newest first (matches the RPC's own ordering)
+async function pullSupplyRequestQueue(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let result;
+  try{ result=await client.rpc('get_supply_request_queue', {p_incident_id:incidentId}); }
+  catch(e){ return; } // offline/network failure — next interval retries
+  if(result.error || !Array.isArray(result.data)) return;
+  _supplyRequestQueue[incidentId]=result.data;
+}
+async function pullSupplyRequestQueueAll(){
+  await Promise.all(Object.values(SITE_TO_INCIDENT_ID).map(id=>pullSupplyRequestQueue(id)));
+  if(currentUser) refreshActiveScreenData();
+}
+setInterval(()=>{ if(currentUser) pullSupplyRequestQueueAll(); }, 45000);
+const SUPPLY_REQUEST_STATUS_LABELS = {
+  requested:'ממתין',
+  approved:'אושר',
+  dispatched:'נשלח',
+  in_transit:'בדרך',
+  delivered:'נמסר',
+  cancelled:'בוטל'
+};
+const SUPPLY_REQUEST_LEVEL_LABELS = {
+  medic_to_pc:'חובש ← חוג״ד',
+  pc_to_logo:'חוג״ד ← לוגיסטיקה',
+  logo_direct_to_medic:'לוגיסטיקה ← חובש (ישיר)'
+};
+function formatSupplyRequestRow(r){
+  const items=(r.items_json||[]).map(x=>`${supplyLabel(x.item,true)} x${x.quantity}`).join(' · ')||'—';
+  const status=SUPPLY_REQUEST_STATUS_LABELS[r.status]||r.status;
+  const level=SUPPLY_REQUEST_LEVEL_LABELS[r.request_level]||r.request_level;
+  const runner=r.assigned_runner_name?` · רץ: ${r.assigned_runner_name}${Number.isFinite(r.eta_minutes)?` · ETA ${r.eta_minutes} דק׳`:''}`:'';
+  const when=r.requested_at?new Date(r.requested_at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):'';
+  return {title:items, sub:`${level} · ${status}${runner} · ${when}`, status:r.status};
+}
+// Shared by pc/cc's role-dashboard boards (roleRow/roleSection idiom). Open requests only -
+// these two boards are "what needs action," not a full history; logistics shows the full queue.
+function renderRealSupplyQueueRoleSection(incidentId){
+  const rows=(_supplyRequestQueue[incidentId]||[]).filter(r=>!['delivered','cancelled'].includes(r.status));
+  const body=rows.map(r=>{ const f=formatSupplyRequestRow(r); return roleRow(f.title,f.sub); }).join('');
+  return roleSection('תור בקשות ציוד — Real-time · כל המכשירים', body || roleRow('אין בקשות ציוד פתוחות בתור האמיתי','נתון חוצה-מכשירים מ-supply_requests, לא מה-outbox המקומי'));
+}
 
 // ── Poison-event quarantine review: sync_ingestion_errors, command-role only ──
 // The "poison event quarantine" concept (CLAUDE.md, docs/API_SURFACE_v1.2.md's Atomic

@@ -661,6 +661,20 @@ Recommended dashboard behavior:
 - do not recalculate command aggregates on arbitrary button clicks
 - use `vw_command_incident_throughput_funnel` for backend analytics and AAR throughput analysis, not as the hot dashboard endpoint
 
+## Logistics Resupply Queue API
+
+Backs the Logistics Hub's supply request queue (`C5_SENTINEL_SAR_MVP_SPEC_v1.2.md` §5.6).
+
+```http
+GET /logistics/incidents/:incidentId/supply-requests
+```
+
+**Implemented** (`database/033_supply_request_projection.sql`) as `get_supply_request_queue(p_incident_id uuid)`, a `SECURITY DEFINER` Postgres function callable via `client.rpc('get_supply_request_queue', {p_incident_id})` — same non-literal-HTTP-path pattern as `get_incident_command_state` above, and the same `app.can_access_incident()` gate. Unlike `incident_command_state`, `supply_requests` is a real per-row table (not a precomputed snapshot), so this function is plain `RETURN QUERY` over it rather than a single-row lookup.
+
+The write side is a trigger, not a client-facing endpoint: `project_supply_request_event()` runs `AFTER INSERT ON events` (mirroring `project_patient_state()`) and projects the medic's existing resupply-request creation/escalation events, plus the schema-native `SUPPLY_REQUEST_DISPATCHED`/`SUPPLY_REQUEST_IN_TRANSIT`/`SUPPLY_REQUEST_RECEIVED` event types, into real `supply_requests` rows. A client's local request id (e.g. `REQ-SUP-001`) is only unique per-device, so rows are keyed by `(origin_device_id, origin_client_request_id)` for idempotency rather than by that id alone.
+
+`index.html` polls this every 45s (same cadence as `get_incident_command_state`), and currently renders it read-only on the pc, cc, and logistics boards — dispatch/runner-assign write actions are a later pass. `supply_request_items` (the schema's normalized, `inventory_items`-FK'd item table) is deliberately left unpopulated by the trigger: its vocabulary (`inventory_items.sku` values like `TQ`/`COMBAT_GAUZE`) doesn't match the client's real item keys (`tourniquets`/`pressureDressings`/etc.) — the same mismatch `inventory_ledger_v12` already exists to route around for `inventory_ledger`. Items are carried instead on a plain `items_json` column on `supply_requests`.
+
 ## High-Risk Override Payload
 
 Medication/treatment events with safety issues should include:
