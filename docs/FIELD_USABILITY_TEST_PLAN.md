@@ -6,6 +6,12 @@
 
 `docs/FAILURE_MODE_REVIEW.md`'s F4 finding is the direct motivation for one specific test in this plan (commander stale-data comprehension) — that review explicitly said the passive sync-freshness indicator's real-world sufficiency "hasn't been tested with real users under field-like attention conditions" and recommended testing before building a more aggressive alternative. This plan is how that testing actually happens, not more speculation about it.
 
+## How to Record Findings In-App
+
+An observer with any device on the synthetic incident can log a timestamped note during a session via the "📝 הערת צופה לניסוי" button on the medic dashboard screen (`showObserverNote()`, V2.99.18 — a real gap fixed here: the note panel, its save/cancel logic, and the export pipeline all existed already, but nothing previously opened it). Each note is stamped with `timestamp`/`device_id`/`phase` and stored alongside the session's own event log.
+
+When a session ends, use the AAR screen's "ייצוא סיכום" button (`exportExperimentLog()`) to download `rescue_incident_export.json` — it bundles `experiment_events`, `patients_summary`, `aar_metrics`, and `observer_notes` together (plus the same data pre-formatted as `observer_notes.csv` etc. under the file's `csv` key), so every recorded note lines up with the real events around it. This export is the raw material for "What Findings Feed Into" below — it is not itself the write-up.
+
 ## Test Sessions
 
 ### Session 1: Gloved / One-Handed / Low-Light Medic Workflow

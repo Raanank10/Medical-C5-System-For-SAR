@@ -646,7 +646,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9917</div>
+      <div class="demo-kicker">Demo V2.9918</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -745,7 +745,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9917</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9918</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -755,7 +755,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9917</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9918</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -886,6 +886,7 @@ textarea{resize:vertical;min-height:70px;}
   <div class="experiment-strip">
     <div class="experiment-title">תמונת מצב פעילה</div>
     <div class="experiment-meta" id="experiment-line-dashboard">—</div>
+    <button class="demo-mini-btn" onclick="showObserverNote()" style="margin-top:8px">📝 הערת צופה לניסוי</button>
   </div>
 
   <!-- Big action buttons -->
@@ -2540,7 +2541,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.17';
+const APP_VERSION = '2.99.18';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -5849,6 +5850,12 @@ function updateExperimentLine(){
   const conflicts=conflictLog().length;
   const line=`תרחיש: ${siteData.name||'ללא מוקד'} · תפקידים: חובש/חוג"ד/לוגיסטיקה/מ״פ רפואה/חמ״ל · מכשיר: ${getDeviceId()} · התחלה: ${started.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})} · שלב: ${experimentPhase} · ${notes} הערות · ${conflicts} התנגשויות · ${mins} דק׳`;
   ['experiment-line-dashboard','experiment-line-command'].forEach(id=>{const el=document.getElementById(id); if(el) el.textContent=line;});
+}
+function showObserverNote(){
+  const panel=document.getElementById('observer-note-panel');
+  const input=document.getElementById('observer-note-text');
+  if(panel) panel.style.display='block';
+  if(input) input.focus();
 }
 function hideObserverNote(){
   const panel=document.getElementById('observer-note-panel');
