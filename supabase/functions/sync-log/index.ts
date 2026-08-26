@@ -84,6 +84,16 @@ const SUPPLY_LOGISTICS_EVENTS = [
   "SUPPLY_REQUEST_RECEIVED", "INVENTORY_LEDGER_ENTRY", "INVENTORY_INITIALIZED",
   "INVENTORY_TRANSFER_OUT", "INVENTORY_TRANSFER_IN", "PLATOON_STOCK_INITIALIZED",
   "PLATOON_STOCK_REFILLED", "DIRECT_LOGO_TO_MEDIC_REFILL",
+  // The following are the event type strings index.html's real supply/resupply
+  // flow actually emits (consumeFieldSupply, receiveLogisticsSupply,
+  // submitMedicResupplyRequest, updateResupplyStatus) - they were missing from
+  // this list entirely, which meant isEventTypeAllowed() default-denied every
+  // one of them and the whole field supply-consumption/resupply pipeline was
+  // quarantined (FORBIDDEN_ACTOR_ROLE) on push instead of syncing.
+  "SUPPLY_CONSUMED", "SUPPLY_USE_CANCELLED", "INVENTORY_LEDGER_MOVEMENT",
+  "LOCAL_STOCKOUT_WARNING", "RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE",
+  "RESUPPLY_REQUEST_ESCALATED_CC", "RESUPPLY_APPROVED_FROM_PC_TRUCK",
+  "PC_TRUCK_RESUPPLY_UNAVAILABLE_ESCALATED", "RESUPPLY_ESCALATED_TO_CC",
 ];
 const EXTERNAL_REPORT_EVENTS = ["EXTERNAL_REPORT_CREATED", "EXTERNAL_REPORT_LINKED"];
 // Real physician-only clinical death confirmation (docs/CONFLICT_RESOLUTION_DECISION.md's
@@ -103,8 +113,20 @@ const SYSTEM_EVENTS = [
   "HIGH_RISK_CLINICAL_VIOLATION", "NOTE_ADDED", "AAR_CONTEXT_NOTE_ADDED",
 ];
 
+// Field supply-consumption event types medic/paramedic actually emit while
+// treating patients (consumeFieldSupply/showOwnInventory in index.html) and
+// while requesting resupply from the PC truck (submitMedicResupplyRequest) -
+// listed individually rather than spreading SUPPLY_LOGISTICS_EVENTS, since
+// medic/paramedic never approve/dispatch/transfer stock, only consume it and
+// request more.
+const MEDIC_SUPPLY_EVENTS = [
+  "SUPPLY_REQUEST_CREATED", "SUPPLY_CONSUMED", "SUPPLY_USE_CANCELLED",
+  "INVENTORY_LEDGER_MOVEMENT", "LOCAL_STOCKOUT_WARNING",
+  "RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE", "RESUPPLY_REQUEST_ESCALATED_CC",
+];
+
 const ROLE_ALLOWED_EVENT_TYPES: Record<string, string[]> = {
-  medic: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, "INCIDENT_DRAFT_CREATED", "MEDIC_SITE_CLOSE_REQUESTED", "SUPPLY_REQUEST_CREATED", ...SYSTEM_EVENTS],
+  medic: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, "INCIDENT_DRAFT_CREATED", "MEDIC_SITE_CLOSE_REQUESTED", ...MEDIC_SUPPLY_EVENTS, ...SYSTEM_EVENTS],
   pc: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, ...INCIDENT_COMMAND_EVENTS, ...SITE_AUTHORITY_EVENTS, ...SUPPLY_LOGISTICS_EVENTS, ...EXTERNAL_REPORT_EVENTS, ...SYSTEM_EVENTS],
   cc: [...INCIDENT_COMMAND_EVENTS, ...SITE_AUTHORITY_EVENTS, ...SUPPLY_LOGISTICS_EVENTS, ...EXTERNAL_REPORT_EVENTS, ...SYSTEM_EVENTS],
   chamal: [...INCIDENT_COMMAND_EVENTS, ...SITE_AUTHORITY_EVENTS, ...EXTERNAL_REPORT_EVENTS, ...SYSTEM_EVENTS],
@@ -119,7 +141,7 @@ const ROLE_ALLOWED_EVENT_TYPES: Record<string, string[]> = {
   physician: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, ...INCIDENT_COMMAND_EVENTS, ...SITE_AUTHORITY_EVENTS, ...SUPPLY_LOGISTICS_EVENTS, ...EXTERNAL_REPORT_EVENTS, ...SYSTEM_EVENTS, ...PHYSICIAN_ONLY_EVENTS],
   // Exact mirror of medic's scope - paramedic is a clinical-seniority tier
   // for the F3 tie-break, not a different set of app capabilities.
-  paramedic: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, "INCIDENT_DRAFT_CREATED", "MEDIC_SITE_CLOSE_REQUESTED", "SUPPLY_REQUEST_CREATED", ...SYSTEM_EVENTS],
+  paramedic: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, "INCIDENT_DRAFT_CREATED", "MEDIC_SITE_CLOSE_REQUESTED", ...MEDIC_SUPPLY_EVENTS, ...SYSTEM_EVENTS],
 };
 
 function isEventTypeAllowed(role: string, type: string): boolean {
