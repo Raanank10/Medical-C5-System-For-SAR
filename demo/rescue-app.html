@@ -646,7 +646,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9918</div>
+      <div class="demo-kicker">Demo V2.9922</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -745,7 +745,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9918</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9922</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -755,7 +755,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9918</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9922</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -1679,6 +1679,40 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 
+<!-- ══════════════════════ LOGISTICS DISPATCH RUNNER MODAL ══ -->
+<div class="modal-overlay hidden" id="dispatch-runner-modal" onclick="closeDispatchRunnerModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="field-label">שיוך רץ להשלמה</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.55;margin-bottom:14px" id="dispatch-runner-summary">—</div>
+    <div class="field-label">שם הרץ</div>
+    <input type="text" id="dispatch-runner-name" placeholder="לדוגמה: דוד כהן" style="margin-bottom:12px">
+    <div class="field-label">זמן הגעה משוער (דק׳)</div>
+    <input type="number" id="dispatch-runner-eta" placeholder="15" min="1">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+      <button class="btn-primary" onclick="submitDispatchRunner()">שלח ציוד</button>
+      <button class="btn-secondary" onclick="hideDispatchRunnerModal()">ביטול</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ KIT TEMPLATE CREATE/EDIT MODAL ══ -->
+<div class="modal-overlay hidden" id="kit-template-modal" onclick="closeKitTemplateModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="field-label">שם הקיט</div>
+    <input type="text" id="kit-template-name" placeholder="לדוגמה: קיט חובש בסיסי" style="margin-bottom:12px">
+    <div class="field-label">תיאור</div>
+    <textarea id="kit-template-description" placeholder="אופציונלי" style="margin-bottom:14px"></textarea>
+    <div class="field-label">פריטים בקיט · כמות</div>
+    <div id="kit-template-items-grid" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+      <button class="btn-primary" onclick="submitKitTemplate()">שמור קיט</button>
+      <button class="btn-secondary" onclick="hideKitTemplateModal()">ביטול</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════════ SUPPLY USED CONFIRMATION SHEET ══ -->
 <div class="modal-overlay hidden" id="supply-used-modal" onclick="closeSupplyUsedModal(event)">
   <div class="modal-sheet supply-sheet">
@@ -1917,6 +1951,9 @@ textarea{resize:vertical;min-height:70px;}
     <div class="sync-pill" id="sync-pill-logistics">LEDGER</div>
   </div>
   <div id="logistics-task-board" style="padding:12px 16px 0"></div>
+  <div id="logistics-real-queue" style="padding:12px 16px 0"></div>
+  <div id="logistics-kit-templates-link" style="padding:0 16px"></div>
+  <div id="logistics-burn-predictions" style="padding:12px 16px 0"></div>
   <div id="logistics-summary" class="cmd-priority-grid"></div>
   <div style="padding:12px 16px 0">
     <div class="section-label" style="padding:0 0 8px">צריכה אחרונה</div>
@@ -1926,6 +1963,30 @@ textarea{resize:vertical;min-height:70px;}
     <div id="logistics-quick-restock" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"></div>
   </div>
   <div id="logistics-companies" class="cmd-status-matrix" style="padding-bottom:90px"></div>
+</div>
+
+<!-- ══════════════════════ KIT TEMPLATES (standalone management screen) ══ -->
+<div id="screen-kit-templates" class="screen">
+  <div class="header">
+    <div class="header-left">
+      <div class="header-subtitle">KIT TEMPLATES // REFERENCE</div>
+      <div class="header-title">קיטים מוגדרים מראש</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goTo('dashboard')">✕</button>
+    </div>
+  </div>
+  <div class="demo-strip">
+    <div>
+      <div class="demo-strip-title">ניהול תבניות קיט</div>
+      <div class="demo-strip-sub">זמין לצפייה לכולם · עריכה זמינה לחוג״ד, מ״פ רפואה, לוגיסטיקה ומנהל מערכת בלבד</div>
+    </div>
+  </div>
+  <div id="kit-templates-lock-note" style="display:none;padding:10px 16px;margin:10px 16px 0;background:rgba(244,162,97,.12);border:1px solid var(--yellow);border-radius:10px;font-size:13px;color:var(--yellow)">עריכת קיטים אפשרית רק כאשר האירוע אינו פעיל (טיוטה / staging / סגור).</div>
+  <div style="padding:12px 16px 0">
+    <button id="kit-templates-create-btn" class="btn-primary" style="display:none" onclick="showKitTemplateModal()">+ קיט חדש</button>
+  </div>
+  <div id="kit-templates-list" style="padding:12px 16px 90px"></div>
 </div>
 
 <!-- ══════════════════════ ROLES / AUTHORIZATION ══ -->
@@ -2541,7 +2602,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.18';
+const APP_VERSION = '2.99.22';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -2797,7 +2858,7 @@ const AUTH_MATRIX = [
   {action:'Request resupply', medic:'yes', pc:'no', log_o:'no', cc:'no', physician:'no', paramedic:'yes', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
   {action:'View resupply / reinforcement requests (read-only)', medic:'yes', pc:'yes', log_o:'yes', cc:'yes', physician:'yes', paramedic:'yes', chamal:'yes', rpc:'no', rcc:'limited', admin:'yes'},
   {action:'Dispatch supply to Log-O', medic:'no', pc:'yes', log_o:'no', cc:'no', physician:'no', paramedic:'no', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
-  {action:'Manage kit templates', medic:'no', pc:'yes', log_o:'yes', cc:'yes', physician:'yes', paramedic:'no', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
+  {action:'Manage kit templates', medic:'no', pc:'yes', log_o:'yes', cc:'yes', physician:'no', paramedic:'no', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
   {action:'Dispatch resupply runner', medic:'no', pc:'no', log_o:'yes', cc:'no', physician:'no', paramedic:'no', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
   {action:'Update building status', medic:'yes', pc:'yes', log_o:'no', cc:'yes', physician:'yes', paramedic:'yes', chamal:'yes', rpc:'yes', rcc:'yes', admin:'yes'},
   {action:'Confirm Site Clear', medic:'no', pc:'yes', log_o:'no', cc:'yes', physician:'yes', paramedic:'no', chamal:'yes', rpc:'yes', rcc:'yes', admin:'yes'},
@@ -4435,7 +4496,8 @@ function renderPcResupplyBoard(){
     return roleRow(`${r.requestedByName} · ${resupplyItemsText(r)}`,`${r.zone||zoneLabel()} · ${REINFORCEMENT_URGENCY_LABELS[r.urgency]||r.urgency} · ${availability} · ${status}${r.linkedPatientId?' · '+r.linkedPatientId:''} · חובש ${medicRemain} · רכב ${truckRemain}`,actions);
   }).join('');
   const truckWarnings=Object.entries(pcTruckStock).filter(([key,value])=>value<=(PC_TRUCK_LOW_THRESHOLDS[key]??1)).map(([key,value])=>roleRow(`רכב חוג״ד · ${supplyLabel(key)}`,`${value} נותרו · אם יש טיפול פעיל יוסלם למ״פ רפואה`)).join('');
-  return renderCollapsibleSection('pc-resupply','השלמות ציוד מהחובשים', `${renderPcTruckStockChips()}${rows}${truckWarnings}` || renderOperationalEmptyState('אין בקשות במיקוד הנוכחי','רכב חוג״ד הוא מקור ההשלמה הראשון לפני מ״פ רפואה / לוגיסטיקה.'), requests.length, {criticalCount:requests.filter(r=>r.urgency==='immediate').length, emptyMessage:'אין בקשות במיקוד הנוכחי'});
+  return renderCollapsibleSection('pc-resupply','השלמות ציוד מהחובשים', `${renderPcTruckStockChips()}${rows}${truckWarnings}` || renderOperationalEmptyState('אין בקשות במיקוד הנוכחי','רכב חוג״ד הוא מקור ההשלמה הראשון לפני מ״פ רפואה / לוגיסטיקה.'), requests.length, {criticalCount:requests.filter(r=>r.urgency==='immediate').length, emptyMessage:'אין בקשות במיקוד הנוכחי'})
+    + renderRealSupplyQueueRoleSection(SITE_TO_INCIDENT_ID[currentSiteId()]);
 }
 function pcTaskAction(label, onclick){
   return `<button class="demo-mini-btn" style="min-height:56px;touch-action:manipulation" onclick="${onclick}">${label}</button>`;
@@ -4628,6 +4690,7 @@ function acknowledgeRecommendation(id){
   saveDemoState();
   if(document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard(activeRoleDashboard);
   if(document.getElementById('screen-commander')?.classList.contains('active')) renderCommander();
+  if(document.getElementById('screen-logistics')?.classList.contains('active')) renderLogisticsOfficer();
   toast('המלצה סומנה בטיפול');
 }
 const DecisionSupportEngine=(()=>{
@@ -4947,7 +5010,16 @@ const DecisionSupportEngine=(()=>{
     ]);
     return {recommendations};
   }
-  return {evaluate,forPc,forCc,forMedic,evaluateTourniquets,evaluateMedicCoverage,evaluateSupplyBurn,evaluateEvacuation,evaluatePatientDeterioration,SectorRiskScore,OperationalPressureIndex,rank};
+  // Burn-rate/stockout predictions (evaluateSupplyBurn) already existed and already fed
+  // forPc()/forCc() - they just never surfaced on the Logistics Hub screen itself, the role
+  // that's actually supposed to act on them (spec: "Burn rate by item"). No new computation,
+  // just the missing role-scoped view onto the existing one.
+  function forLogistics(){
+    const ctx=defaultContext();
+    const recommendations=rank(evaluateSupplyBurn(ctx));
+    return {recommendations};
+  }
+  return {evaluate,forPc,forCc,forMedic,forLogistics,evaluateTourniquets,evaluateMedicCoverage,evaluateSupplyBurn,evaluateEvacuation,evaluatePatientDeterioration,SectorRiskScore,OperationalPressureIndex,rank};
 })();
 function renderRecommendationCard(r){
   const colors={INFO:'var(--muted)',LOW:'var(--green)',MEDIUM:'var(--yellow)',HIGH:'var(--orange)',CRITICAL:'var(--red)'};
@@ -4984,6 +5056,7 @@ function renderRoleBriefingBody(role){
   const dse = role==='medic' ? DecisionSupportEngine.forMedic()
     : role==='cc' ? DecisionSupportEngine.forCc()
     : role==='pc' ? DecisionSupportEngine.forPc()
+    : role==='logistics' ? DecisionSupportEngine.forLogistics()
     : {recommendations:[]};
   return `
     ${roleSection('תחומי אחריות', resp)}
@@ -5403,7 +5476,7 @@ function renderCcResupplyCommandBoard(){
     `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','fulfilled_by_company')">אשר השלמה פלוגתית</button><button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','closed')">סגור</button><button class="demo-mini-btn" onclick="toast('ציוד נותב מרכב חוג״ד אחר')">נתב בין רכבים</button><button class="demo-mini-btn" onclick="updateResupplyStatus('${r.id}','unavailable_at_truck')">סמן לא זמין</button></div>`
   )).join('');
   const impact=escalated.length?roleRow('השפעת חוסר על טיפול',`${escalated.length} בקשות ציוד הוסלמו · ${activeCritical} פצועים אדום/צהוב עשויים להיות מושפעים`):'';
-  return `${roleSection('סטטוס רכב חוג״ד לפי מחלקה', truckRows)}${roleSection('חוסרי ציוד שהוסלמו למ״פ רפואה', reqRows || roleRow('אין חוסר ציוד מחלקתי פתוח','מ״פ רפואה רואה כאן רק חוסרים שלא נפתרו ברכב חוג״ד.'))}${roleSection('השפעת חוסר על טיפול', impact)}`;
+  return `${roleSection('סטטוס רכב חוג״ד לפי מחלקה', truckRows)}${roleSection('חוסרי ציוד שהוסלמו למ״פ רפואה', reqRows || roleRow('אין חוסר ציוד מחלקתי פתוח','מ״פ רפואה רואה כאן רק חוסרים שלא נפתרו ברכב חוג״ד.'))}${roleSection('השפעת חוסר על טיפול', impact)}${renderRealSupplyQueueRoleSection(SITE_TO_INCIDENT_ID[currentSiteId()])}`;
 }
 function assignReinforcementRequest(requestId){
   const rr=reinforcementRequests.find(x=>x.id===requestId);
@@ -6059,6 +6132,7 @@ function goTo(screen){
   if(screen==='step8')     renderSummary();
   if(screen==='commander') renderCommander();
   if(screen==='logistics') renderLogisticsOfficer();
+  if(screen==='kit-templates') renderKitTemplates();
   if(screen==='roles')     renderRolesAuthorization();
   if(screen==='role-dashboard') renderRoleDashboard(activeRoleDashboard);
   if(screen==='enroute') {
@@ -9450,6 +9524,27 @@ function renderLogisticsOfficer(){
   updateClock();
   const taskBoard=document.getElementById('logistics-task-board');
   if(taskBoard) taskBoard.innerHTML=dashboardFocusBanner()+renderLogisticsTaskBoard();
+  const realQueueEl=document.getElementById('logistics-real-queue');
+  if(realQueueEl){
+    const realQueueIncidentId=SITE_TO_INCIDENT_ID[currentSiteId()];
+    const realQueue=_supplyRequestQueue[realQueueIncidentId]||[];
+    const realQueueRows=realQueue.map(r=>{
+      const f=formatSupplyRequestRow(r);
+      const actions=supplyRequestDispatchActions(r, realQueueIncidentId);
+      return `<div class="cmd-matrix-row${r.status==='requested'?' critical':''}">
+        <div>
+          <div class="cmd-matrix-title">${f.title}</div>
+          <div class="cmd-matrix-sub">${f.sub}</div>
+          ${actions}
+        </div>
+      </div>`;
+    }).join('') || renderOperationalEmptyState('אין בקשות ציוד בתור האמיתי','נתון חוצה-מכשירים מ-supply_requests (database/033) — יתעדכן ברגע שחובש/חוג״ד יוצר בקשה');
+    realQueueEl.innerHTML=renderCollapsibleSection('logistics-real-queue-section','תור בקשות ציוד — Real-time · כל המכשירים',realQueueRows,realQueue.length,{criticalCount:realQueue.filter(r=>r.status==='requested').length,emptyMessage:'אין בקשות ציוד בתור האמיתי'});
+  }
+  const kitLinkEl=document.getElementById('logistics-kit-templates-link');
+  if(kitLinkEl) kitLinkEl.innerHTML=canManageKitTemplates()?`<button class="demo-mini-btn" onclick="goTo('kit-templates')">ניהול קיטים מוגדרים מראש</button>`:'';
+  const burnPredictionsEl=document.getElementById('logistics-burn-predictions');
+  if(burnPredictionsEl) burnPredictionsEl.innerHTML=renderRecommendationPanel('חיזוי צריכה — קצב שריפה (Top 3)', DecisionSupportEngine.forLogistics().recommendations);
   const companies=logisticsCompanies();
   const totalLow=companies.reduce((sum,c)=>sum+c.lowItems.length,0);
   const totalStock=companies.reduce((sum,c)=>sum+Object.values(c.inventory).reduce((a,b)=>a+Number(b||0),0),0);
@@ -10975,6 +11070,291 @@ async function pullIncidentCommandStateAll(){
 }
 setInterval(()=>{ if(currentUser) pullIncidentCommandStateAll(); }, 45000);
 
+// ── Real cross-device resupply queue: supply_requests via get_supply_request_queue RPC ──
+// See database/033_supply_request_projection.sql: a trigger on events projects the medic's
+// existing resupply-request events (creation/escalation today; SUPPLY_REQUEST_DISPATCHED/
+// IN_TRANSIT/RECEIVED once a dispatch/runner UI emits them) into real supply_requests rows.
+// This RPC reads them back through the same app.can_access_incident() gate as
+// get_incident_command_state() above. Read-only for now (PR2 of the resupply queue/dispatch
+// scope) - replaces reinforcementRequests' local-only view of resupply requests, which never
+// reflected another device's requests at all. Dispatch/runner-assign actions are a follow-up.
+let _supplyRequestQueue={}; // incidentId -> rows, newest first (matches the RPC's own ordering)
+async function pullSupplyRequestQueue(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let result;
+  try{ result=await client.rpc('get_supply_request_queue', {p_incident_id:incidentId}); }
+  catch(e){ return; } // offline/network failure — next interval retries
+  if(result.error || !Array.isArray(result.data)) return;
+  _supplyRequestQueue[incidentId]=result.data;
+}
+async function pullSupplyRequestQueueAll(){
+  await Promise.all(Object.values(SITE_TO_INCIDENT_ID).map(id=>pullSupplyRequestQueue(id)));
+  if(currentUser) refreshActiveScreenData();
+}
+setInterval(()=>{ if(currentUser) pullSupplyRequestQueueAll(); }, 45000);
+const SUPPLY_REQUEST_STATUS_LABELS = {
+  requested:'ממתין',
+  approved:'אושר',
+  dispatched:'נשלח',
+  in_transit:'בדרך',
+  delivered:'נמסר',
+  cancelled:'בוטל'
+};
+const SUPPLY_REQUEST_LEVEL_LABELS = {
+  medic_to_pc:'חובש ← חוג״ד',
+  pc_to_logo:'חוג״ד ← לוגיסטיקה',
+  logo_direct_to_medic:'לוגיסטיקה ← חובש (ישיר)'
+};
+function formatSupplyRequestRow(r){
+  const items=(r.items_json||[]).map(x=>`${supplyLabel(x.item,true)} x${x.quantity}`).join(' · ')||'—';
+  const status=SUPPLY_REQUEST_STATUS_LABELS[r.status]||r.status;
+  const level=SUPPLY_REQUEST_LEVEL_LABELS[r.request_level]||r.request_level;
+  const runner=r.assigned_runner_name?` · רץ: ${r.assigned_runner_name}${Number.isFinite(r.eta_minutes)?` · ETA ${r.eta_minutes} דק׳`:''}`:'';
+  const when=r.requested_at?new Date(r.requested_at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):'';
+  return {title:items, sub:`${level} · ${status}${runner} · ${when}`, status:r.status};
+}
+// Shared by pc/cc's role-dashboard boards (roleRow/roleSection idiom). Open requests only -
+// these two boards are "what needs action," not a full history; logistics shows the full queue.
+function renderRealSupplyQueueRoleSection(incidentId){
+  const rows=(_supplyRequestQueue[incidentId]||[]).filter(r=>!['delivered','cancelled'].includes(r.status));
+  const body=rows.map(r=>{ const f=formatSupplyRequestRow(r); return roleRow(f.title,f.sub); }).join('');
+  const kitLink=canManageKitTemplates()?`<div style="padding:0 16px 10px"><button class="demo-mini-btn" onclick="goTo('kit-templates')">ניהול קיטים מוגדרים מראש</button></div>`:'';
+  return roleSection('תור בקשות ציוד — Real-time · כל המכשירים', body || roleRow('אין בקשות ציוד פתוחות בתור האמיתי','נתון חוצה-מכשירים מ-supply_requests, לא מה-outbox המקומי')) + kitLink;
+}
+
+// ── Logistics dispatch/runner-assign write actions (PR3) ──
+// Writes SUPPLY_REQUEST_DISPATCHED/IN_TRANSIT/RECEIVED - the schema-native event types
+// SUPPLY_LOGISTICS_EVENTS already allow-listed for logistics_officer, and database/034's
+// project_supply_request_event() resolves by the real payload_json.supply_request_id (the
+// server UUID this device only has because it already pulled the row via
+// get_supply_request_queue) rather than by originating device - required here specifically
+// because the dispatching device is essentially never the same device that created the
+// request (database/034's own commit message covers the bug this fixes). Screen-scoped, not
+// separately role-checked client-side: this UI only renders inside renderLogisticsOfficer,
+// and the real gate is server-side (SUPPLY_LOGISTICS_EVENTS/RLS), same as every other
+// role-scoped action in this file.
+function supplyRequestDispatchActions(r, incidentId){
+  if(r.status==='requested' || r.status==='approved'){
+    return `<div style="display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px">
+      <button class="demo-mini-btn" onclick="showDispatchRunnerModal('${r.id}','${incidentId}')">שלח ציוד + הקצה רץ</button>
+    </div>`;
+  }
+  if(r.status==='dispatched'){
+    return `<div style="display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px">
+      <button class="demo-mini-btn" onclick="markSupplyRequestInTransit('${r.id}','${incidentId}')">סמן בדרך</button>
+    </div>`;
+  }
+  if(r.status==='in_transit'){
+    return `<div style="display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px">
+      <button class="demo-mini-btn" onclick="markSupplyRequestDelivered('${r.id}','${incidentId}')">סמן נמסר</button>
+    </div>`;
+  }
+  return '';
+}
+function updateLocalSupplyRequestOptimistic(incidentId, requestId, patch){
+  const rows=_supplyRequestQueue[incidentId];
+  if(!Array.isArray(rows)) return;
+  const row=rows.find(r=>r.id===requestId);
+  if(row) Object.assign(row, patch);
+}
+let dispatchRunnerTarget=null;
+function showDispatchRunnerModal(requestId, incidentId){
+  const row=(_supplyRequestQueue[incidentId]||[]).find(r=>r.id===requestId);
+  if(!row) return;
+  dispatchRunnerTarget={requestId, incidentId};
+  const summary=document.getElementById('dispatch-runner-summary');
+  if(summary) summary.textContent=formatSupplyRequestRow(row).title;
+  const nameEl=document.getElementById('dispatch-runner-name');
+  if(nameEl) nameEl.value=row.assigned_runner_name||'';
+  const etaEl=document.getElementById('dispatch-runner-eta');
+  if(etaEl) etaEl.value=row.eta_minutes||'';
+  document.getElementById('dispatch-runner-modal')?.classList.remove('hidden');
+}
+function hideDispatchRunnerModal(){
+  document.getElementById('dispatch-runner-modal')?.classList.add('hidden');
+  dispatchRunnerTarget=null;
+}
+function closeDispatchRunnerModal(e){ if(e.target.id==='dispatch-runner-modal') hideDispatchRunnerModal(); }
+function submitDispatchRunner(){
+  if(!dispatchRunnerTarget) return;
+  const {requestId, incidentId}=dispatchRunnerTarget;
+  const runnerName=(document.getElementById('dispatch-runner-name')?.value||'').trim();
+  if(!runnerName){ toast('נא להזין שם רץ'); return; }
+  const etaRaw=document.getElementById('dispatch-runner-eta')?.value;
+  const etaMinutes=etaRaw?Math.max(1,Math.round(Number(etaRaw))):null;
+  saveLocalEvent({
+    type:'SUPPLY_REQUEST_DISPATCHED',
+    detail:`נשלח רץ · ${runnerName}${etaMinutes?` · ETA ${etaMinutes} דק׳`:''}`,
+    warn:false,
+    payload_json:{supply_request_id:requestId, runner_name:runnerName, eta_minutes:etaMinutes}
+  });
+  updateLocalSupplyRequestOptimistic(incidentId, requestId, {status:'dispatched', assigned_runner_name:runnerName, eta_minutes:etaMinutes, dispatched_at:new Date().toISOString()});
+  hideDispatchRunnerModal();
+  toast('ציוד נשלח · הוקצה רץ');
+  renderLogisticsOfficer();
+}
+function markSupplyRequestInTransit(requestId, incidentId){
+  saveLocalEvent({type:'SUPPLY_REQUEST_IN_TRANSIT',detail:`בדרך · ${requestId}`,warn:false,payload_json:{supply_request_id:requestId}});
+  updateLocalSupplyRequestOptimistic(incidentId, requestId, {status:'in_transit', in_transit_at:new Date().toISOString()});
+  toast('סומן כבדרך');
+  renderLogisticsOfficer();
+}
+function markSupplyRequestDelivered(requestId, incidentId){
+  saveLocalEvent({type:'SUPPLY_REQUEST_RECEIVED',detail:`נמסר · ${requestId}`,warn:false,payload_json:{supply_request_id:requestId}});
+  updateLocalSupplyRequestOptimistic(incidentId, requestId, {status:'delivered', delivered_at:new Date().toISOString()});
+  toast('סומן כנמסר');
+  renderLogisticsOfficer();
+}
+
+// ── Kit templates (PR3 of the kit-templates scope): standalone management screen ──
+// kit_templates/kit_template_items (database/001) are plain reference/config tables, not part
+// of the append-only events log - RLS (database/005/036) is the real enforcement, direct
+// supabase-js CRUD is the correct pattern here (same as device_presence's upsert), not an
+// event-sourced write. client_item_key (database/035) is the join between these rows'
+// item_id (inventory_items.id) and the client's real 7-item vocabulary. Not incident-scoped,
+// so a flat 45s poll (no per-incident RPC) like get_incident_command_state needs.
+let _kitTemplates=[];
+let _kitTemplateItems=[];
+let _kitCatalogItems=[]; // inventory_items rows with client_item_key set - the 7 kit-eligible items
+async function pullKitTemplates(){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  try{
+    const [templatesResult, itemsResult, catalogResult] = await Promise.all([
+      client.from('kit_templates').select('id,name,description,is_active,created_by,updated_at,version').order('name'),
+      client.from('kit_template_items').select('id,kit_template_id,item_id,quantity'),
+      client.from('inventory_items').select('id,sku,name,client_item_key').not('client_item_key','is',null)
+    ]);
+    if(!templatesResult.error && Array.isArray(templatesResult.data)) _kitTemplates=templatesResult.data;
+    if(!itemsResult.error && Array.isArray(itemsResult.data)) _kitTemplateItems=itemsResult.data;
+    if(!catalogResult.error && Array.isArray(catalogResult.data)) _kitCatalogItems=catalogResult.data;
+  }catch(e){} // offline/network failure — next interval retries
+  if(document.getElementById('screen-kit-templates')?.classList.contains('active')) renderKitTemplates();
+}
+setInterval(()=>{ if(currentUser) pullKitTemplates(); }, 45000);
+
+// AUTH_MATRIX's "Manage kit templates" row (pc/cc/logistics_officer/admin - physician
+// deliberately excluded, database/036) - mirrors it here rather than reading the table, same
+// as every other role-gated action in this file.
+function canManageKitTemplates(){
+  return !!currentUser && ['pc','cc','logistics_officer','admin'].includes(currentUser.role);
+}
+// C5_SENTINEL_SAR_MVP_SPEC_v1.2.md sec 5.6: "editable only in staging/non-active incident
+// mode." Unknown status (not yet pulled, or offline) is treated as locked - fail-safe, not
+// fail-open, for a config-change gate. Real incident status via database/037's extension to
+// incident_command_state, not the local-only siteData.incidentStatus (different, unsynced
+// vocabulary).
+function kitTemplatesEditLocked(){
+  const status=_remoteCommandState[SITE_TO_INCIDENT_ID[currentSiteId()]]?.status;
+  return !status || status==='active';
+}
+let kitTemplateEditTarget=null; // null = creating new; else the kit_templates.id being edited
+function showKitTemplateModal(templateId=null){
+  if(!canManageKitTemplates()){ toast('אין הרשאה לניהול קיטים'); return; }
+  if(kitTemplatesEditLocked()){ toast('ניתן לערוך קיטים רק כשהאירוע אינו פעיל (טיוטה / staging / סגור)'); return; }
+  kitTemplateEditTarget=templateId;
+  const template=templateId?_kitTemplates.find(t=>t.id===templateId):null;
+  const nameEl=document.getElementById('kit-template-name'); if(nameEl) nameEl.value=template?.name||'';
+  const descEl=document.getElementById('kit-template-description'); if(descEl) descEl.value=template?.description||'';
+  const existingQty={};
+  if(template){
+    _kitTemplateItems.filter(x=>x.kit_template_id===template.id).forEach(x=>{
+      const cat=_kitCatalogItems.find(c=>c.id===x.item_id);
+      if(cat) existingQty[cat.client_item_key]=x.quantity;
+    });
+  }
+  const grid=document.getElementById('kit-template-items-grid');
+  if(grid) grid.innerHTML=_kitCatalogItems.map(item=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <span>${SUPPLY_LABELS[item.client_item_key]||item.name}</span>
+      <input type="number" min="0" id="kit-item-qty-${item.client_item_key}" style="width:70px" value="${existingQty[item.client_item_key]||0}">
+    </div>
+  `).join('') || '<div style="color:var(--muted);font-size:13px">קטלוג הפריטים עדיין לא נטען</div>';
+  document.getElementById('kit-template-modal')?.classList.remove('hidden');
+}
+function hideKitTemplateModal(){
+  document.getElementById('kit-template-modal')?.classList.add('hidden');
+  kitTemplateEditTarget=null;
+}
+function closeKitTemplateModal(e){ if(e.target.id==='kit-template-modal') hideKitTemplateModal(); }
+async function submitKitTemplate(){
+  if(!canManageKitTemplates() || kitTemplatesEditLocked()) return; // defense in depth - the modal shouldn't be reachable otherwise
+  const client=getSupabaseClient();
+  if(!client || !currentUser) return;
+  const name=(document.getElementById('kit-template-name')?.value||'').trim();
+  if(!name){ toast('נא להזין שם קיט'); return; }
+  const description=(document.getElementById('kit-template-description')?.value||'').trim();
+  const desiredItems=_kitCatalogItems.map(item=>({
+    item_id:item.id,
+    quantity:Math.max(0,Math.round(Number(document.getElementById(`kit-item-qty-${item.client_item_key}`)?.value)||0))
+  })).filter(x=>x.quantity>0);
+  try{
+    let templateId=kitTemplateEditTarget;
+    if(templateId){
+      const {error}=await client.from('kit_templates').update({name, description}).eq('id', templateId);
+      if(error){ toast('שגיאה בשמירת הקיט'); return; }
+      const {error:delErr}=await client.from('kit_template_items').delete().eq('kit_template_id', templateId);
+      if(delErr){ toast('שגיאה בעדכון פריטי הקיט'); return; }
+    }else{
+      const {data, error}=await client.from('kit_templates').insert({name, description, created_by:currentUser.id}).select('id').single();
+      if(error || !data){ toast('שגיאה ביצירת הקיט'); return; }
+      templateId=data.id;
+    }
+    if(desiredItems.length){
+      const {error:itemsError}=await client.from('kit_template_items').insert(desiredItems.map(x=>({kit_template_id:templateId, item_id:x.item_id, quantity:x.quantity})));
+      if(itemsError){ toast('הקיט נשמר אך פריטים לא נשמרו במלואם'); }
+    }
+    hideKitTemplateModal();
+    toast('הקיט נשמר');
+    await pullKitTemplates();
+    renderKitTemplates();
+  }catch(e){ toast('שגיאה בשמירת הקיט'); }
+}
+async function toggleKitTemplateActive(templateId){
+  if(!canManageKitTemplates()){ toast('אין הרשאה לניהול קיטים'); return; }
+  if(kitTemplatesEditLocked()){ toast('ניתן לערוך קיטים רק כשהאירוע אינו פעיל (טיוטה / staging / סגור)'); return; }
+  const client=getSupabaseClient();
+  if(!client) return;
+  const template=_kitTemplates.find(t=>t.id===templateId);
+  if(!template) return;
+  const {error}=await client.from('kit_templates').update({is_active:!template.is_active}).eq('id', templateId);
+  if(error){ toast('שגיאה בעדכון הקיט'); return; }
+  await pullKitTemplates();
+  renderKitTemplates();
+  toast(template.is_active?'קיט הושבת':'קיט הופעל');
+}
+function renderKitTemplates(){
+  const canManage=canManageKitTemplates();
+  const locked=kitTemplatesEditLocked();
+  const createBtn=document.getElementById('kit-templates-create-btn');
+  if(createBtn){ createBtn.style.display=canManage?'block':'none'; createBtn.disabled=locked; }
+  const lockNoteEl=document.getElementById('kit-templates-lock-note');
+  if(lockNoteEl) lockNoteEl.style.display=(canManage && locked)?'block':'none';
+  const listEl=document.getElementById('kit-templates-list');
+  if(!listEl) return;
+  const rows=_kitTemplates.map(t=>{
+    const items=_kitTemplateItems.filter(x=>x.kit_template_id===t.id).map(x=>{
+      const cat=_kitCatalogItems.find(c=>c.id===x.item_id);
+      return cat?`${SUPPLY_LABELS[cat.client_item_key]||cat.name} x${x.quantity}`:null;
+    }).filter(Boolean).join(' · ') || 'אין פריטים';
+    const actions=canManage?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+      <button class="demo-mini-btn" ${locked?'disabled':''} onclick="showKitTemplateModal('${t.id}')">ערוך</button>
+      <button class="demo-mini-btn" ${locked?'disabled':''} onclick="toggleKitTemplateActive('${t.id}')">${t.is_active?'השבת':'הפעל'}</button>
+    </div>`:'';
+    return `<div class="cmd-matrix-row${t.is_active?'':' critical'}">
+      <div>
+        <div class="cmd-matrix-title">${t.name}${t.is_active?'':' · לא פעיל'}</div>
+        <div class="cmd-matrix-sub">${t.description||'—'}<br>${items}</div>
+        ${actions}
+      </div>
+    </div>`;
+  }).join('') || renderOperationalEmptyState('אין קיטים מוגדרים','לחץ על "קיט חדש" כדי להגדיר קיט ראשון');
+  listEl.innerHTML=renderCollapsibleSection('kit-templates-list-section','קיטים מוגדרים', rows, _kitTemplates.length, {criticalCount:_kitTemplates.filter(t=>!t.is_active).length, emptyMessage:'אין קיטים מוגדרים'});
+}
+
 // ── Poison-event quarantine review: sync_ingestion_errors, command-role only ──
 // The "poison event quarantine" concept (CLAUDE.md, docs/API_SURFACE_v1.2.md's Atomic
 // Individual Event Processing) has always been real server-side — malformed/dependency-blocked
@@ -11049,6 +11429,7 @@ function refreshActiveScreenData(){
   else if(screen==='logistics') renderLogisticsOfficer();
   else if(screen==='role-dashboard') renderRoleDashboard(activeRoleDashboard);
   else if(screen==='aar') renderAar();
+  else if(screen==='kit-templates') renderKitTemplates();
   updateDemoStatus();
 }
 
