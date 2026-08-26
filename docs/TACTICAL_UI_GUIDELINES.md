@@ -113,6 +113,14 @@ The timer must stay visible in:
 
 The timer is not passive history. It is an active risk clock.
 
+## Logistics Resupply Queue
+
+The resupply queue (`supply_requests`, real and cross-device — `docs/API_SURFACE_v1.2.md`'s "Logistics Resupply Queue API") is the one place a logistics officer sees a request from a medic or PC on a different device. It must stay a genuine cross-device queue, not silently fall back to the local-only demo state (`reinforcementRequests`) it replaced — the whole point of building it was that the old board only ever showed the current device's own local copy.
+
+Status must always be legible at a glance, matching the tourniquet clock's "not passive history" principle: `requested`/`approved` (needs a dispatch decision), `dispatched` (runner + ETA assigned, in transit not yet confirmed), `in_transit`, `delivered`. A request with no runner assigned must never look the same as one that's actively moving.
+
+Burn-rate/stockout predictions (`evaluateSupplyBurn`, surfaced on the Logistics Hub via `forLogistics()`) are recommendations, not automatic reorders — same `RECOMMENDATION_LABEL` / "Recommendation only – Human decision required" framing as every other role's decision-support panel. Never auto-dispatch a runner or auto-create a resupply request from a burn-rate prediction alone.
+
 ## Local-First Interaction
 
 The medic should never wait for the network while standing over a patient.

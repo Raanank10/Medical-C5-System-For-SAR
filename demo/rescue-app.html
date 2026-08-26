@@ -646,7 +646,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9920</div>
+      <div class="demo-kicker">Demo V2.9921</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -745,7 +745,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9920</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9921</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -755,7 +755,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9920</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9921</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -1935,6 +1935,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div id="logistics-task-board" style="padding:12px 16px 0"></div>
   <div id="logistics-real-queue" style="padding:12px 16px 0"></div>
+  <div id="logistics-burn-predictions" style="padding:12px 16px 0"></div>
   <div id="logistics-summary" class="cmd-priority-grid"></div>
   <div style="padding:12px 16px 0">
     <div class="section-label" style="padding:0 0 8px">צריכה אחרונה</div>
@@ -2559,7 +2560,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.20';
+const APP_VERSION = '2.99.21';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -4647,6 +4648,7 @@ function acknowledgeRecommendation(id){
   saveDemoState();
   if(document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard(activeRoleDashboard);
   if(document.getElementById('screen-commander')?.classList.contains('active')) renderCommander();
+  if(document.getElementById('screen-logistics')?.classList.contains('active')) renderLogisticsOfficer();
   toast('המלצה סומנה בטיפול');
 }
 const DecisionSupportEngine=(()=>{
@@ -4966,7 +4968,16 @@ const DecisionSupportEngine=(()=>{
     ]);
     return {recommendations};
   }
-  return {evaluate,forPc,forCc,forMedic,evaluateTourniquets,evaluateMedicCoverage,evaluateSupplyBurn,evaluateEvacuation,evaluatePatientDeterioration,SectorRiskScore,OperationalPressureIndex,rank};
+  // Burn-rate/stockout predictions (evaluateSupplyBurn) already existed and already fed
+  // forPc()/forCc() - they just never surfaced on the Logistics Hub screen itself, the role
+  // that's actually supposed to act on them (spec: "Burn rate by item"). No new computation,
+  // just the missing role-scoped view onto the existing one.
+  function forLogistics(){
+    const ctx=defaultContext();
+    const recommendations=rank(evaluateSupplyBurn(ctx));
+    return {recommendations};
+  }
+  return {evaluate,forPc,forCc,forMedic,forLogistics,evaluateTourniquets,evaluateMedicCoverage,evaluateSupplyBurn,evaluateEvacuation,evaluatePatientDeterioration,SectorRiskScore,OperationalPressureIndex,rank};
 })();
 function renderRecommendationCard(r){
   const colors={INFO:'var(--muted)',LOW:'var(--green)',MEDIUM:'var(--yellow)',HIGH:'var(--orange)',CRITICAL:'var(--red)'};
@@ -5003,6 +5014,7 @@ function renderRoleBriefingBody(role){
   const dse = role==='medic' ? DecisionSupportEngine.forMedic()
     : role==='cc' ? DecisionSupportEngine.forCc()
     : role==='pc' ? DecisionSupportEngine.forPc()
+    : role==='logistics' ? DecisionSupportEngine.forLogistics()
     : {recommendations:[]};
   return `
     ${roleSection('תחומי אחריות', resp)}
@@ -9486,6 +9498,8 @@ function renderLogisticsOfficer(){
     }).join('') || renderOperationalEmptyState('אין בקשות ציוד בתור האמיתי','נתון חוצה-מכשירים מ-supply_requests (database/033) — יתעדכן ברגע שחובש/חוג״ד יוצר בקשה');
     realQueueEl.innerHTML=renderCollapsibleSection('logistics-real-queue-section','תור בקשות ציוד — Real-time · כל המכשירים',realQueueRows,realQueue.length,{criticalCount:realQueue.filter(r=>r.status==='requested').length,emptyMessage:'אין בקשות ציוד בתור האמיתי'});
   }
+  const burnPredictionsEl=document.getElementById('logistics-burn-predictions');
+  if(burnPredictionsEl) burnPredictionsEl.innerHTML=renderRecommendationPanel('חיזוי צריכה — קצב שריפה (Top 3)', DecisionSupportEngine.forLogistics().recommendations);
   const companies=logisticsCompanies();
   const totalLow=companies.reduce((sum,c)=>sum+c.lowItems.length,0);
   const totalStock=companies.reduce((sum,c)=>sum+Object.values(c.inventory).reduce((a,b)=>a+Number(b||0),0),0);
