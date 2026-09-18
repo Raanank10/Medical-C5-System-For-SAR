@@ -33,6 +33,12 @@ node scripts/smoke_v2_992_decision_support.js
 npm install
 npm run test:browser-smoke            # or: node scripts/browser_smoke_test.js
 
+# Outbox eviction regression test (Playwright) — reproduces docs/FAILURE_MODE_REVIEW.md's F1
+# fix (persistOutbox() must never silently drop unsynced clinical events when trimming to the
+# 500-entry cap). No network/login involved — pure client-side logic, manual-only, not wired
+# into CI.
+node scripts/test_outbox_eviction.js
+
 # Analytics package
 cd analytics/c5_sentinel_sar_analytics_v1_1
 python -m venv .venv
