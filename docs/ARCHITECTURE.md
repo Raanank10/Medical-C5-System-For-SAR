@@ -123,7 +123,7 @@ The next major implementation should split the repo into these packages only whe
 
 ```text
 apps/
-|-- field-mobile/        # Expo or native mobile app
+|-- field-mobile/        # PWA (React), not Expo -- see docs/PHASE_4_PLAN.md's decision 1/2
 |-- command-web/         # command dashboard
 packages/
 |-- domain/              # triage, vitals, alert, inventory rules
