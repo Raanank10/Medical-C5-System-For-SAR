@@ -4,6 +4,8 @@ Development repository for an offline-first medical command-and-control prototyp
 
 [Live demo](https://raanank10.github.io/Medical-C5-System-For-SAR/) | [Development guide](docs/DEVELOPMENT.md) | [Architecture](docs/ARCHITECTURE.md) | [Tactical UI](docs/TACTICAL_UI_GUIDELINES.md) | [Field gaps](docs/FIELD_EXPERIMENT_GAPS.md) | [Production readiness](docs/PRODUCTION_READINESS.md)
 
+> **Reviewing this for a data, analytics or product role?** Start with the focused [**analytics case study**](https://github.com/Raanank10/c5-sentinel-sar-analytics-case-study). It covers the SQL KPI views, the Python KPI engine, the metrics dictionary and a sample after-action report, all built on this system's event log.
+
 ![C5 Sentinel-SAR Command Dashboard](assets/mockups/command_dashboard.png)
 
 ## Purpose
