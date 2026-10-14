@@ -45,11 +45,16 @@ Why `SECURITY DEFINER`: these functions need to read `profiles`/`incident_member
 3. **Gate** — `is_active` is checked everywhere (every RLS policy, the `sync-log` Edge Function). A `false` value locks the account out completely: authenticated, but with no usable access, rather than silently granted a wrong/default role. `database/017_lock_out_inactive_profiles.sql` (found during `docs/RLS_AUDIT_v1.md`'s systematic pass) closed two remaining gaps in this specific path — an inactive account could still be read/write in ways the `is_active` gate was supposed to prevent.
 4. **Deactivation** — setting `is_active=false` on an existing account (an admin action) has the same locked-out effect. There is currently no dedicated admin UI for this — it's a direct database operation, not a feature in `index.html`.
 
+## Incident Membership Lifecycle
+
+`incident_memberships` is what scopes a field role (medic, paramedic, pc, logistics_officer) to an incident through `app.can_access_incident()`. Since `database/038_incident_lifecycle_rpcs.sql` a membership row is created in four ways: the opener of an incident is added by `open_incident()`; any active profile can add itself with `join_incident()` (only for a draft/staging/active incident); a commander who confirms a draft is added by `confirm_draft()`; and command roles can still insert rows directly under the existing `incident_memberships_insert` policy. This self-join is a deliberate access widening, see `docs/RLS_AUDIT_v1.md`'s `038` follow-up. There is no "leave incident" path yet, and closing an incident does not remove memberships (it only stops new joins).
+
 ## Known Gaps (cross-referenced, not re-litigated here)
 
 - **No MFA.** Password-only authentication.
 - **No leaked-password protection** — a Supabase Pro-tier feature, currently unavailable on the Free plan this project runs on (`docs/THREAT_MODEL.md` T6).
 - **No `rpc`/`rcc` platoon/company scoping** — `docs/ARCHITECTURE.md`'s "Backend Deployment Status" already documents this: the "tactical view scoped to my own platoon/company, no vitals/identity" requirement needs a real platoon/company data model (a `platoons` table, `patients.assigned_platoon_id` or equivalent) that doesn't exist yet. `rpc`/`rcc` currently get the same incident-wide access shape as other roles, just with different write-action permissions (`database/007`).
+- **No unit scoping on incident self-join.** `list_open_incidents()`/`join_incident()` (`database/038`) let any active profile see and join any open incident. Fine for one unit; a multi-unit deployment needs the same platoon/company model the bullet above describes.
 - **No role-change audit trail.** `profiles.role`/`is_active` changes aren't themselves logged as auditable events — an admin's own promote/demote/deactivate actions leave no record beyond the row's own `updated_at`. Real gap, not previously documented elsewhere; candidate for `docs/AUDIT_AND_RETENTION_POLICY.md`'s Class A (clinical/operational record) if adopted, since who has access to what is exactly the kind of thing an after-action review might need to reconstruct.
 
 ## Explicitly Out of Scope Here
