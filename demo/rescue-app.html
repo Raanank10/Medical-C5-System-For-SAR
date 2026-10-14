@@ -646,7 +646,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9922</div>
+      <div class="demo-kicker">Demo V2.9923</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -745,7 +745,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9922</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9923</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -755,7 +755,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9922</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9923</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -780,11 +780,18 @@ textarea{resize:vertical;min-height:70px;}
     <div class="sync-pill">LOCAL</div>
   </div>
   <div class="flow-content">
-    <div style="text-align:center;margin-bottom:16px">
-      <span class="badge badge-red" style="display:inline-block;animation:blink 1.2s infinite;font-size:13px;padding:7px 12px">התרעה: אירוע קריסת מבנה פלוגתי</span>
+    <div id="enroute-assignment-card" style="margin-bottom:14px"></div>
+    <div class="field-label">סוג אירוע</div>
+    <div class="tap-grid tap-grid-2" id="enroute-incident-type-grid" style="margin-bottom:8px">
+      <button class="tap-btn" data-incident-type="missile_strike_structural_collapse" onclick="selectEnrouteIncidentType('missile_strike_structural_collapse')"><span class="icon">🏚️</span>קריסת מבנה / טיל</button>
+      <button class="tap-btn" data-incident-type="mass_shooting" onclick="selectEnrouteIncidentType('mass_shooting')"><span class="icon">🎯</span>ירי המוני</button>
+      <button class="tap-btn" data-incident-type="vehicle_accident" onclick="selectEnrouteIncidentType('vehicle_accident')"><span class="icon">🚗</span>תאונת דרכים</button>
+      <button class="tap-btn" data-incident-type="explosion" onclick="selectEnrouteIncidentType('explosion')"><span class="icon">💥</span>פיצוץ</button>
     </div>
+    <div id="enroute-incident-type-note" style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:14px"></div>
     <div class="field-label">כתובת / מוקד ידוע</div>
-    <input type="text" id="enroute-address" placeholder="לדוגמה: הרצל 12, בניין 15A" style="margin-bottom:12px;font-size:18px;padding:16px">
+    <input type="text" id="enroute-address" placeholder="לדוגמה: הרצל 12, בניין 15A" style="margin-bottom:6px;font-size:18px;padding:16px">
+    <div id="enroute-address-source" style="font-size:12px;color:var(--accent);margin-bottom:12px"></div>
     <div class="field-label">הערכת זמן הגעה — אופציונלי</div>
     <input type="text" id="enroute-eta" placeholder="לדוגמה: 7 דקות / 14:35" style="margin-bottom:12px" oninput="siteData.eta=this.value">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
@@ -827,6 +834,7 @@ textarea{resize:vertical;min-height:70px;}
     </div>
     <div class="field-label">הערת מוקד חופשית</div>
     <textarea id="enroute-notes" placeholder="סכנות, כניסה מומלצת, לכודים מדווחים..."></textarea>
+    <div id="enroute-notes-source" style="font-size:12px;color:var(--accent);margin-top:6px"></div>
   </div>
   <div class="bottom-bar"><button class="btn-primary" onclick="arriveAtSite()" style="background:var(--red);font-size:16px;padding:16px">הגעתי — התחל סריקת MSTART</button></div>
 </div>
@@ -1644,6 +1652,25 @@ textarea{resize:vertical;min-height:70px;}
     <div class="panic-title" style="color:var(--accent)" id="incident-type-brief-title">סוג אירוע</div>
     <div class="panic-message" id="incident-type-brief-message">—</div>
     <button class="panic-confirm-btn" style="background:var(--accent)" onclick="hideIncidentTypeBriefModal()">הבנתי</button>
+  </div>
+</div>
+
+<!-- ══════════════════════ PC → MEDIC INCIDENT ASSIGNMENT MODAL ══ -->
+<div class="modal-overlay hidden" id="medic-assign-modal" onclick="closeMedicAssignModal(event)">
+  <div class="modal-sheet">
+    <div class="panic-title" style="color:var(--accent)" id="medic-assign-title">שיוך חובש לאירוע</div>
+    <div class="field-label">אירוע / מוקד</div>
+    <div class="demo-actions" id="medic-assign-site-grid" style="margin:0 0 8px;grid-template-columns:1fr 1fr"></div>
+    <div id="medic-assign-site-status" style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px"></div>
+    <div class="field-label">כתובת / מוקד ידוע (יועבר לחובש)</div>
+    <input type="text" id="medic-assign-address" placeholder="לדוגמה: הרצל 12" style="margin-bottom:10px">
+    <div class="field-label">הערה לחובש — אופציונלי</div>
+    <textarea id="medic-assign-note" placeholder="כניסה מומלצת, סכנות, לכודים מדווחים..."></textarea>
+    <div id="medic-assign-warning" style="font-size:12px;color:var(--red);line-height:1.5;margin-top:8px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+      <button class="btn-primary" style="background:var(--accent)" onclick="confirmMedicAssignment()">שייך לאירוע</button>
+      <button class="btn-primary" style="background:var(--surface2);border:1px solid var(--border);color:var(--text)" onclick="hideMedicAssignModal()">ביטול</button>
+    </div>
   </div>
 </div>
 
@@ -2602,7 +2629,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.22';
+const APP_VERSION = '2.99.23';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3686,6 +3713,7 @@ function ensureSiteStatusFields(siteId=rescueActiveSiteId){
   if(s.incidentType===undefined) s.incidentType=null;
   if(!s.siteClear) s.siteClear={cleared:false,clearedAt:null,clearedByRole:null};
   if(s.lastRescueStatusChange===undefined) s.lastRescueStatusChange=null;
+  if(s.incidentTypeSource===undefined) s.incidentTypeSource=null;
   return s;
 }
 function rescueSwitchAuthoritySite(role, siteId){
@@ -3695,6 +3723,7 @@ function rescueSwitchAuthoritySite(role, siteId){
 function rescueSetIncidentType(role, type, siteId=rescueActiveSiteId){
   const s=ensureSiteStatusFields(siteId);
   s.incidentType=type;
+  s.incidentTypeSource={role,byLabel:rescueReporterLabel(role),at:Date.now()};
   s.lastRescueStatusChange={type:'incident_type',by:role,byLabel:rescueReporterLabel(role),detail:`סוג אירוע עודכן: ${INCIDENT_TYPE_LABELS[type]||type}`,at:Date.now()};
   saveLocalEvent({type:'INCIDENT_TYPE_SET',detail:`${type} by ${role} at ${siteId}`,payload_json:{role,siteId,incidentType:type,timestamp:new Date().toISOString()}});
   saveDemoState();
@@ -3713,6 +3742,184 @@ function hideIncidentTypeBriefModal(){
   if(modal) modal.classList.add('hidden');
 }
 function closeIncidentTypeBriefModal(e){ if(e.target.id==='incident-type-brief-modal') hideIncidentTypeBriefModal(); }
+// ── PC → medic incident assignment + medic incident-type selection (Movement screen) ──
+// Local-demo only for now: a PC assigns a medic to one of the open sites, and the medic's
+// Movement screen ("מסך תנועה") then pre-fills what the PC and rescue chain already know.
+// The real, synced version belongs on incident_memberships (assigned_by) and is a separate
+// follow-up - see currentSiteId() for why a signed-in medic stays on SITE_A until then.
+// MEDIC_ASSIGNED_TO_INCIDENT / INCIDENT_TYPE_MISMATCH_REPORTED / SITE_PREFILL_CORRECTED are
+// deliberately outside SYNC_ELIGIBLE_EVENT_TYPES (like INCIDENT_TYPE_SET), so never pushed.
+let medicIncidentAssignments={}; // medicUserId -> {siteId, assignedById, assignedByName, assignedAt, address, note}
+let enroutePrefill={address:'', note:''}; // values pre-filled from an assignment, compared on arrival
+let pendingMedicAssign={medicId:null, siteId:'SITE_A'};
+function siteAddressFromName(siteId){
+  const site=allSites.find(s=>s.id===siteId);
+  return (site?.name||'').split('—')[1]?.trim()||'';
+}
+function siteShortName(siteId){
+  const site=allSites.find(s=>s.id===siteId);
+  return (site?.name||siteId).split('—')[0].trim();
+}
+function incidentTypeSourceLabel(siteId){
+  const s=ensureSiteStatusFields(siteId);
+  if(!s.incidentType) return '';
+  if(!s.incidentTypeSource) return 'נקבע מראש';
+  return `נקבע ע״י ${s.incidentTypeSource.byLabel} · ${timeAgoLabel(s.incidentTypeSource.at)}`;
+}
+// Rescue chain (rpc/rcc) has final site authority (docs/ROLE_COMMAND_MODEL_v2.8.md): a medic
+// may set the incident type only while none is set, or replace one a medic set. A medic pick
+// that differs from rescue's is recorded as a mismatch for the PC, never applied over it.
+function incidentTypeLockedForMedic(siteId){
+  const s=ensureSiteStatusFields(siteId);
+  return !!s.incidentType && s.incidentTypeSource?.role!=='medic';
+}
+function selectEnrouteIncidentType(type){
+  const siteId=currentSiteId();
+  const s=ensureSiteStatusFields(siteId);
+  if(incidentTypeLockedForMedic(siteId)){
+    if(type===s.incidentType){
+      siteData.medicIncidentTypeReport=null;
+      saveDemoState();
+      renderEnrouteIncidentContext();
+      showIncidentTypeBriefModal(type);
+      return;
+    }
+    siteData.medicIncidentTypeReport={siteId,type,at:Date.now()};
+    saveLocalEvent({type:'INCIDENT_TYPE_MISMATCH_REPORTED',detail:`medic reported ${type}, rescue set ${s.incidentType} at ${siteId}`,warn:true,payload_json:{role:'medic',siteId,reportedType:type,authoritativeType:s.incidentType,authoritativeRole:s.incidentTypeSource?.role||null,timestamp:new Date().toISOString()}});
+    saveDemoState();
+    renderEnrouteIncidentContext();
+    toast(`סוג האירוע נקבע ע״י חילוץ (${INCIDENT_TYPE_LABELS[s.incidentType]}) · הפער נשלח לחוג"ד`);
+    return;
+  }
+  s.incidentType=type;
+  s.incidentTypeSource={role:'medic',byLabel:currentMedicName(),at:Date.now()};
+  siteData.medicIncidentTypeReport=null;
+  saveLocalEvent({type:'INCIDENT_TYPE_SET',detail:`${type} by medic at ${siteId}`,payload_json:{role:'medic',siteId,incidentType:type,timestamp:new Date().toISOString()}});
+  saveDemoState();
+  renderEnrouteIncidentContext();
+  showIncidentTypeBriefModal(type);
+}
+function renderEnrouteIncidentContext(){
+  const card=document.getElementById('enroute-assignment-card');
+  if(!card) return;
+  const siteId=currentSiteId();
+  const s=ensureSiteStatusFields(siteId);
+  const a=medicIncidentAssignments[currentMedicId()];
+  const typeLabel=s.incidentType?INCIDENT_TYPE_LABELS[s.incidentType]:'סוג אירוע טרם נבחר';
+  const badge=`<div style="text-align:center;margin-bottom:10px"><span class="badge badge-red" style="display:inline-block;animation:blink 1.2s infinite;font-size:13px;padding:7px 12px">התרעה: ${escAttr(typeLabel)}</span></div>`;
+  let body;
+  if(a){
+    const sitePts=getSitePatients(siteId).length;
+    const offlineOnly=currentUser && a.siteId!=='SITE_A'
+      ? `<div class="role-row-sub" style="color:var(--red)">שיוך מקומי בלבד: בחשבון מחובר החובש נשאר ב${escAttr(siteShortName('SITE_A'))} עד שיוך בשרת.</div>`:'';
+    body=`<div class="role-row" style="border-color:var(--accent)">
+      <div class="role-row-title">שובצת לאירוע ע״י ${escAttr(a.assignedByName)} · ${escAttr(siteShortName(a.siteId))} · ${timeAgoLabel(a.assignedAt)}</div>
+      <div class="role-row-sub">מידע קיים (ניתן לתקן בשדות למטה):</div>
+      <div class="role-row-sub">• סוג אירוע: ${escAttr(s.incidentType?`${typeLabel} (${incidentTypeSourceLabel(siteId)})`:'לא נקבע עדיין - בחר למטה')}</div>
+      <div class="role-row-sub">• ${escAttr(siteStatusSummaryLine(siteId))}</div>
+      <div class="role-row-sub">• ${sitePts} פצועים כבר רשומים באתר (כולל דיווחי חילוץ ראשוניים)</div>
+      ${a.address?`<div class="role-row-sub">• כתובת מחוג"ד: ${escAttr(a.address)}</div>`:''}
+      ${a.note?`<div class="role-row-sub">• הערת חוג"ד: ${escAttr(a.note)}</div>`:''}
+      ${offlineOnly}
+    </div>`;
+  }else{
+    body=`<div class="role-row">
+      <div class="role-row-title">לא שובצת לאירוע ע״י חוג"ד - אתה מקים את האירוע</div>
+      <div class="role-row-sub">בחר סוג אירוע ומלא את מה שידוע. אם חוג"ד ישבץ אותך לאירוע קיים, המידע הקיים ימולא כאן אוטומטית.</div>
+    </div>`;
+  }
+  card.innerHTML=badge+body;
+  document.querySelectorAll('#enroute-incident-type-grid .tap-btn').forEach(b=>{
+    b.classList.toggle('selected', b.dataset.incidentType===s.incidentType);
+  });
+  const note=document.getElementById('enroute-incident-type-note');
+  if(note){
+    const report=siteData.medicIncidentTypeReport;
+    if(report && report.siteId===siteId && s.incidentType && report.type!==s.incidentType){
+      note.style.color='var(--yellow)';
+      note.textContent=`דיווחת "${INCIDENT_TYPE_LABELS[report.type]}" אבל חילוץ קבע "${typeLabel}". סוג החילוץ נשאר בתוקף; הפער מוצג לחוג"ד.`;
+    }else if(incidentTypeLockedForMedic(siteId)){
+      note.style.color='var(--muted)';
+      note.textContent=`${incidentTypeSourceLabel(siteId)} · לחיצה על סוג אחר תדווח פער לחוג"ד ולא תשנה את הסוג.`;
+    }else{
+      note.style.color='var(--muted)';
+      note.textContent=s.incidentType?`${incidentTypeSourceLabel(siteId)} · חילוץ יכול לעדכן את הסוג בהמשך.`:'בחירת סוג אירוע מציגה תבנית פציעות צפויה.';
+    }
+  }
+}
+// Prefill only empty fields (same rule as the existing siteData prefill in goTo('enroute')),
+// so nothing the medic already typed is ever overwritten.
+function applyEnrouteAssignmentPrefill(){
+  const a=medicIncidentAssignments[currentMedicId()];
+  const addrSrc=document.getElementById('enroute-address-source');
+  const notesSrc=document.getElementById('enroute-notes-source');
+  if(addrSrc) addrSrc.textContent='';
+  if(notesSrc) notesSrc.textContent='';
+  if(!a) return;
+  const addr=document.getElementById('enroute-address');
+  if(addr && a.address && (!addr.value || addr.value===enroutePrefill.address)){
+    addr.value=a.address; enroutePrefill.address=a.address;
+  }
+  if(addrSrc && enroutePrefill.address) addrSrc.textContent=`מולא מראש ע״י ${a.assignedByName} · ניתן לתקן`;
+  const notes=document.getElementById('enroute-notes');
+  if(notes && a.note && (!notes.value || notes.value===enroutePrefill.note)){
+    notes.value=a.note; enroutePrefill.note=a.note;
+  }
+  if(notesSrc && enroutePrefill.note) notesSrc.textContent=`מולא מראש ע״י ${a.assignedByName} · ניתן לתקן`;
+}
+function logEnroutePrefillCorrections(address, notes){
+  [['address',enroutePrefill.address,address],['note',enroutePrefill.note,notes]].forEach(([field,from,to])=>{
+    if(!from || from===to) return;
+    saveLocalEvent({type:'SITE_PREFILL_CORRECTED',detail:`חובש תיקן ${field==='address'?'כתובת':'הערה'} שמולאה ע״י חוג"ד`,warn:false,payload_json:{field,from,to,source:'pc_assignment',siteId:currentSiteId(),timestamp:new Date().toISOString()}});
+  });
+}
+function openMedicAssignModal(medicId){
+  const modal=document.getElementById('medic-assign-modal');
+  if(!modal) return;
+  const current=medicIncidentAssignments[medicId];
+  pendingMedicAssign={medicId, siteId:current?.siteId||'SITE_A'};
+  document.getElementById('medic-assign-title').textContent=`שיוך ${displayUser(medicId)} לאירוע`;
+  document.getElementById('medic-assign-address').value=current?.address||siteAddressFromName(pendingMedicAssign.siteId);
+  document.getElementById('medic-assign-note').value=current?.note||'';
+  renderMedicAssignSites();
+  modal.classList.remove('hidden');
+}
+function renderMedicAssignSites(){
+  const grid=document.getElementById('medic-assign-site-grid');
+  if(!grid) return;
+  grid.innerHTML=allSites.filter(s=>s.id!=='ALL').map(s=>`<button class="demo-mini-btn" style="${s.id===pendingMedicAssign.siteId?'border-color:var(--accent);background:rgba(67,97,238,.12);color:var(--accent)':''}" onclick="selectMedicAssignSite('${s.id}')">${s.id===pendingMedicAssign.siteId?'✓ ':''}${escAttr(siteShortName(s.id))}</button>`).join('');
+  const status=document.getElementById('medic-assign-site-status');
+  if(status) status.textContent=siteStatusSummaryLine(pendingMedicAssign.siteId);
+  const warning=document.getElementById('medic-assign-warning');
+  if(warning) warning.textContent=currentUser && pendingMedicAssign.siteId!=='SITE_A'
+    ? 'בחשבון מחובר אפשר לשייך כרגע רק ל'+siteShortName('SITE_A')+' - שיוך לאירוע אחר דורש שיוך בשרת (בפיתוח).':'';
+}
+function selectMedicAssignSite(siteId){
+  const addr=document.getElementById('medic-assign-address');
+  if(addr && (!addr.value || addr.value===siteAddressFromName(pendingMedicAssign.siteId))) addr.value=siteAddressFromName(siteId);
+  pendingMedicAssign.siteId=siteId;
+  renderMedicAssignSites();
+}
+function hideMedicAssignModal(){
+  const modal=document.getElementById('medic-assign-modal');
+  if(modal) modal.classList.add('hidden');
+}
+function closeMedicAssignModal(e){ if(e.target.id==='medic-assign-modal') hideMedicAssignModal(); }
+function confirmMedicAssignment(){
+  const {medicId, siteId}=pendingMedicAssign;
+  if(!medicId) return;
+  if(currentUser && siteId!=='SITE_A'){ toast('שיוך לאירוע אחר דורש שיוך בשרת - לא נשמר'); return; }
+  const pc=DEMO_PLATOONS.find(pl=>pl.platoonId===(DEMO_USERS.find(u=>u.userId===medicId)?.platoonId||'PLT-A'));
+  const assignedById=pc?.pcId||'USR-BARAK';
+  const address=document.getElementById('medic-assign-address')?.value.trim()||'';
+  const note=document.getElementById('medic-assign-note')?.value.trim()||'';
+  medicIncidentAssignments[medicId]={siteId, assignedById, assignedByName:displayUser(assignedById), assignedAt:Date.now(), address, note};
+  saveLocalEvent({type:'MEDIC_ASSIGNED_TO_INCIDENT',detail:`${displayUser(medicId)} שובץ ל${siteShortName(siteId)} ע״י ${displayUser(assignedById)}`,warn:false,payload_json:{medicId,siteId,assignedById,address,note,timestamp:new Date().toISOString()}});
+  saveDemoState();
+  hideMedicAssignModal();
+  if(document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard(activeRoleDashboard);
+  toast(`${displayUser(medicId)} שובץ ל${siteShortName(siteId)} · מסך התנועה שלו ימולא מראש`);
+}
 // Rescue-chain (rpc/rcc) site authority actions. Per design decision: final authority,
 // no medical (pc/cc) sign-off required — they only get notified via siteAuthority[siteId].lastRescueStatusChange,
 // surfaced on their own dashboards next render.
@@ -4258,7 +4465,7 @@ function saveDemoState(){
         }
       }
       demoRevision += 1;
-      await secureSetItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:6,appVersion:APP_VERSION,revision:demoRevision,savedAt:new Date().toISOString(),experimentStartedAt,experimentPhase,siteData,patients,reinforcementRequests,pcTruckStock,companyStock,demoSyncMode,lastSyncAt}));
+      await secureSetItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:6,appVersion:APP_VERSION,revision:demoRevision,savedAt:new Date().toISOString(),experimentStartedAt,experimentPhase,siteData,patients,reinforcementRequests,pcTruckStock,companyStock,medicIncidentAssignments,demoSyncMode,lastSyncAt}));
     }catch(e){}
   });
 }
@@ -4275,6 +4482,7 @@ function loadStoredDemoState(){
       reinforcementRequests=Array.isArray(saved.reinforcementRequests)?saved.reinforcementRequests:[];
       pcTruckStock={...PC_TRUCK_BASELINE, ...(saved.pcTruckStock||{})};
       companyStock={...COMPANY_STOCK_BASELINE, ...(saved.companyStock||{})};
+      medicIncidentAssignments=(saved.medicIncidentAssignments && typeof saved.medicIncidentAssignments==='object')?saved.medicIncidentAssignments:{};
       patients.forEach(p=>{
         if(!p.lastModifiedAt) p.lastModifiedAt=saved.savedAt||new Date().toISOString();
         if(!p.trapStatus) p.trapStatus=normalizeTrapStatus(p);
@@ -5203,8 +5411,8 @@ function renderPcMedicPanel(m){
         <div class="pm"><div class="pm-n${m.trapped?' warn':''}">${m.trapped}</div><div class="pm-l">לכודים</div></div>
         <div class="pm"><div class="pm-n${m.tqs?' warn':''}">${m.tqs}</div><div class="pm-l">חסמים</div></div>
       </div>
-      <div class="panel-sub">${m.mins===null?'אין עדכון':`עדכון לפני ${m.mins} דק׳`}</div>
-      <div class="panel-actions">${actionBtn}</div>
+      <div class="panel-sub">${m.mins===null?'אין עדכון':`עדכון לפני ${m.mins} דק׳`} · ${m.assignedSiteId?`משובץ: ${escAttr(siteShortName(m.assignedSiteId))}`:'לא שובץ לאירוע'}</div>
+      <div class="panel-actions">${actionBtn}<button class="p-btn" onclick="openMedicAssignModal('${m.userId}')">${m.assignedSiteId?'שנה שיוך':'שייך לאירוע'}</button></div>
     </div>
   </div>`;
 }
@@ -5221,7 +5429,7 @@ function renderPcMedicLoadBoard(myPts){
     const silent=C5Rules.isDeviceSilent(lastMs);
     const status=overloaded?'עמוס':silent?'שקט':'פעיל';
     const focus={role:'pc',type:'cc_decision',id:`medic-${u.userId}`,label:displayUser(u.userId),patientIds:pts.map(p=>p.id)};
-    return renderPcMedicPanel({name:displayUser(u.userId),pts:pts.length,red,trapped,tqs,mins,overloaded,silent,status,focus});
+    return renderPcMedicPanel({userId:u.userId,assignedSiteId:medicIncidentAssignments[u.userId]?.siteId||null,name:displayUser(u.userId),pts:pts.length,red,trapped,tqs,mins,overloaded,silent,status,focus});
   }).join('');
   const grid=panels?`<div class="panel-grid">${panels}</div>`:'';
   return renderCollapsibleSection('pc-medic-load','עומס חובשים',grid || renderOperationalEmptyState('אין פצועים במיקוד הנוכחי'), medics.length, {emptyMessage:'אין פצועים במיקוד הנוכחי'});
@@ -6144,6 +6352,8 @@ function goTo(screen){
     const floor=document.getElementById('enroute-floor'); if(floor && !floor.value) floor.value=siteData.floorHint||'';
     const apt=document.getElementById('enroute-apartment'); if(apt && !apt.value) apt.value=siteData.apartmentHint||'';
     const zone=document.getElementById('enroute-zone'); if(zone && !zone.value) zone.value=siteData.currentZone||'';
+    applyEnrouteAssignmentPrefill();
+    renderEnrouteIncidentContext();
   }
   if(screen==='aar')       renderAar();
   updateDemoStatus();
@@ -6471,7 +6681,14 @@ function updateZoneContextBar(){
 }
 function currentMedicId(){ return 'USR-COHEN'; }
 function currentMedicName(){ return displayUser(currentMedicId()); }
-function currentSiteId(){ return 'SITE_A'; }
+// The device's own site. Follows a PC's local medic->incident assignment in local-demo mode only:
+// while signed in it stays SITE_A, because the live medic test account is only an
+// incident_memberships member of incident A and RLS would reject its pushes to any other
+// incident. Real, synced assignment (incident_memberships.assigned_by) is a separate follow-up.
+function currentSiteId(){
+  const a=medicIncidentAssignments[currentMedicId()];
+  return (!currentUser && a?.siteId) || 'SITE_A';
+}
 function sweepPatientsForCurrentZone(){
   return patients.filter(p=>p.phase==='mstart_sweep' && (p.zone||p.locDetail)===zoneLabel() && (p.assignedMedicId||currentMedicId())===currentMedicId());
 }
@@ -7259,6 +7476,11 @@ function buildAlertObjects(pts=patients){
   });
   duplicateCandidates(pts).forEach(([a,b],idx)=>pushAlert(alerts,{id:`dup-${a.id}-${b.id}`,type:'DUPLICATE_SUSPECTED',severity:'medium',owner:'pc',audience:['pc','chamal'],escalatesTo:null,actionRequired:'merge_duplicate',scope:'site',category:'integrity',siteId:a.siteId||b.siteId||'SITE_A',patientId:a.id,title:`חשד לכפילות ${a.id} ↔ ${b.id}`,detail:'בדיקה ידנית בלבד; אין מיזוג הרסני של אירועים'}));
   const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>s.externalReports||[]):((allSites.find(s=>s.id===cmdActiveSite)||siteData).externalReports||siteData.externalReports||[]);
+  const typeReport=siteData.medicIncidentTypeReport;
+  if(typeReport){
+    const auth=ensureSiteStatusFields(typeReport.siteId);
+    if(auth.incidentType && auth.incidentType!==typeReport.type) pushAlert(alerts,{id:`incident-type-mismatch-${typeReport.siteId}`,type:'INCIDENT_TYPE_MISMATCH',severity:'medium',owner:'pc',audience:['pc','cc'],escalatesTo:null,actionRequired:'acknowledge',scope:'site',category:'integrity',siteId:typeReport.siteId,title:'פער בסוג אירוע: חובש מול חילוץ',detail:`חילוץ: ${INCIDENT_TYPE_LABELS[auth.incidentType]} · חובש: ${INCIDENT_TYPE_LABELS[typeReport.type]} · סוג החילוץ נשאר בתוקף`});
+  }
   const conflicts=externalConflictCount(pts,reports);
   if(conflicts>0) pushAlert(alerts,{id:`external-conflict-${cmdActiveSite}`,type:'EXTERNAL_REPORT_CONFLICT',severity:conflicts>2?'high':'medium',owner:'chamal',audience:['pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'verify_report',scope:'site',category:'integrity',siteId:cmdActiveSite,title:'פער דיווח חיצוני מול שדה',detail:`${conflicts} פערים בין דיווח חיצוני לספירה מאושרת`});
   const unsynced=pts.reduce((sum,p)=>sum+(p.unsyncedEvents||0),0)+localOutboxCount();
@@ -7733,6 +7955,7 @@ function selectInitialReportSource(btn, source){
 function arriveAtSite(){
   const address=document.getElementById('enroute-address')?.value.trim() || siteData.address || 'מוקד חדש';
   const notes=document.getElementById('enroute-notes')?.value.trim() || '';
+  logEnroutePrefillCorrections(document.getElementById('enroute-address')?.value.trim()||'', notes);
   const floor=document.getElementById('enroute-floor')?.value.trim() || siteData.floorHint || '';
   const apt=document.getElementById('enroute-apartment')?.value.trim() || siteData.apartmentHint || '';
   const eta=document.getElementById('enroute-eta')?.value.trim() || siteData.eta || '';

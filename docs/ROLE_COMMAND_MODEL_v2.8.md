@@ -41,6 +41,19 @@ This is the core authority decision in V2.8. As first responders, RPC/RCC can ta
 
 This currently exists only as a client-side capability check (the button set rendered per role). There is no server-side enforcement yet — see the "Known gap" note in [`CHANGELOG_v2.995.md`](CHANGELOG_v2.995.md). Before this ships anywhere beyond a demo, the RLS/auth work in Mission 2 of [`MULTI_AGENT_DEV_PLAN.md`](MULTI_AGENT_DEV_PLAN.md) must enforce this same restriction server-side, or a compromised/misconfigured client could call these actions as any role.
 
+## Incident type and medic assignment on the Movement screen (V2.99.23)
+
+The medic Movement screen (`screen-enroute`, "מסך תנועה - הכנת זירה") used to show a hardcoded "structural collapse" alert banner. It now offers the same four incident types as the RPC/RCC site-authority panel (קריסת מבנה / טיל, ירי המוני, תאונת דרכים, פיצוץ), with the same expected-injury brief, so a medic who is first on scene can set up the incident themselves.
+
+Incident type follows the site-authority rule above: **rescue (RPC/RCC) wins.**
+
+- A medic may set the type while none is set, or replace a type a medic set earlier.
+- Once RPC/RCC set the type, a medic pick that differs is never applied. It is logged as `INCIDENT_TYPE_MISMATCH_REPORTED` and surfaces to חוג״ד/מ״פ רפואה as an `INCIDENT_TYPE_MISMATCH` alert ("פער בסוג אירוע: חובש מול חילוץ"). Rescue can still overwrite a medic-set type at any time.
+
+חוג״ד can also assign a medic to an existing incident ("שייך לאירוע" on each medic panel in the PC medic-load board), with an optional address and note. An assigned medic's Movement screen shows who assigned them and what is already known: incident type and who set it, rescue site status, patients already registered at the site, and the PC's address and note. The address and note are pre-filled into the editable fields, but only into empty ones, so nothing the medic typed is overwritten. A medic correction to a pre-filled value is logged on arrival as `SITE_PREFILL_CORRECTED` with the old and new values.
+
+**Local-demo only for now.** `MEDIC_ASSIGNED_TO_INCIDENT`, `INCIDENT_TYPE_MISMATCH_REPORTED`, `SITE_PREFILL_CORRECTED` and (as before) `INCIDENT_TYPE_SET` are outside `SYNC_ELIGIBLE_EVENT_TYPES`, so they are never pushed. While signed in, `currentSiteId()` ignores a local assignment, and a PC cannot assign a medic to any site other than SITE_A. That is because the live medic test account is an `incident_memberships` member of incident A only, and RLS would reject its pushes to any other incident. The real, synced version belongs on `incident_memberships` (`assigned_by` already exists) and is a separate follow-up.
+
 ## PC can go hands-on
 
 חוג״ד's server-side clinical write authority (`app.can_write_clinical_event()`, `ROLE_ALLOWED_EVENT_TYPES.pc`, `patients_insert`) has always matched medic's — the in-app read-only authorization matrix already documented this. What was missing was a client-side entry point: pc's dashboard had no button to create a new patient or reach the MSTART sweep/field workflow screen, so in practice pc could only treat patients already in its scope (via the shared `openPatient`/`openQuickVitals` path, which has never had a role check), not create new ones.
