@@ -646,7 +646,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9923</div>
+      <div class="demo-kicker">Demo V2.9924</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -717,13 +717,9 @@ textarea{resize:vertical;min-height:70px;}
       </div>
     </div>
     <div class="demo-panel">
-      <div class="demo-strip-title">תרחיש דמו חתום</div>
-      <div class="demo-strip-sub">מיועד להפעלה יזומה על ידי חובש / חוג"ד / מ״פ רפואה בלבד לצורכי הדגמה. ברירת המחדל של האפליקציה נשארת נקייה.</div>
+      <div class="demo-strip-title">ניקוי נתונים מקומיים</div>
+      <div class="demo-strip-sub">אין פצועים מובנים באפליקציה. כל פצוע שמופיע נוצר בשטח או נמשך מהשרת. ניקוי משפיע על מכשיר זה בלבד.</div>
       <div style="display:flex;gap:8px;margin-top:12px">
-        <button class="demo-mini-btn" onclick="activateSignedDemoScenario()">טען תרחיש Omni-Role</button>
-        <button class="demo-mini-btn" onclick="playNotebookAdvantageDemo()">הדגם יתרון על מחברת</button>
-        <button class="demo-mini-btn" onclick="playMedicCommanderSequence()">הצג תדריך מ״פ / חוג״ד ב־60 שניות</button>
-        <button class="demo-mini-btn" onclick="playDeathCertificationSequence()">הדגם שרשרת אישור מוות</button>
         <button class="demo-mini-btn" onclick="clearDemoPatientsOnly()">נקה נתוני פצועים</button>
         <button class="demo-mini-btn" onclick="clearDemoScenario()">נקה תרחיש</button>
         <button class="demo-mini-btn" onclick="continueDemo()">המשך מהשמירה</button>
@@ -745,7 +741,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9923</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9924</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -755,7 +751,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9923</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9924</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2629,7 +2625,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.23';
+const APP_VERSION = '2.99.24';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3588,6 +3584,8 @@ let holdTimer=null, holdInterval=null;
 //  DEMO DATA
 // ═══════════════════════════════════════════════
 let patients = [];
+const REMOVED_DEMO_PATIENT_IDS = new Set(['P-001','P-002','P-003','P-004','P-005','P-006','P-901']);
+const REMOVED_DEMO_SITE_NAMES = new Set(['מוקד A — הרצל 12','Omni-Role · הרצל 12','מוקד מחברת מול RESCUE','מוקד חי — הדגמת חובש','מוקד הדגמה — שרשרת אישור מוות']);
 let demoSyncMode = 'fresh';
 let lastSyncAt = Date.now();
 let experimentStartedAt = new Date().toISOString();
@@ -4033,122 +4031,6 @@ function tacticalPlatoonRollup(platoonId){
     `${pts.length} פצועים · אדום ${c.red} · צהוב ${c.yellow} · ירוק ${c.green} · שחור ${c.black} · לכודים ${c.trapped} · פונו ${evacuated}`
   );
 }
-function demoPatient(id, triage, accessibility, location, injury, patientStatus, vitals, lastVitalsMin, extra={}){
-  const createdAt=minutesAgo(extra.createdMin||35);
-  const t=timeAgoLabel(createdAt);
-  const deterioration=extra.deterioration||[];
-  return {
-    id, triage, accessibility, trapStatus:extra.trapStatus||normalizeTrapStatus({accessibility}), location, locDetail:extra.locDetail||'',
-    injury, patientStatus, time:t, vitals,
-    txHistory:extra.txHistory||[],
-    alert:deterioration.length>0 || !!extra.alert,
-    deterioration,
-    lastVitalsAt:minutesAgo(lastVitalsMin),
-    vitalsHistory:extra.vitalsHistory||[{t:minutesAgo(lastVitalsMin),pulse:vitals.pulse,spo2:vitals.spo2,rr:vitals.rr,avpu:vitals.avpu}],
-    tourniquet:extra.tourniquet||null,
-    tourniquets:extra.tourniquets||[],
-    hemorrhageControl:extra.hemorrhageControl||null,
-    activeBleeding:!!extra.activeBleeding,
-    assessmentDebt:extra.assessmentDebt||[],
-    medic:extra.medic||'',
-    lastTouchedBy:extra.lastTouchedBy||extra.medic||'PHONE-ALFA',
-    lastModifiedAt:extra.lastModifiedAt||new Date(createdAt).toISOString(),
-    confirmedClinical:extra.confirmedClinical!==false,
-    needsFullAssessment:!!extra.needsFullAssessment,
-    unsyncedEvents:extra.unsyncedEvents||0,
-    patientAgeGroup:extra.patientAgeGroup||'adult',
-    patientAgeBand:extra.patientAgeBand||(extra.patientAgeGroup==='pediatric'?'child':'adult'),
-    patientAge:extra.patientAge||null,
-    fullName:extra.fullName||'לא מזוהה',
-    identityStatus:extra.identityStatus||'unknown',
-    temporaryDescription:extra.temporaryDescription||extra.locDetail||'',
-    assignedMedicId:extra.assignedMedicId||userIdFromMedic(extra.medic||extra.lastTouchedBy)||'USR-COHEN',
-    assignedPlatoonId:extra.assignedPlatoonId||'PLT-A',
-    locationHistory:extra.locationHistory||[{time:t,location,source:'field'}],
-    siteId:extra.siteId||'SITE_A',
-    events:extra.events||[
-      {type:'PATIENT_CREATED',time:t,detail:'פצוע נפתח'},
-      {type:'TRIAGE_SET',time:t,detail:TRIAGE_LABELS[triage]},
-      {type:'VITALS_RECORDED',time:timeAgoLabel(minutesAgo(lastVitalsMin)),detail:`דופק ${vitals.pulse} / נשימות ${vitals.rr} / SpO₂ ${vitals.spo2||'לא נמדד'} / AVPU ${vitals.avpu||'—'}`,warn:triage==='red'}
-    ]
-  };
-}
-function loadDemoScenario(persist=false){
-  if(persist) clearActiveRecoveryState();
-  siteData={
-    name:'מוקד A — הרצל 12',
-    address:'הרצל 12, תל אביב',
-    eventType:'house_hit',
-    buildingType:'partial_collapse',
-    floorHint:'קומה 3',
-    apartmentHint:'דירה 7',
-    initialEvacuatedGreen:4,
-    initialEvacuation:{green:4,yellow:1,red:0,summary:'4 קלים פונו לנקודת מד״א ברחוב, 1 בינוני לשער צפוני',source:'mda'},
-    expectedCasualties:{trapped:3,immobile:2,missing:1,severe:2},
-    description:'פגיעה במבנה מגורים. מדרגות חסומות חלקית, עבודה בשני מוקדים.',
-    externalReports:[
-      {sourceLabel:'מד"א',source:'MDA',red:1,yellow:1,green:0,evacDest:'איכילוב',notes:'ניידת בדרך',time:timeAgoLabel(minutesAgo(18)),id:'RPT001',status:'new'}
-    ]
-  };
-  allSites.find(s=>s.id==='SITE_A').externalReports=siteData.externalReports;
-  allSites.find(s=>s.id==='SITE_B').externalReports=[
-    {sourceLabel:'משטרה',source:'police',red:0,yellow:1,green:1,evacDest:'',notes:'דיווח אזרחים על לכוד בקומה 1',time:timeAgoLabel(minutesAgo(11)),id:'RPT002',status:'new'}
-  ];
-  patients=[
-    demoPatient('P-001','red','partial','בניין 15A, קומה 3, דירה 7','מעיכה + דימום גפה','in_treatment',
-      {pulse:124,spo2:91,bp_estimate:'carotid',rr:32,avpu:'P'},7,{
-        siteId:'SITE_A', medic:'חובש כהן', lastTouchedBy:'PHONE-ALFA', unsyncedEvents:2, fullName:'דוד לוי', identityStatus:'reported', temporaryDescription:'חולצה כחולה, קסדה שחורה', assignedMedicId:'USR-COHEN', assignedPlatoonId:'PLT-A',
-        deterioration:['SpO₂ 96→91%','AVPU A→P'],
-        tourniquet:{limb:'רגל ימין',appliedAt:minutesAgo(42)},
-        txHistory:[{time:timeAgoLabel(minutesAgo(27)),text:'חסם עורקים — רגל ימין',medic:'חובש כהן'}],
-        events:[
-          {type:'TRIAGE_SET',time:timeAgoLabel(minutesAgo(35)),detail:'מיון: אדום',warn:true},
-          {type:'TOURNIQUET_APPLIED',time:timeAgoLabel(minutesAgo(42)),detail:'חסם עורקים רגל ימין',warn:true},
-          {type:'VITALS_RECORDED',time:timeAgoLabel(minutesAgo(7)),detail:'דופק 124 / SpO₂ 91 / AVPU P',warn:true},
-          {type:'WATCHDOG_ALERT',time:timeAgoLabel(minutesAgo(5)),detail:'מדדים נדרשים + הידרדרות',warn:true}
-        ]
-      }),
-    demoPatient('P-002','yellow','full','בניין 15A, קומה 2','חתכים + חשד שאיפת עשן','monitoring',
-      {pulse:96,spo2:97,bp_estimate:'radial',rr:22,avpu:'A'},3,{siteId:'SITE_A', medic:'חובש לוי', lastTouchedBy:'PHONE-BETA', needsFullAssessment:true, fullName:'לא מזוהה', identityStatus:'unknown', temporaryDescription:'מעיל אפור, תיק שחור', assignedMedicId:'USR-LEVI', assignedPlatoonId:'PLT-A'}),
-    demoPatient('P-003','green','full','בניין 15B, קומה 1','ילד, שפשופים וחרדה','evacuated',
-      {pulse:110,spo2:99,bp_estimate:'radial',rr:28,avpu:'A'},1,{siteId:'SITE_B', medic:'חובש כהן', createdMin:28, patientAgeGroup:'pediatric', patientAge:6, lastTouchedBy:'PHONE-ALFA', fullName:'נועם ישראלי', identityStatus:'reported', temporaryDescription:'ילד, חולצה ירוקה', assignedMedicId:'USR-COHEN', assignedPlatoonId:'PLT-B',
-        events:[{type:'PATIENT_HANDED_OVER',time:timeAgoLabel(minutesAgo(4)),detail:'הועבר למד"א — MIST logged'}]}),
-    demoPatient('P-004','red','none','בניין 15B, קומה 2, חדר מדרגות','לכוד — נדרש חילוץ','monitoring',
-      {pulse:118,spo2:null,bp_estimate:'carotid',rr:30,avpu:'V'},12,{siteId:'SITE_B', medic:'חובש לוי', alert:true, lastTouchedBy:'PHONE-BETA', fullName:'לא מזוהה', identityStatus:'unknown', temporaryDescription:'אפוד צהוב, לכוד בחדר מדרגות', assignedMedicId:'USR-LEVI', assignedPlatoonId:'PLT-B',
-        events:[
-          {type:'TRIAGE_SET',time:timeAgoLabel(minutesAgo(31)),detail:'מיון: אדום',warn:true},
-          {type:'PATIENT_ACCESS_UPDATED',time:timeAgoLabel(minutesAgo(20)),detail:'סטטוס חילוץ: לכוד',warn:true}
-        ]}),
-    demoPatient('P-005','yellow','partial','חצר אחורית, סמוך לכניסה','פגיעת ראש קלה','in_treatment',
-      {pulse:88,spo2:95,bp_estimate:'radial',rr:18,avpu:'A'},6,{siteId:'SITE_A', medic:'חובש כהן', lastTouchedBy:'PHONE-ALFA', confirmedClinical:false, fullName:'יעל אברהם', identityStatus:'reported', temporaryDescription:'חולצה לבנה, פגיעת ראש קלה', assignedMedicId:'USR-COHEN', assignedPlatoonId:'PLT-A'})
-  ];
-  reinforcementRequests=[
-    {
-      id:'REQ-001',
-      type:'medical_reinforcement',
-      requestedByRole:'pc',
-      requestedById:getDeviceId(),
-      siteId:'SITE_A',
-      eventName:siteData.name,
-      company:companyLabelForSite('SITE_A'),
-      targetLocation:'מוקד A · בניין 15A · קומה 3',
-      resourceType:'paramedic',
-      quantity:1,
-      urgency:'immediate',
-      reasonCodes:['red_patient','tourniquet','evac_delay'],
-      linkedPatientIds:['P-001'],
-      freeText:'פצוע אדום עם חסם, מדדים באיחור ופינוי מתעכב',
-      status:'pending',
-      createdAt:new Date(minutesAgo(8)).toISOString(),
-      statusHistory:[{status:'pending', at:new Date(minutesAgo(8)).toISOString(), by:getDeviceId()}]
-    }
-  ];
-  demoSyncMode='fresh';
-  pcTruckStock={...PC_TRUCK_BASELINE, tourniquets:4, pressureDressings:5, hemostaticGauze:2, chestSeals:1, airwayEquipment:2};
-  lastSyncAt=Date.now();
-  if(persist) saveDemoState();
-  renderDashboard(); renderAlerts();
-}
 function safeScopedDemoReset({confirmReset=false, preserveFieldMode=true}={}){
   if(confirmReset && !confirm('פעולה זו תנקה את נתוני הדמו בלבד. להמשיך?')) return false;
   const fieldMode=preserveFieldMode ? localStorage.getItem('rescue_field_mode') : null;
@@ -4158,251 +4040,8 @@ function safeScopedDemoReset({confirmReset=false, preserveFieldMode=true}={}){
   }catch(e){}
   return true;
 }
-function loadOmniRoleScenario(persist=false){
-  if(persist) safeScopedDemoReset({confirmReset:false});
-  loadDemoScenario(false);
-  siteData.name='Omni-Role · הרצל 12';
-  siteData.currentZone='קומה 2 / אגף צפוני';
-  siteData.description='תרחיש דמו שמפעיל חובש, חוג״ד, מ״פ רפואה, לוגיסטיקה ו-AAR סביב אותו חוט זהב מבצעי.';
-  experimentPhase='omni-role-demo';
-  const p1=patients.find(p=>p.id==='P-001');
-  if(p1){
-    p1.zone='קומה 2 / אגף צפוני';
-    p1.location='קומה 2 / אגף צפוני';
-    p1.patientStatus='in_treatment';
-    p1.lastVitalsAt=minutesAgo(17);
-    p1.assessmentDebt=[...new Set([...(p1.assessmentDebt||[]),'full_vitals','evacuation_status'])];
-  }
-  const p2=patients.find(p=>p.id==='P-002');
-  if(p2){
-    p2.triage='red';
-    p2.accessibility='trapped';
-    p2.trapStatus='trapped';
-    p2.zone='קומה 2 / אגף צפוני';
-    p2.location='קומה 2 / אגף צפוני';
-    p2.injury='דימום גפה · חסם ראשון לא יעיל';
-    p2.patientStatus='in_treatment';
-    p2.lastVitalsAt=minutesAgo(18);
-    p2.assessmentDebt=[...new Set([...(p2.assessmentDebt||[]),'full_vitals','evacuation_status'])];
-    p2.activeBleeding=true;
-    p2.hemorrhageControl={status:'bleeding_continues',lastCheckedAt:minutesAgo(9),sourceTourniquetId:'TQ-001',note:'דימום ממשיך אחרי חסם ראשון'};
-    p2.tourniquets=[
-      {id:'TQ-001',appliedAt:minutesAgo(31),timeCode:'T-31',limb:'right_leg',limbLabel:'רגל ימין',side:'right',bodyPart:'leg',appliedBy:'חובש לוי',source:'mstart_sweep',status:'ineffective',effectiveness:'bleeding_continues',reasonForAdditional:null,sourceTourniquetId:null,sequenceOnLimb:1,placementRelation:null,bleedingStatusAtApplication:'unknown',effectiveAt:null,ineffectiveAt:minutesAgo(9),note:'חסם ראשון לא עצר דימום'},
-      {id:'TQ-002',appliedAt:minutesAgo(7),timeCode:'T-07',limb:'right_leg',limbLabel:'רגל ימין',side:'right',bodyPart:'leg',appliedBy:'חובש לוי',source:'mstart_sweep',status:'active',effectiveness:'unknown',reasonForAdditional:'same_limb_bleeding_continues',sourceTourniquetId:'TQ-001',sequenceOnLimb:2,placementRelation:'above_previous',bleedingStatusAtApplication:'bleeding_continues',effectiveAt:null,ineffectiveAt:null,note:'חסם שני מעל הראשון בגלל דימום ממשיך'}
-    ];
-    syncLegacyTourniquetAlias(p2);
-    p2.lifeSavingTreatments=[
-      {treatmentType:'tourniquet',label:'חסם עורקים',at:new Date(minutesAgo(31)).toISOString(),payload:{tourniquetId:'TQ-001',limb:'right_leg'}},
-      {treatmentType:'tourniquet',label:'חסם עורקים',at:new Date(minutesAgo(7)).toISOString(),payload:{tourniquetId:'TQ-002',limb:'right_leg'}}
-    ];
-    p2.events=[
-      {type:'TOURNIQUET_APPLIED',time:timeAgoLabel(minutesAgo(31)),detail:'TQ-001 · רגל ימין',warn:true},
-      {type:'TOURNIQUET_MARKED_INEFFECTIVE',time:timeAgoLabel(minutesAgo(9)),detail:'TQ-001 · דימום ממשיך',warn:true},
-      {type:'TOURNIQUET_ADDED_SAME_LIMB',time:timeAgoLabel(minutesAgo(7)),detail:'TQ-002 מעל TQ-001',warn:true},
-      ...(p2.events||[])
-    ];
-  }
-  const p6=demoPatient('P-006','black','none','קומה 1 / חדר מדרגות','חשד לנפטר / לא בר הצלה','deceased',
-    {pulse:null,spo2:null,bp_estimate:'absent',rr:0,avpu:'U'},22,{
-      siteId:'SITE_A',medic:'חובש כהן',assignedMedicId:'USR-COHEN',assignedPlatoonId:'PLT-A',
-      identityStatus:'unknown',temporaryDescription:'לא מזוהה, נמצא ללא נשימה אחרי פתיחת נתיב אוויר',
-      assessmentDebt:['identity'],events:[{type:'PATIENT_MARKED_NOT_SALVAGEABLE',time:timeAgoLabel(minutesAgo(16)),detail:'חשד לנפטר / לא בר הצלה — אינו אישור מוות רשמי',warn:true}]
-    });
-  patients=[...patients,p6];
-  reinforcementRequests=[
-    ...reinforcementRequests,
-    {
-      id:'REQ-OMNI-EVAC-001',type:'medical_reinforcement',requestedByRole:'pc',requestedById:getDeviceId(),siteId:'SITE_A',eventName:siteData.name,company:companyLabelForSite('SITE_A'),targetLocation:'קומה 2 / אגף צפוני',resourceType:'urgent_evac',quantity:1,urgency:'immediate',reasonCodes:['evac_delay','red_patient','tourniquet'],linkedPatientIds:['P-002'],freeText:'פצוע אדום עם שני חסמים, פינוי מתעכב',status:'pending',createdAt:new Date(minutesAgo(11)).toISOString(),statusHistory:[{status:'pending',at:new Date(minutesAgo(11)).toISOString(),by:getDeviceId()}]
-    },
-    {
-      id:'REQ-OMNI-SUP-001',type:'resupply',requestedByRole:'pc',requestedById:getDeviceId(),requestedByName:displayUser('USR-BARAK'),siteId:'SITE_A',eventName:siteData.name,company:companyLabelForSite('SITE_A'),targetLocation:'רכב חוג״ד א׳ → קומה 2 / אגף צפוני',resourceType:'resupply',items:[{item:'tourniquets',quantity:10},{item:'hemostaticGauze',quantity:5}],quantity:15,urgency:'high',reason:'pc_truck_low',reasonCodes:['pc_truck_low','active_bleeding'],linkedPatientIds:['P-002'],status:'pending_pc',createdAt:new Date(minutesAgo(5)).toISOString(),statusHistory:[{status:'pending_pc',at:new Date(minutesAgo(5)).toISOString(),by:getDeviceId()}],truckAvailability:'missing'
-    }
-  ];
-  createDeathCertificationRequest(p6);
-  pcTruckStock={...PC_TRUCK_BASELINE,tourniquets:2,pressureDressings:4,hemostaticGauze:2,airwayEquipment:2,ivKits:5,blankets:12,batteryPacks:3};
-  companyStock={...COMPANY_STOCK_BASELINE,tourniquets:70,pressureDressings:112,hemostaticGauze:45};
-  lastSyncAt=Date.now();
-  if(persist){
-    saveLocalEvent({type:'OMNI_ROLE_SCENARIO_LOADED',detail:'תרחיש Omni-Role נטען: חסם לא יעיל, פינוי, ציוד, קביעת מוות',warn:false,payload_json:{scenario:'V2.995_OMNI_ROLE'}});
-    saveDemoState();
-  }
-  renderDashboard(); renderAlerts(); renderCommander(); renderLogisticsOfficer(); renderAar();
-}
-function activateSignedDemoScenario(){
-  loadOmniRoleScenario(true);
-  toast('תרחיש Omni-Role נטען');
-}
-function playNotebookAdvantageDemo(){
-  clearDemoScenario({confirmReset:false});
-  siteData={
-    name:'מוקד מחברת מול RESCUE',
-    address:'הרצל 12',
-    eventType:'collapse',
-    buildingType:'partial_collapse',
-    floorHint:'קומה 2',
-    apartmentHint:'אגף צפוני',
-    eta:'3 דקות',
-    currentZone:'קומה 2 / אגף צפוני',
-    description:'דמו 60 שניות: שתי לחיצות חובש הופכות לתמונת חוג"ד, תמונת לוגיסטיקה ו-AAR.',
-    externalReports:[],
-    initialEvacuatedGreen:2,
-    initialEvacuation:{green:2,yellow:0,red:0,summary:'2 קלים פונו לנקודת איסוף ברחוב',source:'civilian'},
-    expectedCasualties:{trapped:2,immobile:1,missing:1,severe:1},
-    sweepSessions:[]
-  };
-  state.localStockCache={...SUPPLY_BASELINE, tourniquets:1, pressureDressings:2, hemostaticGauze:1, airwayEquipment:1};
-  pcTruckStock={...PC_TRUCK_BASELINE, tourniquets:18};
-  experimentStartedAt=new Date(Date.now()-9*60*1000).toISOString();
-  experimentPhase='notebook-proof';
-  goTo('sweep');
-  renderMstartSweep();
-  toast('1/5 מוקד ואזור הוזנו בדרך לאירוע');
-  setTimeout(()=>{
-    startSweepCasualtyMarker();
-    updateSweepField('walking','yes');
-    closeSweepMarker();
-    toast('2/5 פצוע הולך סווג ירוק אוטומטית');
-  },550);
-  setTimeout(()=>{
-    startSweepCasualtyMarker();
-    updateSweepField('walking','no');
-    updateSweepField('breathing','yes');
-    updateSweepField('perfusion','radial_weak');
-    updateSweepField('avpu','V');
-    updateSweepField('trapped','trapped');
-    recordSweepTreatment('tourniquet');
-    setSweepTourniquetLimb('רגל ימין');
-    toast('3/5 פצוע שני הפך אדום, חסם וטיימר התחילו, ללא הפרעת לוגיסטיקה');
-  },1500);
-  setTimeout(()=>{
-    hideSupplyUsedModal();
-    const req=reinforcementRequests.find(r=>r.type==='resupply');
-    if(req){
-      req.status='pending_pc';
-      req.createdAt=new Date(Date.now()-4*60*1000-10*1000).toISOString();
-      req.updatedAt=req.createdAt;
-    }
-    completeMstartSweep();
-    renderRoleDashboard('pc');
-    toast('4/5 חוג"ד רואה כרטיס סריקה, חוב הערכה וחסם פעיל');
-  },2900);
-  setTimeout(()=>{
-    const req=reinforcementRequests.find(r=>r.type==='resupply');
-    if(req){
-      req.status='escalated_to_cc';
-      req.updatedAt=new Date(Date.now()-2*60*1000).toISOString();
-    }
-    pcTruckStock.tourniquets=4;
-    renderRoleDashboard('cc');
-    toast('5/5 מ״פ רפואה רואה חוסר משאבים ולא רעש של טפסים');
-  },4300);
-  setTimeout(()=>{
-    saveLocalEvent({type:'NOTEBOOK_PROOF_DEMO_COMPLETED',detail:'הדגם יתרון על מחברת הושלם',warn:false});
-    saveDemoState();
-    goTo('aar');
-    renderAar();
-    toast('מה המחברת הייתה מפספסת? מוצג ב-AAR');
-  },5600);
-}
-function playMedicCommanderSequence(){
-  clearDemoScenario({confirmReset:false});
-  siteData={
-    name:'מוקד חי — הדגמת חובש',
-    address:'הרצל 12, בניין 15A',
-    eventType:'collapse',
-    buildingType:'partial_collapse',
-    floorHint:'אגף מזרחי',
-    apartmentHint:'כניסה ב',
-    description:'רצף מודגם: חובש פועל, תמונת חוג"ד מתעדכנת.',
-    externalReports:[],
-    initialEvacuatedGreen:3,
-    initialEvacuation:{green:3,yellow:0,red:0,summary:'3 קלים פונו לנקודת מד״א ברחוב',source:'mda'},
-    expectedCasualties:{trapped:2,immobile:1,missing:1,severe:1}
-  };
-  allSites.find(s=>s.id==='SITE_A').externalReports=[];
-  activeRoleDashboard='pc';
-  goTo('role-dashboard');
-  renderRoleDashboard('pc');
-  toast('שלב 1: מוקד/אזור נפתח — חוג״ד רואה התחלה');
-  setTimeout(()=>{
-    createImmediateInterventionPatient('tourniquet');
-    goTo('role-dashboard');
-    renderRoleDashboard('pc');
-    toast('שלב 2: פצוע אדום + חסם הופיע במשימות חוג״ד');
-  },2500);
-  setTimeout(()=>{
-    const p=patients[0];
-    if(p){
-      p.vitals={pulse:132,spo2:91,bp_estimate:'carotid',rr:34,avpu:'P'};
-      p.deterioration=['דופק גבוה','SpO₂ נמוך','AVPU P'];
-      p.alert=true;
-      p.events.unshift({type:'VITALS_RECORDED',time:nowT(),detail:'דופק 132 / נשימות 34 / SpO₂ 91 / AVPU P',warn:true});
-      saveLocalEvent({type:'VITALS_RECORDED',detail:'מדדים מדרדרים ברצף הדמו',warn:true,payload_json:{patient_id:p.id}});
-    }
-    renderRoleDashboard('pc');
-    toast('שלב 3: חוב הערכה ועדיפות פינוי התעדכנו לחוג״ד');
-  },5500);
-  setTimeout(()=>{
-    createMedicalResourceRequest({resourceType:'paramedic',reasonCodes:['red_patient','tourniquet'],urgency:'immediate',siteId:'SITE_A',targetLocation:'מוקד חי · בניין 15A',linkedPatientIds:patients[0]?[patients[0].id]:[],requestedByRole:'pc',requestedByName:displayUser('USR-BARAK')});
-    saveDemoState();
-    goTo('role-dashboard');
-    renderRoleDashboard('cc');
-    toast('שלב 4: מ״פ רפואה רואה החלטות משאב');
-  },9000);
-  setTimeout(()=>{
-    const p=patients[0];
-    if(p){
-      p.patientStatus='evacuating';
-      p.events.unshift({type:'EVACUATION_INITIATED',time:nowT(),detail:'פינוי נפתח — מד"א ממתין ברחוב',warn:false});
-      saveDemoState();
-    }
-    goTo('logistics');
-    renderLogisticsOfficer();
-    toast('שלב 5: לוגיסטיקה רואה רק משימות ציוד רלוונטיות');
-  },12000);
-  setTimeout(()=>{
-    goTo('aar');
-    renderAar();
-    toast('שלב 6: AAR מציג מה המחברת הייתה מפספסת');
-  },15000);
-}
-function playDeathCertificationSequence(){
-  clearDemoScenario({confirmReset:false});
-  siteData={
-    name:'מוקד הדגמה — שרשרת אישור מוות',
-    address:'הרצל 12, אגף צפוני',
-    eventType:'collapse',
-    buildingType:'partial_collapse',
-    floorHint:'קומת קרקע',
-    apartmentHint:'כניסה צפונית',
-    description:'הדגמה: חובש מסמן חשד לנפטר, המערכת פותחת בקשת רופא לא דחופה.',
-    externalReports:[],
-    initialEvacuatedGreen:0,
-    initialEvacuation:{green:0,yellow:0,red:0,summary:'',source:null},
-    expectedCasualties:{trapped:1,immobile:0,missing:0,severe:1}
-  };
-  const p=demoPatient('P-901','black','none','הרצל 12, אגף צפוני','חשד לנפטר / לא בר הצלה','deceased',
-    {pulse:null,spo2:null,bp_estimate:'absent',rr:0,avpu:'U'},1,{
-      siteId:'SITE_A',
-      medic:'חובש כהן',
-      alert:true,
-      fullName:'לא מזוהה',
-      identityStatus:'unknown',
-      temporaryDescription:'נפתח לצורך הדגמת שרשרת אישור מוות',
-      assignedMedicId:'USR-COHEN',
-      assignedPlatoonId:'PLT-A',
-      needsFullAssessment:false,
-      events:[
-        {type:'QUICK_PATIENT_CREATED',time:nowT(),detail:'פצוע זמני נפתח על ידי חובש',warn:false},
-        {type:'PATIENT_MARKED_NOT_SALVAGEABLE',time:nowT(),detail:'חשד לנפטר / לא בר הצלה — אינו אישור מוות רשמי',warn:true}
-      ]
-    });
-  patients=[p];
-  createDeathCertificationRequest(p);
-  saveDemoState();
-  activeRoleDashboard='cc';
-  goTo('role-dashboard');
-  toast('שרשרת אישור מוות נפתחה: חובש → חוג״ד → מ״פ → רופא');
+function emptySiteData(){
+  return {name:'', address:'', eventType:null, buildingType:null, floorHint:'', apartmentHint:'', eta:'', currentZone:'', lastMechanism:'', likelyMechanisms:[], sweepSessions:[], description:'', externalReports:[], initialEvacuatedGreen:0, initialEvacuation:{green:0,yellow:0,red:0,summary:'',source:null}, expectedCasualties:{trapped:0,immobile:0,missing:0,severe:0}};
 }
 function clearDemoScenario({confirmReset=true}={}){
   if(!safeScopedDemoReset({confirmReset})) return false;
@@ -4410,7 +4049,7 @@ function clearDemoScenario({confirmReset=true}={}){
   reinforcementRequests=[];
   pcTruckStock={...PC_TRUCK_BASELINE};
   companyStock={...COMPANY_STOCK_BASELINE};
-  siteData={name:'', address:'', eventType:null, buildingType:null, floorHint:'', apartmentHint:'', eta:'', currentZone:'', lastMechanism:'', likelyMechanisms:[], sweepSessions:[], description:'', externalReports:[], initialEvacuatedGreen:0, initialEvacuation:{green:0,yellow:0,red:0,summary:'',source:null}, expectedCasualties:{trapped:0,immobile:0,missing:0,severe:0}};
+  siteData=emptySiteData();
   allSites.forEach(s=>{ if(s.id!=='ALL') s.externalReports=[]; });
   // Site fields are plain <input>/<textarea> elements that only get pre-filled when empty
   // (see goTo('site')) and are read back into siteData by saveSite(). Without explicitly
@@ -4477,9 +4116,13 @@ function loadStoredDemoState(){
       const saved=JSON.parse(raw);
       if(!saved || !Array.isArray(saved.patients)) return false;
       siteData=saved.siteData||siteData;
+      if(REMOVED_DEMO_SITE_NAMES.has(siteData.name)) siteData=emptySiteData();
       ensureSiteReadiness();
-      patients=saved.patients;
-      reinforcementRequests=Array.isArray(saved.reinforcementRequests)?saved.reinforcementRequests:[];
+      // Drop leftovers of the removed hardcoded demo scenarios a device may still have saved.
+      // Fixture ids were fixed strings; real patients always get newUuid(), so this can't match one.
+      patients=saved.patients.filter(p=>!REMOVED_DEMO_PATIENT_IDS.has(p.id));
+      reinforcementRequests=(Array.isArray(saved.reinforcementRequests)?saved.reinforcementRequests:[])
+        .filter(r=>!String(r.id||'').startsWith('REQ-OMNI-') && !(r.linkedPatientIds||[r.patientId]).some(id=>REMOVED_DEMO_PATIENT_IDS.has(id)));
       pcTruckStock={...PC_TRUCK_BASELINE, ...(saved.pcTruckStock||{})};
       companyStock={...COMPANY_STOCK_BASELINE, ...(saved.companyStock||{})};
       medicIncidentAssignments=(saved.medicIncidentAssignments && typeof saved.medicIncidentAssignments==='object')?saved.medicIncidentAssignments:{};
@@ -4517,7 +4160,6 @@ function flushLocalStateForUnload(){
 window.addEventListener('beforeunload', flushLocalStateForUnload);
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushLocalStateForUnload(); });
 function startPcDemo(screen){
-  if(!patients.length) loadDemoScenario(true);
   goTo(screen);
 }
 async function continueDemo(){
@@ -4555,7 +4197,6 @@ function startRoleDashboard(role){
     goTo('enroute');
     return;
   }
-  if(role!=='medic' && !patients.length) loadDemoScenario(true);
   goTo('role-dashboard');
 }
 function roleConfig(role){
@@ -6062,7 +5703,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
     role==='pc'?`<button class="demo-mini-btn" onclick="demoReassignWithinPlatoon()">הדגם הקצאה בתוך מחלקה</button>`:'',
     role==='cc'?`<button class="demo-mini-btn" onclick="demoReassignBetweenPlatoons()">הדגם הקצאה בין מחלקות</button>`:'',
     role==='physician'?`<button class="demo-mini-btn" onclick="exitEventView()">יציאה מהאירוע</button>`:'',
-    role==='admin'?`<button class="demo-mini-btn" onclick="activateSignedDemoScenario();renderRoleDashboard('admin')">טען Omni-Role</button><button class="demo-mini-btn" onclick="if(clearDemoScenario())renderRoleDashboard('admin')">נקה דמו</button><button class="demo-mini-btn" onclick="exportExperimentLog()">ייצוא ניסוי</button>`:''
+    role==='admin'?`<button class="demo-mini-btn" onclick="if(clearDemoScenario())renderRoleDashboard('admin')">נקה דמו</button><button class="demo-mini-btn" onclick="exportExperimentLog()">ייצוא ניסוי</button>`:''
   ].filter(Boolean).join('');
   const genericSections=`
     ${roleSection('האחריות שלי', responsibilities)}
