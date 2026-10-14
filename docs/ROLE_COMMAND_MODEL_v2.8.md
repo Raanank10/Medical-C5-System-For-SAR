@@ -54,6 +54,29 @@ Incident type follows the site-authority rule above: **rescue (RPC/RCC) wins.**
 
 **Local-demo only for now.** `MEDIC_ASSIGNED_TO_INCIDENT`, `INCIDENT_TYPE_MISMATCH_REPORTED`, `SITE_PREFILL_CORRECTED` and (as before) `INCIDENT_TYPE_SET` are outside `SYNC_ELIGIBLE_EVENT_TYPES`, so they are never pushed. While signed in, `currentSiteId()` ignores a local assignment, and a PC cannot assign a medic to any site other than SITE_A. That is because the live medic test account is an `incident_memberships` member of incident A only, and RLS would reject its pushes to any other incident. The real, synced version belongs on `incident_memberships` (`assigned_by` already exists) and is a separate follow-up.
 
+## Briefing demo and guided tour (V2.99.25)
+
+The 60-second PC/CC briefing ("הצג תדריך מ״פ / חוג״ד ב־60 שניות") is back on the launcher, now as a **sandboxed** demo. Every test phone shares one live database, and the old sequence also started by wiping the phone's local data, so the scripted fake patient could reach other phones or delete real local patients. Now:
+
+- The current local state is snapshotted first.
+- While the sandbox is open, `getSupabaseClient()` returns `null`, so no pull, push, presence or other server read or write happens at all. `saveDemoState()` and `saveActiveRecoveryState()` are no-ops, and `saveLocalEvent()` never touches the outbox.
+- A purple "הדגמה · לא נשמר ולא נשלח לשרת" banner with a "סיום הדגמה" button stays on screen for the whole run.
+- Ending the demo cancels pending steps, closes any sheet a step opened (e.g. the tourniquet's supply sheet, which could otherwise write supply events about a demo patient), and restores the exact snapshot.
+
+"סיור מודרך במסכי חוג״ד / מ״פ" is a read-only, 15-step walkthrough that highlights the real PC and CC dashboard panels and explains each one. It creates no data.
+
+## Cross-device PC → medic assignment: verified design, held for the incident lifecycle
+
+A synced version of the assignment above was built and checked against the live access rules (impersonating the real PC, medic and rescue accounts inside transactions that were forced to roll back, so nothing persisted). It needs **no schema, RLS or Edge Function change**:
+
+1. The assigning PC adds itself to the target incident's `incident_memberships` (a PC can only see and update incidents it is a member of; its role may insert memberships).
+2. The PC writes the address to `incidents.address` and the note to `incidents.metadata.medic_assignments[<medic profile id>] = {note, assigned_by_name, assigned_at}`. The assigner's name goes in metadata because a medic cannot read other profiles. Each update is checked to have changed exactly one row.
+3. The PC upserts the medic's `incident_memberships` row (`assigned_by` = PC, `created_at` = now). That membership is also what lets the medic's pushes into that incident pass RLS.
+4. The medic phone reads its newest membership that has `assigned_by` set, plus that incident's row, at login, every 45 seconds and when the Movement screen opens, and pre-fills from it.
+5. Rescue (`rpc`/`rcc`) writes its incident type to `incidents.incident_type` (+ `metadata.incident_type_set_by`), and every phone with access reads it, so rescue's type reaches the medic and PC phones. The medic's own pick and the mismatch alert stay on the medic's phone, because medics may not update an active incident.
+
+All five steps passed live. It was not shipped because it targeted the two fixed test incidents (`SITE_TO_INCIDENT_ID`), which a parallel incident-lifecycle change (`database/038`/`039`, real incidents via `list_open_incidents` / `join_incident` / `open_incident`) has since closed. Port it onto that model, using the picked incident instead of SITE_A/SITE_B, once it lands. Known limit: `metadata` is read-modify-write, so two writers in the same instant can drop one change.
+
 ## PC can go hands-on
 
 חוג״ד's server-side clinical write authority (`app.can_write_clinical_event()`, `ROLE_ALLOWED_EVENT_TYPES.pc`, `patients_insert`) has always matched medic's — the in-app read-only authorization matrix already documented this. What was missing was a client-side entry point: pc's dashboard had no button to create a new patient or reach the MSTART sweep/field workflow screen, so in practice pc could only treat patients already in its scope (via the shared `openPatient`/`openQuickVitals` path, which has never had a role check), not create new ones.

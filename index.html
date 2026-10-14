@@ -364,6 +364,7 @@ body.field-mode .ticket-meta{color:#d6d6e4;}
 /* ── MODAL ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:200;display:flex;align-items:flex-end;backdrop-filter:blur(4px);}
 .modal-overlay.hidden{display:none;}
+.tour-highlight{outline:3px solid var(--accent);outline-offset:3px;border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.45);position:relative;z-index:40;}
 .modal-sheet{background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);width:100%;padding:20px 16px 40px;animation:slideUp 0.2s ease;max-height:92dvh;overflow-y:auto;}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:none}}
 .modal-handle{width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;}
@@ -646,7 +647,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9924</div>
+      <div class="demo-kicker">Demo V2.9925</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -720,6 +721,8 @@ textarea{resize:vertical;min-height:70px;}
       <div class="demo-strip-title">ניקוי נתונים מקומיים</div>
       <div class="demo-strip-sub">אין פצועים מובנים באפליקציה. כל פצוע שמופיע נוצר בשטח או נמשך מהשרת. ניקוי משפיע על מכשיר זה בלבד.</div>
       <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="demo-mini-btn" onclick="startBriefingDemo()">הצג תדריך מ״פ / חוג״ד ב־60 שניות (הדגמה מבודדת)</button>
+        <button class="demo-mini-btn" onclick="startGuidedTour()">סיור מודרך במסכי חוג״ד / מ״פ</button>
         <button class="demo-mini-btn" onclick="clearDemoPatientsOnly()">נקה נתוני פצועים</button>
         <button class="demo-mini-btn" onclick="clearDemoScenario()">נקה תרחיש</button>
         <button class="demo-mini-btn" onclick="continueDemo()">המשך מהשמירה</button>
@@ -741,7 +744,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9924</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9925</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -751,7 +754,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9924</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9925</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -1648,6 +1651,29 @@ textarea{resize:vertical;min-height:70px;}
     <div class="panic-title" style="color:var(--accent)" id="incident-type-brief-title">סוג אירוע</div>
     <div class="panic-message" id="incident-type-brief-message">—</div>
     <button class="panic-confirm-btn" style="background:var(--accent)" onclick="hideIncidentTypeBriefModal()">הבנתי</button>
+  </div>
+</div>
+
+<!-- ══════════════════════ SANDBOXED BRIEFING DEMO BANNER ══ -->
+<div id="demo-sandbox-banner" style="display:none;position:fixed;left:8px;right:8px;bottom:8px;z-index:900;background:#5b21b6;color:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 10px 40px rgba(0,0,0,.45);gap:10px;align-items:center">
+  <div style="flex:1;min-width:0">
+    <div style="font-weight:900;font-size:13px">הדגמה · לא נשמר ולא נשלח לשרת</div>
+    <div id="demo-sandbox-step" style="font-size:12px;opacity:.9;line-height:1.4"></div>
+  </div>
+  <button class="demo-mini-btn" style="background:#fff;color:#5b21b6;border-color:#fff;white-space:nowrap" onclick="endBriefingDemo()">סיום הדגמה</button>
+</div>
+
+<!-- ══════════════════════ GUIDED TOUR CARD ══ -->
+<div id="guided-tour-card" style="display:none;position:fixed;left:8px;right:8px;bottom:8px;z-index:950;background:var(--surface);border:2px solid var(--accent);border-radius:14px;padding:12px;box-shadow:0 10px 40px rgba(0,0,0,.5)">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+    <div id="guided-tour-title" style="font-weight:900;color:var(--accent)"></div>
+    <div id="guided-tour-count" style="font-family:var(--mono);font-size:12px;color:var(--muted)"></div>
+  </div>
+  <div id="guided-tour-text" style="font-size:13px;line-height:1.5;margin:6px 0 10px"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+    <button class="demo-mini-btn" id="guided-tour-prev" onclick="guidedTourPrev()">הקודם</button>
+    <button class="demo-mini-btn" id="guided-tour-next" style="background:var(--accent);border-color:var(--accent);color:#fff" onclick="guidedTourNext()">הבא</button>
+    <button class="demo-mini-btn" onclick="endGuidedTour()">יציאה</button>
   </div>
 </div>
 
@@ -2625,7 +2651,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.24';
+const APP_VERSION = '2.99.25';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3055,6 +3081,7 @@ function setDeviceLabels(){
 let currentUser=null; // {id, email, role} once signed in via Supabase Auth; null in local-demo mode
 let _supabaseClient=null;
 function getSupabaseClient(){
+  if(_demoSandbox) return null; // sandboxed briefing demo: no server reads or writes at all
   if(_supabaseClient) return _supabaseClient;
   if(!window.supabase || !window.supabase.createClient) return null;
   // Session token encrypted at rest via the same device-PIN-derived key as everything else in
@@ -3626,6 +3653,7 @@ function serializeActiveDraft(screen=null){
   };
 }
 function saveActiveRecoveryState(screen=null){
+  if(_demoSandbox) return Promise.resolve();
   return queuedSecureSetItem(ACTIVE_RECOVERY_KEY, JSON.stringify(serializeActiveDraft(screen)));
 }
 function clearActiveRecoveryState(){
@@ -4093,6 +4121,7 @@ function clearDemoPatientsOnly({confirmReset=true}={}){
   return true;
 }
 function saveDemoState(){
+  if(_demoSandbox) return Promise.resolve();
   return runSerialized(DEMO_STORAGE_KEY, async ()=>{
     try{
       const raw=await secureGetItem(DEMO_STORAGE_KEY);
@@ -4159,6 +4188,202 @@ function flushLocalStateForUnload(){
 }
 window.addEventListener('beforeunload', flushLocalStateForUnload);
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushLocalStateForUnload(); });
+// ── Sandboxed briefing demo ("תדריך מ״פ / חוג״ד ב־60 שניות") ──
+// The scripted briefing needs fake patients, but this app shares one live database across every
+// test phone, so the demo runs in an isolated sandbox: the current local state is snapshotted,
+// and while the sandbox is open getSupabaseClient() returns null (no pull, push, presence or any
+// other server write), saveDemoState()/saveActiveRecoveryState() are no-ops, and saveLocalEvent()
+// never touches the outbox. Ending the demo restores the exact snapshot, so real patients on this
+// phone are untouched and nothing the demo created can reach the server or other phones.
+let _demoSandbox=null; // {snapshot, screen, timers:[]}
+function inDemoSandbox(){ return !!_demoSandbox; }
+function snapshotSandboxState(){
+  return structuredClone({
+    patients, reinforcementRequests, siteData, pcTruckStock, companyStock, siteAuthority,
+    medicIncidentAssignments, activeRoleDashboard, demoSyncMode, lastSyncAt, experimentPhase,
+    rescueActiveSiteId, state,
+    externalReports:allSites.map(s=>({id:s.id, reports:s.externalReports||[]}))
+  });
+}
+function restoreSandboxState(snap){
+  patients=snap.patients; reinforcementRequests=snap.reinforcementRequests; siteData=snap.siteData;
+  pcTruckStock=snap.pcTruckStock; companyStock=snap.companyStock; siteAuthority=snap.siteAuthority;
+  medicIncidentAssignments=snap.medicIncidentAssignments; activeRoleDashboard=snap.activeRoleDashboard;
+  demoSyncMode=snap.demoSyncMode; lastSyncAt=snap.lastSyncAt; experimentPhase=snap.experimentPhase;
+  rescueActiveSiteId=snap.rescueActiveSiteId; state=snap.state;
+  snap.externalReports.forEach(x=>{ const s=allSites.find(a=>a.id===x.id); if(s) s.externalReports=x.reports; });
+}
+function setDemoSandboxBanner(text){
+  const banner=document.getElementById('demo-sandbox-banner');
+  if(!banner) return;
+  banner.style.display=_demoSandbox?'flex':'none';
+  const step=document.getElementById('demo-sandbox-step');
+  if(step) step.textContent=text||'';
+}
+// Demo steps reuse the real field actions, which can pop sheets (e.g. the tourniquet's
+// "ציוד נצרך" sheet). Close them: they would cover the screens being shown, and one left open
+// after the restore would let a tap write supply events about a demo patient into the real outbox.
+function closeAllOpenModals(){
+  document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(m=>m.classList.add('hidden'));
+}
+function demoSandboxStep(delayMs, text, fn){
+  _demoSandbox.timers.push(setTimeout(()=>{
+    if(!_demoSandbox) return;
+    try{ fn(); }catch(e){ console.error(e); }
+    closeAllOpenModals();
+    setDemoSandboxBanner(text);
+    toast(text);
+  }, delayMs));
+}
+function startBriefingDemo(){
+  if(_demoSandbox) return;
+  _demoSandbox={snapshot:snapshotSandboxState(), screen:activeScreenId(), timers:[]};
+  patients=[]; reinforcementRequests=[];
+  pcTruckStock={...PC_TRUCK_BASELINE}; companyStock={...COMPANY_STOCK_BASELINE};
+  medicIncidentAssignments={};
+  state=freshState();
+  allSites.forEach(s=>{ if(s.id!=='ALL') s.externalReports=[]; });
+  siteData={...emptySiteData(),
+    name:'מוקד הדגמה',
+    address:'כתובת הדגמה',
+    eventType:'collapse',
+    buildingType:'partial_collapse',
+    floorHint:'אגף מזרחי',
+    apartmentHint:'כניסה ב',
+    description:'רצף מודגם: חובש פועל, תמונת חוג"ד מתעדכנת.',
+    initialEvacuatedGreen:3,
+    initialEvacuation:{green:3,yellow:0,red:0,summary:'3 קלים פונו לנקודת מד״א ברחוב',source:'mda'},
+    expectedCasualties:{trapped:2,immobile:1,missing:1,severe:1}
+  };
+  ensureSiteReadiness();
+  const first='שלב 1: מוקד/אזור נפתח · חוג״ד רואה התחלה';
+  activeRoleDashboard='pc';
+  goTo('role-dashboard');
+  renderRoleDashboard('pc');
+  setDemoSandboxBanner(first);
+  toast(first);
+  demoSandboxStep(4000,'שלב 2: פצוע אדום + חסם הופיע במשימות חוג״ד',()=>{
+    createImmediateInterventionPatient('tourniquet');
+    activeRoleDashboard='pc'; goTo('role-dashboard'); renderRoleDashboard('pc');
+  });
+  demoSandboxStep(10000,'שלב 3: מדדים מדרדרים · עדיפות פינוי התעדכנה לחוג״ד',()=>{
+    const p=patients[0];
+    if(p){
+      p.vitals={pulse:132,spo2:91,bp_estimate:'carotid',rr:34,avpu:'P'};
+      p.deterioration=['דופק גבוה','SpO₂ נמוך','AVPU P'];
+      p.alert=true;
+      p.events.unshift({type:'VITALS_RECORDED',time:nowT(),detail:'דופק 132 / נשימות 34 / SpO₂ 91 / AVPU P',warn:true});
+    }
+    renderRoleDashboard('pc');
+  });
+  demoSandboxStep(17000,'שלב 4: מ״פ רפואה רואה החלטות משאב',()=>{
+    createMedicalResourceRequest({resourceType:'paramedic',reasonCodes:['red_patient','tourniquet'],urgency:'immediate',siteId:'SITE_A',targetLocation:'מוקד הדגמה',linkedPatientIds:patients[0]?[patients[0].id]:[],requestedByRole:'pc',requestedByName:displayUser('USR-BARAK')});
+    activeRoleDashboard='cc'; goTo('role-dashboard'); renderRoleDashboard('cc');
+  });
+  demoSandboxStep(24000,'שלב 5: לוגיסטיקה רואה רק משימות ציוד רלוונטיות',()=>{
+    const p=patients[0];
+    if(p){
+      p.patientStatus='evacuating';
+      p.events.unshift({type:'EVACUATION_INITIATED',time:nowT(),detail:'פינוי נפתח · מד"א ממתין ברחוב',warn:false});
+    }
+    goTo('logistics'); renderLogisticsOfficer();
+  });
+  demoSandboxStep(31000,'שלב 6: AAR · סוף ההדגמה. לחץ "סיום הדגמה" לחזרה',()=>{
+    goTo('aar'); renderAar();
+  });
+}
+function endBriefingDemo(){
+  if(!_demoSandbox) return;
+  const {snapshot, screen, timers}=_demoSandbox;
+  timers.forEach(clearTimeout);
+  _demoSandbox=null;
+  closeAllOpenModals();
+  restoreSandboxState(snapshot);
+  setDemoSandboxBanner('');
+  goTo(screen||'role-dashboard');
+  renderDashboard(); renderAlerts();
+  toast('ההדגמה הסתיימה · המצב הקודם שוחזר');
+}
+// ── Guided tour of the PC / CC dashboards ──
+// Read-only: it only navigates between role dashboards and highlights real panels. It creates no
+// patients and writes nothing, so it is safe on a phone that is also carrying real data.
+const GUIDED_TOUR_STEPS = [
+  {role:'pc', sel:'.role-top-grid', title:'חוג״ד · תמונת מצב מהירה', text:'פצועי המחלקה, התראות לפעולה, בקשות פתוחות ומוקדים. זה הדבר הראשון שחוג״ד רואה.'},
+  {role:'pc', section:'סטטוס אתר', title:'סטטוס אתר מהחילוץ', text:'מה שמ״מ / מ״פ חילוץ קבעו: סוג אירוע, T0, מצב מבנה ואתר נקי. חוג״ד מקבל עדכון, לא מאשר.'},
+  {role:'pc', section:'משימות חוג״ד עכשיו', title:'משימות עכשיו', text:'מה דורש החלטה שלך עכשיו, מחולק למיידי / מבצעי / השלמה.'},
+  {role:'pc', section:'עומס חובשים', title:'עומס חובשים', text:'לכל חובש: כמה פצועים, אדומים, לכודים, חסמים ומתי עדכן לאחרונה. מכאן גם משייכים חובש לאירוע.'},
+  {role:'pc', sel:'.stat-grid', title:'ספירת מיון', text:'אדום / צהוב / ירוק / לכודים במחלקה, מתעדכן מכל החובשים.'},
+  {role:'pc', section:'⏱ חסמי עורקים פעילים', title:'חסמי עורקים', text:'כל חסם פעיל עם שעון רץ: תזכורת ב-45 דק׳, אזהרה ב-60 דק׳ וקריטי ב-120 דק׳.'},
+  {role:'pc', section:'לוח פצועים מחלקתי', title:'לוח פצועים', text:'כל הפצועים לפי עדיפות פינוי. לחיצה על פצוע פותחת את התיק שלו.'},
+  {role:'pc', section:'חוב הערכה אחרי סריקה', title:'חוב הערכה', text:'פצועים שסומנו בסריקה מהירה ועדיין חסרים להם מדדים או הערכה מלאה.'},
+  {role:'pc', section:'תור בקשות ציוד', title:'בקשות ציוד', text:'בקשות ציוד מכל המכשירים, בזמן אמת מהשרת.'},
+  {role:'cc', sel:'.role-top-grid', title:'מ״פ רפואה · תמונת פלוגה', text:'מחלקות ומוקדים פעילים, אדום/צהוב ובקשות חוג״ד פתוחות בכל הפלוגה.'},
+  {role:'cc', section:'תמונת משאבים פלוגתית', title:'משאבים פלוגתיים', text:'מה זמין לשיוך בפלוגה: צוותים, רכבים וציוד.'},
+  {role:'cc', section:'עומס מחלקות', title:'עומס מחלקות', text:'אדום/צהוב לפי מחלקה, כדי לראות איפה צריך תגבור.'},
+  {role:'cc', section:'תעדוף פינוי פלוגתי', title:'תעדוף פינוי', text:'סדר פינוי מומלץ לכל הפלוגה, מעל רמת המחלקה.'},
+  {role:'cc', section:'בקשות משאב רפואי פתוחות', title:'בקשות משאב', text:'בקשות תגבור רפואי מחוג״ד שמחכות להחלטה שלך.'},
+  {role:'cc', section:'תור רופא', title:'תור רופא', text:'חשד לנפטר שמחכה לאישור רופא. זה אישור קליני, לא קביעת מוות רשמית.'}
+];
+let _guidedTour=null; // {index, screen, role}
+function findTourTarget(step){
+  const body=document.getElementById('role-dashboard-body');
+  if(!body) return null;
+  if(step.sel) return body.querySelector(step.sel);
+  const title=[...body.querySelectorAll('.role-section-title')].find(t=>t.textContent.trim().startsWith(step.section));
+  return title?.closest('.role-section')||null;
+}
+function clearTourHighlight(){
+  document.querySelectorAll('.tour-highlight').forEach(el=>el.classList.remove('tour-highlight'));
+}
+function startGuidedTour(){
+  if(_demoSandbox){ toast('סיים קודם את ההדגמה'); return; }
+  _guidedTour={index:0, screen:activeScreenId(), role:activeRoleDashboard};
+  // Dashboards re-render on their own refresh cycles, which drops the highlight - re-apply it.
+  _guidedTour.timer=setInterval(()=>{
+    if(!_guidedTour || document.querySelector('.tour-highlight')) return;
+    findTourTarget(GUIDED_TOUR_STEPS[_guidedTour.index])?.classList.add('tour-highlight');
+  },1000);
+  showGuidedTourStep();
+}
+function showGuidedTourStep(){
+  if(!_guidedTour) return;
+  const step=GUIDED_TOUR_STEPS[_guidedTour.index];
+  if(activeScreenId()!=='role-dashboard' || activeRoleDashboard!==step.role) startRoleDashboard(step.role);
+  clearTourHighlight();
+  const target=findTourTarget(step);
+  if(target){
+    target.classList.add('tour-highlight');
+    target.scrollIntoView({block:'center', behavior:'smooth'});
+  }
+  const card=document.getElementById('guided-tour-card');
+  if(!card) return;
+  card.style.display='block';
+  document.getElementById('guided-tour-count').textContent=`${_guidedTour.index+1} / ${GUIDED_TOUR_STEPS.length}`;
+  document.getElementById('guided-tour-title').textContent=step.title;
+  document.getElementById('guided-tour-text').textContent=step.text+(target?'':' (האזור לא מוצג כרגע במסך הזה)');
+  document.getElementById('guided-tour-prev').disabled=_guidedTour.index===0;
+  document.getElementById('guided-tour-next').textContent=_guidedTour.index===GUIDED_TOUR_STEPS.length-1?'סיום':'הבא';
+}
+function guidedTourNext(){
+  if(!_guidedTour) return;
+  if(_guidedTour.index>=GUIDED_TOUR_STEPS.length-1) return endGuidedTour();
+  _guidedTour.index++; showGuidedTourStep();
+}
+function guidedTourPrev(){
+  if(!_guidedTour || _guidedTour.index===0) return;
+  _guidedTour.index--; showGuidedTourStep();
+}
+function endGuidedTour(){
+  if(!_guidedTour) return;
+  const {screen, role, timer}=_guidedTour;
+  clearInterval(timer);
+  _guidedTour=null;
+  clearTourHighlight();
+  const card=document.getElementById('guided-tour-card');
+  if(card) card.style.display='none';
+  activeRoleDashboard=role;
+  goTo(screen||'role-dashboard');
+}
 function startPcDemo(screen){
   goTo(screen);
 }
@@ -10574,6 +10799,7 @@ function saveLocalEvent(event){
   // so they never sit in the "pending sync" count (see SYNC_ELIGIBLE_EVENT_TYPES).
   entry.synced=!SYNC_ELIGIBLE_EVENT_TYPES.has(entry.type);
   state.localEvents.push(entry);
+  if(_demoSandbox) return; // sandboxed demo events never reach the outbox
   saveActiveRecoveryState(activeScreenId());
   getOutbox().push(entry);
   persistOutbox();
