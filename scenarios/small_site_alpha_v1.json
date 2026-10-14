@@ -1,0 +1,86 @@
+{
+  "id": "small_site_alpha_v1",
+  "title": "Synthetic partial building collapse, one site, two virtual medics, about 20 minutes",
+  "synthetic": true,
+  "notes": "All values are synthetic and only clinically plausible, not doctrine. Triage follows MSTART logic (walking = green; RR > 30, no radial pulse or not following commands = red; otherwise yellow). Review before use per docs/CLINICAL_GOVERNANCE_REVIEW_FRAMEWORK.md.",
+  "incident": {
+    "location_name": "Synthetic Site Alpha (exercise)",
+    "address": "Synthetic Street 1",
+    "incident_type": "missile_strike_structural_collapse"
+  },
+  "actors": {
+    "vm1": { "label": "Virtual medic 1" },
+    "vm2": { "label": "Virtual medic 2" }
+  },
+  "timeline": [
+    { "at": "0:00", "actor": "vm1", "action": "note", "note": "Virtual medics arrive at the collapsed building" },
+    { "at": "0:20", "actor": "vm1", "action": "create", "patient": "S1-01", "triage": "red", "trap_status": "not_trapped",
+      "vitals": { "pulse": 128, "rr": 32, "spo2": 90, "avpu": "V", "bp_estimate": "radial_weak" } },
+    { "at": "0:40", "actor": "vm1", "action": "tourniquet", "patient": "S1-01", "limb": "right_leg", "clinical_context": "arterial_bleed" },
+    { "at": "1:00", "actor": "vm2", "action": "create", "patient": "S1-02", "triage": "green", "trap_status": "not_trapped",
+      "vitals": { "pulse": 92, "rr": 18, "spo2": 98, "avpu": "A", "bp_estimate": "radial_strong" } },
+    { "at": "1:30", "actor": "vm2", "action": "create", "patient": "S1-03", "triage": "green", "trap_status": "not_trapped",
+      "vitals": { "pulse": 88, "rr": 16, "spo2": 99, "avpu": "A", "bp_estimate": "radial_strong" } },
+    { "at": "2:00", "actor": "vm1", "action": "create", "patient": "S1-04", "triage": "yellow", "trap_status": "trapped",
+      "vitals": { "pulse": 104, "rr": 24, "spo2": 95, "avpu": "A", "bp_estimate": "radial_strong" } },
+    { "at": "3:00", "actor": "vm2", "action": "create", "patient": "S1-05", "triage": "red", "trap_status": "not_trapped",
+      "vitals": { "pulse": 136, "rr": 34, "spo2": 88, "avpu": "P", "bp_estimate": "carotid_strong" } },
+    { "at": "4:30", "actor": "vm1", "action": "create", "patient": "S1-06", "triage": "yellow", "trap_status": "not_trapped",
+      "vitals": { "pulse": 100, "rr": 22, "spo2": 96, "avpu": "A", "bp_estimate": "radial_strong" } },
+    { "at": "5:30", "actor": "vm2", "action": "create", "patient": "S1-07", "triage": "green", "trap_status": "not_trapped" },
+    { "at": "6:00", "actor": "vm1", "action": "vitals", "patient": "S1-01",
+      "vitals": { "pulse": 124, "rr": 30, "spo2": 91, "avpu": "V", "bp_estimate": "radial_weak" } },
+    { "at": "7:00", "actor": "vm2", "action": "handover", "patient": "S1-02", "receiving_unit_transport": "walking wounded to EMS point" },
+    { "at": "8:00", "actor": "vm1", "action": "create", "patient": "S1-08", "triage": "red", "trap_status": "trapped",
+      "vitals": { "pulse": 132, "rr": 36, "spo2": 87, "avpu": "P", "bp_estimate": "carotid_weak" } },
+    { "at": "9:00", "actor": "vm2", "action": "vitals", "patient": "S1-05",
+      "vitals": { "pulse": 140, "rr": 36, "spo2": 86, "avpu": "P", "bp_estimate": "carotid_weak" } },
+    { "at": "10:00", "actor": "vm1", "action": "create", "patient": "S1-09", "triage": "black", "trap_status": "trapped",
+      "note": "no breathing after airway repositioning (synthetic)" },
+    { "at": "12:00", "actor": "vm1", "action": "vitals", "patient": "S1-04",
+      "vitals": { "pulse": 106, "rr": 24, "spo2": 95, "avpu": "A", "bp_estimate": "radial_strong" } },
+    { "at": "13:00", "actor": "vm2", "action": "handover", "patient": "S1-03", "receiving_unit_transport": "walking wounded to EMS point" },
+    { "at": "14:00", "actor": "vm1", "action": "access", "patient": "S1-04", "trap_status": "not_trapped" },
+    { "at": "15:00", "actor": "vm2", "action": "vitals", "patient": "S1-06",
+      "vitals": { "pulse": 98, "rr": 20, "spo2": 97, "avpu": "A", "bp_estimate": "radial_strong" } },
+    { "at": "16:00", "actor": "vm1", "action": "handover", "patient": "S1-01", "receiving_unit_transport": "ALS ambulance", "destination_facility": "Synthetic Trauma Center" },
+    { "at": "18:00", "actor": "vm2", "action": "vitals", "patient": "S1-07",
+      "vitals": { "pulse": 84, "rr": 16, "spo2": 99, "avpu": "A", "bp_estimate": "radial_strong" } },
+    { "at": "20:00", "actor": "vm1", "action": "note", "note": "End of scripted timeline - injects remain available" }
+  ],
+  "injects": {
+    "deterioration": {
+      "description": "S1-04 (yellow, just extricated) deteriorates and becomes red",
+      "steps": [
+        { "after": "0:00", "actor": "vm1", "action": "vitals", "patient": "S1-04", "triage": "red",
+          "vitals": { "pulse": 136, "rr": 34, "spo2": 89, "avpu": "P", "bp_estimate": "carotid_strong" } }
+      ]
+    },
+    "medic_silent": {
+      "description": "vm2 goes silent (Dead Man's Switch should fire after the silence threshold)",
+      "steps": [ { "after": "0:00", "actor": "vm2", "action": "silence" } ]
+    },
+    "medic_back": {
+      "description": "vm2 comes back online",
+      "steps": [ { "after": "0:00", "actor": "vm2", "action": "resume" } ]
+    },
+    "mass_arrival": {
+      "description": "Three more casualties found in the stairwell within one minute",
+      "steps": [
+        { "after": "0:00", "actor": "vm1", "action": "create", "patient": "S1-10", "triage": "red", "trap_status": "trapped",
+          "vitals": { "pulse": 130, "rr": 33, "spo2": 89, "avpu": "V", "bp_estimate": "radial_weak" } },
+        { "after": "0:30", "actor": "vm2", "action": "create", "patient": "S1-11", "triage": "yellow", "trap_status": "not_trapped",
+          "vitals": { "pulse": 102, "rr": 22, "spo2": 96, "avpu": "A", "bp_estimate": "radial_strong" } },
+        { "after": "1:00", "actor": "vm2", "action": "create", "patient": "S1-12", "triage": "green", "trap_status": "not_trapped" }
+      ]
+    },
+    "overdue_tourniquet": {
+      "description": "Casualty found with a bystander tourniquet applied about 55 minutes ago (server reassessment due about 5 minutes after the inject)",
+      "steps": [
+        { "after": "0:00", "actor": "vm2", "action": "create", "patient": "S1-13", "triage": "red", "trap_status": "not_trapped",
+          "vitals": { "pulse": 118, "rr": 26, "spo2": 94, "avpu": "A", "bp_estimate": "radial_weak" } },
+        { "after": "0:10", "actor": "vm2", "action": "tourniquet", "patient": "S1-13", "limb": "left_arm", "applied_offset_minutes": -55, "clinical_context": "arterial_bleed" }
+      ]
+    }
+  }
+}
