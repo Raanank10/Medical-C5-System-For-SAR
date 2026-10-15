@@ -113,6 +113,32 @@ Same false-positive class as `get_incident_command_state` — the lint can't see
 
 Verdict: **PASS (by design)**, same as `incident_command_state`'s "RLS deliberately disabled + grants revoked" pattern documented above — just the RLS-enabled-instead-of-disabled variant of the same idea. No fix needed; `docs/PRODUCTION_READINESS.md` updated to reflect this is now reviewed, not just assumed.
 
+## Follow-up: incident lifecycle RPCs (`database/038`)
+
+Six new `authenticated`-callable `SECURITY DEFINER` functions (`open_incident`, `list_open_incidents`, `join_incident`, `confirm_draft`, `reject_draft`, `acknowledge_draft`) plus one internal helper (`app.append_incident_lifecycle_event`, `EXECUTE` revoked from `public`/`anon`/`authenticated`). All six trip the same `get_advisors` WARN class as `get_incident_command_state` above; the advisor showed no other new finding after `038` was applied (checked before and after).
+
+**Deliberate access widening, decided with the repo owner (2026-10-03), not an oversight:** before `038`, a field role (medic, paramedic, pc, logistics_officer) could only see or write an incident a command role had added it to. Now any active profile can (a) list the minimal header fields of every open incident and (b) join any open incident on its own, which grants it that incident's normal role-scoped read/write access. This is what lets the first medic on scene, or a second medic arriving later, work without waiting for command. Accepted for a single-unit deployment; a multi-unit deployment would need unit scoping on both functions (the same missing platoon/company model already listed under `docs/AUTH_AND_ROLE_MODEL.md`'s Known Gaps).
+
+Verified live by impersonation (`set local role` + `request.jwt.claims`) inside transactions that were always rolled back, nothing persisted:
+
+| Check | Result |
+|---|---|
+| medic `open_incident` | `draft`, opener auto-joined; retry with same id returns `created:false` |
+| medic reads own draft via plain RLS / writes an event into it via `events_insert_by_role` | allowed (both were impossible before `038`) |
+| medic `confirm_draft` / `acknowledge_draft` | denied (`42501`) |
+| paramedic before / after `join_incident` | `can_access_incident` false -> true |
+| logistics_officer `open_incident` | denied; `join_incident` allowed |
+| a different medic reusing an existing incident id | denied (`23505`) |
+| non-member medic writing an event into someone else's draft | denied by `events_insert_by_role` |
+| pc `acknowledge_draft`, `confirm_draft` (+ idempotent retry) | allowed; pc becomes a member |
+| pc `reject_draft` on an active incident | denied |
+| patient `pending_incident_approval` after confirm / after reject | cleared / kept |
+| `join_incident` on a rejected draft; rejected draft in `list_open_incidents` | denied; not listed |
+| cc `open_incident` | `active` |
+| inactive profile / `anon` calling `list_open_incidents` | denied (`no active profile` / `permission denied for function`) |
+| internal helper called directly by `authenticated` | denied |
+| events written | `INCIDENT_DRAFT_CREATED`, `INCIDENT_CONFIRMED`, `INCIDENT_DRAFT_REJECTED`, `INCIDENT_OPENED`, each with the real `actor_role` |
+
 ## Explicitly not re-litigated here
 
 - T6 (leaked-password protection) and T5 (service-role key handling) — out of scope, not RLS/authorization, already tracked in `docs/THREAT_MODEL.md`.

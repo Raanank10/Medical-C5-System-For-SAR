@@ -475,6 +475,8 @@ POST /command/incidents/:incidentId/aar/context-note
 POST /command/incidents/:incidentId/aar/voice-memo
 ```
 
+**Partly implemented**: `confirm-draft` and `reject-draft` exist as `confirm_draft()`/`reject_draft()` RPCs (`database/038_incident_lifecycle_rpcs.sql`) - see "Incident Lifecycle API" below. `merge-draft` is not built yet.
+
 ---
 
 # 7. AAR API
@@ -676,6 +678,21 @@ The write side is a trigger, not a client-facing endpoint: `project_supply_reque
 `index.html` polls this every 45s (same cadence as `get_incident_command_state`), and renders it on the pc, cc, and logistics boards — read-only on pc/cc, with real dispatch/runner-assign write actions on the logistics screen (log_o-only, per `AUTH_MATRIX`'s "Dispatch resupply runner"). `supply_request_items` (the schema's normalized, `inventory_items`-FK'd item table) is deliberately left unpopulated by the trigger: its vocabulary (`inventory_items.sku` values like `TQ`/`COMBAT_GAUZE`) doesn't match the client's real item keys (`tourniquets`/`pressureDressings`/etc.) — the same mismatch `inventory_ledger_v12` already exists to route around for `inventory_ledger`. Items are carried instead on a plain `items_json` column on `supply_requests`.
 
 Dispatch/runner-assign is real, not simulated: the logistics screen writes `SUPPLY_REQUEST_DISPATCHED` (with `runner_name`/`eta_minutes`), `SUPPLY_REQUEST_IN_TRANSIT`, and `SUPPLY_REQUEST_RECEIVED` — the schema-native event types `SUPPLY_LOGISTICS_EVENTS` already allow-listed for `logistics_officer` before this session, previously unused by the client. `database/034_supply_request_dispatch_by_real_id.sql` fixes a real bug `033`'s own live-verification missed: the trigger's update path originally resolved the target row via `(device_id, client-local id)`, which assumes the update comes from the same device that created the request — never true for dispatch, since the whole point is a logistics device acting on a medic's request. Fixed by having these three event types carry `payload_json.supply_request_id` (the real server UUID, known once the client has pulled the row via `get_supply_request_queue`) and resolving by that instead; live-verified with a three-device chain (medic creates, a different device dispatches, a third marks in-transit) before merge.
+
+## Incident Lifecycle API
+
+Lets an incident come into existence from the field instead of from seed data (`C5_SENTINEL_SAR_MVP_SPEC_v1.2.md` sec 141, 202-221). **Implemented** (`database/038_incident_lifecycle_rpcs.sql`) as six `SECURITY DEFINER` RPCs called via `client.rpc(...)`, same non-literal-HTTP-path pattern as `get_incident_command_state`. Each does its own role check; `EXECUTE` is granted to `authenticated` only.
+
+| RPC | Who | What it does |
+|---|---|---|
+| `open_incident(p_incident_id, p_location_name, p_address?, p_incident_type?, p_t_zero?, p_device_id?, p_local_event_id?)` | medic, paramedic -> `draft`; pc, cc, chamal, admin, physician, rpc, rcc -> `active`; logistics_officer denied | Creates the incident with a client-generated id (a retry by the same opener returns the existing row with `created:false`; anyone else reusing the id gets `23505`), generates `visual_id` (`INC-YYMMDD-XXXXXX`), makes the opener a member, appends `INCIDENT_DRAFT_CREATED` or `INCIDENT_OPENED`, and seeds `incident_command_state`. |
+| `list_open_incidents()` | any active profile | Minimal header fields of every `draft`/`staging`/`active` incident: id, visual_id, location, address, type, status, t_zero, opened_at, opener display name, draft_acknowledged_at, patient count, and whether the caller is a member. No clinical data. |
+| `join_incident(p_incident_id)` | any active profile | Adds the caller's own `incident_memberships` row (`role_at_incident` = their role). Only for `draft`/`staging`/`active` incidents. Idempotent. |
+| `confirm_draft(p_incident_id, p_device_id?, p_local_event_id?)` | command roles (`app.is_command_role()`: pc, cc, chamal, admin, physician) | `draft` -> `active`, stamps `confirmed_by/at` and `draft_resolved_at`, clears the incident's patients' `pending_incident_approval`, makes the confirmer a member, appends `INCIDENT_CONFIRMED`. Idempotent. |
+| `reject_draft(p_incident_id, p_reason?, p_device_id?, p_local_event_id?)` | command roles | `draft` -> `closed` with `metadata.draft_resolution='rejected'`. Nothing is deleted; the patients keep `pending_incident_approval=true`. Appends `INCIDENT_DRAFT_REJECTED`. Idempotent. |
+| `acknowledge_draft(p_incident_id)` | command roles | Stamps `draft_acknowledged_by/at` so the approval banner stops blinking, without confirming or rejecting. |
+
+Joining is recorded on the membership row itself (`assigned_by`, `created_at`); there is no join event type. Draft merge (`INCIDENT_DRAFT_MERGED`) is not built yet.
 
 ## High-Risk Override Payload
 
