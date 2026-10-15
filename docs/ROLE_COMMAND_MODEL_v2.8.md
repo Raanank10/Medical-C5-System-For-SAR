@@ -33,13 +33,49 @@ One piece of that ranking's reasoning stays redacted for RPC/RCC: the tourniquet
 This is the core authority decision in V2.8. As first responders, RPC/RCC can take the following actions **final, with no חוג״ד/מ״פ רפואה approval required**:
 
 - Declare the incident official and set T0.
-- Close or reopen the incident. Since `database/040_close_incident_guard.sql` (V2.99.25) closing is blocked while any patient has not been handed over (or self-evacuated, or died). RPC/RCC still need no medical approval to close a fully handed-over incident, but they cannot override the block: only חוג״ד / מ״פ רפואה / חמ״ל / physician / admin can, with a mandatory reason that goes into the event log. This rule is enforced server-side (`close_incident()` plus a trigger), unlike the rest of this list.
+- Close or reopen the incident. Since `database/040_close_incident_guard.sql` (V2.99.28) closing is blocked while any patient has not been handed over (or self-evacuated, or died). RPC/RCC still need no medical approval to close a fully handed-over incident, but they cannot override the block: only חוג״ד / מ״פ רפואה / חמ״ל / physician / admin can, with a mandatory reason that goes into the event log. This rule is enforced server-side (`close_incident()` plus a trigger), unlike the rest of this list.
 - Set building status: stable / unstable / progressive collapse / safe to enter.
 - Confirm the site is clear.
 
 חוג״ד and מ״פ רפואה are notified of each change on their own dashboards — they see it, they do not gate it. The reasoning: these are scene-safety and incident-declaration calls, which is rescue command's competency, not medical command's. Requiring medical sign-off on "is this building safe to enter" would put a medical role in the approval path for a decision they have no basis to evaluate, and would slow down exactly the call that most needs to be fast.
 
 This currently exists only as a client-side capability check (the button set rendered per role). There is no server-side enforcement yet — see the "Known gap" note in [`CHANGELOG_v2.995.md`](CHANGELOG_v2.995.md). Before this ships anywhere beyond a demo, the RLS/auth work in Mission 2 of [`MULTI_AGENT_DEV_PLAN.md`](MULTI_AGENT_DEV_PLAN.md) must enforce this same restriction server-side, or a compromised/misconfigured client could call these actions as any role.
+
+## Incident type and medic assignment on the Movement screen (V2.99.23)
+
+The medic Movement screen (`screen-enroute`, "מסך תנועה - הכנת זירה") used to show a hardcoded "structural collapse" alert banner. It now offers the same four incident types as the RPC/RCC site-authority panel (קריסת מבנה / טיל, ירי המוני, תאונת דרכים, פיצוץ), with the same expected-injury brief, so a medic who is first on scene can set up the incident themselves.
+
+Incident type follows the site-authority rule above: **rescue (RPC/RCC) wins.**
+
+- A medic may set the type while none is set, or replace a type a medic set earlier.
+- Once RPC/RCC set the type, a medic pick that differs is never applied. It is logged as `INCIDENT_TYPE_MISMATCH_REPORTED` and surfaces to חוג״ד/מ״פ רפואה as an `INCIDENT_TYPE_MISMATCH` alert ("פער בסוג אירוע: חובש מול חילוץ"). Rescue can still overwrite a medic-set type at any time.
+
+חוג״ד can also assign a medic to an existing incident ("שייך לאירוע" on each medic panel in the PC medic-load board), with an optional address and note. An assigned medic's Movement screen shows who assigned them and what is already known: incident type and who set it, rescue site status, patients already registered at the site, and the PC's address and note. The address and note are pre-filled into the editable fields, but only into empty ones, so nothing the medic typed is overwritten. A medic correction to a pre-filled value is logged on arrival as `SITE_PREFILL_CORRECTED` with the old and new values.
+
+**Local-demo only for now.** `MEDIC_ASSIGNED_TO_INCIDENT`, `INCIDENT_TYPE_MISMATCH_REPORTED`, `SITE_PREFILL_CORRECTED` and (as before) `INCIDENT_TYPE_SET` are outside `SYNC_ELIGIBLE_EVENT_TYPES`, so they are never pushed. While signed in, `currentSiteId()` ignores a local assignment, and a PC cannot assign a medic to any site other than SITE_A. That is because the live medic test account is an `incident_memberships` member of incident A only, and RLS would reject its pushes to any other incident. The real, synced version belongs on `incident_memberships` (`assigned_by` already exists) and is a separate follow-up.
+
+## Briefing demo and guided tour (V2.99.25)
+
+The 60-second PC/CC briefing ("הצג תדריך מ״פ / חוג״ד ב־60 שניות") is back on the launcher, now as a **sandboxed** demo. Every test phone shares one live database, and the old sequence also started by wiping the phone's local data, so the scripted fake patient could reach other phones or delete real local patients. Now:
+
+- The current local state is snapshotted first.
+- While the sandbox is open, `getSupabaseClient()` returns `null`, so no pull, push, presence or other server read or write happens at all. `saveDemoState()` and `saveActiveRecoveryState()` are no-ops, and `saveLocalEvent()` never touches the outbox.
+- A purple "הדגמה · לא נשמר ולא נשלח לשרת" banner with a "סיום הדגמה" button stays on screen for the whole run.
+- Ending the demo cancels pending steps, closes any sheet a step opened (e.g. the tourniquet's supply sheet, which could otherwise write supply events about a demo patient), and restores the exact snapshot.
+
+"סיור מודרך במסכי חוג״ד / מ״פ" is a read-only, 15-step walkthrough that highlights the real PC and CC dashboard panels and explains each one. It creates no data.
+
+## Cross-device PC → medic assignment: verified design, held for the incident lifecycle
+
+A synced version of the assignment above was built and checked against the live access rules (impersonating the real PC, medic and rescue accounts inside transactions that were forced to roll back, so nothing persisted). It needs **no schema, RLS or Edge Function change**:
+
+1. The assigning PC adds itself to the target incident's `incident_memberships` (a PC can only see and update incidents it is a member of; its role may insert memberships).
+2. The PC writes the address to `incidents.address` and the note to `incidents.metadata.medic_assignments[<medic profile id>] = {note, assigned_by_name, assigned_at}`. The assigner's name goes in metadata because a medic cannot read other profiles. Each update is checked to have changed exactly one row.
+3. The PC upserts the medic's `incident_memberships` row (`assigned_by` = PC, `created_at` = now). That membership is also what lets the medic's pushes into that incident pass RLS.
+4. The medic phone reads its newest membership that has `assigned_by` set, plus that incident's row, at login, every 45 seconds and when the Movement screen opens, and pre-fills from it.
+5. Rescue (`rpc`/`rcc`) writes its incident type to `incidents.incident_type` (+ `metadata.incident_type_set_by`), and every phone with access reads it, so rescue's type reaches the medic and PC phones. The medic's own pick and the mismatch alert stay on the medic's phone, because medics may not update an active incident.
+
+All five steps passed live. It was not shipped because it targeted the two fixed test incidents (`SITE_TO_INCIDENT_ID`), which a parallel incident-lifecycle change (`database/038`/`039`, real incidents via `list_open_incidents` / `join_incident` / `open_incident`) has since closed. Port it onto that model, using the picked incident instead of SITE_A/SITE_B, once it lands. Known limit: `metadata` is read-modify-write, so two writers in the same instant can drop one change.
 
 ## PC can go hands-on
 

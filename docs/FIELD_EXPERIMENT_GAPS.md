@@ -1,13 +1,13 @@
 # Field Experiment Gap Register
 
-This repo is a development prototype, not a field-ready shared system. This register says what a field experiment with synthetic data can rely on today and what is still missing. Updated for V2.99.23 (it previously described the pre-backend prototype, when storage was browser-only and there was no multi-device visibility, which stopped being true with Phase 3).
+This repo is a development prototype, not a field-ready shared system. This register says what a field experiment with synthetic data can rely on today and what is still missing. Updated for V2.99.26 (it previously described the pre-backend prototype, when storage was browser-only and there was no multi-device visibility, which stopped being true with Phase 3).
 
 ## Current Prototype Truth
 
 | Component | Current state | Still missing for a field experiment |
 | --- | --- | --- |
 | Persistence | Logged-in devices sync to the live Supabase Postgres project through `/sync/log` (`docs/ARCHITECTURE.md`, "Backend Deployment Status"). Clinically relevant `localStorage` is encrypted at rest behind a device PIN. | Backup/restore testing (`docs/BACKUP_AND_INCIDENT_RESPONSE_PLAN.md`). |
-| Incident lifecycle | Logged-in mode starts empty. Incidents are opened from the field: a medic opens a draft that command confirms or rejects, command opens an official incident directly, other devices join from the incident picker (`database/038`, V2.99.23). An incident cannot be closed while patients are not handed over; only medical command can override, with a recorded reason (`database/040`, V2.99.25). | Draft merge into another incident; a "leave incident" action; closing needs a server connection. |
+| Incident lifecycle | Logged-in mode starts empty. Incidents are opened from the field: a medic opens a draft that command confirms or rejects, command opens an official incident directly, other devices join from the incident picker (`database/038`, V2.99.26). An incident cannot be closed while patients are not handed over; only medical command can override, with a recorded reason (`database/040`, V2.99.28). | Draft merge into another incident; a "leave incident" action; closing needs a server connection. |
 | Multi-device visibility | Real push/pull, projected patient state, device presence and command-state snapshots across devices in the same incident. | Session 2 of `docs/FIELD_USABILITY_TEST_PLAN.md` (real offline/intermittent drill) has not run yet. |
 | Synthetic data | Option A: people play medics and enter casualties live. A scenario injector (virtual medics pushing a synthetic timeline through the real `/sync/log`) is the planned option B. | The injector itself (PR3 of the incident-lifecycle work). |
 | Phone field testing | Not certified. Browser smoke tests cover the page itself. | Real iOS/Android testing: one-handed, glove mode, sunlight, lock screen, poor network. |

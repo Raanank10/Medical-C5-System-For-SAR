@@ -16,7 +16,7 @@ Concrete inventory, not the aspirational picture:
 | Target (per `docs/ROADMAP.md`) | What exists today | Gap |
 |---|---|---|
 | `packages/domain` | `src/domain/rules.js` (318 lines) — real, tested (`tests/domain-rules.test.js`), but not a real npm package (no `package.json`, not importable by anything other than Node `require()` and a manually-synced inline copy in `index.html`/`demo/rescue-app.html`) | Needs real package structure. The manual-sync-plus-`check_repo.py`-drift-check pattern is a deliberate, working design for the no-build-step prototype — don't break it. |
-| `packages/fixtures` | Two independent, unreconciled implementations: `index.html`'s inline demo-scenario generator (`loadDemoScenario()` and friends) and `analytics/c5_sentinel_sar_analytics_v1_1/seed_demo_db.py`. Different languages, different schemas, no shared source of truth. | Real design work, not a mechanical move — see 4B. |
+| `packages/fixtures` | Was two independent, unreconciled implementations: `index.html`'s inline demo-scenario generator (`loadDemoScenario()` and friends) and `analytics/c5_sentinel_sar_analytics_v1_1/seed_demo_db.py`. V2.99.24 removed every hardcoded patient from `index.html` ahead of commander hands-on testing, so today only the analytics generator remains. | Real design work, not a mechanical move — see 4B. |
 | `services/sync-api` | `supabase/functions/sync-log/index.ts` (425 lines), deployed and real. Lives where the Supabase CLI's `functions deploy` command requires it to live (`supabase/functions/<name>/`). | Directory-move risk — see 4D, this one has a real tooling constraint. |
 | `services/projectors` | `project_patient_state()`, a Postgres trigger function (`database/013_consolidate_patient_status_projection.sql`), not a separately deployable service at all. | **DECISION NEEDED** — see 4D. The ROADMAP.md phrasing may not map onto what actually exists. |
 | `database/migrations` | 16 numbered draft SQL files (`database/001_...sql` through `016_...sql`), applied by hand via Supabase MCP tooling during development, no `up`/`down` framework. | Real gap — see 4C. |
@@ -51,6 +51,8 @@ Lowest risk, do this first — it's mostly formalization of something that alrea
 - Acceptance: `tests/domain-rules.test.js` still passes unmodified in behavior, `check_repo.py`'s domain-rules drift check still catches a deliberately-introduced mismatch (verify this, don't assume the path change didn't silently break the check), and the package is importable via a normal `require`/`import` from a throwaway Node script outside `src/`.
 
 ### 4B. `packages/fixtures` — reconcile two demo-data generators into one
+
+> **Update (V2.99.24):** `index.html`'s side no longer exists. All hardcoded patients and scripted demo sequences (`loadDemoScenario()`, the Omni-Role, notebook-advantage, medic-commander and death-certification sequences) were removed so commanders testing the app only ever see patients created in the field or pulled from the server. If a client-side demo mode is wanted again, build it from the shared fixture source below rather than reintroducing inline fixtures.
 
 Real design work. `index.html`'s `loadDemoScenario()` (JS, in-memory objects matching the client's patient shape) and `seed_demo_db.py`'s `SCHEMA`/data (Python, SQLite rows matching the analytics schema) currently describe *the same conceptual demo incident* in two disconnected, hand-maintained implementations.
 

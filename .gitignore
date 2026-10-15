@@ -24,3 +24,6 @@ analytics/c5_sentinel_sar_analytics_v1_1/live_incident.db
 
 # Supabase CLI local state (npx supabase ...) - machine-local, not a repo asset.
 supabase/.temp/
+
+# Scenario injector credentials (scripts/inject_scenario.js --accounts). Never commit these.
+*.accounts.json
