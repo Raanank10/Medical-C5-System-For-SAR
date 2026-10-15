@@ -1,4 +1,4 @@
-// Real-browser test of the logged-in incident lifecycle UI (V2.99.23, database/038): the app
+// Real-browser test of the logged-in incident lifecycle UI (V2.99.26, database/038): the app
 // starts with no incident and no patients, a medic opens a draft incident, events are pinned to
 // that incident at creation, command sees the pulsing approval banner and confirms it, and the
 // local demo mode still works after sign-out.
@@ -187,7 +187,7 @@ async function checkFile(browser, file) {
   const legacy = await page.evaluate(() => getOutbox().find((e) => e.local_event_id === 'legacy-unstamped-1'));
   assert(legacy.syncRejected && legacy.syncRejectReason === 'no_incident_context', `${rel}: unstamped entry must be visibly rejected, got ${JSON.stringify(legacy)}`);
 
-  // 3b. Triage sync (V2.99.24): local triage reaches the server as PATIENT_TRIAGE_UPDATED /
+  // 3b. Triage sync (V2.99.27): local triage reaches the server as PATIENT_TRIAGE_UPDATED /
   // PATIENT_TRIAGED_EXPECTANT, only after the patient's create event, and server 'pending'
   // never overwrites a real local triage.
   const tri = await page.evaluate(() => {
@@ -238,10 +238,23 @@ async function checkFile(browser, file) {
   assert(pull.tookServer === 'red', `${rel}: a real server triage must win locally, got ${pull.tookServer}`);
   assert(!pull.echoed, `${rel}: an accepted server triage must not be echoed back`);
 
-  // 4. Demo loaders and clearers are refused while logged in.
-  await page.evaluate(() => { loadOmniRoleScenario(true); playNotebookAdvantageDemo(); clearDemoPatientsOnly({ confirmReset: false }); });
-  assert(await page.evaluate(() => patients.every((p) => !String(p.id).startsWith('P-'))), `${rel}: demo patients must not load while logged in`);
-  assert(await page.evaluate(() => getOutbox().length >= 2), `${rel}: clearDemoPatientsOnly must not wipe the outbox while logged in`);
+  // 3c. The sandboxed briefing demo (V2.99.25) creates a red patient while signed in; the triage
+  // reconciler must not turn it into outbox events, and ending the demo restores everything.
+  const sandboxBefore = await page.evaluate(() => ({ ob: JSON.stringify(getOutbox()), ids: patients.map((p) => p.id + p.triage).join(',') }));
+  await page.evaluate(() => startBriefingDemo());
+  await page.waitForFunction(() => patients.some((p) => p.triage === 'red'), { timeout: 8000 });
+  await page.evaluate(() => { saveDemoState(); syncPush(); });
+  const sandboxDuring = await page.evaluate(() => JSON.stringify(getOutbox()));
+  await page.evaluate(() => endBriefingDemo());
+  const sandboxAfter = await page.evaluate(() => ({ ob: JSON.stringify(getOutbox()), ids: patients.map((p) => p.id + p.triage).join(',') }));
+  assert(sandboxDuring === sandboxBefore.ob, `${rel}: the sandboxed demo must not add outbox events while signed in`);
+  assert(sandboxAfter.ob === sandboxBefore.ob && sandboxAfter.ids === sandboxBefore.ids, `${rel}: ending the sandboxed demo must restore patients and outbox exactly`);
+
+  // 4. Local-demo clearers are refused while logged in (they would wipe real unsynced events).
+  // The demo patient loaders themselves were removed in V2.99.24.
+  const outboxBefore = await page.evaluate(() => getOutbox().length);
+  await page.evaluate(() => { clearDemoPatientsOnly({ confirmReset: false }); clearDemoScenario({ confirmReset: false }); });
+  assert(await page.evaluate(() => getOutbox().length) === outboxBefore && outboxBefore >= 2, `${rel}: demo clearers must not wipe the outbox while logged in`);
 
   // 5. Reload: session restore resumes the stored incident instead of the picker.
   await page.reload({ waitUntil: 'domcontentloaded' });
@@ -289,12 +302,12 @@ async function checkFile(browser, file) {
   await page.waitForSelector('#screen-incident-picker.active', { timeout: 5000 });
   assert(!(await page.locator('#incident-open-panel').isVisible()), `${rel}: logistics must not see the open-incident panel`);
 
-  // 9. Sign out -> local demo mode is intact (SITE_B back, demo scenario loads).
+  // 9. Sign out -> local demo mode is intact (SITE_B back) and starts with no patients (V2.99.24).
   await page.evaluate(() => signOut());
   await page.waitForSelector('#screen-login.active', { timeout: 5000 });
   assert(await page.evaluate(() => allSites.some((s) => s.id === 'SITE_B') && SITE_TO_INCIDENT_ID.SITE_B), `${rel}: local demo sites must be restored after sign-out`);
   await page.evaluate(() => { goTo('demo'); startRoleDashboard('pc'); });
-  assert(await page.evaluate(() => patients.length > 0), `${rel}: local demo mode should still load the demo scenario`);
+  assert(await page.evaluate(() => patients.length === 0), `${rel}: local demo mode must start with no patients after sign-out`);
   assert(!(await page.locator('#incident-context-strip').isVisible()), `${rel}: incident strip must be hidden in local demo mode`);
 
   assert(pageErrors.length === 0, `${rel}: uncaught page error(s): ${pageErrors.join(' | ')}`);
