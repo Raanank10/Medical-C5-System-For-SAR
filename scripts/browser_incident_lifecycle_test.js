@@ -187,6 +187,57 @@ async function checkFile(browser, file) {
   const legacy = await page.evaluate(() => getOutbox().find((e) => e.local_event_id === 'legacy-unstamped-1'));
   assert(legacy.syncRejected && legacy.syncRejectReason === 'no_incident_context', `${rel}: unstamped entry must be visibly rejected, got ${JSON.stringify(legacy)}`);
 
+  // 3b. Triage sync (V2.99.24): local triage reaches the server as PATIENT_TRIAGE_UPDATED /
+  // PATIENT_TRIAGED_EXPECTANT, only after the patient's create event, and server 'pending'
+  // never overwrites a real local triage.
+  const tri = await page.evaluate(() => {
+    const mk = (triage) => ({ id: newUuid(), visualId: 'T' + Math.floor(Math.random() * 1000), triage, patientStatus: 'identified', events: [], siteId: 'SITE_A' });
+    const p1 = mk('red'); const p2 = mk('yellow');
+    patients.push(p1, p2);
+    saveLocalEvent({ type: 'QUICK_PATIENT_CREATED', patient_id: p1.id, payload_json: { visual_id: p1.visualId, triage: 'red' } });
+    saveDemoState();
+    const ob = () => getOutbox();
+    const idx = (pid, type) => ob().findIndex((e) => e.patient_id === pid && e.type === type);
+    const r = {
+      createIdx: idx(p1.id, 'QUICK_PATIENT_CREATED'),
+      triageIdx: idx(p1.id, 'PATIENT_TRIAGE_UPDATED'),
+      redPayload: ob().find((e) => e.patient_id === p1.id && e.type === 'PATIENT_TRIAGE_UPDATED')?.payload_json?.triage,
+      p2Deferred: !ob().some((e) => e.patient_id === p2.id),
+      incidentStamped: ob().filter((e) => e.patient_id === p1.id).every((e) => e.incident_id === activeIncident.id),
+    };
+    saveDemoState();
+    r.noDuplicate = ob().filter((e) => e.patient_id === p1.id && e.type === 'PATIENT_TRIAGE_UPDATED').length === 1;
+    p1.triage = 'yellow'; saveDemoState();
+    r.yellow = ob().filter((e) => e.patient_id === p1.id && e.type === 'PATIENT_TRIAGE_UPDATED').map((e) => e.payload_json.triage).join(',');
+    p1.triage = 'black'; saveDemoState();
+    r.black = ob().some((e) => e.patient_id === p1.id && e.type === 'PATIENT_TRIAGED_EXPECTANT' && e.payload_json.current_triage === 'black');
+    window.__p1 = p1.id;
+    return r;
+  });
+  assert(tri.createIdx >= 0 && tri.triageIdx > tri.createIdx, `${rel}: triage event must follow the create event (${JSON.stringify(tri)})`);
+  assert(tri.redPayload === 'red', `${rel}: triage event must carry red`);
+  assert(tri.p2Deferred, `${rel}: no triage event before the patient's create event`);
+  assert(tri.incidentStamped, `${rel}: triage events must be pinned to the incident`);
+  assert(tri.noDuplicate, `${rel}: an unchanged triage must not be re-sent`);
+  assert(tri.yellow === 'red,yellow', `${rel}: a triage change must be sent, got ${tri.yellow}`);
+  assert(tri.black, `${rel}: black must be sent as PATIENT_TRIAGED_EXPECTANT`);
+  await page.evaluate(() => syncPush());
+  const pull = await page.evaluate(() => {
+    const id = window.__p1;
+    const row = (t, v) => ({ id, incident_id: activeIncident.id, visual_id: 'T', current_triage: t, current_status: 'identified', access_status: null, needs_full_assessment: false, version: v });
+    const count = () => getOutbox().filter((e) => e.patient_id === id && ['PATIENT_TRIAGE_UPDATED', 'PATIENT_TRIAGED_EXPECTANT'].includes(e.type)).length;
+    const before = count();
+    applyProjectedPatientState([row('pending', 50)]);
+    const keptLocal = patients.find((p) => p.id === id).triage;
+    applyProjectedPatientState([row('red', 51)]);
+    const tookServer = patients.find((p) => p.id === id).triage;
+    saveDemoState();
+    return { keptLocal, tookServer, echoed: count() !== before };
+  });
+  assert(pull.keptLocal === 'black', `${rel}: server 'pending' must not overwrite local triage, got ${pull.keptLocal}`);
+  assert(pull.tookServer === 'red', `${rel}: a real server triage must win locally, got ${pull.tookServer}`);
+  assert(!pull.echoed, `${rel}: an accepted server triage must not be echoed back`);
+
   // 4. Demo loaders and clearers are refused while logged in.
   await page.evaluate(() => { loadOmniRoleScenario(true); playNotebookAdvantageDemo(); clearDemoPatientsOnly({ confirmReset: false }); });
   assert(await page.evaluate(() => patients.every((p) => !String(p.id).startsWith('P-'))), `${rel}: demo patients must not load while logged in`);
@@ -222,6 +273,15 @@ async function checkFile(browser, file) {
   await page.waitForSelector('#screen-incident-picker.active', { timeout: 5000 });
   await page.waitForFunction(() => document.getElementById('incident-picker-list').textContent.includes('אדומים פעילים'), { timeout: 5000 });
   assert((await page.textContent('#incident-picker-list')).includes('Synthetic Site Alpha'), `${rel}: CC overview should list the incident`);
+
+  await page.click('#incident-picker-list button:has-text("כניסה")');
+  await page.waitForSelector('#screen-role-dashboard.active', { timeout: 5000 });
+  const ccEmits = await page.evaluate(() => {
+    const p = { id: newUuid(), visualId: 'TCC', triage: 'red', patientStatus: 'identified', events: [], siteId: 'SITE_A', _serverVersion: 1 };
+    patients.push(p); saveDemoState();
+    return getOutbox().some((e) => e.patient_id === p.id);
+  });
+  assert(!ccEmits, `${rel}: CC must not emit triage events (sync-log would reject them)`);
 
   // 8. Logistics cannot open incidents.
   await page.evaluate(() => signOut());
