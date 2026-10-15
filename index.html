@@ -574,6 +574,8 @@ textarea{resize:vertical;min-height:70px;}
 .incident-status-badge.draft{color:var(--orange);border-color:var(--orange);}
 .incident-status-badge.active{color:var(--green);border-color:var(--green);}
 .incident-status-badge.closed{color:var(--red);border-color:var(--red);}
+.close-guard-list{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;max-height:40dvh;overflow-y:auto;}
+.close-guard-row{display:flex;justify-content:space-between;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;}
 #incident-open-form select{width:100%;padding:13px;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--text);font-size:15px;margin-bottom:10px;direction:rtl;}
 </style>
 </head>
@@ -591,7 +593,10 @@ textarea{resize:vertical;min-height:70px;}
 </div>
 <div id="incident-context-strip" class="incident-strip">
   <span class="incident-strip-text"></span>
-  <button onclick="openIncidentPicker()">החלף / כל האירועים</button>
+  <div style="display:flex;gap:6px">
+    <button id="incident-strip-close-btn" style="display:none" onclick="toggleActiveIncidentClosed()">סגור אירוע</button>
+    <button onclick="openIncidentPicker()">החלף / כל האירועים</button>
+  </div>
 </div>
 <div id="draft-approval-banner" class="draft-approval-banner"></div>
 
@@ -700,7 +705,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9924</div>
+      <div class="demo-kicker">Demo V2.9925</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -799,7 +804,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9924</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9925</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -809,7 +814,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9924</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9925</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -1698,6 +1703,25 @@ textarea{resize:vertical;min-height:70px;}
     <div class="panic-title" style="color:var(--accent)" id="incident-type-brief-title">סוג אירוע</div>
     <div class="panic-message" id="incident-type-brief-message">—</div>
     <button class="panic-confirm-btn" style="background:var(--accent)" onclick="hideIncidentTypeBriefModal()">הבנתי</button>
+  </div>
+</div>
+
+<!-- ══════════════════════ INCIDENT CLOSE GUARD MODAL (database/040) ══ -->
+<div class="modal-overlay hidden" id="incident-close-modal" onclick="closeIncidentCloseModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="incident-close-title">לא ניתן לסגור את האירוע</div>
+    <div class="modal-sub" id="incident-close-sub"></div>
+    <div class="close-guard-list" id="incident-close-list"></div>
+    <div id="incident-close-override" style="display:none">
+      <div class="field-label">סגירה בעקיפה: סיבה (חובה, נרשמת ביומן האירוע)</div>
+      <textarea id="incident-close-reason" placeholder="לדוגמה: הפצועים הנותרים פונו באמבולנס ללא מסירה מתועדת"></textarea>
+      <div class="login-error" id="incident-close-error"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+      <button class="btn-primary" id="incident-close-override-btn" style="background:var(--red);display:none" onclick="submitIncidentCloseOverride()">סגור בכל זאת</button>
+      <button class="btn-secondary" onclick="hideIncidentCloseModal()">חזרה</button>
+    </div>
   </div>
 </div>
 
@@ -2656,7 +2680,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.24';
+const APP_VERSION = '2.99.25';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3778,15 +3802,11 @@ function rescueOpenOfficialIncident(role, siteId=rescueActiveSiteId){
   renderRoleDashboard(role);
   toast('אירוע הוכרז רשמי · T0 נקבע · חוג"ד ומ״פ רפואה יראו עדכון');
 }
+// Close / reopen goes through the incident close guard (see "Incident close guard" below): an
+// incident with patients not yet handed over cannot be closed without a medical-command override.
 function rescueToggleIncidentClosed(role, siteId=rescueActiveSiteId){
-  const s=ensureSiteStatusFields(siteId);
-  const reopening=s.incidentStatus==='closed';
-  s.incidentStatus=reopening?'official':'closed';
-  s.lastRescueStatusChange={type:'close',by:role,byLabel:rescueReporterLabel(role),detail:reopening?'האירוע נפתח מחדש':'האירוע נסגר',at:Date.now()};
-  saveLocalEvent({type:'INCIDENT_CLOSE_TOGGLED',detail:`${reopening?'reopened':'closed'} by ${role} at ${siteId}`,payload_json:{role,siteId,newStatus:s.incidentStatus,timestamp:new Date().toISOString()}});
-  saveDemoState();
-  renderRoleDashboard(role);
-  toast(reopening?'האירוע נפתח מחדש':'האירוע נסגר');
+  if(isIncidentClosedForSite(siteId)) requestIncidentReopen(role, siteId);
+  else requestIncidentClose(role, siteId);
 }
 function rescueUpdateBuildingStatus(role, status, siteId=rescueActiveSiteId){
   const s=ensureSiteStatusFields(siteId);
@@ -5900,7 +5920,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
       </div>
       <div class="demo-actions" style="margin:8px 0 0;grid-template-columns:1fr 1fr">
         <button class="demo-mini-btn" onclick="rescueOpenOfficialIncident('${role}')">${authSite.incidentStatus==='official'||authSite.incidentStatus==='closed'?'אירוע כבר רשמי':'פתח אירוע רשמי + T0'}</button>
-        <button class="demo-mini-btn" onclick="rescueToggleIncidentClosed('${role}')">${authSite.incidentStatus==='closed'?'פתח אירוע מחדש':'סגור אירוע'}</button>
+        <button class="demo-mini-btn" onclick="rescueToggleIncidentClosed('${role}')">${isIncidentClosedForSite(rescueActiveSiteId)?'פתח אירוע מחדש':'סגור אירוע'}</button>
         <button class="demo-mini-btn" onclick="rescueUpdateBuildingStatus('${role}','stable')">מבנה: יציב</button>
         <button class="demo-mini-btn" onclick="rescueUpdateBuildingStatus('${role}','unstable')">מבנה: לא יציב</button>
         <button class="demo-mini-btn" onclick="rescueUpdateBuildingStatus('${role}','progressive_collapse')">מבנה: קריסה מתמשכת</button>
@@ -10936,6 +10956,9 @@ async function enterIncidentContextAfterLogin(){
   }
   openIncidentPicker();
 }
+function freshSiteAuthority(){
+  return {incidentStatus:'draft', t0:null, buildingStatus:null, incidentType:null, siteClear:{cleared:false,clearedAt:null,clearedByRole:null}, lastRescueStatusChange:null};
+}
 function resetWorkingStateForIncident(inc){
   // patients[] is a view of one incident. Its server rows come back on the next pull; unsynced
   // local events stay in the outbox, already pinned to their own incident (saveLocalEvent).
@@ -10943,6 +10966,12 @@ function resetWorkingStateForIncident(inc){
   reinforcementRequests=[];
   _pulledEvents=[];
   if(state && Array.isArray(state.localEvents)) state.localEvents=state.localEvents.filter(e=>e.incident_id===inc.id);
+  clearWorkingSiteData();
+}
+// SITE_A's site data and rescue-authority fields (T0, building status, closed flag) belong to the
+// incident bound to it; switching incident or signing out must not carry them over.
+function clearWorkingSiteData(){
+  siteAuthority.SITE_A=freshSiteAuthority();
   siteData={name:'', address:'', eventType:null, buildingType:null, floorHint:'', apartmentHint:'', eta:'', currentZone:'', lastMechanism:'', likelyMechanisms:[], sweepSessions:[], description:'', externalReports:[], initialEvacuatedGreen:0, initialEvacuation:{green:0,yellow:0,red:0,summary:'',source:null}, expectedCasualties:{trapped:0,immobile:0,missing:0,severe:0}};
   ['site-name-input','site-address','site-description','enroute-address'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
 }
@@ -10978,6 +11007,8 @@ function deactivateIncidentContext(){
   patients=[];
   reinforcementRequests=[];
   _pulledEvents=[];
+  clearWorkingSiteData();
+  hideIncidentCloseModal();
   restoreLocalDemoSites();
   renderIncidentContext();
 }
@@ -11100,6 +11131,152 @@ function rejectDraftIncident(id){
 function acknowledgeDraftIncident(id){
   runDraftAction('acknowledge_draft', {p_incident_id:id}, 'סומן כנראה');
 }
+
+// ── Incident close guard (database/040_close_incident_guard.sql) ──
+// An incident cannot be closed while any patient on it is still open, meaning not handed over,
+// self-evacuated, deceased or closed. Rescue command (rpc/rcc) and medical command may close;
+// only medical command (pc/cc/chamal/physician) and admin may override, with a mandatory reason
+// that goes into the event log with the list of patients still open. Logged in, the server's
+// close_incident() is the authority (a direct table update is rejected by a trigger). Local demo
+// mode applies the same rule to its local patients.
+const INCIDENT_CLOSE_ROLES=new Set(['pc','cc','chamal','admin','physician','rpc','rcc']);
+const INCIDENT_CLOSE_OVERRIDE_ROLES=new Set(['pc','cc','chamal','admin','physician']);
+// 'evacuated' exists only in local demo data (not in the server's patient_status enum).
+const LOCAL_PATIENT_CLOSED_OUT_STATUSES=new Set(['handed_over','closed','self_evacuated','deceased','evacuated']);
+let _incidentCloseCtx=null; // {mode:'server'|'local', role, siteId, openPatients, canOverride}
+
+function isIncidentClosedForSite(siteId){
+  if(currentUser) return activeIncident?.status==='closed';
+  return ensureSiteStatusFields(siteId).incidentStatus==='closed';
+}
+function localOpenPatientsForSite(siteId){
+  return getSitePatients(siteId).filter(p=>!LOCAL_PATIENT_CLOSED_OUT_STATUSES.has(p.patientStatus||'identified'));
+}
+function toggleActiveIncidentClosed(){
+  if(!currentUser) return;
+  rescueToggleIncidentClosed(currentUser.role, 'SITE_A');
+}
+async function callIncidentCloseRpc(name, params){
+  const client=getSupabaseClient();
+  if(!client){ toast('אין חיבור לשרת, לא ניתן לשנות סטטוס אירוע'); return null; }
+  let r;
+  try{ r=await client.rpc(name, params); }catch(e){ r={error:e}; }
+  if(r.error || !r.data){ toast('הפעולה נכשלה: '+(r.error?.message||'אין חיבור לשרת')); return null; }
+  return r.data;
+}
+async function requestIncidentClose(role, siteId){
+  if(currentUser){
+    role=currentUser.role; // the server decides by the signed-in role, never the rendered view
+    if(!INCIDENT_CLOSE_ROLES.has(role)){ toast('אין הרשאה לסגור אירוע'); return; }
+    if(!activeIncident){ toast('אין אירוע פעיל'); return; }
+    if(activeIncident.status==='draft'){ toast('טיוטת אירוע: יש לאשר או לדחות אותה, לא לסגור'); return; }
+    const r=await callIncidentCloseRpc('close_incident', {p_incident_id:activeIncident.id, p_device_id:getDeviceId(), p_local_event_id:`incident-close-${newUuid()}`});
+    if(!r) return;
+    if(r.closed){ applyServerIncidentStatus('closed', role, 'האירוע נסגר'); return; }
+    showIncidentCloseModal({mode:'server', role, siteId, openPatients:r.open_patients||[], canOverride:!!r.can_override});
+    return;
+  }
+  if(!INCIDENT_CLOSE_ROLES.has(role)){ toast('אין הרשאה לסגור אירוע'); return; }
+  const open=localOpenPatientsForSite(siteId);
+  if(!open.length){ applyLocalIncidentClose(role, siteId, null, []); return; }
+  showIncidentCloseModal({mode:'local', role, siteId,
+    openPatients:open.map(p=>({id:p.id, visual_id:p.visualId||p.id, triage:p.triage, status:p.patientStatus||'identified'})),
+    canOverride:INCIDENT_CLOSE_OVERRIDE_ROLES.has(role)});
+}
+async function requestIncidentReopen(role, siteId){
+  if(!confirm('לפתוח את האירוע מחדש?')) return;
+  if(currentUser){
+    role=currentUser.role;
+    if(!activeIncident) return;
+    const r=await callIncidentCloseRpc('reopen_incident', {p_incident_id:activeIncident.id, p_device_id:getDeviceId(), p_local_event_id:`incident-reopen-${newUuid()}`});
+    if(!r) return;
+    applyServerIncidentStatus(r.status||'active', role, 'האירוע נפתח מחדש');
+    return;
+  }
+  const s=ensureSiteStatusFields(siteId);
+  s.incidentStatus='official';
+  s.lastRescueStatusChange={type:'close',by:role,byLabel:rescueReporterLabel(role),detail:'האירוע נפתח מחדש',at:Date.now()};
+  saveLocalEvent({type:'INCIDENT_CLOSE_TOGGLED',detail:`reopened by ${role} at ${siteId}`,payload_json:{role,siteId,newStatus:s.incidentStatus,timestamp:new Date().toISOString()}});
+  saveDemoState();
+  renderRoleDashboard(role);
+  toast('האירוע נפתח מחדש');
+}
+// Logged in: the server already wrote INCIDENT_CLOSED / INCIDENT_REOPENED to the event log, so no
+// local event is queued here (it would be a duplicate).
+function applyServerIncidentStatus(status, role, detail){
+  if(!activeIncident) return;
+  activeIncident.status=status;
+  persistActiveIncident();
+  const s=ensureSiteStatusFields('SITE_A');
+  s.lastRescueStatusChange={type:'close',by:role,byLabel:['rpc','rcc'].includes(role)?rescueReporterLabel(role):(ROLE_LABELS[role]||role),detail,at:Date.now()};
+  renderIncidentContext();
+  if(document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard(activeRoleDashboard);
+  refreshIncidentContext();
+  toast(detail);
+}
+function applyLocalIncidentClose(role, siteId, overrideReason, openPatients){
+  const s=ensureSiteStatusFields(siteId);
+  s.incidentStatus='closed';
+  const detail=overrideReason?`האירוע נסגר בעקיפה (${openPatients.length} פצועים טרם נמסרו)`:'האירוע נסגר';
+  s.lastRescueStatusChange={type:'close',by:role,byLabel:['rpc','rcc'].includes(role)?rescueReporterLabel(role):(ROLE_LABELS[role]||role),detail,at:Date.now()};
+  saveLocalEvent({type:'INCIDENT_CLOSE_TOGGLED',detail:`closed by ${role} at ${siteId}${overrideReason?' (override)':''}`,warn:!!overrideReason,
+    payload_json:{role,siteId,newStatus:'closed',override_reason:overrideReason||null,open_patient_count:openPatients.length,open_patient_ids:openPatients.map(p=>p.id),timestamp:new Date().toISOString()}});
+  saveDemoState();
+  renderRoleDashboard(role);
+  toast(detail);
+}
+function showIncidentCloseModal(ctx){
+  _incidentCloseCtx=ctx;
+  const n=ctx.openPatients.length;
+  const title=document.getElementById('incident-close-title');
+  if(title) title.textContent='לא ניתן לסגור את האירוע';
+  const sub=document.getElementById('incident-close-sub');
+  if(sub) sub.textContent=`${n} פצועים באירוע טרם נמסרו (לא הועברו, לא פונו עצמאית ולא נקבע מוות). יש להשלים מסירה לפני סגירה.`
+    +(ctx.canOverride?' פיקוד רפואה רשאי לסגור בעקיפה עם סיבה מתועדת.':' רק חוג״ד / מ״פ רפואה / חמ״ל / רופא רשאים לסגור בעקיפה.');
+  const list=document.getElementById('incident-close-list');
+  if(list) list.innerHTML=ctx.openPatients.map(p=>`<div class="close-guard-row"><strong>${escAttr(p.visual_id||p.id||'')}</strong><span>${escAttr(TRIAGE_LABELS[p.triage]||p.triage||'')} · ${escAttr(STATUS_LABELS[p.status]||p.status||'')}</span></div>`).join('');
+  const override=document.getElementById('incident-close-override');
+  if(override) override.style.display=ctx.canOverride?'':'none';
+  const btn=document.getElementById('incident-close-override-btn');
+  if(btn){ btn.style.display=ctx.canOverride?'':'none'; btn.disabled=false; }
+  const reason=document.getElementById('incident-close-reason');
+  if(reason) reason.value='';
+  const err=document.getElementById('incident-close-error');
+  if(err) err.textContent='';
+  document.getElementById('incident-close-modal')?.classList.remove('hidden');
+}
+function hideIncidentCloseModal(){
+  _incidentCloseCtx=null;
+  document.getElementById('incident-close-modal')?.classList.add('hidden');
+}
+function closeIncidentCloseModal(e){ if(e.target.id==='incident-close-modal') hideIncidentCloseModal(); }
+async function submitIncidentCloseOverride(){
+  const ctx=_incidentCloseCtx;
+  if(!ctx || !ctx.canOverride) return;
+  const reason=(document.getElementById('incident-close-reason')?.value||'').trim();
+  const err=document.getElementById('incident-close-error');
+  if(!reason){ if(err) err.textContent='חובה לציין סיבה לסגירה בעקיפה'; return; }
+  if(ctx.mode==='local'){
+    hideIncidentCloseModal();
+    applyLocalIncidentClose(ctx.role, ctx.siteId, reason, ctx.openPatients);
+    return;
+  }
+  if(!activeIncident) return;
+  const btn=document.getElementById('incident-close-override-btn');
+  if(btn) btn.disabled=true;
+  const r=await callIncidentCloseRpc('close_incident', {p_incident_id:activeIncident.id, p_override_reason:reason, p_device_id:getDeviceId(), p_local_event_id:`incident-close-${newUuid()}`});
+  if(btn) btn.disabled=false;
+  if(!r) return;
+  if(!r.closed){
+    // The server refused (for example the role changed); show its current answer, keep the reason.
+    showIncidentCloseModal({...ctx, openPatients:r.open_patients||[], canOverride:!!r.can_override});
+    const el=document.getElementById('incident-close-reason');
+    if(el) el.value=reason;
+    return;
+  }
+  hideIncidentCloseModal();
+  applyServerIncidentStatus('closed', ctx.role, `האירוע נסגר בעקיפה (${r.open_patient_count||0} פצועים טרם נמסרו)`);
+}
 async function refreshActiveIncidentStatus(){
   if(!activeIncident || !currentUser) return;
   const listed=_openIncidents.find(i=>i.id===activeIncident.id);
@@ -11133,6 +11310,13 @@ function renderIncidentContext(){
       strip.className='incident-strip'+(st==='draft'?' draft':st==='closed'?' closed':'');
       const label=strip.querySelector('.incident-strip-text');
       if(label) label.textContent=`📍 ${incidentDisplayName(activeIncident)} · ${statusText}`;
+      const closeBtn=document.getElementById('incident-strip-close-btn');
+      if(closeBtn){
+        closeBtn.style.display=INCIDENT_CLOSE_ROLES.has(currentUser.role) && st!=='draft' && !rejected ? '' : 'none';
+        closeBtn.textContent=st==='closed'?'פתח אירוע מחדש':'סגור אירוע';
+      }
+      // The rescue-authority panel reads SITE_A's local status; keep it equal to the server's.
+      ensureSiteStatusFields('SITE_A').incidentStatus=st==='closed'?'closed':st==='draft'?'draft':'official';
     }else{
       strip.style.display='none';
     }

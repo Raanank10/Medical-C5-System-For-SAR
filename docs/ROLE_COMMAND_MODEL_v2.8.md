@@ -33,7 +33,7 @@ One piece of that ranking's reasoning stays redacted for RPC/RCC: the tourniquet
 This is the core authority decision in V2.8. As first responders, RPC/RCC can take the following actions **final, with no חוג״ד/מ״פ רפואה approval required**:
 
 - Declare the incident official and set T0.
-- Close or reopen the incident.
+- Close or reopen the incident. Since `database/040_close_incident_guard.sql` (V2.99.25) closing is blocked while any patient has not been handed over (or self-evacuated, or died). RPC/RCC still need no medical approval to close a fully handed-over incident, but they cannot override the block: only חוג״ד / מ״פ רפואה / חמ״ל / physician / admin can, with a mandatory reason that goes into the event log. This rule is enforced server-side (`close_incident()` plus a trigger), unlike the rest of this list.
 - Set building status: stable / unstable / progressive collapse / safe to enter.
 - Confirm the site is clear.
 

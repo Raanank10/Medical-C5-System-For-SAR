@@ -139,6 +139,31 @@ Verified live by impersonation (`set local role` + `request.jwt.claims`) inside 
 | internal helper called directly by `authenticated` | denied |
 | events written | `INCIDENT_DRAFT_CREATED`, `INCIDENT_CONFIRMED`, `INCIDENT_DRAFT_REJECTED`, `INCIDENT_OPENED`, each with the real `actor_role` |
 
+## Follow-up: incident close guard (`database/040`)
+
+Gap found while preparing the first PC+CC experiment (asked by the repo owner, verified live): the only close action in the app changed a local flag and logged `INCIDENT_CLOSE_TOGGLED` with no patient check, nothing on the server reacted to it, and `incidents_update` let pc/cc/chamal/admin/physician/rpc/rcc set `status='closed'` directly, again with no patient check. Design decided with the repo owner (2026-10-15): open patients block the close; medical command (pc/cc/chamal/physician) and admin may override with a mandatory reason; rescue command (rpc/rcc) may close but not override.
+
+New: `close_incident()`, `reopen_incident()` (`authenticated`-callable `SECURITY DEFINER`, own role check plus `app.can_access_incident`), `reject_draft()` redefined to pass the guard, and the trigger function `app.guard_incident_close()` (`SECURITY DEFINER`, `EXECUTE` revoked from `public`/`anon`/`authenticated`) on a `BEFORE UPDATE OF status` trigger. The RPCs set a transaction-local flag (`app.incident_close_via_rpc`) around their own update and clear it right after, which the trigger requires for a signed-in user's transition to `closed`. `get_advisors` after the change: the two new RPCs trip the same WARN class as the other lifecycle RPCs; no other new finding; the `app.` trigger function is not exposed.
+
+Verified live by impersonation inside a transaction that was always rolled back (post-rollback check: `TEST-INC-A` still `closed`, zero `INCIDENT_CLOSED`/`INCIDENT_REOPENED` events persisted). Fixture: `TEST-INC-A` reopened inside the transaction, 3 of its 5 patients open.
+
+| Check | Result |
+|---|---|
+| service path (no `auth.uid()`) sets status directly | allowed (migrations / service role unaffected) |
+| rpc direct `update incidents set status='closed'` | denied by the trigger (`42501`), even though `incidents_update` RLS allows rpc |
+| rpc `close_incident` without / with a reason | `closed:false`, `can_override:false`, 3 open patients listed |
+| medic `close_incident` | denied (`42501`) |
+| cc `close_incident` without a reason / with a blank reason | `closed:false`, `reason_required:true` |
+| cc `close_incident` with a reason | closed, `override:true`; `metadata.close_override` has reason, role `cc`, count 3; one `INCIDENT_CLOSED` event with actor_role `cc` |
+| cc `close_incident` again | `closed:true, changed:false` |
+| cc `reopen_incident`, then cc direct close in the same transaction | reopened + `INCIDENT_REOPENED`; direct close still denied (the flag does not leak past the RPC) |
+| every patient handed over, rpc `close_incident` | closed, `override:false` |
+| medic opens a draft; cc `close_incident` on it | denied (draft: confirm or reject) |
+| cc `reject_draft` on it | allowed (passes the guard) |
+| cc `reopen_incident` on the rejected draft | denied |
+
+Every other function that updates `incidents` (`confirm_draft`, `acknowledge_draft`, `finalize_incident_aar`) was checked: none sets `status='closed'`, so none is affected by the trigger.
+
 ## Explicitly not re-litigated here
 
 - T6 (leaked-password protection) and T5 (service-role key handling) — out of scope, not RLS/authorization, already tracked in `docs/THREAT_MODEL.md`.
