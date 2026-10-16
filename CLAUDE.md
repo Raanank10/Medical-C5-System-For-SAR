@@ -33,6 +33,7 @@ node scripts/smoke_v2_992_decision_support.js
 npm install
 npm run test:browser-smoke            # or: node scripts/browser_smoke_test.js
 node scripts/browser_incident_lifecycle_test.js   # logged-in incident picker/draft flow + close guard, stubbed Supabase client
+node scripts/browser_medic_assignment_test.js     # cross-device PC -> medic assignment: PC, medic and rescue tabs sharing one stubbed backend
 
 # Analytics package
 cd analytics/c5_sentinel_sar_analytics_v1_1
