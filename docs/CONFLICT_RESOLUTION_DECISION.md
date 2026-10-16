@@ -32,7 +32,7 @@ A hybrid of A, B, and C — not any single option alone:
 - **C provides the tie-break for what's left.** Once B is in place, only genuine same-field collisions remain (two devices both setting `current_triage` in the same window). Those are resolved by role authority order, decided by the user: **physician > paramedic > cc > pc > medic** — the user added `paramedic` to the ranking when resolving the physician-role prerequisite below, ranked as a clinical-seniority tier just under physician. A higher-authority role's edit to the same field always wins, regardless of which event's trigger happened to fire last on the server, as long as the two edits fall within a 5-minute collision window of each other (`app.resolve_field_authority()`, `database/021`) — outside that window it's treated as a legitimate later reassessment and falls back to plain last-write-wins, so an old authority edit can never permanently freeze a patient's state against real newer data. The 5-minute window is a reasoned starting default (client syncs every 45s plus offline-reconnect slack), not something this decision pinned exactly — adjustable from real field-drill data (`docs/FIELD_USABILITY_TEST_PLAN.md`).
 - **A provides the transparency layer on top.** Whenever C's authority rule causes an override — i.e. a lower-authority edit to a field loses to a higher-authority one — that event is written to `conflict_log` as a `PATIENT_FIELD_CONFLICT_DETECTED`-tagged row (`app.log_field_authority_conflict()`) and surfaced as a flag on the patient card plus a review-panel entry in the command view. The overridden medic's action is never silently lost from view, even though there's still always one deterministic winner and no real-time merge UI. Equal-rank genuine collisions (e.g. two medics, same field, same window) are also logged, at lower severity, on the reading that "surfaced, not silent" applies to any real silent-loss case, not only authority-decided ones.
 
-**Scope note**: the field-level mechanism only routes `PATIENT_TRIAGE_UPDATED`/`PATIENT_STATUS_UPDATED` through the authority tie-break — `PATIENT_TRIAGED_EXPECTANT`, `PATIENT_HANDED_OVER`, and the treatment-implied `stabilizing` status write keep their pre-existing guards unchanged. Those are lifecycle-terminal or side-effect writes, not the deliberate concurrent field edits this decision's running example (triage override vs. medication administration) describes.
+**Scope note**: the field-level mechanism only routes `PATIENT_TRIAGE_UPDATED`/`PATIENT_STATUS_UPDATED` through the authority tie-break — `PATIENT_HANDED_OVER` and the treatment-implied `stabilizing` status write keep their pre-existing guards unchanged. (`PATIENT_TRIAGED_EXPECTANT` originally did too; since `database/041` it goes through the same tie-break, see below.) Those are lifecycle-terminal or side-effect writes, not the deliberate concurrent field edits this decision's running example (triage override vs. medication administration) describes.
 
 ## Physician-role prerequisite — resolved
 
@@ -52,11 +52,30 @@ Follow-up decision from the user, after the roles above shipped: **paramedic sho
 
 `docs/FAILURE_MODE_REVIEW.md`'s F3 entry updated to "built"; `docs/ROADMAP.md`'s Phase 4 gate updated to reflect this item is built, not just decided (the field-usability-drill gate item remains open independently); `docs/PHASE_4_PLAN.md`'s §4E "build later" framing removed since this shipped ahead of Phase 4; `docs/ROLE_COMMAND_MODEL_v2.8.md` and `docs/AUTH_AND_ROLE_MODEL.md` updated for the two new roles; `docs/API_SURFACE_v1.2.md`/`docs/ARCHITECTURE.md` updated for the new field-level projection behavior, the new `conflict_log` conflict type, and the `sync-log` push response's new `field_conflicts` field. Later, the real physician-only clinical death confirmation above (`database/024`-`026`, `docs/API_SURFACE_v1.2.md`, `docs/ROLE_COMMAND_MODEL_v2.8.md`, `docs/RLS_AUDIT_v1.md`) shipped in the same client/server pattern, and the client-side `physician`/`doctor` naming duplication this whole build had introduced (`physician` mapped onto a separate `doctor` dashboard key) was consolidated to a single `physician` key throughout, once pointed out that they were always the same role.
 
-## Open question found while fixing triage sync (V2.99.27): expectant bypasses the tie-break
+## Expectant follows the same tie-break (decided 2026-10-16, `database/041`)
 
-Until V2.99.27 the field app never sent red/yellow/green triage to the server, so this tie-break had never actually been exercised by real field triage. Testing it live (role impersonation, rolled-back transaction, 2026-10-15):
+Found while fixing triage sync (V2.99.27): `project_patient_state()` handled `PATIENT_TRIAGED_EXPECTANT` in its own branch, outside `app.resolve_field_authority()`. Tested live (role impersonation, rolled-back transaction, 2026-10-15): medic yellow, then pc green, then medic red left the patient **green (set by pc)** with both medic values in `conflict_log`, as decided above, but the same medic's `PATIENT_TRIAGED_EXPECTANT` then made the patient **black / deceased**, overriding the pc's green. That branch also never recorded `triage_set_by_role` and kept the old `triage_recorded_at`.
 
-- medic sets yellow, then pc sets green, then medic sets red: the patient stays **green (set by pc)** and both medic values are recorded in `conflict_log`. Working as decided above.
-- the same medic then sends `PATIENT_TRIAGED_EXPECTANT`: the patient becomes **black / deceased**, overriding the pc's green. `project_patient_state()` handles `PATIENT_TRIAGED_EXPECTANT` in its own branch, which does not go through `app.resolve_field_authority()`.
+Decided by the repo owner after the 5-minute rule was explained:
 
-Not changed here, because which way it should go is a clinical-governance decision (`docs/CLINICAL_GOVERNANCE_REVIEW_FRAMEWORK.md`): letting the closest medic declare expectant immediately may be intended, or black may need the same authority rule (or physician confirmation, which `PATIENT_DEATH_CONFIRMED` already provides separately). Recorded so it is decided explicitly rather than by accident.
+- **Black follows the same rule as every other triage change.** Within 5 minutes of a different triage, the higher role wins (physician > paramedic > cc > pc > medic); a losing black is not applied (the patient is not made deceased) and is written to `conflict_log` as a high-severity `PATIENT_FIELD_CONFLICT_DETECTED`. More than 5 minutes apart, the later value wins as a reassessment.
+- **Reversing a black restores the previous status.** When a red/yellow/green triage wins over a black, the status the patient had before the black is restored (saved in `patients.pre_expectant_status`), or `identified` if none was saved.
+- **Added for consistency:** once a physician has confirmed the death (`PATIENT_DEATH_CONFIRMED`, physician-only), only a physician can move the triage away from black; anyone else's change is refused and logged. Without this, triage could read green while the status stays deceased, and `PATIENT_STATUS_UPDATED` never touches a deceased patient. A physician who reverses it also restores the status and clears `physician_death_confirmed_at/by` on the patient row; the confirmation stays in `death_confirmations` and the event log.
+- The black branch now records `triage_set_by_role`, `triage_set_by_event_id` and a fresh `triage_recorded_at` (plus the status equivalents), so later edits are compared against the right role and time.
+
+Verified live against the applied function, rolled back:
+
+| Scenario | Result |
+|---|---|
+| pc green, medic black 1 min later | stays green (by pc), status unchanged, 1 high-severity conflict (black lost to pc) |
+| pc green, medic black 10 min later | black / deceased (by medic), previous status `observing` saved |
+| medic black, pc green 2 min later | green, status restored to `evacuating`, conflict logged |
+| medic black, physician confirms death, pc green 30 min later | stays black / deceased, conflict logged |
+| same, then physician green | green, status restored, confirmation cleared on the patient row, `death_confirmations` row kept |
+| medic black, medic red 20 min later | red, status restored, no conflict |
+| untriaged patient, medic black | black / deceased |
+| handed-over patient, medic black | unchanged |
+| pc green, physician black 1 min later | black / deceased (by physician), conflict logged |
+| vitals and handover after the change | still project as before |
+
+The client needs no change: its pull merge already takes the server's triage and status for a synced patient (V2.99.27), so a medic whose black lost sees the patient return to the higher role's triage, and the triage reconciler does not re-send the losing black.
