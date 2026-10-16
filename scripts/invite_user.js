@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 // Invite a real user with their correct role baked in from the start.
 //
+// Fallback only: the normal path is the in-app admin screen ("ניהול משתמשים", V2.99.30), which
+// calls supabase/functions/admin-users and keeps the service-role key on the server. Use this
+// script when no admin account exists yet (e.g. to create the first admin).
+//
 // The Supabase dashboard's "Send invitation" button has no field for role/metadata — inviting
 // someone that way lands them with no working role (handle_new_user() now sets is_active=false
 // when role metadata is missing/invalid, on purpose; see database/008_auto_create_profile_on_signup.sql
