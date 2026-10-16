@@ -706,7 +706,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9929</div>
+      <div class="demo-kicker">Demo V2.9930</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -803,7 +803,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9929</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9930</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -813,7 +813,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9929</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9930</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -1756,10 +1756,21 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 
+<!-- ══════════════════════ MEDIC: ASSIGNED TO ANOTHER INCIDENT ══ -->
+<div id="assignment-switch-banner" style="display:none;position:fixed;left:8px;right:8px;top:8px;z-index:880;background:var(--accent);color:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 10px 40px rgba(0,0,0,.45);gap:8px;align-items:center">
+  <div id="assignment-switch-text" style="flex:1;min-width:0;font-weight:800;font-size:13px;line-height:1.4"></div>
+  <button class="demo-mini-btn" style="background:#fff;color:var(--accent);border-color:#fff;white-space:nowrap" onclick="switchToAssignedIncident()">עבור לאירוע</button>
+  <button class="demo-mini-btn" style="background:transparent;color:#fff;border-color:#fff;white-space:nowrap" onclick="dismissAssignmentSwitch()">לא עכשיו</button>
+</div>
+
 <!-- ══════════════════════ PC → MEDIC INCIDENT ASSIGNMENT MODAL ══ -->
 <div class="modal-overlay hidden" id="medic-assign-modal" onclick="closeMedicAssignModal(event)">
   <div class="modal-sheet">
     <div class="panic-title" style="color:var(--accent)" id="medic-assign-title">שיוך חובש לאירוע</div>
+    <div id="medic-assign-real-wrap" style="display:none">
+      <div class="field-label">חובש (חשבון אמיתי)</div>
+      <select id="medic-assign-real-medic" style="width:100%;margin-bottom:10px"></select>
+    </div>
     <div class="field-label">אירוע / מוקד</div>
     <div class="demo-actions" id="medic-assign-site-grid" style="margin:0 0 8px;grid-template-columns:1fr 1fr"></div>
     <div id="medic-assign-site-status" style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px"></div>
@@ -2730,7 +2741,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.29';
+const APP_VERSION = '2.99.30';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3829,6 +3840,7 @@ function rescueSetIncidentType(role, type, siteId=rescueActiveSiteId){
   s.lastRescueStatusChange={type:'incident_type',by:role,byLabel:rescueReporterLabel(role),detail:`סוג אירוע עודכן: ${INCIDENT_TYPE_LABELS[type]||type}`,at:Date.now()};
   saveLocalEvent({type:'INCIDENT_TYPE_SET',detail:`${type} by ${role} at ${siteId}`,payload_json:{role,siteId,incidentType:type,timestamp:new Date().toISOString()}});
   saveDemoState();
+  if(currentUser && activeIncident && siteId==='SITE_A') writeIncidentTypeToServer(activeIncident.id, type, role);
   renderRoleDashboard(role);
   showIncidentTypeBriefModal(type, siteId);
 }
@@ -3925,14 +3937,12 @@ function renderEnrouteIncidentContext(){
   if(!card) return;
   const siteId=currentSiteId();
   const s=ensureSiteStatusFields(siteId);
-  const a=medicIncidentAssignments[currentMedicId()];
+  const a=myIncidentAssignment();
   const typeLabel=s.incidentType?incidentTypeLabel(siteId):(siteHasBuildingCollapse(siteId)?'קריסת מבנה · סוג אירוע טרם נבחר':'סוג אירוע טרם נבחר');
   const badge=`<div style="text-align:center;margin-bottom:10px"><span class="badge badge-red" style="display:inline-block;animation:blink 1.2s infinite;font-size:13px;padding:7px 12px">התרעה: ${escAttr(typeLabel)}</span></div>`;
   let body;
   if(a){
     const sitePts=getSitePatients(siteId).length;
-    const offlineOnly=currentUser && a.siteId!=='SITE_A'
-      ? `<div class="role-row-sub" style="color:var(--red)">שיוך מקומי בלבד: בחשבון מחובר החובש נשאר ב${escAttr(siteShortName('SITE_A'))} עד שיוך בשרת.</div>`:'';
     body=`<div class="role-row" style="border-color:var(--accent)">
       <div class="role-row-title">שובצת לאירוע ע״י ${escAttr(a.assignedByName)} · ${escAttr(siteShortName(a.siteId))} · ${timeAgoLabel(a.assignedAt)}</div>
       <div class="role-row-sub">מידע קיים (ניתן לתקן בשדות למטה):</div>
@@ -3941,7 +3951,6 @@ function renderEnrouteIncidentContext(){
       <div class="role-row-sub">• ${sitePts} פצועים כבר רשומים באתר (כולל דיווחי חילוץ ראשוניים)</div>
       ${a.address?`<div class="role-row-sub">• כתובת מחוג"ד: ${escAttr(a.address)}</div>`:''}
       ${a.note?`<div class="role-row-sub">• הערת חוג"ד: ${escAttr(a.note)}</div>`:''}
-      ${offlineOnly}
     </div>`;
   }else{
     body=`<div class="role-row">
@@ -3964,14 +3973,14 @@ function renderEnrouteIncidentContext(){
       note.textContent=`${incidentTypeSourceLabel(siteId)} · לחיצה על סוג אחר תדווח פער לחוג"ד ולא תשנה את הסוג.`;
     }else{
       note.style.color='var(--muted)';
-      note.textContent=s.incidentType?`${incidentTypeSourceLabel(siteId)} · חילוץ יכול לעדכן את הסוג בהמשך.`:'בחירת סוג אירוע מציגה תבנית פציעות צפויה.';
+      note.textContent=s.incidentType?`${incidentTypeSourceLabel(siteId)}${currentUser?' · נשמר במכשיר שלך בלבד':''} · חילוץ יכול לעדכן את הסוג בהמשך.`:'בחירת סוג אירוע מציגה תבנית פציעות צפויה.';
     }
   }
 }
 // Prefill only empty fields (same rule as the existing siteData prefill in goTo('enroute')),
 // so nothing the medic already typed is ever overwritten.
 function applyEnrouteAssignmentPrefill(){
-  const a=medicIncidentAssignments[currentMedicId()];
+  const a=myIncidentAssignment();
   const addrSrc=document.getElementById('enroute-address-source');
   const notesSrc=document.getElementById('enroute-notes-source');
   if(addrSrc) addrSrc.textContent='';
@@ -3994,13 +4003,22 @@ function logEnroutePrefillCorrections(address, notes){
     saveLocalEvent({type:'SITE_PREFILL_CORRECTED',detail:`חובש תיקן ${field==='address'?'כתובת':'הערה'} שמולאה ע״י חוג"ד`,warn:false,payload_json:{field,from,to,source:'pc_assignment',siteId:currentSiteId(),timestamp:new Date().toISOString()}});
   });
 }
-function openMedicAssignModal(medicId){
+async function openMedicAssignModal(medicId){
   const modal=document.getElementById('medic-assign-modal');
   if(!modal) return;
-  const current=medicIncidentAssignments[medicId];
+  if(currentUser && !canAssignMedicsOnServer()){ toast(activeIncident?'אין לך הרשאה לשייך חובשים':'בחר/י קודם אירוע'); return; }
+  const real=canAssignMedicsOnServer();
+  const current=real?null:medicIncidentAssignments[medicId];
   pendingMedicAssign={medicId, siteId:current?.siteId||'SITE_A'};
-  document.getElementById('medic-assign-title').textContent=`שיוך ${displayUser(medicId)} לאירוע`;
-  document.getElementById('medic-assign-address').value=current?.address||siteAddressFromName(pendingMedicAssign.siteId);
+  document.getElementById('medic-assign-real-wrap').style.display=real?'block':'none';
+  if(real){
+    await loadRealMedicProfiles();
+    document.getElementById('medic-assign-real-medic').innerHTML=_realMedicProfiles.length
+      ? _realMedicProfiles.map(p=>`<option value="${escAttr(p.id)}">${escAttr(p.display_name||'חובש ללא שם')}${p.role==='paramedic'?' (פראמדיק)':''}</option>`).join('')
+      : '<option value="">לא נמצאו חשבונות חובש</option>';
+  }
+  document.getElementById('medic-assign-title').textContent=real?`שיוך חובש לאירוע ${incidentDisplayName(activeIncident)}`:`שיוך ${displayUser(medicId)} לאירוע`;
+  document.getElementById('medic-assign-address').value=real?(activeIncident.address||''):(current?.address||siteAddressFromName(pendingMedicAssign.siteId));
   document.getElementById('medic-assign-note').value=current?.note||'';
   renderMedicAssignSites();
   modal.classList.remove('hidden');
@@ -4012,8 +4030,12 @@ function renderMedicAssignSites(){
   const status=document.getElementById('medic-assign-site-status');
   if(status) status.textContent=siteStatusSummaryLine(pendingMedicAssign.siteId);
   const warning=document.getElementById('medic-assign-warning');
-  if(warning) warning.textContent=currentUser && pendingMedicAssign.siteId!=='SITE_A'
-    ? 'בחשבון מחובר אפשר לשייך כרגע רק ל'+siteShortName('SITE_A')+' - שיוך לאירוע אחר דורש שיוך בשרת (בפיתוח).':'';
+  if(warning){
+    warning.style.color=currentUser?'var(--muted)':'var(--red)';
+    warning.textContent=currentUser
+      ? 'השיוך נשמר בשרת ומגיע לטלפון של החובש תוך עד 45 שניות (או מיד כשיפתח את מסך התנועה).'
+      : 'מצב דמו מקומי: השיוך נשמר רק במכשיר הזה.';
+  }
 }
 function selectMedicAssignSite(siteId){
   const addr=document.getElementById('medic-assign-address');
@@ -4026,10 +4048,203 @@ function hideMedicAssignModal(){
   if(modal) modal.classList.add('hidden');
 }
 function closeMedicAssignModal(e){ if(e.target.id==='medic-assign-modal') hideMedicAssignModal(); }
-function confirmMedicAssignment(){
+// ── Real, cross-device PC → medic assignment + shared incident info (signed-in mode) ──
+// Uses only tables and access rules that already exist (verified live by rolled-back role
+// impersonation; see docs/ROLE_COMMAND_MODEL_v2.8.md):
+// - incident_memberships: command roles may insert/update any row; a medic reads its own. The
+//   membership is also what lets the medic join and push into that incident.
+// - incidents.address + incidents.metadata.medic_assignments[profileId] = {note, assigned_by_name,
+//   assigned_at}: written by the assigner, read by any incident member. A medic can't read other
+//   profiles, so the assigner's name travels inside metadata.
+// - incidents.incident_type + metadata.incident_type_set_by: written by rescue (rpc/rcc may update
+//   any incident), read by every phone in the incident. Only a status change is guarded
+//   (database/040), so these writes are unaffected by the close guard.
+// metadata is read-modify-write: two writers within the same instant can drop one change.
+let _realMedicProfiles=[];
+let _myDisplayName='';
+let _myRealAssignment=null; // newest assignment: {incidentId, siteId, assignedById, assignedByName, assignedAt, address, note, incident}
+let _activeIncidentRow=null; // {id, address, incident_type, metadata} of the active incident
+let _dismissedAssignmentKey=(()=>{ try{ return localStorage.getItem('c5_dismissed_assignment'); }catch(e){ return null; } })();
+let _assignmentPullBusy=false;
+const _pendingIncidentTypeWrites={}; // incidentId -> {type, role} while a rescue write hasn't landed
+function isSignedInMedic(){ return !!currentUser && ['medic','paramedic'].includes(currentUser.role); }
+function canAssignMedicsOnServer(){ return !!currentUser && !!activeIncident && INCIDENT_COMMAND_ROLES.has(currentUser.role); }
+// The assignment that applies to the screen in front of the user: local demo assignment, or (signed
+// in) the real one, but only while the medic is actually in that incident.
+function myIncidentAssignment(){
+  if(!currentUser) return medicIncidentAssignments[currentMedicId()];
+  const a=_myRealAssignment;
+  return a && activeIncident && a.incidentId===activeIncident.id ? a : null;
+}
+async function loadRealMedicProfiles(){
+  const client=getSupabaseClient();
+  if(!client || !currentUser) return;
+  try{
+    const res=await client.from('profiles').select('id,display_name,role').in('role',['medic','paramedic']).eq('is_active',true).order('display_name');
+    if(!res.error) _realMedicProfiles=res.data||[];
+    const me=await client.from('profiles').select('display_name').eq('id',currentUser.id).single();
+    _myDisplayName=me.data?.display_name||'';
+  }catch(e){}
+}
+async function updateIncidentWithMetadata(client, incidentId, patchFn){
+  const cur=await client.from('incidents').select('metadata').eq('id',incidentId).single();
+  if(cur.error) throw cur.error;
+  const patch=patchFn({...(cur.data?.metadata||{})});
+  const upd=await client.from('incidents').update(patch).eq('id',incidentId).select('id');
+  if(upd.error) throw upd.error;
+  if(!upd.data?.length) throw new Error('אין הרשאה לעדכן את האירוע');
+}
+async function assignRealMedic(profileId, address, note){
+  const client=getSupabaseClient();
+  if(!client || !activeIncident) throw new Error('אין חיבור לשרת');
+  const incidentId=activeIncident.id;
+  const medic=_realMedicProfiles.find(p=>p.id===profileId);
+  const nowIso=new Date().toISOString();
+  // 1. Address + note before the membership, so the medic never sees the assignment without them.
+  await updateIncidentWithMetadata(client, incidentId, metadata=>{
+    metadata.medic_assignments={...(metadata.medic_assignments||{}), [profileId]:{note, assigned_by_name:_myDisplayName||'חוג"ד', assigned_at:nowIso}};
+    return address ? {metadata, address} : {metadata};
+  });
+  // 2. The medic's membership: grants access and marks this as their current assignment (the
+  // medic phone takes the newest assigned membership).
+  const mem=await client.from('incident_memberships').upsert({incident_id:incidentId, profile_id:profileId, role_at_incident:medic?.role||'medic', assigned_by:currentUser.id, created_at:nowIso},{onConflict:'incident_id,profile_id'});
+  if(mem.error) throw mem.error;
+  if(address) activeIncident.address=address;
+}
+async function writeIncidentTypeToServer(incidentId, type, role){
+  const client=getSupabaseClient();
+  if(!client || !currentUser || !incidentId) return;
+  _pendingIncidentTypeWrites[incidentId]={type, role};
+  try{
+    await updateIncidentWithMetadata(client, incidentId, metadata=>{
+      metadata.incident_type_set_by={role, by_label:rescueReporterLabel(role), at:new Date().toISOString()};
+      return {incident_type:type, metadata};
+    });
+    if(_pendingIncidentTypeWrites[incidentId]?.type===type) delete _pendingIncidentTypeWrites[incidentId];
+    if(activeIncident?.id===incidentId) activeIncident.incident_type=type;
+  }catch(e){
+    toast('סוג האירוע נשמר במכשיר אך לא בשרת · ינסה שוב בסנכרון הבא');
+  }
+}
+// The server's incident type is the rescue/opening authority for the incident: it wins over a
+// type picked locally on this phone (docs/ROLE_COMMAND_MODEL_v2.8.md, "rescue wins").
+function applyServerIncidentType(row){
+  if(!row || !INCIDENT_TYPE_LABELS[row.incident_type]) return;
+  if(_pendingIncidentTypeWrites[row.id]) return; // this phone's own newer write hasn't landed yet
+  const s=ensureSiteStatusFields('SITE_A');
+  const by=row.metadata?.incident_type_set_by;
+  s.incidentType=row.incident_type;
+  s.incidentTypeSource=by ? {role:by.role||'rpc', byLabel:by.by_label||'חילוץ', at:Date.parse(by.at||'')||Date.now()}
+    : {role:'incident_open', byLabel:'פתיחת האירוע', at:Date.now()};
+}
+async function pullActiveIncidentRow(client){
+  if(!activeIncident) { _activeIncidentRow=null; return; }
+  let r;
+  try{ r=await client.from('incidents').select('id,address,incident_type,metadata').eq('id',activeIncident.id).single(); }catch(e){ return; }
+  if(r.error || !r.data) return;
+  _activeIncidentRow=r.data;
+  if(r.data.address) activeIncident.address=r.data.address;
+  if(r.data.incident_type) activeIncident.incident_type=r.data.incident_type;
+  applyServerIncidentType(r.data);
+}
+async function pullMyAssignment(client){
+  if(!isSignedInMedic()) return;
+  let res;
+  try{
+    res=await client.from('incident_memberships').select('incident_id,assigned_by,created_at')
+      .eq('profile_id',currentUser.id).not('assigned_by','is',null).order('created_at',{ascending:false}).limit(1);
+  }catch(e){ return; }
+  if(res.error) return;
+  const row=(res.data||[])[0];
+  if(!row || row.assigned_by===currentUser.id){ _myRealAssignment=null; return; }
+  let inc=activeIncident?.id===row.incident_id ? _activeIncidentRow : null;
+  let incMeta=null;
+  try{
+    const r=await client.from('incidents').select('id,visual_id,status,location_name,address,incident_type,metadata').eq('id',row.incident_id).single();
+    if(!r.error && r.data){ incMeta=r.data; inc=r.data; }
+  }catch(e){}
+  if(!inc || inc.status==='closed'){ _myRealAssignment=null; return; }
+  const meta=inc.metadata?.medic_assignments?.[currentUser.id]||{};
+  _myRealAssignment={incidentId:row.incident_id, siteId:'SITE_A', assignedById:row.assigned_by,
+    assignedByName:meta.assigned_by_name||'חוג"ד', assignedAt:Date.parse(row.created_at)||Date.now(),
+    address:inc.address||'', note:meta.note||'', incident:incMeta};
+}
+function assignmentKey(a){ return a ? `${a.incidentId}|${a.assignedAt}` : ''; }
+function renderAssignmentSwitchBanner(){
+  const el=document.getElementById('assignment-switch-banner');
+  if(!el) return;
+  const a=_myRealAssignment;
+  const show=!!(isSignedInMedic() && a && a.incident && activeIncident && a.incidentId!==activeIncident.id && _dismissedAssignmentKey!==assignmentKey(a));
+  el.style.display=show?'flex':'none';
+  if(!show) return;
+  document.getElementById('assignment-switch-text').textContent=`שובצת ע״י ${a.assignedByName} לאירוע ${incidentDisplayName(a.incident)}`;
+}
+async function switchToAssignedIncident(){
+  const a=_myRealAssignment;
+  if(!a?.incident) return;
+  rememberDismissedAssignment(assignmentKey(a));
+  renderAssignmentSwitchBanner();
+  await activateIncident(a.incident);
+  goTo('enroute');
+  toast(`עברת לאירוע ${incidentDisplayName(a.incident)}`);
+}
+function rememberDismissedAssignment(key){
+  _dismissedAssignmentKey=key;
+  try{ localStorage.setItem('c5_dismissed_assignment', key||''); }catch(e){}
+}
+function dismissAssignmentSwitch(){
+  rememberDismissedAssignment(assignmentKey(_myRealAssignment));
+  renderAssignmentSwitchBanner();
+}
+// A request that arrives while a pull is running must not be dropped: that running pull may have
+// read the server before the PC saved the assignment. Queue exactly one fresh pull after it, and
+// let every caller await the pull that will reflect its request.
+let _assignmentPullPromise=null, _assignmentPullQueued=null;
+function pullIncidentAssignmentState(){
+  if(!currentUser) return Promise.resolve();
+  if(_assignmentPullPromise){
+    if(!_assignmentPullQueued) _assignmentPullQueued=_assignmentPullPromise.then(()=>{ _assignmentPullQueued=null; return pullIncidentAssignmentState(); });
+    return _assignmentPullQueued;
+  }
+  _assignmentPullPromise=runIncidentAssignmentPull().finally(()=>{ _assignmentPullPromise=null; });
+  return _assignmentPullPromise;
+}
+async function runIncidentAssignmentPull(){
+  const client=getSupabaseClient();
+  if(!client) return;
+  _assignmentPullBusy=true;
+  try{
+    for(const [incId, w] of Object.entries(_pendingIncidentTypeWrites)) await writeIncidentTypeToServer(incId, w.type, w.role);
+    await pullActiveIncidentRow(client);
+    const prevKey=assignmentKey(_myRealAssignment);
+    await pullMyAssignment(client);
+    const a=_myRealAssignment;
+    if(a && assignmentKey(a)!==prevKey && a.incident){
+      // Not in any incident yet (picker on screen): go straight to the assigned one.
+      if(!activeIncident){ rememberDismissedAssignment(assignmentKey(a)); await activateIncident(a.incident); goTo('enroute'); toast(`שובצת לאירוע ${incidentDisplayName(a.incident)} ע״י ${a.assignedByName}`); }
+      else if(a.incidentId===activeIncident.id) toast(`שובצת לאירוע זה ע״י ${a.assignedByName} · מסך התנועה עודכן`);
+    }
+  }finally{ _assignmentPullBusy=false; }
+  renderAssignmentSwitchBanner();
+  if(activeScreenId()==='enroute'){ applyEnrouteAssignmentPrefill(); renderEnrouteIncidentContext(); }
+}
+async function confirmMedicAssignment(){
   const {medicId, siteId}=pendingMedicAssign;
+  if(currentUser){
+    if(!canAssignMedicsOnServer()){ toast('אין לך הרשאה לשייך חובשים'); return; }
+    const profileId=document.getElementById('medic-assign-real-medic')?.value;
+    if(!profileId){ toast('בחר/י חובש'); return; }
+    const address=document.getElementById('medic-assign-address')?.value.trim()||'';
+    const note=document.getElementById('medic-assign-note')?.value.trim()||'';
+    const name=_realMedicProfiles.find(p=>p.id===profileId)?.display_name||'החובש';
+    try{ await assignRealMedic(profileId, address, note); }
+    catch(e){ toast('השיוך לא נשמר בשרת: '+(e?.message||'שגיאה')); return; }
+    saveLocalEvent({type:'MEDIC_ASSIGNED_TO_INCIDENT',detail:`${name} שובץ ל${incidentDisplayName(activeIncident)} (שרת)`,warn:false,payload_json:{profileId,incidentId:activeIncident.id,address,note,server:true,timestamp:new Date().toISOString()}});
+    hideMedicAssignModal();
+    toast(`${name} שובץ לאירוע · יגיע לטלפון שלו תוך עד 45 שניות`);
+    return;
+  }
   if(!medicId) return;
-  if(currentUser && siteId!=='SITE_A'){ toast('שיוך לאירוע אחר דורש שיוך בשרת - לא נשמר'); return; }
   const pc=DEMO_PLATOONS.find(pl=>pl.platoonId===(DEMO_USERS.find(u=>u.userId===medicId)?.platoonId||'PLT-A'));
   const assignedById=pc?.pcId||'USR-BARAK';
   const address=document.getElementById('medic-assign-address')?.value.trim()||'';
@@ -5401,7 +5616,8 @@ function renderPcMedicLoadBoard(myPts){
     const focus={role:'pc',type:'cc_decision',id:`medic-${u.userId}`,label:displayUser(u.userId),patientIds:pts.map(p=>p.id)};
     return renderPcMedicPanel({userId:u.userId,assignedSiteId:medicIncidentAssignments[u.userId]?.siteId||null,name:displayUser(u.userId),pts:pts.length,red,trapped,tqs,mins,overloaded,silent,status,focus});
   }).join('');
-  const grid=panels?`<div class="panel-grid">${panels}</div>`:'';
+  const assignBtn=canAssignMedicsOnServer()?`<button class="demo-mini-btn" style="width:100%;margin-bottom:8px;background:var(--accent);border-color:var(--accent);color:#fff" onclick="openMedicAssignModal(null)">שייך חובש לאירוע</button>`:'';
+  const grid=panels?`${assignBtn}<div class="panel-grid">${panels}</div>`:assignBtn;
   return renderCollapsibleSection('pc-medic-load','עומס חובשים',grid || renderOperationalEmptyState('אין פצועים במיקוד הנוכחי'), medics.length, {emptyMessage:'אין פצועים במיקוד הנוכחי'});
 }
 function renderPcResponsibilityBoard(){
@@ -6325,6 +6541,7 @@ function goTo(screen){
     const zone=document.getElementById('enroute-zone'); if(zone && !zone.value) zone.value=siteData.currentZone||'';
     applyEnrouteAssignmentPrefill();
     renderEnrouteIncidentContext();
+    if(currentUser) pullIncidentAssignmentState();
   }
   if(screen==='aar')       renderAar();
   updateDemoStatus();
@@ -11068,6 +11285,8 @@ async function enterIncidentContextAfterLogin(){
     if(!listed){ await activateIncident(stored); return; }
   }
   openIncidentPicker();
+  // A medic the PC already assigned goes straight into that incident (pullIncidentAssignmentState).
+  pullIncidentAssignmentState();
 }
 function freshSiteAuthority(){
   return {incidentStatus:'draft', t0:null, buildingStatus:null, incidentType:null, siteClear:{cleared:false,clearedAt:null,clearedByRole:null}, lastRescueStatusChange:null};
@@ -11111,9 +11330,13 @@ async function activateIncident(inc){
   pullIncidentCommandStateAll();
   pullSyncIngestionErrorsAll();
   pullFieldConflictsAll();
+  pullIncidentAssignmentState();
 }
 function deactivateIncidentContext(){
   activeIncident=null;
+  _myRealAssignment=null;
+  _activeIncidentRow=null;
+  renderAssignmentSwitchBanner();
   _workingIncidentId=null;
   _openIncidents=[];
   _incidentOverviewState={};
@@ -11409,6 +11632,7 @@ async function refreshIncidentContext(){
   await refreshOpenIncidents();
   await refreshActiveIncidentStatus();
   renderIncidentContext();
+  await pullIncidentAssignmentState();
 }
 setInterval(()=>{ if(currentUser) refreshIncidentContext(); }, 45000);
 function renderIncidentContext(){
