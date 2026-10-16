@@ -51,3 +51,12 @@ Follow-up decision from the user, after the roles above shipped: **paramedic sho
 ## What this decision produced
 
 `docs/FAILURE_MODE_REVIEW.md`'s F3 entry updated to "built"; `docs/ROADMAP.md`'s Phase 4 gate updated to reflect this item is built, not just decided (the field-usability-drill gate item remains open independently); `docs/PHASE_4_PLAN.md`'s §4E "build later" framing removed since this shipped ahead of Phase 4; `docs/ROLE_COMMAND_MODEL_v2.8.md` and `docs/AUTH_AND_ROLE_MODEL.md` updated for the two new roles; `docs/API_SURFACE_v1.2.md`/`docs/ARCHITECTURE.md` updated for the new field-level projection behavior, the new `conflict_log` conflict type, and the `sync-log` push response's new `field_conflicts` field. Later, the real physician-only clinical death confirmation above (`database/024`-`026`, `docs/API_SURFACE_v1.2.md`, `docs/ROLE_COMMAND_MODEL_v2.8.md`, `docs/RLS_AUDIT_v1.md`) shipped in the same client/server pattern, and the client-side `physician`/`doctor` naming duplication this whole build had introduced (`physician` mapped onto a separate `doctor` dashboard key) was consolidated to a single `physician` key throughout, once pointed out that they were always the same role.
+
+## Open question found while fixing triage sync (V2.99.27): expectant bypasses the tie-break
+
+Until V2.99.27 the field app never sent red/yellow/green triage to the server, so this tie-break had never actually been exercised by real field triage. Testing it live (role impersonation, rolled-back transaction, 2026-10-15):
+
+- medic sets yellow, then pc sets green, then medic sets red: the patient stays **green (set by pc)** and both medic values are recorded in `conflict_log`. Working as decided above.
+- the same medic then sends `PATIENT_TRIAGED_EXPECTANT`: the patient becomes **black / deceased**, overriding the pc's green. `project_patient_state()` handles `PATIENT_TRIAGED_EXPECTANT` in its own branch, which does not go through `app.resolve_field_authority()`.
+
+Not changed here, because which way it should go is a clinical-governance decision (`docs/CLINICAL_GOVERNANCE_REVIEW_FRAMEWORK.md`): letting the closest medic declare expectant immediately may be intended, or black may need the same authority rule (or physician confirmation, which `PATIENT_DEATH_CONFIRMED` already provides separately). Recorded so it is decided explicitly rather than by accident.

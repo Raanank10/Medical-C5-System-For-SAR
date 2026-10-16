@@ -701,7 +701,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9926</div>
+      <div class="demo-kicker">Demo V2.9927</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -798,7 +798,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9926</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9927</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -808,7 +808,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9926</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9927</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2705,7 +2705,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.26';
+const APP_VERSION = '2.99.27';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -4183,6 +4183,7 @@ function clearDemoPatientsOnly({confirmReset=true}={}){
 }
 function saveDemoState(){
   if(_demoSandbox) return Promise.resolve();
+  reconcileTriageSync();
   return runSerialized(DEMO_STORAGE_KEY, async ()=>{
     try{
       const raw=await secureGetItem(DEMO_STORAGE_KEY);
@@ -11245,6 +11246,7 @@ function currentIncidentId(siteId){
 }
 async function syncPush(){
   if(!currentUser) return; // local-demo mode: never touches the network
+  reconcileTriageSync();
   const client=getSupabaseClient();
   if(!client) return;
   const outbox=getOutbox();
@@ -11393,6 +11395,44 @@ function accessibilityFromServerStatus(access_status){
   if(access_status==='free') return {accessibility:'full', trapStatus:'not_trapped'};
   return {accessibility:null, trapStatus:null};
 }
+// ── Triage sync (V2.99.27) ──
+// Before V2.99.27 field triage never reached the server: no code path sent
+// PATIENT_TRIAGE_UPDATED, and the black paths (sweep "not salvageable", patient-card override)
+// sent only client-only event types. project_patient_state() sets current_triage only from
+// PATIENT_TRIAGE_UPDATED or PATIENT_TRIAGED_EXPECTANT, so every human-created patient stayed
+// 'pending' on the server, on every other device, and in the command counts.
+// Rather than patching each of the ~12 places that set p.triage (and missing the next one),
+// this reconciler compares each patient's local triage with the last value known to be on the
+// server (p._triageSyncRef) and emits the server event when they differ. It runs after every
+// local save and before every push.
+const TRIAGE_SYNC_ROLES=new Set(['medic','paramedic','pc','physician','admin']); // roles sync-log lets write these events
+const PATIENT_CREATE_SYNC_TYPES=new Set(['PATIENT_CREATED','QUICK_PATIENT_CREATED','FIRST_RESPONDER_REPORT']);
+function reconcileTriageSync(){
+  // Never inside the sandboxed briefing demo: its patients are invented and get restored away.
+  if(_demoSandbox || !currentUser || !activeIncident || !TRIAGE_SYNC_ROLES.has(currentUser.role)) return;
+  const outbox=getOutbox();
+  for(const p of patients){
+    const desired=p.triage;
+    if(!['red','yellow','green','black'].includes(desired)) continue;
+    if(p._triageSyncRef===desired) continue;
+    // Never before the patient exists server-side: the triage event's patient_id FK would fail
+    // and the event would be rejected. Deferred, not dropped - the next run picks it up.
+    const known=p._serverVersion!=null || p.sourcedFromRemote
+      || outbox.some(e=>e.patient_id===p.id && PATIENT_CREATE_SYNC_TYPES.has(e.type) && !e.syncRejected);
+    if(!known) continue;
+    const previous=p._triageSyncRef||null;
+    if(desired==='black'){
+      // Same event the full-assessment fast exit already uses; projection sets triage black and
+      // status deceased, matching what the client itself does locally for black.
+      saveLocalEvent({type:'PATIENT_TRIAGED_EXPECTANT', detail:`${p.visualId||p.id} · סיווג שחור סונכרן לשרת`, warn:true, patient_id:p.id,
+        payload_json:{current_triage:'black', previous_triage:previous, source:'triage_sync', siteId:p.siteId}});
+    }else{
+      saveLocalEvent({type:'PATIENT_TRIAGE_UPDATED', detail:`${p.visualId||p.id} · סיווג ${TRIAGE_LABELS[desired]||desired} סונכרן לשרת`, warn:desired==='red', patient_id:p.id,
+        payload_json:{triage:desired, previous_triage:previous, source:'triage_sync', siteId:p.siteId}});
+    }
+    p._triageSyncRef=desired;
+  }
+}
 function applyProjectedPatientState(rows){
   if(!rows || !rows.length) return;
   const pending=patientsWithPendingLocalEdits();
@@ -11400,13 +11440,20 @@ function applyProjectedPatientState(rows){
   for(const row of rows){
     if(pending.has(row.id)) continue; // local edit wins until pushed
     const access=accessibilityFromServerStatus(row.access_status);
-    const triage=VALID_LOCAL_TRIAGE.has(row.current_triage) ? row.current_triage : null;
+    const serverTriage=VALID_LOCAL_TRIAGE.has(row.current_triage) ? row.current_triage : null;
     const status=VALID_LOCAL_STATUS.has(row.current_status) ? row.current_status : null;
     const existing=patients.find(x=>x.id===row.id);
     if(existing){
       if(existing._serverVersion!=null && row.version!=null && row.version<=existing._serverVersion) continue;
       const before=JSON.stringify([existing.triage,existing.patientStatus,existing.accessibility,existing.trapStatus,existing.needsFullAssessment,existing.fullName,existing.temporaryDescription,existing.physicianDeathConfirmedAt]);
-      existing.triage=triage;
+      // Server 'pending'/null means the server has no triage for this patient yet (e.g. a patient
+      // created before V2.99.27, whose field triage never reached the server) - it must never
+      // overwrite a real triage the medic set locally. reconcileTriageSync() then sends it up.
+      // Any real server value (including a higher-authority override from the F3 role tie-break,
+      // docs/CONFLICT_RESOLUTION_DECISION.md) still wins locally, and becomes the sync reference
+      // so it is not echoed back to the server.
+      if(serverTriage && serverTriage!=='pending'){ existing.triage=serverTriage; existing._triageSyncRef=serverTriage; }
+      else if(!existing.triage || existing.triage==='pending'){ existing.triage=serverTriage; }
       if(status) existing.patientStatus=status;
       existing.accessibility=access.accessibility;
       existing.trapStatus=access.trapStatus;
@@ -11433,7 +11480,7 @@ function applyProjectedPatientState(rows){
       // it's visible at all, rather than staying invisible until this device happens to touch it.
       changed=true;
       patients.push({
-        id:row.id, visualId:row.visual_id, triage, accessibility:access.accessibility, trapStatus:access.trapStatus,
+        id:row.id, visualId:row.visual_id, triage:serverTriage, _triageSyncRef:serverTriage, accessibility:access.accessibility, trapStatus:access.trapStatus,
         location:'לא צוין (התקבל ממכשיר אחר)', locDetail:'',
         injury:null, injuryZones:[], patientStatus:status||'identified',
         needsFullAssessment:!!row.needs_full_assessment,
