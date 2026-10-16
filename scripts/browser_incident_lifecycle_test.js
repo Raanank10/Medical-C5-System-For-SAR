@@ -1,7 +1,9 @@
 // Real-browser test of the logged-in incident lifecycle UI (V2.99.26, database/038): the app
 // starts with no incident and no patients, a medic opens a draft incident, events are pinned to
 // that incident at creation, command sees the pulsing approval banner and confirms it, and the
-// local demo mode still works after sign-out.
+// local demo mode still works after sign-out. Also the incident close guard (V2.99.28,
+// database/040): no close while patients are open, medical-command override with a mandatory
+// reason, no override for rescue command, and the same rule in local demo mode.
 //
 // The Supabase client and the sync-log Edge Function are STUBBED here (an in-page fake that
 // mimics the database/038 RPC contracts), so this proves client behavior only - it does not
@@ -30,7 +32,8 @@ const FAKE_SUPABASE = `
     'medic@test':{id:'11111111-1111-4111-8111-111111111111',role:'medic'},
     'pc@test':{id:'22222222-2222-4222-8222-222222222222',role:'pc'},
     'cc@test':{id:'33333333-3333-4333-8333-333333333333',role:'cc'},
-    'logo@test':{id:'44444444-4444-4444-8444-444444444444',role:'logistics_officer'}
+    'logo@test':{id:'44444444-4444-4444-8444-444444444444',role:'logistics_officer'},
+    'rpc@test':{id:'55555555-5555-4555-8555-555555555555',role:'rpc'}
   };
   const load=(k,d)=>{ try{ return JSON.parse(localStorage.getItem('__fake_'+k))??d; }catch(e){ return d; } };
   const save=(k,v)=>localStorage.setItem('__fake_'+k, JSON.stringify(v));
@@ -92,6 +95,21 @@ const FAKE_SUPABASE = `
       if(name==='acknowledge_draft'){ inc.draft_acknowledged_at=new Date().toISOString(); }
       save('incidents',incidents);
       return ok({id:inc.id});
+    }
+    // database/040 contract. Open patients per incident come from __fake_openpatients.
+    if(name==='close_incident'||name==='reopen_incident'){
+      if(!['pc','cc','chamal','admin','physician','rpc','rcc'].includes(me.role)) return fail('role '+me.role+' cannot close an incident');
+      if(!inc) return fail('not found');
+      if(name==='reopen_incident'){ if(inc.status!=='closed') return ok({status:inc.status,changed:false}); inc.status='active'; save('incidents',incidents); return ok({status:'active',changed:true}); }
+      if(inc.status==='closed') return ok({closed:true,changed:false});
+      if(inc.status==='draft') return fail('draft');
+      const open=(load('openpatients',{})[inc.id])||[];
+      const canOverride=command;
+      const reason=(params.p_override_reason||'').trim()||null;
+      if(open.length && (!reason||!canOverride)) return ok({closed:false,open_patient_count:open.length,open_patients:open,can_override:canOverride,reason_required:canOverride});
+      inc.status='closed'; if(open.length) inc.metadata={...(inc.metadata||{}),close_override:{reason,role:me.role}};
+      save('incidents',incidents);
+      return ok({closed:true,changed:true,override:open.length>0,open_patient_count:open.length});
     }
     if(name==='get_incident_command_state') return ok(inc?{incident_id:inc.id,status:inc.status,active_red_patients:2,total_patients:5,patients_missing_full_vitals:1,active_watchdog_alerts:3,state_json:{}}:null);
     return ok(null);
@@ -280,6 +298,32 @@ async function checkFile(browser, file) {
   assert(await page.evaluate(() => patients.length === 0), `${rel}: logged-in PC dashboard must not auto-load demo patients`);
   assert((await page.textContent('#incident-context-strip')).includes('פעיל'), `${rel}: strip should show the confirmed incident as active`);
 
+  // 6b. Close guard (V2.99.28): PC cannot close while patients are open; override needs a reason.
+  await page.evaluate((id) => localStorage.setItem('__fake_openpatients', JSON.stringify({ [id]: [
+    { id: 'p1', visual_id: 'P101', triage: 'red', status: 'evacuating' },
+    { id: 'p2', visual_id: 'P102', triage: 'pending', status: 'identified' }] })), draftId);
+  const stripClose = page.locator('#incident-strip-close-btn');
+  assert(await stripClose.isVisible(), `${rel}: PC should see the close button on the incident strip`);
+  await stripClose.click();
+  await page.waitForSelector('#incident-close-modal:not(.hidden)', { timeout: 5000 });
+  assert((await page.locator('#incident-close-list .close-guard-row').count()) === 2, `${rel}: close modal should list the 2 open patients`);
+  assert((await page.textContent('#incident-close-list')).includes('P101'), `${rel}: close modal should name open patients by visual id`);
+  assert(await page.locator('#incident-close-override-btn').isVisible(), `${rel}: PC should be offered the override`);
+  await page.click('#incident-close-override-btn');
+  assert((await page.textContent('#incident-close-error')).includes('חובה'), `${rel}: override without a reason must be refused`);
+  assert(await page.evaluate(() => activeIncident.status === 'active'), `${rel}: incident must stay open after a reasonless override attempt`);
+  await page.fill('#incident-close-reason', 'synthetic override reason');
+  await page.click('#incident-close-override-btn');
+  await page.waitForSelector('#incident-close-modal.hidden', { state: 'attached', timeout: 5000 });
+  await page.waitForFunction(() => activeIncident.status === 'closed', { timeout: 5000 });
+  const lastClose = await page.evaluate(() => window.__fakeRpcLog.filter((r) => r.name === 'close_incident').pop().params);
+  assert(lastClose.p_override_reason === 'synthetic override reason', `${rel}: override reason must be sent to close_incident`);
+  assert((await page.textContent('#incident-context-strip')).includes('סגור'), `${rel}: strip should show the incident as closed`);
+  assert((await stripClose.textContent()).includes('פתח אירוע מחדש'), `${rel}: strip button should offer reopen once closed`);
+  await stripClose.click(); // confirm() auto-accepted
+  await page.waitForFunction(() => activeIncident.status === 'active', { timeout: 5000 });
+  assert(await page.evaluate(() => window.__fakeRpcLog.some((r) => r.name === 'reopen_incident')), `${rel}: reopen must go through reopen_incident`);
+
   // 7. CC: overview of all open incidents with server counts.
   await page.evaluate(() => signOut());
   await login(page, 'cc@test');
@@ -296,6 +340,27 @@ async function checkFile(browser, file) {
   });
   assert(!ccEmits, `${rel}: CC must not emit triage events (sync-log would reject them)`);
 
+  // 7b. Rescue command (rpc): may close, may not override; closes once everything is handed over.
+  await page.evaluate(() => signOut());
+  await login(page, 'rpc@test');
+  await page.waitForSelector('#screen-incident-picker.active', { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelector('#incident-picker-list button'), { timeout: 5000 });
+  await page.click('#incident-picker-list button:has-text("כניסה")');
+  await page.waitForSelector('#screen-role-dashboard.active', { timeout: 5000 });
+  const rescueClose = page.locator('#screen-role-dashboard button:has-text("סגור אירוע")');
+  await rescueClose.click();
+  await page.waitForSelector('#incident-close-modal:not(.hidden)', { timeout: 5000 });
+  assert(!(await page.locator('#incident-close-override-btn').isVisible()), `${rel}: rpc must not be offered the override`);
+  assert(!(await page.locator('#incident-close-override').isVisible()), `${rel}: rpc must not see the override reason field`);
+  await page.click('#incident-close-modal button:has-text("חזרה")');
+  assert(await page.evaluate(() => activeIncident.status === 'active'), `${rel}: incident must stay open for rpc while patients are open`);
+  await page.evaluate(() => localStorage.setItem('__fake_openpatients', '{}'));
+  await rescueClose.click();
+  await page.waitForFunction(() => activeIncident.status === 'closed', { timeout: 5000 });
+  assert(await page.locator('#incident-close-modal').evaluate((el) => el.classList.contains('hidden')), `${rel}: no modal when every patient is handed over`);
+  assert(await page.evaluate(() => siteAuthority.SITE_A.incidentStatus === 'closed'), `${rel}: rescue panel status must mirror the server close`);
+  assert(await page.locator('#screen-role-dashboard button:has-text("פתח אירוע מחדש")').isVisible(), `${rel}: rescue panel should offer reopen once closed`);
+
   // 8. Logistics cannot open incidents.
   await page.evaluate(() => signOut());
   await login(page, 'logo@test');
@@ -309,6 +374,24 @@ async function checkFile(browser, file) {
   await page.evaluate(() => { goTo('demo'); startRoleDashboard('pc'); });
   assert(await page.evaluate(() => patients.length === 0), `${rel}: local demo mode must start with no patients after sign-out`);
   assert(!(await page.locator('#incident-context-strip').isVisible()), `${rel}: incident strip must be hidden in local demo mode`);
+  assert(await page.evaluate(() => siteAuthority.SITE_A.incidentStatus !== 'closed'), `${rel}: a server close must not leak into local demo site authority`);
+
+  // 10. Local demo mode applies the same close guard to its local patients (local mode starts
+  // empty since V2.99.24, so the test creates its own local patient).
+  await page.evaluate(() => startRoleDashboard('rpc'));
+  await page.waitForSelector('#screen-role-dashboard.active', { timeout: 5000 });
+  await page.evaluate(() => { patients.push({ id: newUuid(), visualId: 'L01', triage: 'red', patientStatus: 'evacuating', events: [], siteId: 'SITE_A' }); renderRoleDashboard('rpc'); });
+  await page.click('#screen-role-dashboard button:has-text("סגור אירוע")');
+  await page.waitForSelector('#incident-close-modal:not(.hidden)', { timeout: 5000 });
+  assert((await page.textContent('#incident-close-list')).includes('L01'), `${rel}: local close guard should list the open local patient`);
+  assert(!(await page.locator('#incident-close-override-btn').isVisible()), `${rel}: local rpc must not be offered the override`);
+  await page.click('#incident-close-modal button:has-text("חזרה")');
+  assert(await page.evaluate(() => siteAuthority.SITE_A.incidentStatus !== 'closed'), `${rel}: local incident must stay open while a local patient is open`);
+  await page.evaluate(() => { patients[0].patientStatus = 'handed_over'; });
+  await page.click('#screen-role-dashboard button:has-text("סגור אירוע")');
+  assert(await page.evaluate(() => siteAuthority.SITE_A.incidentStatus === 'closed'), `${rel}: local incident should close once every patient is handed over`);
+  assert(await page.locator('#incident-close-modal').evaluate((el) => el.classList.contains('hidden')), `${rel}: no local close dialog when nothing is open`);
+  assert(await page.evaluate(() => getOutbox().some((e) => e.type === 'INCIDENT_CLOSE_TOGGLED' && e.payload_json.newStatus === 'closed' && !e.incident_id)), `${rel}: local close must be logged as a local (unstamped) event`);
 
   assert(pageErrors.length === 0, `${rel}: uncaught page error(s): ${pageErrors.join(' | ')}`);
   await context.close();

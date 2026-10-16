@@ -694,6 +694,17 @@ Lets an incident come into existence from the field instead of from seed data (`
 
 Joining is recorded on the membership row itself (`assigned_by`, `created_at`); there is no join event type. Draft merge (`INCIDENT_DRAFT_MERGED`) is not built yet.
 
+### Closing and reopening (`database/040_close_incident_guard.sql`)
+
+An incident cannot be closed while any of its patients is still open: `current_status` not in `handed_over`, `closed`, `self_evacuated`, `deceased` (`evacuating` counts as open, the patient has not been handed over yet).
+
+| RPC | Who | What it does |
+|---|---|---|
+| `close_incident(p_incident_id, p_override_reason?, p_device_id?, p_local_event_id?)` | pc, cc, chamal, admin, physician, rpc, rcc (plus `app.can_access_incident`) | No open patients: closes (`status='closed'`, `closed_by/at`) and appends `INCIDENT_CLOSED`. Open patients and no usable override: changes nothing and returns `{closed:false, open_patient_count, open_patients:[{id, visual_id, triage, status}], can_override, reason_required}`. Override: only pc/cc/chamal/admin/physician, only with a non-blank reason; the reason, role and the list of patients still open are stored in `incidents.metadata.close_override` and in the `INCIDENT_CLOSED` payload. rpc/rcc can never override. A draft cannot be closed (confirm or reject it). Closing a closed incident returns `{closed:true, changed:false}`. |
+| `reopen_incident(p_incident_id, p_device_id?, p_local_event_id?)` | same roles | `closed` -> `active`, appends `INCIDENT_REOPENED`. A rejected draft cannot be reopened. |
+
+A `BEFORE UPDATE OF status` trigger (`app.guard_incident_close()`) rejects (`42501`) any other transition to `closed` made by a signed-in user, so the `incidents_update` RLS policy can no longer be used to close an incident directly. Only `close_incident()` and `reject_draft()` pass it. Service-role and migration updates (no `auth.uid()`) are not affected. Closing needs a server round trip: an offline device cannot close an incident.
+
 ## High-Risk Override Payload
 
 Medication/treatment events with safety issues should include:
