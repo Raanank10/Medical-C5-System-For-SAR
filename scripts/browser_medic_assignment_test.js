@@ -1,8 +1,10 @@
-// Real-browser test of the cross-device PC -> medic assignment (V2.99.29): three tabs in one
-// browser context act as three phones (medic, PC, rescue) sharing one fake backend. Data lives
-// in localStorage (shared, like the server); each tab's login lives in sessionStorage (separate,
-// like separate phones). The fake enforces the access rules the feature relies on, as verified
-// live by rolled-back role impersonation (docs/ROLE_COMMAND_MODEL_v2.8.md):
+// Real-browser test of the cross-device PC -> medic assignment (V2.99.30): three tabs in one
+// browser context act as three phones (medic, PC, rescue) sharing one fake backend. The backend
+// lives in this Node process and every tab reaches it through a Playwright binding, so all three
+// see the same data the way phones see one server (shared browser storage between tabs was tried
+// first and is not reliable: a tab could miss another tab's writes). Each tab's login lives in its
+// own sessionStorage, like separate phones. The fake enforces the access rules the feature relies
+// on, as verified live by rolled-back role impersonation (docs/ROLE_COMMAND_MODEL_v2.8.md):
 // - incident_memberships: command roles may insert/update; a medic reads only its own rows
 // - incidents: visible to blanket roles (cc/chamal/admin/rpc/rcc/physician) or members; updatable
 //   by pc/cc/chamal/admin/physician/rpc/rcc only where visible; a medic cannot update an active one
@@ -28,88 +30,110 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+const USERS = {
+  'medic@test': { id: MEDIC, role: 'medic', display_name: 'חובש בדיקה' },
+  'pc@test': { id: PC, role: 'pc', display_name: 'חוג"ד בדיקה' },
+  'rpc@test': { id: RPC, role: 'rpc', display_name: 'מ"מ בדיקה' },
+};
+const COMMAND = ['pc', 'cc', 'chamal', 'admin', 'physician'];
+const BLANKET = ['cc', 'chamal', 'admin', 'rpc', 'rcc', 'physician'];
+const INC_UPDATERS = ['pc', 'cc', 'chamal', 'admin', 'physician', 'rpc', 'rcc'];
+const userById = (id) => Object.values(USERS).find((u) => u.id === id);
+
+function newServer() {
+  const now = new Date().toISOString();
+  return {
+    incidents: [
+      { id: INC1, visual_id: 'INC-TEST-1', status: 'active', location_name: 'מוקד בדיקה 1', address: null, incident_type: null, metadata: {} },
+      { id: INC2, visual_id: 'INC-TEST-2', status: 'active', location_name: 'מוקד בדיקה 2', address: null, incident_type: null, metadata: {} },
+    ],
+    members: [
+      { incident_id: INC1, profile_id: PC, role_at_incident: 'pc', assigned_by: null, created_at: now },
+      { incident_id: INC2, profile_id: MEDIC, role_at_incident: 'medic', assigned_by: null, created_at: now },
+    ],
+  };
+}
+// One request from a tab's fake client -> {data, error}, with the access rules applied.
+function handle(server, req) {
+  const u = userById(req.userId);
+  if (!u) return { data: null, error: { message: 'not signed in' } };
+  const clone = (x) => JSON.parse(JSON.stringify(x));
+  const match = (row) => Object.entries(req.eq || {}).every(([c, v]) => row[c] === v)
+    && Object.entries(req.in || {}).every(([c, v]) => v.includes(row[c]))
+    && (req.notNull || []).every((c) => row[c] != null);
+  const canSee = (inc) => BLANKET.includes(u.role) || server.members.some((m) => m.incident_id === inc.id && m.profile_id === u.id);
+  if (req.kind === 'rpc') {
+    const p = req.params || {};
+    if (req.name === 'list_open_incidents') return { data: clone(server.incidents.filter((i) => i.status === 'active').map((i) => ({ ...i, patient_count: 0, is_member: server.members.some((m) => m.incident_id === i.id && m.profile_id === u.id) }))), error: null };
+    if (req.name === 'join_incident') {
+      if (!server.members.some((m) => m.incident_id === p.p_incident_id && m.profile_id === u.id)) server.members.push({ incident_id: p.p_incident_id, profile_id: u.id, role_at_incident: u.role, assigned_by: null, created_at: new Date().toISOString() });
+      return { data: { id: p.p_incident_id }, error: null };
+    }
+    if (req.name === 'get_incident_command_state') { const inc = server.incidents.find((i) => i.id === p.p_incident_id); return { data: inc ? { incident_id: inc.id, status: inc.status, state_json: {} } : null, error: null }; }
+    return { data: null, error: null };
+  }
+  if (req.table === 'profiles') {
+    let rows = Object.values(USERS).map((x) => ({ id: x.id, role: x.role, display_name: x.display_name, is_active: true }));
+    if (!COMMAND.includes(u.role)) rows = rows.filter((r) => r.id === u.id);
+    rows = rows.filter(match);
+    return { data: req.single ? (rows[0] || null) : rows, error: null };
+  }
+  if (req.table === 'incidents') {
+    const visible = server.incidents.filter((i) => canSee(i) && match(i));
+    if (req.op === 'update') {
+      const ok = INC_UPDATERS.includes(u.role);
+      if (ok) visible.forEach((i) => Object.assign(i, clone(req.payload)));
+      return { data: ok ? visible.map((i) => ({ id: i.id })) : [], error: null };
+    }
+    const data = req.single ? (visible[0] || null) : visible;
+    return { data: clone(data), error: req.single && !data ? { message: 'no rows' } : null };
+  }
+  if (req.table === 'incident_memberships') {
+    if (req.op === 'upsert') {
+      if (!COMMAND.includes(u.role)) return { data: null, error: { message: 'rls: insert denied' } };
+      const p = clone(req.payload);
+      const ex = server.members.find((r) => r.incident_id === p.incident_id && r.profile_id === p.profile_id);
+      if (ex) { if (!req.ignoreDup) Object.assign(ex, p); } else server.members.push({ created_at: new Date().toISOString(), ...p });
+      return { data: null, error: null };
+    }
+    let vis = server.members.filter((r) => COMMAND.includes(u.role) || r.profile_id === u.id).filter(match);
+    if (req.order) vis.sort((a, c) => (a[req.order.c] > c[req.order.c] ? 1 : -1) * (req.order.asc ? 1 : -1));
+    if (req.limit) vis = vis.slice(0, req.limit);
+    return { data: clone(req.single ? (vis[0] || null) : vis), error: null };
+  }
+  return { data: req.single ? null : [], error: null };
+}
+
+// The in-page client: builds each query and sends it to the Node-side server above.
 const FAKE_SUPABASE = `
 (function(){
-  const USERS={
-    'medic@test':{id:'${MEDIC}',role:'medic',display_name:'חובש בדיקה'},
-    'pc@test':{id:'${PC}',role:'pc',display_name:'חוג"ד בדיקה'},
-    'rpc@test':{id:'${RPC}',role:'rpc',display_name:'מ"מ בדיקה'}
-  };
-  const load=(k,d)=>{ try{ return JSON.parse(localStorage.getItem('__fake_'+k))??d; }catch(e){ return d; } };
-  const save=(k,v)=>localStorage.setItem('__fake_'+k, JSON.stringify(v));
+  const USERS=${JSON.stringify(USERS)};
   const session=()=>{ try{ return JSON.parse(sessionStorage.getItem('__fake_session')); }catch(e){ return null; } };
-  const userById=id=>Object.entries(USERS).map(([email,u])=>({email,...u})).find(u=>u.id===id);
-  const me=()=>{ const s=session(); return s&&userById(s.user.id); };
-  const COMMAND=['pc','cc','chamal','admin','physician'];
-  const BLANKET=['cc','chamal','admin','rpc','rcc','physician'];
-  const INC_UPDATERS=['pc','cc','chamal','admin','physician','rpc','rcc'];
-  const canSee=(u,inc)=>BLANKET.includes(u.role)||load('members',[]).some(m=>m.incident_id===inc.id&&m.profile_id===u.id);
+  const userId=()=>session()?.user?.id||null;
   function builder(table){
-    const b={_f:{},_in:{},_notNull:[],_op:'select',_payload:null,_single:false,_order:null,_limit:null,_onConflict:null,_ignoreDup:false};
-    b.select=()=>b; b.eq=(c,v)=>{ b._f[c]=v; return b; }; b.in=(c,v)=>{ b._in[c]=v; return b; };
-    b.not=(c,op,v)=>{ if(op==='is'&&v===null) b._notNull.push(c); return b; };
-    b.order=(c,o)=>{ b._order={c,asc:o?.ascending!==false}; return b; }; b.limit=n=>{ b._limit=n; return b; };
-    b.single=()=>{ b._single=true; return b; }; b.maybeSingle=b.single;
-    b.update=p=>{ b._op='update'; b._payload=p; return b; };
-    b.upsert=(p,o)=>{ b._op='upsert'; b._payload=p; b._onConflict=o?.onConflict; b._ignoreDup=!!o?.ignoreDuplicates; return b; };
+    const q={kind:'from',table,op:'select',eq:{},in:{},notNull:[],single:false,order:null,limit:null,payload:null,ignoreDup:false};
+    const b={};
+    b.select=()=>b; b.eq=(c,v)=>{ q.eq[c]=v; return b; }; b.in=(c,v)=>{ q.in[c]=v; return b; };
+    b.not=(c,op,v)=>{ if(op==='is'&&v===null) q.notNull.push(c); return b; };
+    b.order=(c,o)=>{ q.order={c,asc:o?.ascending!==false}; return b; }; b.limit=n=>{ q.limit=n; return b; };
+    b.single=()=>{ q.single=true; return b; }; b.maybeSingle=b.single;
+    b.update=p=>{ q.op='update'; q.payload=p; return b; };
+    b.upsert=(p,o)=>{ q.op='upsert'; q.payload=p; q.ignoreDup=!!o?.ignoreDuplicates; return b; };
     ['gte','gt','lt','lte','neq','is','range','insert','delete'].forEach(m=>{ b[m]=b[m]||(()=>b); });
-    const match=row=>Object.entries(b._f).every(([c,v])=>row[c]===v)&&Object.entries(b._in).every(([c,v])=>v.includes(row[c]))&&b._notNull.every(c=>row[c]!=null);
-    b.then=(resolve,reject)=>{
-      const u=me(); let data=null, error=null;
-      if(!u){ error={message:'not signed in'}; }
-      else if(table==='profiles'){
-        let rows=Object.values(USERS).map(x=>({id:x.id,role:x.role,display_name:x.display_name,is_active:true}));
-        if(!COMMAND.includes(u.role)) rows=rows.filter(r=>r.id===u.id);
-        rows=rows.filter(match); data=b._single?(rows[0]||null):rows;
-      }else if(table==='incidents'){
-        const all=load('incidents',[]);
-        const visible=all.filter(i=>canSee(u,i)&&match(i));
-        if(b._op==='update'){
-          const ok=INC_UPDATERS.includes(u.role);
-          visible.forEach(i=>{ if(ok) Object.assign(i,b._payload); });
-          save('incidents',all); data=ok?visible.map(i=>({id:i.id})):[];
-        }else data=b._single?(visible[0]||null):visible;
-        if(b._single&&!data&&b._op==='select') error={message:'no rows'};
-      }else if(table==='incident_memberships'){
-        const rows=load('members',[]);
-        if(b._op==='upsert'){
-          if(!COMMAND.includes(u.role)) error={message:'rls: insert denied'};
-          else{
-            const p=b._payload; const ex=rows.find(r=>r.incident_id===p.incident_id&&r.profile_id===p.profile_id);
-            if(ex){ if(!b._ignoreDup) Object.assign(ex,p); } else rows.push({created_at:new Date().toISOString(),...p});
-            save('members',rows);
-          }
-        }else{
-          let vis=rows.filter(r=>COMMAND.includes(u.role)||r.profile_id===u.id).filter(match);
-          if(b._order) vis.sort((a,c)=>(a[b._order.c]>c[b._order.c]?1:-1)*(b._order.asc?1:-1));
-          if(b._limit) vis=vis.slice(0,b._limit);
-          data=b._single?(vis[0]||null):vis;
-        }
-      }else data=b._single?null:[];
-      return Promise.resolve({data,error}).then(resolve,reject);
-    };
+    b.then=(resolve,reject)=>window.__fakeServer({...q,userId:userId()}).then(resolve,reject);
     return b;
-  }
-  function rpc(name,params){
-    const u=me(); const ok=d=>Promise.resolve({data:d,error:null});
-    if(!u) return Promise.resolve({data:null,error:{message:'no profile'}});
-    const incidents=load('incidents',[]); const members=load('members',[]);
-    if(name==='list_open_incidents') return ok(incidents.filter(i=>i.status==='active').map(i=>({...i,patient_count:0,is_member:members.some(m=>m.incident_id===i.id&&m.profile_id===u.id)})));
-    if(name==='join_incident'){ if(!members.some(m=>m.incident_id===params.p_incident_id&&m.profile_id===u.id)){ members.push({incident_id:params.p_incident_id,profile_id:u.id,role_at_incident:u.role,assigned_by:null,created_at:new Date().toISOString()}); save('members',members); } return ok({id:params.p_incident_id}); }
-    if(name==='get_incident_command_state'){ const inc=incidents.find(i=>i.id===params.p_incident_id); return ok(inc?{incident_id:inc.id,status:inc.status,state_json:{}}:null); }
-    return ok(null);
   }
   window.supabase={createClient:()=>({
     auth:{
       signInWithPassword:async({email})=>{ const u=USERS[email]; if(!u) return {data:null,error:{message:'bad'}}; sessionStorage.setItem('__fake_session',JSON.stringify({access_token:'tok-'+u.id,user:{id:u.id}})); return {data:{user:{id:u.id}},error:null}; },
       getSession:async()=>({data:{session:session()},error:null}),
-      getUser:async()=>{ const u=me(); return {data:{user:u?{id:u.id,email:u.email}:null}}; },
+      getUser:async()=>{ const id=userId(); const e=Object.entries(USERS).find(([,u])=>u.id===id); return {data:{user:e?{id,email:e[0]}:null}}; },
       signOut:async()=>{ sessionStorage.removeItem('__fake_session'); return {error:null}; },
       onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}}),
       verifyOtp:async()=>({error:{message:'n/a'}}), updateUser:async()=>({error:null}), resetPasswordForEmail:async()=>({error:null})
     },
     from:t=>builder(t),
-    rpc
+    rpc:(name,params)=>window.__fakeServer({kind:'rpc',name,params,userId:userId()})
   })};
 })();`;
 
@@ -139,28 +163,15 @@ async function login(page, email) {
   await page.waitForFunction(() => !!currentUser, null, { timeout: 5000 });
   await page.waitForTimeout(400);
 }
-const db = (page) => page.evaluate(() => ({
-  incidents: JSON.parse(localStorage.getItem('__fake_incidents') || '[]'),
-  members: JSON.parse(localStorage.getItem('__fake_members') || '[]'),
-}));
+let SERVER = null;
+const db = async () => JSON.parse(JSON.stringify(SERVER));
 
 async function checkFile(browser, file) {
   const rel = path.relative(root, file);
   const context = await browser.newContext({ viewport: { width: 420, height: 900 } });
-  // Seed the shared fake backend before any app code runs.
-  await context.addInitScript(({ INC1, INC2, MEDIC, PC }) => {
-    if (localStorage.getItem('__fake_seeded')) return;
-    const now = new Date().toISOString();
-    localStorage.setItem('__fake_incidents', JSON.stringify([
-      { id: INC1, visual_id: 'INC-TEST-1', status: 'active', location_name: 'מוקד בדיקה 1', address: null, incident_type: null, metadata: {} },
-      { id: INC2, visual_id: 'INC-TEST-2', status: 'active', location_name: 'מוקד בדיקה 2', address: null, incident_type: null, metadata: {} },
-    ]));
-    localStorage.setItem('__fake_members', JSON.stringify([
-      { incident_id: INC1, profile_id: PC, role_at_incident: 'pc', assigned_by: null, created_at: now },
-      { incident_id: INC2, profile_id: MEDIC, role_at_incident: 'medic', assigned_by: null, created_at: now },
-    ]));
-    localStorage.setItem('__fake_seeded', '1');
-  }, { INC1, INC2, MEDIC, PC });
+  // One shared fake server for all three phones in this run.
+  SERVER = newServer();
+  await context.exposeBinding('__fakeServer', (_source, req) => handle(SERVER, req));
 
   // Phone 1, medic: working in incident 2.
   const medic = await openPhone(context, file);
@@ -185,7 +196,7 @@ async function checkFile(browser, file) {
   await pc.page.fill('#medic-assign-note', 'כניסה משער צפוני');
   await pc.page.click('#medic-assign-modal button:has-text("שייך לאירוע")');
   await pc.page.waitForTimeout(300);
-  let state = await db(pc.page);
+  let state = await db();
   const mem = state.members.find((m) => m.incident_id === INC1 && m.profile_id === MEDIC);
   assert(mem && mem.assigned_by === PC, `${rel}: medic membership in incident 1 must carry assigned_by = PC`);
   const inc1 = state.incidents.find((i) => i.id === INC1);
@@ -200,7 +211,7 @@ async function checkFile(browser, file) {
   await rpc.page.waitForTimeout(300);
   await rpc.page.evaluate(() => { rescueSetIncidentType('rpc', 'explosion', 'SITE_A'); hideIncidentTypeBriefModal(); });
   await rpc.page.waitForTimeout(300);
-  state = await db(rpc.page);
+  state = await db();
   assert(state.incidents.find((i) => i.id === INC1).incident_type === 'explosion', `${rel}: rescue's incident type must be written to the incident`);
 
   // Back on the medic phone: the next refresh shows the switch banner; switching pre-fills.
@@ -226,7 +237,7 @@ async function checkFile(browser, file) {
   await medic.page.click('#enroute-incident-type-grid [data-incident-type="vehicle_accident"]');
   await medic.page.waitForTimeout(200);
   assert(await medic.page.evaluate(() => siteAuthority.SITE_A.incidentType === 'explosion'), `${rel}: medic pick must not override rescue's type`);
-  state = await db(medic.page);
+  state = await db();
   assert(state.incidents.find((i) => i.id === INC1).incident_type === 'explosion', `${rel}: server type must stay rescue's`);
 
   // A medic cannot assign anyone, even by calling the code path directly.

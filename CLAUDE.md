@@ -33,6 +33,7 @@ node scripts/smoke_v2_992_decision_support.js
 npm install
 npm run test:browser-smoke            # or: node scripts/browser_smoke_test.js
 node scripts/browser_incident_lifecycle_test.js   # logged-in incident picker/draft flow + close guard, stubbed Supabase client
+node scripts/browser_collapse_brief_test.js       # Movement screen: building collapse with any incident type
 node scripts/browser_medic_assignment_test.js     # cross-device PC -> medic assignment: PC, medic and rescue tabs sharing one stubbed backend
 
 # Analytics package
@@ -63,7 +64,7 @@ CI (`.github/workflows/validate.yml`) runs exactly two things on every PR and pu
 
 Inside the HTML, look for:
 - `const APP_VERSION = '2.99.5';` — bump this and the visible "Demo X.Y" / "ROLE // X.Y" label strings together when shipping a version; smoke scripts assert on these exact strings.
-- `const ROLE_LABELS` / `const ROLE_DEFS` — defines the role-based views. Eight roles exist in the live `user_role` enum: `medic`, `pc` (חוג"ד — platoon commander), `cc` (מ״פ רפואה — company/command medical), `logistics`, `chamal` (command system), `rpc`/`rcc` (rescue-chain platoon/company commander — site-authority actions per `docs/ROLE_COMMAND_MODEL_v2.8.md`, added in `database/006`/`007`), and `admin`.
+- `const ROLE_LABELS` / `const ROLE_DEFS` — defines the role-based views. Ten roles exist in the live `user_role` enum: `medic`, `paramedic` and `physician` (added in `database/019`/`020`), `pc` (חוג"ד — platoon commander), `cc` (מ״פ רפואה — company/command medical), `logistics_officer` (mapped to the client-side `logistics` key via `SERVER_ROLE_TO_CLIENT_ROLE`), `chamal` (command system), `rpc`/`rcc` (rescue-chain platoon/company commander — site-authority actions per `docs/ROLE_COMMAND_MODEL_v2.8.md`, added in `database/006`/`007`), and `admin`. New users are invited with `scripts/invite_user.js` (not the Supabase dashboard button, which can't set a role) — its `VALID_ROLES` list must match this enum.
 - `render*` functions (e.g. `renderDashboard`, `renderCommander`, `renderMstartSweep`, `renderAar`, `renderCcHeroDashboard`, `renderLogisticsOfficer`) — each is a self-contained view renderer for one role/screen. Grep for `^function render` to find the current screen inventory before adding a new one.
 - A legacy step-based New Patient flow (`screen-step1`..`screen-step8`, guarded by a `LEGACY_FULL_ASSESSMENT_DO_NOT_DELETE_WITHOUT_TESTS` comment) coexists with the newer Quick/Extended patient flows — don't delete it without checking what still depends on it (smoke scripts assert on its presence).
 
@@ -86,7 +87,7 @@ When product rules like these change, prefer extending `src/domain/rules.js` and
 
 The architecture (`docs/ARCHITECTURE.md`) is an append-only event log: field devices (medic/logistics/commander) write local events first, sync them to a Postgres `events` table, and command views read *projected* state (`incident_command_state`) rather than replaying raw history. This is now real, not aspirational: `database/001_postgresql_schema_v1.2.sql` is deployed to a live Supabase project (`c5-sentinel-sar`), RLS is enabled and audited (`docs/RLS_AUDIT_v1.md` — 86 policies across 32 tables), and `index.html` does real login, real sync push/pull, and real pull-side state projection against it. Two events worth knowing because they're referenced across docs, schema, and UI guidelines:
 - `PATIENT_HANDED_OVER` — MIST handover, idempotent by `device_id + local_event_id`, clears `needs_full_assessment` and resolves patient watchdog alerts.
-- `PATIENT_TRIAGED_EXPECTANT` — black/expectant triage fast-exit; bypasses remaining forms, sets `current_triage='black'`, `current_status='deceased'`.
+- `PATIENT_TRIAGED_EXPECTANT` — black/expectant triage fast-exit; bypasses remaining forms, sets `current_triage='black'`, `current_status='deceased'`. Subject to the same role-authority tie-break as other triage (`database/041`): within 5 minutes a higher role's triage wins, and a winning non-black triage restores the previous status.
 
 Invalid/dependency-blocked sync events go to `sync_ingestion_errors` / `sync_event_dependencies` rather than blocking the whole batch ("poison event quarantine") — don't design new sync logic that fails a whole batch on one bad event. Both are now readable in-app: a command-only "אירועים חסומים / סיכון גבוה" review panel reads unresolved `sync_ingestion_errors` and `high_risk_flags` from each sync push response.
 

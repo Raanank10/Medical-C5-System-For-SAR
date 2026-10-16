@@ -20,10 +20,11 @@
 const SUPABASE_URL = 'https://btvvjmuwdzirjyauyijx.supabase.co';
 
 // Source of truth: the live `user_role` enum (database/006_add_rpc_rcc_enum_values.sql extended
-// the original 001 schema's 6 values with rpc/rcc). Kept as a literal list here, matching how
-// index.html's ROLE_LABELS and supabase/functions/sync-log/index.ts's ROLE_ALLOWED_EVENT_TYPES
-// already hardcode the same role set rather than introspecting it at runtime.
-const VALID_ROLES = ['medic', 'pc', 'cc', 'chamal', 'logistics_officer', 'rpc', 'rcc', 'admin'];
+// the original 001 schema's 6 values with rpc/rcc, database/019_add_physician_paramedic_enum_values.sql
+// added physician/paramedic). Kept as a literal list here, matching how index.html's ROLE_LABELS
+// and supabase/functions/sync-log/index.ts's ROLE_ALLOWED_EVENT_TYPES already hardcode the same
+// role set rather than introspecting it at runtime - update it whenever a new enum value is added.
+const VALID_ROLES = ['medic', 'paramedic', 'physician', 'pc', 'cc', 'chamal', 'logistics_officer', 'rpc', 'rcc', 'admin'];
 
 function fail(message) {
   console.error(`Error: ${message}`);

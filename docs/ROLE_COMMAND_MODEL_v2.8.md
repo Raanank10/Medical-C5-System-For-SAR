@@ -50,9 +50,11 @@ Incident type follows the site-authority rule above: **rescue (RPC/RCC) wins.**
 - A medic may set the type while none is set, or replace a type a medic set earlier.
 - Once RPC/RCC set the type, a medic pick that differs is never applied. It is logged as `INCIDENT_TYPE_MISMATCH_REPORTED` and surfaces to חוג״ד/מ״פ רפואה as an `INCIDENT_TYPE_MISMATCH` alert ("פער בסוג אירוע: חובש מול חילוץ"). Rescue can still overwrite a medic-set type at any time.
 
+**Building collapse with any incident type (V2.99.29).** Only "missile strike" used to carry the crush/trapped expectations, although an explosion, a shooting or an accident can also bring a building down. The Movement screen's building-state section ("סוג מבנה / מצב ראשוני") now sits directly under the incident type and acts as the collapse flag: full collapse, partial collapse or "standing with trapped" marks the site as collapsed (as does RPC/RCC's "progressive collapse" building status). For any type except missile strike (which already includes it), the injury brief then adds the crush / trapped / Crush Syndrome part and the type reads "<type> + קריסת מבנה" on the Movement screen and on the PC/CC/rescue site rows. Choosing "unknown" clears the medic's flag. Local-demo / same-device only, like the incident type itself (see below).
+
 חוג״ד can also assign a medic to an existing incident ("שייך לאירוע" on each medic panel in the PC medic-load board), with an optional address and note. An assigned medic's Movement screen shows who assigned them and what is already known: incident type and who set it, rescue site status, patients already registered at the site, and the PC's address and note. The address and note are pre-filled into the editable fields, but only into empty ones, so nothing the medic typed is overwritten. A medic correction to a pre-filled value is logged on arrival as `SITE_PREFILL_CORRECTED` with the old and new values.
 
-**Local demo mode:** as described above, single-device. Signed in, assignment now syncs across phones on real incidents; see "Cross-device PC → medic assignment on real incidents (V2.99.29)" below. `MEDIC_ASSIGNED_TO_INCIDENT`, `INCIDENT_TYPE_MISMATCH_REPORTED`, `SITE_PREFILL_CORRECTED` and `INCIDENT_TYPE_SET` stay outside `SYNC_ELIGIBLE_EVENT_TYPES` (never pushed).
+**Local demo mode:** as described above, single-device. Signed in, assignment now syncs across phones on real incidents; see "Cross-device PC → medic assignment on real incidents (V2.99.30)" below. `MEDIC_ASSIGNED_TO_INCIDENT`, `INCIDENT_TYPE_MISMATCH_REPORTED`, `SITE_PREFILL_CORRECTED` and `INCIDENT_TYPE_SET` stay outside `SYNC_ELIGIBLE_EVENT_TYPES` (never pushed).
 
 ## Briefing demo and guided tour (V2.99.25)
 
@@ -65,7 +67,7 @@ The 60-second PC/CC briefing ("הצג תדריך מ״פ / חוג״ד ב־60 שנ
 
 "סיור מודרך במסכי חוג״ד / מ״פ" is a read-only, 15-step walkthrough that highlights the real PC and CC dashboard panels and explains each one. It creates no data.
 
-## Cross-device PC → medic assignment on real incidents (V2.99.29)
+## Cross-device PC → medic assignment on real incidents (V2.99.30)
 
 Signed in, a PC (or any command role: pc/cc/chamal/admin/physician) can assign a real medic or paramedic account to **the incident the PC is currently in**, from "שייך חובש לאירוע" on the medic-load board, with an optional address and note. It works across phones and needs **no schema, RLS or Edge Function change**. It uses only existing tables and access rules, verified live against the real PC, medic and rescue accounts on a real open incident, inside transactions forced to roll back so nothing persisted.
 

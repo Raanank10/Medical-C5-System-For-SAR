@@ -706,7 +706,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9929</div>
+      <div class="demo-kicker">Demo V2.9930</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -803,7 +803,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9929</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9930</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -813,7 +813,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9929</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9930</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -847,6 +847,14 @@ textarea{resize:vertical;min-height:70px;}
       <button class="tap-btn" data-incident-type="explosion" onclick="selectEnrouteIncidentType('explosion')"><span class="icon">💥</span>פיצוץ</button>
     </div>
     <div id="enroute-incident-type-note" style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:14px"></div>
+    <div class="field-label">סוג מבנה / מצב ראשוני</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.5;margin:-4px 0 8px">קריסה (מלאה, חלקית או מבנה עומד עם לכודים) מוסיפה לכל סוג אירוע את תדריך פציעות המעיכה והלכודים.</div>
+    <div class="tap-grid tap-grid-2" id="enroute-type-grid" style="margin-bottom:14px">
+      <button class="tap-btn" onclick="selectEnrouteType(this,'collapse')"><span class="icon">🏚️</span>קריסה מלאה</button>
+      <button class="tap-btn" onclick="selectEnrouteType(this,'partial_collapse')"><span class="icon">⚠</span>קריסה חלקית</button>
+      <button class="tap-btn" onclick="selectEnrouteType(this,'intact_trapped')"><span class="icon">🏢</span>מבנה עומד + לכודים</button>
+      <button class="tap-btn" onclick="selectEnrouteType(this,'unknown')"><span class="icon">📍</span>לא ידוע</button>
+    </div>
     <div class="field-label">כתובת / מוקד ידוע</div>
     <input type="text" id="enroute-address" placeholder="לדוגמה: הרצל 12, בניין 15A" style="margin-bottom:6px;font-size:18px;padding:16px">
     <div id="enroute-address-source" style="font-size:12px;color:var(--accent);margin-bottom:12px"></div>
@@ -858,13 +866,6 @@ textarea{resize:vertical;min-height:70px;}
     </div>
     <div class="field-label">אזור עבודה ראשוני</div>
     <input type="text" id="enroute-zone" placeholder="לדוגמה: קומה 2, אגף צפוני, ליד חדר מדרגות" style="margin-bottom:12px" oninput="siteData.currentZone=this.value">
-    <div class="field-label">סוג מבנה / מצב ראשוני</div>
-    <div class="tap-grid tap-grid-2" id="enroute-type-grid" style="margin-bottom:14px">
-      <button class="tap-btn" onclick="selectEnrouteType(this,'collapse')"><span class="icon">🏚️</span>קריסה מלאה</button>
-      <button class="tap-btn" onclick="selectEnrouteType(this,'partial_collapse')"><span class="icon">⚠</span>קריסה חלקית</button>
-      <button class="tap-btn" onclick="selectEnrouteType(this,'intact_trapped')"><span class="icon">🏢</span>מבנה עומד + לכודים</button>
-      <button class="tap-btn" onclick="selectEnrouteType(this,'unknown')"><span class="icon">📍</span>לא ידוע</button>
-    </div>
     <div class="field-label">דיווח ראשוני / צפי נפגעים</div>
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px">
       <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px">מונה מוקד בלבד: נספר בתמונת החוג"ד בלי לפתוח רשומות פצוע בודדות.</div>
@@ -2740,7 +2741,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.29';
+const APP_VERSION = '2.99.30';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3841,13 +3842,32 @@ function rescueSetIncidentType(role, type, siteId=rescueActiveSiteId){
   saveDemoState();
   if(currentUser && activeIncident && siteId==='SITE_A') writeIncidentTypeToServer(activeIncident.id, type, role);
   renderRoleDashboard(role);
-  showIncidentTypeBriefModal(type);
+  showIncidentTypeBriefModal(type, siteId);
 }
-function showIncidentTypeBriefModal(type){
+// A building collapse can come with any incident type (explosion, shooting, accident), not only a
+// missile strike. The medic's building-state choice on the Movement screen, or rescue's
+// "progressive collapse" building status, marks the site; the type label and injury brief then add
+// the collapse part. 'missile_strike_structural_collapse' already includes it.
+const COLLAPSE_BUILDING_TYPES=new Set(['collapse','partial_collapse','intact_trapped']);
+const BUILDING_COLLAPSE_INJURY_BRIEF='קריסת מבנה באתר: צפו בנוסף לפציעות מעיכה וחבלות מפולת/הריסות, ללכודים הדורשים חילוץ ממושך לפני שניתן לפנותם, ולתסמונת מעיכה (Crush Syndrome) בנלכדים לאורך זמן.';
+function siteHasBuildingCollapse(siteId=rescueActiveSiteId){
+  const s=ensureSiteStatusFields(siteId);
+  return !!s.buildingCollapse || s.buildingStatus==='progressive_collapse';
+}
+function collapseAddsToType(type, siteId){
+  return type!=='missile_strike_structural_collapse' && siteHasBuildingCollapse(siteId);
+}
+function incidentInjuryBrief(type, siteId){
+  const base=INCIDENT_TYPE_INJURY_BRIEFS[type]||'אין מידע זמין על תבנית הפציעות הצפויה עבור סוג אירוע זה.';
+  return collapseAddsToType(type, siteId) ? `${base}\n\n${BUILDING_COLLAPSE_INJURY_BRIEF}` : base;
+}
+function showIncidentTypeBriefModal(type, siteId=rescueActiveSiteId){
   const modal=document.getElementById('incident-type-brief-modal');
   if(!modal) return;
-  document.getElementById('incident-type-brief-title').textContent=`סוג אירוע: ${INCIDENT_TYPE_LABELS[type]||type}`;
-  document.getElementById('incident-type-brief-message').textContent=INCIDENT_TYPE_INJURY_BRIEFS[type]||'אין מידע זמין על תבנית הפציעות הצפויה עבור סוג אירוע זה.';
+  document.getElementById('incident-type-brief-title').textContent=`סוג אירוע: ${INCIDENT_TYPE_LABELS[type]||type}${collapseAddsToType(type, siteId)?' + קריסת מבנה':''}`;
+  const msg=document.getElementById('incident-type-brief-message');
+  msg.style.whiteSpace='pre-line';
+  msg.textContent=incidentInjuryBrief(type, siteId);
   modal.classList.remove('hidden');
 }
 function hideIncidentTypeBriefModal(){
@@ -3894,7 +3914,7 @@ function selectEnrouteIncidentType(type){
       siteData.medicIncidentTypeReport=null;
       saveDemoState();
       renderEnrouteIncidentContext();
-      showIncidentTypeBriefModal(type);
+      showIncidentTypeBriefModal(type, siteId);
       return;
     }
     siteData.medicIncidentTypeReport={siteId,type,at:Date.now()};
@@ -3910,7 +3930,7 @@ function selectEnrouteIncidentType(type){
   saveLocalEvent({type:'INCIDENT_TYPE_SET',detail:`${type} by medic at ${siteId}`,payload_json:{role:'medic',siteId,incidentType:type,timestamp:new Date().toISOString()}});
   saveDemoState();
   renderEnrouteIncidentContext();
-  showIncidentTypeBriefModal(type);
+  showIncidentTypeBriefModal(type, siteId);
 }
 function renderEnrouteIncidentContext(){
   const card=document.getElementById('enroute-assignment-card');
@@ -3918,7 +3938,7 @@ function renderEnrouteIncidentContext(){
   const siteId=currentSiteId();
   const s=ensureSiteStatusFields(siteId);
   const a=myIncidentAssignment();
-  const typeLabel=s.incidentType?INCIDENT_TYPE_LABELS[s.incidentType]:'סוג אירוע טרם נבחר';
+  const typeLabel=s.incidentType?incidentTypeLabel(siteId):(siteHasBuildingCollapse(siteId)?'קריסת מבנה · סוג אירוע טרם נבחר':'סוג אירוע טרם נבחר');
   const badge=`<div style="text-align:center;margin-bottom:10px"><span class="badge badge-red" style="display:inline-block;animation:blink 1.2s infinite;font-size:13px;padding:7px 12px">התרעה: ${escAttr(typeLabel)}</span></div>`;
   let body;
   if(a){
@@ -4176,8 +4196,20 @@ function dismissAssignmentSwitch(){
   rememberDismissedAssignment(assignmentKey(_myRealAssignment));
   renderAssignmentSwitchBanner();
 }
-async function pullIncidentAssignmentState(){
-  if(!currentUser || _assignmentPullBusy) return;
+// A request that arrives while a pull is running must not be dropped: that running pull may have
+// read the server before the PC saved the assignment. Queue exactly one fresh pull after it, and
+// let every caller await the pull that will reflect its request.
+let _assignmentPullPromise=null, _assignmentPullQueued=null;
+function pullIncidentAssignmentState(){
+  if(!currentUser) return Promise.resolve();
+  if(_assignmentPullPromise){
+    if(!_assignmentPullQueued) _assignmentPullQueued=_assignmentPullPromise.then(()=>{ _assignmentPullQueued=null; return pullIncidentAssignmentState(); });
+    return _assignmentPullQueued;
+  }
+  _assignmentPullPromise=runIncidentAssignmentPull().finally(()=>{ _assignmentPullPromise=null; });
+  return _assignmentPullPromise;
+}
+async function runIncidentAssignmentPull(){
   const client=getSupabaseClient();
   if(!client) return;
   _assignmentPullBusy=true;
@@ -4264,7 +4296,8 @@ function rescueConfirmSiteClear(role, siteId=rescueActiveSiteId){
 }
 function incidentTypeLabel(siteId=rescueActiveSiteId){
   const s=ensureSiteStatusFields(siteId);
-  return s.incidentType?(INCIDENT_TYPE_LABELS[s.incidentType]||s.incidentType):'לא נבחר';
+  if(!s.incidentType) return siteHasBuildingCollapse(siteId)?'לא נבחר · קריסת מבנה':'לא נבחר';
+  return (INCIDENT_TYPE_LABELS[s.incidentType]||s.incidentType)+(collapseAddsToType(s.incidentType, siteId)?' + קריסת מבנה':'');
 }
 function siteStatusSummaryLine(siteId=rescueActiveSiteId){
   const s=ensureSiteStatusFields(siteId);
@@ -8071,6 +8104,14 @@ function selectEnrouteType(btn,val){
     siteData.likelyMechanisms=['פגיעת לחץ / ריסוק','חשד לפגיעת עמוד שדרה'];
     siteData.lastMechanism=siteData.lastMechanism||'פגיעת לחץ / ריסוק';
   }
+  const siteId=currentSiteId();
+  const s=ensureSiteStatusFields(siteId);
+  const hadCollapse=siteHasBuildingCollapse(siteId);
+  s.buildingCollapse=COLLAPSE_BUILDING_TYPES.has(val);
+  saveDemoState();
+  renderEnrouteIncidentContext();
+  // A newly reported collapse changes what to expect for the type already chosen: show the brief.
+  if(!hadCollapse && siteHasBuildingCollapse(siteId) && s.incidentType && collapseAddsToType(s.incidentType, siteId)) showIncidentTypeBriefModal(s.incidentType, siteId);
 }
 function updateInitialEvacDisplays(){
   ensureSiteReadiness();

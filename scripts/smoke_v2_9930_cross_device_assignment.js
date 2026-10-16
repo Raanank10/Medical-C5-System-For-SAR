@@ -13,10 +13,10 @@ function assert(condition, message) {
 for (const rel of files) {
   const html = fs.readFileSync(path.join(root, rel), 'utf8');
 
-  assert(html.includes("const APP_VERSION = '2.99.29';"), `${rel}: APP_VERSION must be V2.9929`);
-  assert(html.includes('Demo V2.9929'), `${rel}: launcher label must be Demo V2.9929`);
-  assert(html.includes('ROLE // V2.9929'), `${rel}: role header must be Demo V2.9929`);
-  assert(html.includes('Role-Based Medical Command System V2.9929'), `${rel}: role system strip must be Demo V2.9929`);
+  assert(html.includes("const APP_VERSION = '2.99.30';"), `${rel}: APP_VERSION must be V2.9930`);
+  assert(html.includes('Demo V2.9930'), `${rel}: launcher label must be Demo V2.9930`);
+  assert(html.includes('ROLE // V2.9930'), `${rel}: role header must be Demo V2.9930`);
+  assert(html.includes('Role-Based Medical Command System V2.9930'), `${rel}: role system strip must be Demo V2.9930`);
 
   // Cross-device PC -> medic assignment on real incidents, using existing tables/RLS only.
   assert(/async function assignRealMedic\(profileId, address, note\)\{[\s\S]{0,1200}?updateIncidentWithMetadata\([\s\S]{0,600}?from\('incident_memberships'\)\.upsert\(\{incident_id:incidentId, profile_id:profileId, role_at_incident:[^}]*assigned_by:currentUser\.id/.test(html), `${rel}: assignment must write address/note first, then the medic membership with assigned_by`);
@@ -37,5 +37,5 @@ for (const rel of files) {
   assert(eligible && !eligible[1].includes("'MEDIC_ASSIGNED_TO_INCIDENT'"), `${rel}: MEDIC_ASSIGNED_TO_INCIDENT stays a local log entry; the membership row is the source of truth`);
   assert(html.includes('function getSupabaseClient(){\n  if(_demoSandbox) return null;'), `${rel}: the sandboxed briefing must still block all server access`);
 
-  console.log(`${rel}: Demo V2.9929 cross-device assignment smoke passed`);
+  console.log(`${rel}: Demo V2.9930 cross-device assignment smoke passed`);
 }

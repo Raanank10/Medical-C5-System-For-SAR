@@ -59,5 +59,5 @@ Why `SECURITY DEFINER`: these functions need to read `profiles`/`incident_member
 
 ## Explicitly Out of Scope Here
 
-- Whether the 8-role model itself is operationally correct (that's `docs/ROLE_COMMAND_MODEL_v2.8.md`'s domain, a product/command-structure question, not an access-control one).
+- Whether the 10-role model itself is operationally correct (that's `docs/ROLE_COMMAND_MODEL_v2.8.md`'s domain, a product/command-structure question, not an access-control one).
 - Legal/regulatory identity-verification requirements for a real deployment (who is allowed to be a "medic" in this system, credential verification) — outside a technical auth document's scope.
