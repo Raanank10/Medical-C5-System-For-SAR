@@ -1,0 +1,258 @@
+// Real-browser test of the logged-in incident lifecycle UI (V2.99.26, database/038): the app
+// starts with no incident and no patients, a medic opens a draft incident, events are pinned to
+// that incident at creation, command sees the pulsing approval banner and confirms it, and the
+// local demo mode still works after sign-out.
+//
+// The Supabase client and the sync-log Edge Function are STUBBED here (an in-page fake that
+// mimics the database/038 RPC contracts), so this proves client behavior only - it does not
+// prove the server side. The server side was verified separately against the live project by
+// role impersonation (docs/RLS_AUDIT_v1.md, "Follow-up: incident lifecycle RPCs").
+//
+// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Run: npm install && node scripts/browser_incident_lifecycle_test.js
+const fs = require('fs');
+const path = require('path');
+const { chromium } = require('playwright');
+
+const root = path.resolve(__dirname, '..');
+const files = [path.join(root, 'index.html'), path.join(root, 'demo', 'rescue-app.html')];
+const PIN = '135790';
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+// In-page fake of window.supabase. State lives in localStorage under __fake_* keys so it
+// survives a page reload (session restore) the way a real backend would.
+const FAKE_SUPABASE = `
+(function(){
+  const USERS={
+    'medic@test':{id:'11111111-1111-4111-8111-111111111111',role:'medic'},
+    'pc@test':{id:'22222222-2222-4222-8222-222222222222',role:'pc'},
+    'cc@test':{id:'33333333-3333-4333-8333-333333333333',role:'cc'},
+    'logo@test':{id:'44444444-4444-4444-8444-444444444444',role:'logistics_officer'}
+  };
+  const load=(k,d)=>{ try{ return JSON.parse(localStorage.getItem('__fake_'+k))??d; }catch(e){ return d; } };
+  const save=(k,v)=>localStorage.setItem('__fake_'+k, JSON.stringify(v));
+  window.__fakeRpcLog=load('rpclog',[]);
+  function logRpc(name,params){ window.__fakeRpcLog.push({name,params}); save('rpclog',window.__fakeRpcLog); }
+  function session(){ return load('session',null); }
+  function userById(id){ return Object.entries(USERS).map(([email,u])=>({email,...u})).find(u=>u.id===id); }
+  function builder(table){
+    const b={_single:false,_filters:{}};
+    const chain=['select','order','limit','gte','gt','lt','lte','in','neq','is','upsert','insert','update','delete','range'];
+    chain.forEach(m=>{ b[m]=()=>b; });
+    b.eq=(col,val)=>{ b._filters[col]=val; return b; };
+    b.single=()=>{ b._single=true; return b; };
+    b.maybeSingle=()=>{ b._single=true; return b; };
+    b.then=(resolve,reject)=>{
+      let data;
+      const s=session();
+      if(table==='profiles'){ const u=s&&userById(s.user.id); data=u?{role:u.role,is_active:true}:null; }
+      else if(table==='incidents'){ const inc=load('incidents',[]).find(i=>i.id===b._filters.id); data=inc?{status:inc.status,metadata:inc.metadata||{}}:null; }
+      else data=b._single?null:[];
+      return Promise.resolve({data,error:null}).then(resolve,reject);
+    };
+    return b;
+  }
+  function rpc(name,params){
+    logRpc(name,params||{});
+    const s=session(); const me=s&&userById(s.user.id);
+    const incidents=load('incidents',[]); const members=load('members',[]);
+    const ok=(data)=>Promise.resolve({data,error:null});
+    const fail=(message)=>Promise.resolve({data:null,error:{message}});
+    if(!me) return fail('no active profile');
+    const command=['pc','cc','chamal','admin','physician'].includes(me.role);
+    if(name==='list_open_incidents'){
+      return ok(incidents.filter(i=>['draft','staging','active'].includes(i.status)).map(i=>({...i,patient_count:0,
+        opened_by_name:userById(i.opened_by||i.draft_created_by)?.email||null,
+        is_member:members.some(m=>m.incident_id===i.id&&m.profile_id===me.id)})));
+    }
+    if(name==='open_incident'){
+      if(me.role==='logistics_officer') return fail('role logistics_officer cannot open an incident');
+      const status=['medic','paramedic'].includes(me.role)?'draft':'active';
+      const inc={id:params.p_incident_id,visual_id:'INC-TEST-'+params.p_incident_id.slice(0,6).toUpperCase(),status,
+        location_name:params.p_location_name,address:params.p_address,incident_type:params.p_incident_type,
+        opened_at:new Date().toISOString(),draft_created_by:status==='draft'?me.id:null,opened_by:status==='active'?me.id:null,
+        draft_acknowledged_at:null,metadata:{}};
+      incidents.push(inc); save('incidents',incidents);
+      members.push({incident_id:inc.id,profile_id:me.id}); save('members',members);
+      return ok({id:inc.id,visual_id:inc.visual_id,status,created:true});
+    }
+    if(name==='join_incident'){
+      members.push({incident_id:params.p_incident_id,profile_id:me.id}); save('members',members);
+      return ok({id:params.p_incident_id});
+    }
+    const inc=incidents.find(i=>i.id===params?.p_incident_id);
+    if(['confirm_draft','reject_draft','acknowledge_draft'].includes(name)){
+      if(!command) return fail('only command roles');
+      if(!inc||inc.status!=='draft') return fail('not a draft');
+      if(name==='confirm_draft'){ inc.status='active'; inc.metadata={draft_resolution:'confirmed'}; }
+      if(name==='reject_draft'){ inc.status='closed'; inc.metadata={draft_resolution:'rejected'}; }
+      if(name==='acknowledge_draft'){ inc.draft_acknowledged_at=new Date().toISOString(); }
+      save('incidents',incidents);
+      return ok({id:inc.id});
+    }
+    if(name==='get_incident_command_state') return ok(inc?{incident_id:inc.id,status:inc.status,active_red_patients:2,total_patients:5,patients_missing_full_vitals:1,active_watchdog_alerts:3,state_json:{}}:null);
+    return ok(null);
+  }
+  window.supabase={createClient:()=>({
+    auth:{
+      signInWithPassword:async({email})=>{ const u=USERS[email]; if(!u) return {data:null,error:{message:'bad'}}; save('session',{access_token:'tok-'+u.id,user:{id:u.id}}); return {data:{user:{id:u.id}},error:null}; },
+      getSession:async()=>({data:{session:session()},error:null}),
+      getUser:async()=>{ const s=session(); const u=s&&userById(s.user.id); return {data:{user:u?{id:u.id,email:u.email}:null}}; },
+      signOut:async()=>{ save('session',null); return {error:null}; },
+      onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}}),
+      verifyOtp:async()=>({error:{message:'n/a'}}),
+      updateUser:async()=>({error:null}),
+      resetPasswordForEmail:async()=>({error:null})
+    },
+    from:(t)=>builder(t),
+    rpc
+  })};
+})();`;
+
+async function unlockOrSetupPin(page) {
+  await page.waitForSelector('#screen-pin-gate.active', { timeout: 5000 });
+  if (await page.locator('#pin-gate-setup-panel').isVisible()) {
+    await page.fill('#pin-gate-setup-new', PIN);
+    await page.fill('#pin-gate-setup-confirm', PIN);
+    await page.click('#pin-gate-setup-btn');
+  } else {
+    await page.fill('#pin-gate-unlock-input', PIN);
+    await page.click('#pin-gate-unlock-btn');
+  }
+}
+async function login(page, email) {
+  await page.waitForSelector('#screen-login.active', { timeout: 5000 });
+  await page.fill('#login-email', email);
+  await page.fill('#login-password', 'synthetic');
+  await page.click('#login-submit-btn');
+}
+const activeScreen = (page) => page.evaluate(() => document.querySelector('.screen.active')?.id);
+
+async function checkFile(browser, file) {
+  const rel = path.relative(root, file);
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const pageErrors = [];
+  page.on('pageerror', (err) => pageErrors.push(String(err)));
+  page.on('dialog', (d) => d.accept(d.type() === 'prompt' ? 'test reason' : undefined));
+  const pushes = [];
+  await page.route('**/supabase-js@*/**', (route) => route.fulfill({ contentType: 'application/javascript', body: FAKE_SUPABASE }));
+  await page.route('**/functions/v1/sync-log**', (route) => {
+    const req = route.request();
+    if (req.method() === 'POST') {
+      const body = JSON.parse(req.postData() || '{}');
+      pushes.push(body);
+      return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ accepted: (body.events || []).map((e) => ({ local_event_id: e.local_event_id })), duplicates: [], rejected: [] }) });
+    }
+    return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ events: [], next_cursor: 0, has_more: false }) });
+  });
+
+  await page.goto('file://' + file, { waitUntil: 'domcontentloaded' });
+  await unlockOrSetupPin(page);
+
+  // 1. Medic: no incident yet -> picker, empty, draft wording, no demo patients.
+  await login(page, 'medic@test');
+  await page.waitForSelector('#screen-incident-picker.active', { timeout: 5000 });
+  assert((await page.textContent('#incident-picker-list')).includes('אין אירועים פתוחים'), `${rel}: medic should see an empty incident list`);
+  assert((await page.textContent('#incident-open-title')).includes('טיוטת'), `${rel}: medic open panel should say draft`);
+  assert(await page.evaluate(() => patients.length === 0), `${rel}: logged-in medic must start with zero patients`);
+
+  // 2. Medic opens a draft -> en-route screen, draft strip, address prefilled.
+  await page.fill('#incident-open-location', 'Synthetic Site Alpha');
+  await page.fill('#incident-open-address', 'Synthetic Street 1');
+  await page.click('#incident-open-btn');
+  await page.waitForSelector('#screen-enroute.active', { timeout: 5000 });
+  const draftId = await page.evaluate(() => activeIncident.id);
+  assert(/^[0-9a-f-]{36}$/.test(draftId), `${rel}: active incident id should be a client UUID, got ${draftId}`);
+  assert((await page.textContent('#incident-context-strip')).includes('ממתין לאישור'), `${rel}: strip should show the draft status`);
+  assert(await page.evaluate(() => document.getElementById('incident-context-strip').classList.contains('draft')), `${rel}: strip should use the draft style`);
+  assert((await page.inputValue('#enroute-address')) === 'Synthetic Street 1', `${rel}: en-route address should be prefilled from the incident`);
+  assert(await page.evaluate((id) => SITE_TO_INCIDENT_ID.SITE_A === id && !('SITE_B' in SITE_TO_INCIDENT_ID), draftId), `${rel}: SITE_A must map to the draft and SITE_B must be gone`);
+  assert(await page.evaluate(() => !allSites.some((s) => s.id === 'SITE_B')), `${rel}: local-demo SITE_B must be hidden while logged in`);
+
+  // 3. Events are pinned to the incident at creation; an unstamped legacy entry is rejected locally, never pushed.
+  await page.evaluate(() => {
+    getOutbox().push({ local_event_id: 'legacy-unstamped-1', local_timestamp: new Date().toISOString(), type: 'QUICK_PATIENT_CREATED', siteId: 'SITE_A', synced: false, payload_json: {} });
+    saveLocalEvent({ type: 'QUICK_PATIENT_CREATED', patient_id: newUuid(), payload_json: { visual_id: 'P001' } });
+  });
+  await page.evaluate(() => syncPush());
+  const stamped = await page.evaluate((id) => getOutbox().filter((e) => e.incident_id === id).length, draftId);
+  assert(stamped >= 1, `${rel}: new outbox entries must carry incident_id`);
+  const pushedIncidents = [...new Set(pushes.map((p) => p.incident_id))];
+  assert(pushedIncidents.length === 1 && pushedIncidents[0] === draftId, `${rel}: pushes must target only the draft incident, got ${JSON.stringify(pushedIncidents)}`);
+  assert(!pushes.some((p) => p.events.some((e) => e.local_event_id === 'legacy-unstamped-1')), `${rel}: an unstamped entry must never be pushed`);
+  const legacy = await page.evaluate(() => getOutbox().find((e) => e.local_event_id === 'legacy-unstamped-1'));
+  assert(legacy.syncRejected && legacy.syncRejectReason === 'no_incident_context', `${rel}: unstamped entry must be visibly rejected, got ${JSON.stringify(legacy)}`);
+
+  // 4. Local-demo clearers are refused while logged in (they would wipe real unsynced events).
+  // The demo patient loaders themselves were removed in V2.99.24.
+  const outboxBefore = await page.evaluate(() => getOutbox().length);
+  await page.evaluate(() => { clearDemoPatientsOnly({ confirmReset: false }); clearDemoScenario({ confirmReset: false }); });
+  assert(await page.evaluate(() => getOutbox().length) === outboxBefore && outboxBefore >= 2, `${rel}: demo clearers must not wipe the outbox while logged in`);
+
+  // 5. Reload: session restore resumes the stored incident instead of the picker.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await unlockOrSetupPin(page);
+  await page.waitForFunction(() => ['screen-enroute', 'screen-incident-picker'].includes(document.querySelector('.screen.active')?.id), { timeout: 5000 });
+  assert((await activeScreen(page)) === 'screen-enroute', `${rel}: reload should resume the medic's incident, got ${await activeScreen(page)}`);
+  assert(await page.evaluate((id) => activeIncident?.id === id, draftId), `${rel}: resumed incident should be the draft`);
+
+  // 6. PC: pulsing approval banner, acknowledge, confirm; no demo patients on the role dashboard.
+  await page.evaluate(() => signOut());
+  await login(page, 'pc@test');
+  await page.waitForSelector('#screen-incident-picker.active', { timeout: 5000 });
+  await page.waitForFunction(() => document.getElementById('draft-approval-banner').style.display === 'flex', { timeout: 5000 });
+  assert(await page.evaluate(() => document.getElementById('draft-approval-banner').classList.contains('pulse')), `${rel}: unacknowledged draft banner should pulse`);
+  await page.click('#draft-approval-banner button:has-text("ראיתי")');
+  await page.waitForFunction(() => !document.getElementById('draft-approval-banner').classList.contains('pulse'), { timeout: 5000 });
+  await page.click('#draft-approval-banner button:has-text("אשר")');
+  await page.waitForFunction(() => document.getElementById('draft-approval-banner').style.display === 'none', { timeout: 5000 });
+  const rpcNames = await page.evaluate(() => window.__fakeRpcLog.map((r) => r.name));
+  assert(rpcNames.includes('acknowledge_draft') && rpcNames.includes('confirm_draft'), `${rel}: expected acknowledge_draft and confirm_draft calls, got ${rpcNames.join(',')}`);
+  await page.click(`#incident-picker-list button:has-text("הצטרף לאירוע")`);
+  await page.waitForSelector('#screen-role-dashboard.active', { timeout: 5000 });
+  assert(await page.evaluate(() => patients.length === 0), `${rel}: logged-in PC dashboard must not auto-load demo patients`);
+  assert((await page.textContent('#incident-context-strip')).includes('פעיל'), `${rel}: strip should show the confirmed incident as active`);
+
+  // 7. CC: overview of all open incidents with server counts.
+  await page.evaluate(() => signOut());
+  await login(page, 'cc@test');
+  await page.waitForSelector('#screen-incident-picker.active', { timeout: 5000 });
+  await page.waitForFunction(() => document.getElementById('incident-picker-list').textContent.includes('אדומים פעילים'), { timeout: 5000 });
+  assert((await page.textContent('#incident-picker-list')).includes('Synthetic Site Alpha'), `${rel}: CC overview should list the incident`);
+
+  // 8. Logistics cannot open incidents.
+  await page.evaluate(() => signOut());
+  await login(page, 'logo@test');
+  await page.waitForSelector('#screen-incident-picker.active', { timeout: 5000 });
+  assert(!(await page.locator('#incident-open-panel').isVisible()), `${rel}: logistics must not see the open-incident panel`);
+
+  // 9. Sign out -> local demo mode is intact (SITE_B back) and starts with no patients (V2.99.24).
+  await page.evaluate(() => signOut());
+  await page.waitForSelector('#screen-login.active', { timeout: 5000 });
+  assert(await page.evaluate(() => allSites.some((s) => s.id === 'SITE_B') && SITE_TO_INCIDENT_ID.SITE_B), `${rel}: local demo sites must be restored after sign-out`);
+  await page.evaluate(() => { goTo('demo'); startRoleDashboard('pc'); });
+  assert(await page.evaluate(() => patients.length === 0), `${rel}: local demo mode must start with no patients after sign-out`);
+  assert(!(await page.locator('#incident-context-strip').isVisible()), `${rel}: incident strip must be hidden in local demo mode`);
+
+  assert(pageErrors.length === 0, `${rel}: uncaught page error(s): ${pageErrors.join(' | ')}`);
+  await context.close();
+  console.log(`${rel}: incident lifecycle browser test passed`);
+}
+
+(async () => {
+  // Same browser selection as scripts/browser_smoke_test.js: prefer a pre-installed Chromium.
+  const preinstalled = '/opt/pw-browsers/chromium';
+  const browser = await chromium.launch(fs.existsSync(preinstalled) ? { executablePath: preinstalled } : {});
+  try {
+    for (const file of files) await checkFile(browser, file);
+  } finally {
+    await browser.close();
+  }
+})().catch((err) => {
+  console.error(err.message || err);
+  process.exit(1);
+});
