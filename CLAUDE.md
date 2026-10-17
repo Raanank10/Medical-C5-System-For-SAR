@@ -35,6 +35,7 @@ npm run test:browser-smoke            # or: node scripts/browser_smoke_test.js
 node scripts/browser_incident_lifecycle_test.js   # logged-in incident picker/draft flow + close guard, stubbed Supabase client
 node scripts/browser_collapse_brief_test.js       # Movement screen: building collapse with any incident type
 node scripts/browser_medic_assignment_test.js     # cross-device PC -> medic assignment: PC, medic and rescue tabs sharing one stubbed backend
+node scripts/browser_remote_patient_and_resupply_test.js  # remote patients show no placeholder vitals; medic resupply requests are queued for push
 
 # Analytics package
 cd analytics/c5_sentinel_sar_analytics_v1_1
