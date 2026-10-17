@@ -277,6 +277,28 @@
     return !isFinalPatientStatus(patient?.patientStatus);
   }
 
+  // Magen David Adom's own casualty scale, as it reports hospital-bound patients. Recorded next to
+  // field triage, never in place of it: our triage is a field decision, MDA's is a separate
+  // organization's classification at handover. A difference is shown to command as information
+  // (the patient may have improved or worsened), never auto-corrected in either direction.
+  const MDA_CLASSIFICATIONS = Object.freeze(["minor", "anxiety", "moderate", "serious", "critical", "deceased"]);
+  const MDA_EXPECTED_BY_TRIAGE = Object.freeze({
+    red: Object.freeze(["serious", "critical"]),
+    yellow: Object.freeze(["moderate"]),
+    green: Object.freeze(["minor", "anxiety"]),
+    black: Object.freeze(["deceased"]),
+  });
+
+  function isValidMdaClassification(value) {
+    return MDA_CLASSIFICATIONS.includes(value);
+  }
+
+  function mdaClassificationDiffersFromTriage(triage, mdaClassification) {
+    const expected = MDA_EXPECTED_BY_TRIAGE[triage];
+    if (!expected || !isValidMdaClassification(mdaClassification)) return false;
+    return !expected.includes(mdaClassification);
+  }
+
   return {
     AVPU_RANK,
     DEVICE_SILENCE_MS,
@@ -298,7 +320,11 @@
     isHighRiskDose,
     isPediatricPatient,
     isRoutineAlert,
+    isValidMdaClassification,
     isVitalsOverdue,
+    MDA_CLASSIFICATIONS,
+    MDA_EXPECTED_BY_TRIAGE,
+    mdaClassificationDiffersFromTriage,
     minutesToStockout,
     needsVitals,
     PEDIATRIC_AGE_CUTOFF,

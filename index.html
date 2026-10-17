@@ -706,7 +706,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9930</div>
+      <div class="demo-kicker">Demo V2.9931</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -803,7 +803,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9930</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9931</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -813,7 +813,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9930</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9931</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -881,6 +881,7 @@ textarea{resize:vertical;min-height:70px;}
         <button class="chip" onclick="selectInitialReportSource(this,'civilian')">אזרח</button>
         <button class="chip" onclick="selectInitialReportSource(this,'fire')">כב״א</button>
         <button class="chip" onclick="selectInitialReportSource(this,'mda')">מד״א</button>
+        <button class="chip" onclick="selectInitialReportSource(this,'uh')">איחוד הצלה</button>
         <button class="chip" onclick="selectInitialReportSource(this,'police')">משטרה</button>
         <button class="chip" onclick="selectInitialReportSource(this,'other')">אחר</button>
       </div>
@@ -1048,6 +1049,7 @@ textarea{resize:vertical;min-height:70px;}
           <button class="chip" onclick="selectInitialReportSource(this,'civilian')">אזרח</button>
           <button class="chip" onclick="selectInitialReportSource(this,'fire')">כב״א</button>
           <button class="chip" onclick="selectInitialReportSource(this,'mda')">מד״א</button>
+        <button class="chip" onclick="selectInitialReportSource(this,'uh')">איחוד הצלה</button>
           <button class="chip" onclick="selectInitialReportSource(this,'police')">משטרה</button>
           <button class="chip" onclick="selectInitialReportSource(this,'other')">אחר</button>
         </div>
@@ -1079,7 +1081,8 @@ textarea{resize:vertical;min-height:70px;}
     <div class="tap-grid tap-grid-2" id="report-source-grid" style="margin-bottom:16px">
       <button class="tap-btn" onclick="selectReportSource(this,'MDA')"><span class="icon">🚑</span>מד"א</button>
       <button class="tap-btn" onclick="selectReportSource(this,'police')"><span class="icon">👮</span>משטרה</button>
-      <button class="tap-btn" onclick="selectReportSource(this,'UH')"><span class="icon">🟡</span>ידידים</button>
+      <button class="tap-btn" onclick="selectReportSource(this,'UH')"><span class="icon">🧡</span>איחוד הצלה</button>
+      <button class="tap-btn" onclick="selectReportSource(this,'YEDIDIM')"><span class="icon">🟡</span>ידידים</button>
       <button class="tap-btn" onclick="selectReportSource(this,'other')"><span class="icon">📻</span>אחר</button>
     </div>
     <div class="field-label">פצועים מדווחים</div>
@@ -1104,7 +1107,11 @@ textarea{resize:vertical;min-height:70px;}
         </div></div>
     </div>
     <div class="field-label">יעד פינוי</div>
-    <input type="text" id="report-evac-dest" placeholder="איכילוב, שיבא..." style="margin-bottom:12px">
+    <input type="text" id="report-evac-dest" list="evac-destination-options" placeholder="איכילוב, שיבא..." style="margin-bottom:12px">
+    <div id="report-mda-wrap" style="display:none;margin-bottom:12px">
+      <div class="field-label">סיווג מד״א לפצוע (אופציונלי)</div>
+      <div class="chip-row" id="report-mda-grid"></div>
+    </div>
     <div class="field-label">שם אירוע / מוקד</div>
     <input type="text" id="report-event-name" placeholder="לדוגמה: מוקד A — הרצל 12" style="margin-bottom:12px">
     <div class="field-label">פלוגה מטפלת</div>
@@ -2030,6 +2037,8 @@ textarea{resize:vertical;min-height:70px;}
   <div style="padding:12px 16px 0"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px" id="cmd-totals"></div></div>
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('priority')"><span>תעדוף מפקד</span><span class="cmd-panel-sub" id="cmd-panel-priority-meta">OPEN</span></button>
   <div id="cmd-panel-priority" class="cmd-panel-body"><div id="cmd-priority-board" class="cmd-priority-grid"></div></div>
+  <button class="cmd-panel-toggle" onclick="toggleCmdPanel('locations')"><span>לוח נפגעים לפי מיקום</span><span class="cmd-panel-sub" id="cmd-panel-locations-meta">OPEN</span></button>
+  <div id="cmd-panel-locations" class="cmd-panel-body"><div id="cmd-location-board" style="padding:6px 16px 0"></div></div>
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('reinforcement')"><span>בקשות תגבור רפואי</span><span class="cmd-panel-sub" id="cmd-panel-reinforcement-meta">OPEN</span></button>
   <div id="cmd-panel-reinforcement" class="cmd-panel-body"><div id="cmd-reinforcement-requests"></div></div>
   <button class="cmd-panel-toggle" onclick="toggleCmdPanel('heatmap')"><span>מפת חום מרחבית</span><span class="cmd-panel-sub" id="cmd-panel-heatmap-meta">COLLAPSED</span></button>
@@ -2658,6 +2667,28 @@ textarea{resize:vertical;min-height:70px;}
     return !isFinalPatientStatus(patient?.patientStatus);
   }
 
+  // Magen David Adom's own casualty scale, as it reports hospital-bound patients. Recorded next to
+  // field triage, never in place of it: our triage is a field decision, MDA's is a separate
+  // organization's classification at handover. A difference is shown to command as information
+  // (the patient may have improved or worsened), never auto-corrected in either direction.
+  const MDA_CLASSIFICATIONS = Object.freeze(["minor", "anxiety", "moderate", "serious", "critical", "deceased"]);
+  const MDA_EXPECTED_BY_TRIAGE = Object.freeze({
+    red: Object.freeze(["serious", "critical"]),
+    yellow: Object.freeze(["moderate"]),
+    green: Object.freeze(["minor", "anxiety"]),
+    black: Object.freeze(["deceased"]),
+  });
+
+  function isValidMdaClassification(value) {
+    return MDA_CLASSIFICATIONS.includes(value);
+  }
+
+  function mdaClassificationDiffersFromTriage(triage, mdaClassification) {
+    const expected = MDA_EXPECTED_BY_TRIAGE[triage];
+    if (!expected || !isValidMdaClassification(mdaClassification)) return false;
+    return !expected.includes(mdaClassification);
+  }
+
   return {
     AVPU_RANK,
     DEVICE_SILENCE_MS,
@@ -2679,7 +2710,11 @@ textarea{resize:vertical;min-height:70px;}
     isHighRiskDose,
     isPediatricPatient,
     isRoutineAlert,
+    isValidMdaClassification,
     isVitalsOverdue,
+    MDA_CLASSIFICATIONS,
+    MDA_EXPECTED_BY_TRIAGE,
+    mdaClassificationDiffersFromTriage,
     minutesToStockout,
     needsVitals,
     PEDIATRIC_AGE_CUTOFF,
@@ -2741,7 +2776,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.30';
+const APP_VERSION = '2.99.31';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -2801,7 +2836,8 @@ const SYNC_ELIGIBLE_EVENT_TYPES = new Set([
   'EXTERNAL_REPORT_CREATED','EXTERNAL_REPORT_LINKED','WATCHDOG_ALERT','WATCHDOG_ACKNOWLEDGED',
   'WATCHDOG_RESOLVED','DEAD_MAN_SWITCH_ESCALATED','SYNC_CONFLICT','CONFLICT_LOG_ENTRY',
   'TREATMENT_SAFETY_WARNING','COMMAND_CONTEXT_NOTE_ADDED','VOICE_MEMO_ADDED',
-  'HIGH_RISK_CLINICAL_VIOLATION','NOTE_ADDED','AAR_CONTEXT_NOTE_ADDED','PATIENT_DEATH_CONFIRMED'
+  'HIGH_RISK_CLINICAL_VIOLATION','NOTE_ADDED','AAR_CONTEXT_NOTE_ADDED','PATIENT_DEATH_CONFIRMED',
+  'PATIENT_EVACUATION_UPDATED'
 ]);
 const SUPPLY_BASELINE = Object.freeze({tourniquets:3, pressureDressings:4, hemostaticGauze:2, airwayEquipment:2, ivKits:1, blankets:2, batteryPacks:1});
 const PC_TRUCK_BASELINE = Object.freeze({tourniquets:20, pressureDressings:30, hemostaticGauze:15, airwayEquipment:10, ivKits:8, blankets:25, batteryPacks:6});
@@ -2947,6 +2983,24 @@ const BP_LABELS = {
 };
 const ACCESS_LABELS = {partial:'לכוד', trapped:'לכוד', full:'לא לכוד', free:'לא לכוד', none:'לכוד', not_trapped:'לא לכוד'};
 const TRAP_LABELS = {trapped:'לכוד', not_trapped:'לא לכוד', unknown:'לא תועד'};
+// Evacuation tracking (V2.99.31, database/042-043): where each casualty was taken and how MDA
+// classified them. MDA's classification sits beside field triage and never replaces it
+// (src/domain/rules.js mdaClassificationDiffersFromTriage).
+const MDA_CLASSIFICATION_LABELS = {minor:'קל', anxiety:'נפגע חרדה', moderate:'בינוני', serious:'קשה', critical:'אנוש', deceased:'נקבע מותו'};
+const MDA_CLASSIFICATION_COLORS = {minor:'var(--green)', anxiety:'var(--green)', moderate:'var(--yellow)', serious:'var(--red)', critical:'var(--red)', deceased:'var(--muted)'};
+const EVAC_DESTINATION_SUGGESTIONS = ['שיבא','איכילוב','בילינסון','וולפסון','אסף הרופא','מאיר','לניאדו','הלל יפה','רמב״ם','העמק','הדסה עין כרם','שערי צדק','ברזילי','אסותא אשדוד','סורוקה'];
+// Add-report sources: client key -> label + server external_source value. UH is United Hatzalah;
+// Yedidim is a separate organization (before V2.99.31 the 'UH' button was labelled Yedidim).
+const EXTERNAL_REPORT_SOURCES = {
+  MDA:{label:'מד"א', server:'mda'},
+  UH:{label:'איחוד הצלה', server:'united_hatzalah'},
+  YEDIDIM:{label:'ידידים', server:'yedidim'},
+  police:{label:'משטרה', server:'police'},
+  other:{label:'אחר', server:'other'}
+};
+const SERVER_EXTERNAL_SOURCE_LABELS = {mda:'מד"א', united_hatzalah:'איחוד הצלה', yedidim:'ידידים', police:'משטרה', idf:'צה"ל', civilian:'אזרח', other:'אחר'};
+// Roles sync-log lets write EXTERNAL_REPORT_CREATED and PATIENT_EVACUATION_UPDATED.
+const EVAC_REPORTING_ROLES = new Set(['pc','cc','chamal','physician','admin']);
 const STATUS_LABELS = {
   identified:'זוהה',
   stabilizing:'ייצוב בטיפול',
@@ -4440,6 +4494,7 @@ function clearDemoPatientsOnly({confirmReset=true}={}){
 function saveDemoState(){
   if(_demoSandbox) return Promise.resolve();
   reconcileTriageSync();
+  reconcileLocationSync();
   return runSerialized(DEMO_STORAGE_KEY, async ()=>{
     try{
       const raw=await secureGetItem(DEMO_STORAGE_KEY);
@@ -6206,7 +6261,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
   }else{
     objects=allSites.filter(s=>s.id!=='ALL').map(s=>roleRow(
       `${s.name} · ${incidentTypeLabel(s.id)}`,
-      `${getSitePatients(s.id).length} פצועים · ${externalConflictCount(getSitePatients(s.id), s.externalReports||[])} פערי דיווח · ${siteStatusSummaryLine(s.id)}`
+      `${getSitePatients(s.id).length} פצועים · ${externalConflictCount(getSitePatients(s.id), siteExternalReports(s.id))} פערי דיווח · ${siteStatusSummaryLine(s.id)}`
     )).join('');
   }
   const authSite=ensureSiteStatusFields(rescueActiveSiteId);
@@ -6263,6 +6318,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
     ${role==='cc'?renderCcCommandBoard():`<div class="role-top-grid">${metrics}</div>`}
     ${role==='medic'?renderMedicActionPanel():''}
     ${role==='pc'?renderPcResponsibilityBoard():''}
+    ${['pc','cc'].includes(role)?roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds(role))):''}
     ${role==='physician'?renderDoctorLegacyNote():''}
     ${role==='medic'||role==='pc'?'':role==='cc'
       ? `<details style="margin:12px 0 0"><summary style="cursor:pointer;font-weight:900;color:var(--muted);padding:10px 0">פירוט נוסף / אחריות ותורים</summary>${genericSections}</details>`
@@ -6589,7 +6645,7 @@ function renderDashboard(){
   updateMedicBriefingBadge(medicDse);
 
   const evacTotal=(siteData.initialEvacuation.green||0)+(siteData.initialEvacuation.yellow||0)+(siteData.initialEvacuation.red||0);
-  const sourceLabel={civilian:'אזרח',fire:'כב״א',mda:'מד״א',police:'משטרה',other:'אחר'}[siteData.initialEvacuation.source]||'לא צוין';
+  const sourceLabel={civilian:'אזרח',fire:'כב״א',mda:'מד״א',uh:'איחוד הצלה',police:'משטרה',other:'אחר'}[siteData.initialEvacuation.source]||'לא צוין';
   const evacNote=evacTotal ? `<div class="patient-card green" style="cursor:default"><div class="patient-id">MASS</div><div class="patient-info"><div style="font-weight:700">פינוי ראשוני לפני הגעת כוח רפואי</div><div style="font-size:12px;color:var(--muted);margin-top:2px">קל ${siteData.initialEvacuation.green||0} · בינוני ${siteData.initialEvacuation.yellow||0} · קשה ${siteData.initialEvacuation.red||0} · מקור: ${sourceLabel}</div><div style="font-size:12px;color:var(--muted);margin-top:2px">${siteData.initialEvacuation.summary||'ללא יעד פינוי קצר'}</div><div class="patient-badges"><span class="triage-pill green">מונה מוקד</span><span class="badge badge-muted">לא רשומת פצוע</span></div></div></div>` : '';
   const active=sortedPatientsByColorThenUrgency(patients.filter(p=>!['evacuating','evacuated','handed_over'].includes(p.patientStatus)).filter(patientMatchesBoardFilter));
   document.getElementById('patient-list').innerHTML=evacNote+active.map(p=>{
@@ -7663,7 +7719,7 @@ function buildAlertObjects(pts=patients){
     }
   });
   duplicateCandidates(pts).forEach(([a,b],idx)=>pushAlert(alerts,{id:`dup-${a.id}-${b.id}`,type:'DUPLICATE_SUSPECTED',severity:'medium',owner:'pc',audience:['pc','chamal'],escalatesTo:null,actionRequired:'merge_duplicate',scope:'site',category:'integrity',siteId:a.siteId||b.siteId||'SITE_A',patientId:a.id,title:`חשד לכפילות ${a.id} ↔ ${b.id}`,detail:'בדיקה ידנית בלבד; אין מיזוג הרסני של אירועים'}));
-  const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>s.externalReports||[]):((allSites.find(s=>s.id===cmdActiveSite)||siteData).externalReports||siteData.externalReports||[]);
+  const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id)):siteExternalReports(cmdActiveSite);
   const typeReport=siteData.medicIncidentTypeReport;
   if(typeReport){
     const auth=ensureSiteStatusFields(typeReport.siteId);
@@ -8196,16 +8252,25 @@ function selectReportSource(btn,val){
 }
 function changeRC(color,delta){ reportState[color]=Math.max(0,(reportState[color]||0)+delta); document.getElementById('rc-'+color).textContent=reportState[color]; }
 function prepareExternalReport(){
-  reportState={source:null, red:0, yellow:0, green:0, patientId:null};
+  reportState={source:null, red:0, yellow:0, green:0, patientId:null, mda:null};
+  renderReportMdaChips(false);
   document.querySelectorAll('#report-source-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
   ['red','yellow','green'].forEach(c=>{const el=document.getElementById('rc-'+c); if(el) el.textContent='0';});
   ['report-patient-id','report-evac-dest','report-company','report-notes'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
   const eventName=document.getElementById('report-event-name'); if(eventName) eventName.value=siteData.name||'';
 }
+// Patient-specific late update only: MDA's classification of that one patient (V2.99.31).
+function renderReportMdaChips(show){
+  ensureEvacDestinationDatalist();
+  const wrap=document.getElementById('report-mda-wrap'); if(wrap) wrap.style.display=show?'block':'none';
+  const grid=document.getElementById('report-mda-grid'); if(!grid) return;
+  grid.innerHTML=C5Rules.MDA_CLASSIFICATIONS.map(k=>`<button class="chip${reportState.mda===k?' selected':''}" onclick="selectReportMda('${k}')">${MDA_CLASSIFICATION_LABELS[k]}</button>`).join('');
+}
+function selectReportMda(k){ reportState.mda=reportState.mda===k?null:k; renderReportMdaChips(true); }
 function saveReport(){
-  const labels={MDA:'מד"א',police:'משטרה',UH:'ידידים',other:'אחר'};
+  const src=EXTERNAL_REPORT_SOURCES[reportState.source];
   const patientId=document.getElementById('report-patient-id')?.value || reportState.patientId || null;
-  const r={sourceLabel:labels[reportState.source]||'',source:reportState.source,red:reportState.red,yellow:reportState.yellow,green:reportState.green,evacDest:document.getElementById('report-evac-dest').value,eventName:document.getElementById('report-event-name').value||siteData.name,company:document.getElementById('report-company').value||'',patientId,notes:document.getElementById('report-notes').value,time:nowT(),id:'RPT'+uid(),status:'new'};
+  const r={sourceLabel:src?.label||'',source:reportState.source,red:reportState.red,yellow:reportState.yellow,green:reportState.green,evacDest:document.getElementById('report-evac-dest').value,eventName:document.getElementById('report-event-name').value||siteData.name,company:document.getElementById('report-company').value||'',patientId,notes:document.getElementById('report-notes').value,time:nowT(),id:'RPT'+uid(),status:'new'};
   if(patientId){
     const p=patients.find(x=>x.id===patientId);
     if(p){
@@ -8215,17 +8280,35 @@ function saveReport(){
       p.unsyncedEvents=(p.unsyncedEvents||0)+1;
     }
   }
-  siteData.externalReports.push(r); lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState(); renderExtReports(); goTo('site');
+  siteData.externalReports.push(r);
+  // Synced so every command device sees the same reports (database/043 projects the event into
+  // external_reports). Roles sync-log would reject stay local, as before V2.99.31.
+  if(src && (!currentUser || EVAC_REPORTING_ROLES.has(currentUser.role))){
+    saveLocalEvent({type:'EXTERNAL_REPORT_CREATED', detail:`${r.sourceLabel} · קשה ${r.red} · בינוני ${r.yellow} · קל ${r.green}${r.evacDest?' · '+r.evacDest:''}`, warn:false,
+      payload_json:{source:src.server, reported_red:r.red||0, reported_yellow:r.yellow||0, reported_green:r.green||0,
+        evacuation_destination:r.evacDest||null, notes:r.notes||null, external_reference:r.id,
+        // Not patient_id: a report about a patient that never synced must not fail the events FK.
+        ...(patientId?{linked_patient_id:patientId}:{})}});
+  }
+  if(patientId && (r.evacDest || reportState.mda) && canUpdateEvacuationTracking()){
+    updatePatientEvacuation(patientId, {destination:r.evacDest, mdaClassification:reportState.mda, silent:true});
+  }
+  lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState(); renderExtReports(); goTo('site');
+}
+function externalReportCardHtml(r, siteLabel=''){
+  return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700">${escAttr(r.sourceLabel)}</span><div style="display:flex;gap:6px">${siteLabel?`<span style="font-size:10px;color:var(--muted)">${escAttr(siteLabel)}</span>`:''}<span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escAttr(r.time)}</span></div></div><div style="font-size:13px">${r.patientId?`<span style="color:var(--accent);font-weight:700">${escAttr(r.patientId)} </span>`:''}${r.red?`<span style="color:var(--red);font-weight:700">${r.red} קשה </span>`:''}${r.yellow?`<span style="color:var(--yellow);font-weight:700">${r.yellow} בינוני </span>`:''}${r.green?`<span style="color:var(--green);font-weight:700">${r.green} קל</span>`:''}</div>${r.evacDest?`<div style="font-size:12px;margin-top:4px">🏥 ${escAttr(r.evacDest)}</div>`:''}<div style="font-size:11px;color:var(--muted);margin-top:4px">${escAttr(r.eventName||(r.fromServer?'':siteData.name)||'')}${r.company?' · '+escAttr(r.company):''}${r.fromServer?' · התקבל מסנכרון':''}</div></div>`;
 }
 function renderExtReports(){
   const el=document.getElementById('ext-reports-list');
-  if(!siteData.externalReports.length){el.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:8px 0">אין דיווחים עדיין</div>';return;}
-  el.innerHTML=siteData.externalReports.map(r=>`<div style="background:var(--surface2);border-radius:12px;padding:12px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700">${r.sourceLabel}</span><span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${r.time}</span></div><div style="font-size:13px">${r.patientId?`<span style="color:var(--accent);font-weight:700">${r.patientId} </span>`:''}${r.red?`<span style="color:var(--red);font-weight:700">${r.red} קשה </span>`:''}${r.yellow?`<span style="color:var(--yellow);font-weight:700">${r.yellow} בינוני </span>`:''}${r.green?`<span style="color:var(--green);font-weight:700">${r.green} קל</span>`:''}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">${r.eventName||siteData.name||''}${r.company?' · '+r.company:''}</div></div>`).join('');
+  const reports=mergeRemoteExternalReports(siteData.externalReports||[], currentSiteId());
+  if(!reports.length){el.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:8px 0">אין דיווחים עדיין</div>';return;}
+  el.innerHTML=reports.map(r=>externalReportCardHtml(r)).join('');
 }
 
 function openLateExternalPatientUpdate(id){
   const p=patients.find(x=>x.id===id);
-  reportState={source:null, red:0, yellow:0, green:0, patientId:id};
+  reportState={source:null, red:0, yellow:0, green:0, patientId:id, mda:p?.mdaClassification||null};
+  renderReportMdaChips(true);
   ['red','yellow','green'].forEach(c=>{const el=document.getElementById('rc-'+c); if(el) el.textContent='0';});
   document.querySelectorAll('#report-source-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
   const pid=document.getElementById('report-patient-id'); if(pid) pid.value=id;
@@ -8315,6 +8398,7 @@ function openPatient(id){
       <input type="text" id="identity-desc-input" placeholder="תיאור זיהוי / לבוש (אם ידוע)" value="${escAttr(p.temporaryDescription||'')}" style="margin-bottom:10px">
       <button class="btn-secondary" onclick="savePatientIdentity('${p.id}')">שמור זיהוי</button>
     </div>
+    ${renderPatientEvacuationCard(p)}
     <div class="summary-card">
       <div style="font-weight:700;font-size:14px;margin-bottom:10px">סיווג פינוי — עקיפת מפקד ידנית</div>
       <div class="tap-grid tap-grid-4">
@@ -8366,7 +8450,7 @@ function openPatient(id){
     <div style="height:80px"></div>`;
 
   const showCollectionPointBtn = p.patientStatus!=='evacuating' && C5Rules.canChangePatientStatus(p);
-  document.getElementById('detail-bottom-bar').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn-primary" onclick="openQuickVitals('${p.id}')">📊 עדכן מדדים</button><button class="btn-primary" style="background:var(--accent)" onclick="speakMist('${p.id}')">🔊 הקרא MIST</button></div><div style="display:grid;grid-template-columns:${showCollectionPointBtn?'1fr 1fr':'1fr'};gap:8px;margin-top:8px">${showCollectionPointBtn?`<button class="btn-primary" style="background:var(--orange)" onclick="markPatientAtCollectionPoint('${p.id}')">🚶 יצא לנקודת איסוף</button>`:''}<button class="btn-primary" style="background:var(--green)" onclick="handoverPatient('${p.id}')">הועבר למד״א — עכשיו</button></div><div style="margin-top:8px">${C5Rules.canChangePatientStatus(p)?`<button class="btn-secondary" onclick="generateQrHandover('${p.id}')">🔗 מסירה מאובטחת — קישור QR</button>`:''}</div>`;
+  document.getElementById('detail-bottom-bar').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn-primary" onclick="openQuickVitals('${p.id}')">📊 עדכן מדדים</button><button class="btn-primary" style="background:var(--accent)" onclick="speakMist('${p.id}')">🔊 הקרא MIST</button></div><div style="display:grid;grid-template-columns:${showCollectionPointBtn?'1fr 1fr':'1fr'};gap:8px;margin-top:8px">${showCollectionPointBtn?`<button class="btn-primary" style="background:var(--orange)" onclick="markPatientAtCollectionPoint('${p.id}')">🚶 יצא לנקודת איסוף</button>`:''}<button class="btn-primary" style="background:var(--green)" onclick="openEvacuationSheet('${p.id}','handover')">הועבר למד״א — עכשיו</button></div><div style="margin-top:8px">${C5Rules.canChangePatientStatus(p)?`<button class="btn-secondary" onclick="generateQrHandover('${p.id}')">🔗 מסירה מאובטחת — קישור QR</button>`:''}</div>`;
   updateDemoStatus();
   goTo('patient');
 }
@@ -8398,10 +8482,113 @@ function markPatientAtCollectionPoint(id){
   openPatient(id);
 }
 
-function handoverPatient(id){
+// ── Evacuation tracking (V2.99.31): destination + MDA classification ──
+// Optional at handover (often unknown at that moment) and updatable later by command roles once
+// MDA reports back. Never touches triage or status. The server keeps the newest value by
+// local_timestamp (database/043), so a late-syncing older update cannot overwrite a newer one.
+// Before V2.99.31 the handover sent the placeholder 'pending', which the server stored as the
+// destination; unknown fields are now simply left out.
+function evacuationActorRole(){ return currentUser ? currentUser.role : activeRoleDashboard; }
+function canUpdateEvacuationTracking(){ return EVAC_REPORTING_ROLES.has(evacuationActorRole()); }
+function mdaClassificationLabel(v){ return MDA_CLASSIFICATION_LABELS[v] || 'לא דווח'; }
+function evacuationPayload(destination, mdaClassification){
+  const payload={};
+  const dest=String(destination||'').trim();
+  if(dest) payload.destination_facility=dest;
+  if(C5Rules.isValidMdaClassification(mdaClassification)) payload.mda_classification=mdaClassification;
+  return payload;
+}
+function applyEvacuationPayloadLocally(p, payload){
+  if(payload.destination_facility) p.evacDestination=payload.destination_facility;
+  if(payload.mda_classification) p.mdaClassification=payload.mda_classification;
+  if(payload.destination_facility || payload.mda_classification) p.evacUpdatedAt=Date.now();
+}
+function evacuationSummaryText(payload){
+  return `${payload.destination_facility?'יעד: '+payload.destination_facility:'יעד טרם ידוע'} · סיווג מד״א: ${mdaClassificationLabel(payload.mda_classification)}`;
+}
+function ensureEvacDestinationDatalist(){
+  if(document.getElementById('evac-destination-options')) return;
+  const list=document.createElement('datalist');
+  list.id='evac-destination-options';
+  list.innerHTML=EVAC_DESTINATION_SUGGESTIONS.map(n=>`<option value="${escAttr(n)}">`).join('');
+  document.body.appendChild(list);
+}
+let evacSheetState={patientId:null, mode:'update', mda:null};
+function openEvacuationSheet(id, mode='update'){
+  const p=patients.find(x=>x.id===id); if(!p) return;
+  if(mode==='handover' && !C5Rules.canChangePatientStatus(p)){ toast('כבר נרשמה מסירה — לא ניתן לשלוח שוב'); return; }
+  if(mode==='update' && !canUpdateEvacuationTracking()){ toast('עדכון יעד / סיווג מד״א — חוג״ד, מ״פ רפואה, חמ״ל או רופא'); return; }
+  ensureEvacDestinationDatalist();
+  evacSheetState={patientId:id, mode, mda:p.mdaClassification||null};
+  let modal=document.getElementById('evac-sheet-modal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='evac-sheet-modal';
+    modal.className='modal-overlay hidden';
+    modal.onclick=function(event){ if(event.target===this) closeEvacuationSheet(); };
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML=`<div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">${mode==='handover'?'מסירה למד״א':'עדכון פינוי'} · ${escAttr(p.visualId||p.id)}</div>
+    <div style="font-size:12px;color:var(--muted);margin:6px 0 12px;line-height:1.5">${mode==='handover'?'יעד וסיווג מד״א אינם חובה. אפשר להשלים אחר כך מלוח הנפגעים.':'מיון השדה לא משתנה. סיווג מד״א נשמר לצדו.'} מיון שדה: <strong>${TRIAGE_LABELS[p.triage]||p.triage||'—'}</strong></div>
+    <div class="field-label">יעד פינוי (בית חולים)</div>
+    <input type="text" id="evac-sheet-dest" list="evac-destination-options" placeholder="לדוגמה: שיבא" value="${escAttr(p.evacDestination||'')}" style="margin-bottom:12px">
+    <div class="field-label">סיווג מד״א</div>
+    <div class="chip-row" id="evac-sheet-mda"></div>
+    <button class="btn-primary" id="evac-sheet-confirm" style="background:var(--green);margin-top:14px" onclick="confirmEvacuationSheet()">${mode==='handover'?'הועבר למד״א — עכשיו':'שמור עדכון פינוי'}</button>
+    <button class="btn-secondary" style="margin-top:8px" onclick="closeEvacuationSheet()">ביטול</button>
+  </div>`;
+  renderEvacSheetMdaChips();
+  modal.classList.remove('hidden');
+}
+function renderEvacSheetMdaChips(){
+  const grid=document.getElementById('evac-sheet-mda'); if(!grid) return;
+  grid.innerHTML=C5Rules.MDA_CLASSIFICATIONS.map(k=>`<button class="chip${evacSheetState.mda===k?' selected':''}" data-mda="${k}" onclick="selectEvacSheetMda('${k}')">${MDA_CLASSIFICATION_LABELS[k]}</button>`).join('');
+}
+function selectEvacSheetMda(k){ evacSheetState.mda=evacSheetState.mda===k?null:k; renderEvacSheetMdaChips(); }
+function closeEvacuationSheet(){ document.getElementById('evac-sheet-modal')?.classList.add('hidden'); }
+function confirmEvacuationSheet(){
+  const {patientId, mode, mda}=evacSheetState;
+  const destination=(document.getElementById('evac-sheet-dest')?.value||'').trim();
+  closeEvacuationSheet();
+  if(mode==='handover') handoverPatient(patientId, {destination, mdaClassification:mda});
+  else updatePatientEvacuation(patientId, {destination, mdaClassification:mda});
+}
+function updatePatientEvacuation(id, {destination='', mdaClassification=null, silent=false}={}){
+  const p=patients.find(x=>x.id===id); if(!p) return;
+  if(!canUpdateEvacuationTracking()){ if(!silent) toast('עדכון יעד / סיווג מד״א — חוג״ד, מ״פ רפואה, חמ״ל או רופא'); return; }
+  const payload=evacuationPayload(destination, mdaClassification);
+  if(!payload.destination_facility && !payload.mda_classification){ if(!silent) toast('לא הוזן יעד או סיווג מד״א'); return; }
+  applyEvacuationPayloadLocally(p, payload);
+  p.lastModifiedAt=new Date().toISOString();
+  p.unsyncedEvents=(p.unsyncedEvents||0)+1;
+  const event={type:'PATIENT_EVACUATION_UPDATED', time:nowT(), detail:`עדכון פינוי · ${evacuationSummaryText(payload)}`, warn:false, payload_json:{...payload, siteId:p.siteId}};
+  (p.events||(p.events=[])).push(event);
+  saveLocalEvent({...event, patient_id:p.id});
+  if(silent) return;
+  lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
+  refreshActiveScreenData();
+  if(activeScreenId()==='patient') openPatient(p.id);
+  toast('עדכון פינוי נשמר');
+}
+function renderPatientEvacuationCard(p){
+  const differs=C5Rules.mdaClassificationDiffersFromTriage(p.triage, p.mdaClassification);
+  const mdaColor=MDA_CLASSIFICATION_COLORS[p.mdaClassification]||'var(--muted)';
+  return `<div class="summary-card">
+      <div style="font-weight:700;font-size:14px;margin-bottom:8px">פינוי — יעד וסיווג מד״א</div>
+      <div class="summary-row"><span class="summary-key">יעד פינוי</span><span class="summary-val">${p.evacDestination?escAttr(p.evacDestination):'<span style="color:var(--orange)">לא ידוע</span>'}</span></div>
+      <div class="summary-row"><span class="summary-key">סיווג מד״א</span><span class="summary-val" style="color:${mdaColor};font-weight:700">${mdaClassificationLabel(p.mdaClassification)}</span></div>
+      ${differs?`<div style="font-size:12px;color:var(--orange);font-weight:700;margin-top:6px">⚠ סיווג מד״א (${mdaClassificationLabel(p.mdaClassification)}) שונה ממיון השדה (${TRIAGE_LABELS[p.triage]||p.triage}) — לידיעה, המיון לא שונה</div>`:''}
+      ${canUpdateEvacuationTracking()?`<button class="btn-secondary" style="margin-top:10px" onclick="openEvacuationSheet('${p.id}','update')">עדכן יעד / סיווג מד״א</button>`:''}
+    </div>`;
+}
+function handoverPatient(id, {destination='', mdaClassification=null}={}){
   const p=patients.find(x=>x.id===id); if(!p) return;
   if(!C5Rules.canChangePatientStatus(p)){ toast('כבר נרשמה מסירה — לא ניתן לשלוח שוב'); return; }
   const deviceId=getDeviceId();
+  const evacPayload=evacuationPayload(destination, mdaClassification);
+  applyEvacuationPayloadLocally(p, evacPayload);
   p.patientStatus='handed_over';
   p.needsFullAssessment=false;
   p.lastTouchedBy=deviceId;
@@ -8410,11 +8597,11 @@ function handoverPatient(id){
   const event={
     type:'PATIENT_HANDED_OVER',
     time:nowT(),
-    detail:'הועבר למד״א — עכשיו · מסירת מצב רפואי לפינוי נרשמה',
+    detail:`הועבר למד״א — עכשיו · ${evacuationSummaryText(evacPayload)}`,
     warn:false,
     payload_json:{
       handover_method:'mist_logged_local',
-      receiving_unit_transport:'pending',
+      ...evacPayload,
       mist_summary:{mechanism:p.injury, injuries:p.injury, signs:`HR ${p.vitals.pulse}, RR ${p.vitals.rr}, AVPU=${p.vitals.avpu||'—'}`, treatment:(p.txHistory||[]).map(tx=>tx.text).join('; ')||'none recorded'}
     }
   };
@@ -8465,8 +8652,7 @@ async function generateQrHandover(id){
     warn:false,
     payload_json:{
       handover_method:'secure_qr_token',
-      destination_facility:'pending',
-      receiving_unit_transport:'pending',
+      ...evacuationPayload(p.evacDestination, p.mdaClassification),
       token_hash:tokenHash,
       token_signature:tokenSignature,
       token_expires_at:expiresAt,
@@ -9721,7 +9907,7 @@ function getSitePatients(siteId){
   return [];
 }
 let cmdActiveSite='ALL', cmdFilter='all', alertFilter='critical', cmdAlertFilter='critical', commandRole='pc', ccCompanySite='SITE_A';
-let cmdPanelOpen={priority:true,reinforcement:true,heatmap:false,devices:false,serverstate:false,quarantine:false,watchdogs:false,duplicates:false,alerts:true};
+let cmdPanelOpen={priority:true,locations:true,reinforcement:true,heatmap:false,devices:false,serverstate:false,quarantine:false,watchdogs:false,duplicates:false,alerts:true};
 function companyLabelForSite(siteId){
   return siteId==='SITE_B' ? 'פלוגה ב / BRAVO' : siteId==='SITE_A' ? 'פלוגה א / ALFA' : 'כל הפלוגות';
 }
@@ -10553,7 +10739,7 @@ function renderCommandOperationalPanels(pts, site){
   const trappedSilent=pts.filter(p=>normalizeTrapStatus(p)==='trapped' && vitalsAgeMs(p)>=10*60*1000);
   const evacBlocked=pts.filter(p=>p.triage==='red' && !['evacuating','evacuated','handed_over'].includes(p.patientStatus));
   const unsynced=pts.reduce((sum,p)=>sum+(p.unsyncedEvents||0),0)+localOutboxCount();
-  const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>s.externalReports||[]):site.externalReports||siteData.externalReports||[];
+  const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id)):siteExternalReports(cmdActiveSite);
   const conflicts=externalConflictCount(pts,reports);
   setCmdPanelMeta('priority', `${pts.filter(p=>p.triage==='red').length} אדומים · ${stale.length} מידע ישן · ${unsynced} לא סונכרן`);
   const commandMacro = commandRole==='pc'
@@ -10769,9 +10955,86 @@ function renderCmdContent(){
     </div>
     <div class="cmd-progress"><div class="cmd-progress-fill" style="width:${pct}%"></div></div>
     <div style="font-size:11px;color:var(--muted);margin-top:4px;text-align:left">${pct}% מחולצו</div></div>`;
-  const rpts=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>(s.externalReports||[]).map(r=>({...r,_site:s.name.split('—')[0].trim()}))):siteData.externalReports;
-  document.getElementById('cmd-ext-reports').innerHTML=rpts.length?rpts.map(r=>`<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px;margin-bottom:7px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700">${r.sourceLabel}</span><div style="display:flex;gap:6px">${r._site?`<span style="font-size:10px;color:var(--muted)">${r._site}</span>`:''}<span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${r.time}</span></div></div><div style="font-size:13px">${r.patientId?`<span style="color:var(--accent);font-weight:700">${r.patientId} </span>`:''}${r.red?`<span style="color:var(--red);font-weight:700">${r.red} קשה </span>`:''}${r.yellow?`<span style="color:var(--yellow);font-weight:700">${r.yellow} בינוני </span>`:''}${r.green?`<span style="color:var(--green);font-weight:700">${r.green} קל</span>`:''}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">${r.eventName||siteData.name||''}${r.company?' · '+r.company:''}</div></div>`).join(''):'<div style="color:var(--muted);font-size:13px;padding:8px 0">אין דיווחים</div>';
+  const rpts=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id).map(r=>({...r,_site:s.name.split('—')[0].trim()}))):siteExternalReports(cmdActiveSite);
+  document.getElementById('cmd-ext-reports').innerHTML=rpts.length?rpts.map(r=>externalReportCardHtml(r, r._site||'')).join(''):'<div style="color:var(--muted);font-size:13px;padding:8px 0">אין דיווחים</div>';
+  const locBoard=document.getElementById('cmd-location-board');
+  if(locBoard) locBoard.innerHTML=renderCasualtyLocationBoard(cmdActiveSite==='ALL'?commandVisibleSites().filter(id=>id!=='ALL'):[cmdActiveSite]);
   applyCmdPanelState();
+}
+// ── Casualty board by location (V2.99.31): site, then zone inside it ──
+// One renderer for the PC and CC role dashboards and the command screen. On-scene casualties are
+// grouped by zone; evacuated ones by where they were taken, with MDA's classification beside field
+// triage. Unknown destination / unknown zone stay visible as such, never hidden.
+const LOCATION_BOARD_EVACUATED_STATUSES = new Set(['evacuating','handed_over','self_evacuated','evacuated','closed']);
+const LOCATION_BOARD_TRIAGE_COLORS = {red:'var(--red)', yellow:'var(--yellow)', green:'var(--green)', black:'var(--muted)'};
+function patientZoneKey(p){
+  const z=p.zone||p.locDetail||p.location;
+  return z && z!=='לא צוין' ? z : 'אזור לא צוין';
+}
+function locationBoardChip(p, extra=''){
+  const color=LOCATION_BOARD_TRIAGE_COLORS[p.triage];
+  // Pending/unknown triage never gets a triage colour (docs/TACTICAL_UI_GUIDELINES.md).
+  const border=color?`2px solid ${color}`:'2px dashed var(--muted)';
+  return `<button onclick="openPatient('${p.id}')" style="background:var(--surface2);border:${border};border-radius:10px;padding:6px 9px;margin:3px;color:var(--text);font-family:var(--mono);font-size:12px;font-weight:700;cursor:pointer">${escAttr(p.visualId||p.id)}${extra}</button>`;
+}
+function triageCountsLine(list){
+  const c={red:0,yellow:0,green:0,black:0,pending:0};
+  list.forEach(p=>{ if(c[p.triage]!==undefined) c[p.triage]++; else c.pending++; });
+  return `<span style="color:var(--red)">${c.red}</span> · <span style="color:var(--yellow)">${c.yellow}</span> · <span style="color:var(--green)">${c.green}</span>${c.black?` · <span style="color:var(--muted)">⚫${c.black}</span>`:''}${c.pending?` · <span style="color:var(--muted)">ממתין ${c.pending}</span>`:''}`;
+}
+function renderCasualtyLocationBoard(siteIds){
+  const canUpdate=canUpdateEvacuationTracking();
+  const blocks=(siteIds||[]).filter(id=>id && id!=='ALL').map(siteId=>{
+    const pts=getSitePatients(siteId);
+    const onScene=pts.filter(p=>!LOCATION_BOARD_EVACUATED_STATUSES.has(p.patientStatus));
+    const evacuated=pts.filter(p=>LOCATION_BOARD_EVACUATED_STATUSES.has(p.patientStatus));
+    const zones=new Map();
+    sortedPatientsByEvacPriority(onScene).forEach(p=>{ const k=patientZoneKey(p); if(!zones.has(k)) zones.set(k,[]); zones.get(k).push(p); });
+    const zoneRows=[...zones.entries()].map(([zone,list])=>`<div style="padding:8px 0;border-top:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span>📍 ${escAttr(zone)}</span><span style="font-family:var(--mono)">${triageCountsLine(list)}</span></div>
+        <div style="display:flex;flex-wrap:wrap;margin-top:4px">${list.map(p=>locationBoardChip(p)).join('')}</div>
+      </div>`).join('') || '<div style="font-size:12px;color:var(--muted);padding:6px 0">אין פצועים בזירה</div>';
+    const dests=new Map();
+    evacuated.forEach(p=>{ const k=p.evacDestination||'יעד לא ידוע'; if(!dests.has(k)) dests.set(k,[]); dests.get(k).push(p); });
+    const destRows=[...dests.entries()].sort((a,b)=>(a[0]==='יעד לא ידוע')-(b[0]==='יעד לא ידוע') || b[1].length-a[1].length).map(([dest,list])=>`<div style="padding:8px 0;border-top:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span style="${dest==='יעד לא ידוע'?'color:var(--orange)':''}">🏥 ${escAttr(dest)}</span><span style="font-family:var(--mono)">${list.length}</span></div>
+        <div style="margin-top:4px">${list.map(p=>{
+          const differs=C5Rules.mdaClassificationDiffersFromTriage(p.triage, p.mdaClassification);
+          const mda=p.mdaClassification?`<span style="color:${MDA_CLASSIFICATION_COLORS[p.mdaClassification]};font-weight:700">מד״א: ${mdaClassificationLabel(p.mdaClassification)}</span>`:'<span style="color:var(--muted)">מד״א: לא דווח</span>';
+          return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px">${locationBoardChip(p)}<span>${STATUS_LABELS[p.patientStatus]||''}</span>${mda}${differs?'<span style="color:var(--orange);font-weight:700">⚠ שונה ממיון שדה</span>':''}${canUpdate?`<button class="demo-mini-btn" style="margin:0;padding:5px 9px" onclick="openEvacuationSheet('${p.id}','update')">עדכן</button>`:''}</div>`;
+        }).join('')}</div>
+      </div>`).join('') || '<div style="font-size:12px;color:var(--muted);padding:6px 0">טרם פונו פצועים רשומים</div>';
+    const ie=siteId==='SITE_A' ? siteData.initialEvacuation : null;
+    const ieTotal=ie ? (ie.green||0)+(ie.yellow||0)+(ie.red||0) : 0;
+    const ieRow=ieTotal?`<div style="font-size:12px;color:var(--muted);padding:6px 0;border-top:1px solid var(--border)">פינוי ראשוני (מונה בלבד): קשה ${ie.red||0} · בינוני ${ie.yellow||0} · קל ${ie.green||0}${ie.summary?' · '+escAttr(ie.summary):''}</div>`:'';
+    const bySource=new Map();
+    siteExternalReports(siteId).forEach(r=>{ const k=r.sourceLabel||'אחר'; const s=bySource.get(k)||{red:0,yellow:0,green:0}; s.red+=r.red||0; s.yellow+=r.yellow||0; s.green+=r.green||0; bySource.set(k,s); });
+    const extRow=bySource.size?`<div style="font-size:12px;padding:6px 0;border-top:1px solid var(--border)"><span style="color:var(--muted)">דיווחים חיצוניים:</span> ${[...bySource.entries()].map(([k,s])=>`<strong>${escAttr(k)}</strong> קשה ${s.red} · בינוני ${s.yellow} · קל ${s.green}`).join(' · ')}</div>`:'';
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="font-weight:900;font-size:14px">${escAttr(siteNameById(siteId))}</div><div style="font-family:var(--mono);font-size:13px;font-weight:700">${triageCountsLine(onScene)}</div></div>
+      <div style="font-size:11px;color:var(--muted)">בזירה ${onScene.length} · פונו ${evacuated.length}</div>
+      <div class="section-label" style="padding:10px 0 2px">בזירה — לפי אזור</div>${zoneRows}
+      <div class="section-label" style="padding:10px 0 2px">פונו — לפי יעד</div>${destRows}
+      ${ieRow}${extRow}
+    </div>`;
+  }).join('');
+  return blocks || '<div style="color:var(--muted);font-size:13px;padding:8px 0">אין מוקדים להצגה</div>';
+}
+function casualtyBoardSiteIds(role){
+  return role==='cc' ? [ccCompanySite] : allSites.filter(s=>s.id!=='ALL').map(s=>s.id);
+}
+// External reports = this device's own (persisted locally) + the synced ones from the server
+// (database/043), deduplicated by the local report id the server keeps as external_reference.
+let _remoteExternalReports={}; // incidentId -> mapped rows, replaced on each pull
+function mergeRemoteExternalReports(local, siteId){
+  const remote=currentUser ? (_remoteExternalReports[SITE_TO_INCIDENT_ID[siteId]]||[]) : [];
+  const localIds=new Set(local.map(r=>r.id));
+  return [...local, ...remote.filter(r=>!localIds.has(r.externalReference))];
+}
+function siteExternalReports(siteId){
+  const site=allSites.find(s=>s.id===siteId);
+  const local=site?.externalReports || (siteId==='SITE_A' ? siteData.externalReports : null) || [];
+  return mergeRemoteExternalReports(local, siteId);
 }
 function renderCmdPatients(){
   const pts=getSitePatients(cmdActiveSite);
@@ -11297,6 +11560,7 @@ function resetWorkingStateForIncident(inc){
   patients=[];
   reinforcementRequests=[];
   _pulledEvents=[];
+  _remoteExternalReports={};
   if(state && Array.isArray(state.localEvents)) state.localEvents=state.localEvents.filter(e=>e.incident_id===inc.id);
   clearWorkingSiteData();
 }
@@ -11343,6 +11607,7 @@ function deactivateIncidentContext(){
   patients=[];
   reinforcementRequests=[];
   _pulledEvents=[];
+  _remoteExternalReports={};
   clearWorkingSiteData();
   hideIncidentCloseModal();
   restoreLocalDemoSites();
@@ -11684,6 +11949,7 @@ function currentIncidentId(siteId){
 async function syncPush(){
   if(!currentUser) return; // local-demo mode: never touches the network
   reconcileTriageSync();
+  reconcileLocationSync();
   const client=getSupabaseClient();
   if(!client) return;
   const outbox=getOutbox();
@@ -11870,6 +12136,70 @@ function reconcileTriageSync(){
     p._triageSyncRef=desired;
   }
 }
+// ── Location sync (V2.99.31) ──
+// The casualty board groups by site and zone on every command device, but before V2.99.31 a
+// patient's zone never left the phone that recorded it: nothing sent PATIENT_LOCATION_UPDATED,
+// so another device showed every remote patient under "zone unknown". Same reconciler pattern as
+// triage: compare the local location with the last value known to be on the server and send
+// PATIENT_LOCATION_UPDATED when they differ. project_patient_state() already stores it in
+// patients.location_json (newest local_timestamp wins); no schema change.
+const REMOTE_LOCATION_PLACEHOLDER='לא צוין (התקבל ממכשיר אחר)';
+// Text another user typed (zone, destination, report fields) now reaches this phone, and much of
+// the UI renders patient fields and timeline details as raw HTML. Strip markup characters on the
+// way in rather than trusting every render site to escape.
+function sanitizeRemoteText(value, max=200){
+  return value==null ? '' : String(value).replace(/[<>"'`&]/g,'').slice(0,max);
+}
+function patientLocationPayload(p){
+  const loc={};
+  if(p.zone) loc.zone=String(p.zone);
+  if(p.locDetail) loc.detail=String(p.locDetail);
+  if(p.location && p.location!==REMOTE_LOCATION_PLACEHOLDER && p.location!=='לא צוין') loc.label=String(p.location);
+  return loc;
+}
+function reconcileLocationSync(){
+  if(_demoSandbox || !currentUser || !activeIncident || !TRIAGE_SYNC_ROLES.has(currentUser.role)) return;
+  const outbox=getOutbox();
+  for(const p of patients){
+    const loc=patientLocationPayload(p);
+    if(!loc.zone && !loc.detail) continue; // nothing a board could group by - never send a placeholder up
+    const ref=JSON.stringify(loc);
+    if(p._locationSyncRef===ref) continue;
+    // Same rule as triage: never before the patient exists server-side (events FK).
+    const known=p._serverVersion!=null || p.sourcedFromRemote
+      || outbox.some(e=>e.patient_id===p.id && PATIENT_CREATE_SYNC_TYPES.has(e.type) && !e.syncRejected);
+    if(!known) continue;
+    saveLocalEvent({type:'PATIENT_LOCATION_UPDATED', detail:`${p.visualId||p.id} · מיקום ${loc.zone||loc.detail} סונכרן לשרת`, warn:false, patient_id:p.id,
+      payload_json:{location:loc, source:'location_sync', siteId:p.siteId}});
+    p._locationSyncRef=ref;
+  }
+}
+async function pullPatientLocations(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let result;
+  try{ result=await client.from('patients').select('id,location_json,location_recorded_at').eq('incident_id', incidentId).not('location_recorded_at','is',null); }
+  catch(e){ return; }
+  if(result.error || !result.data) return;
+  const pending=patientsWithPendingLocalEdits();
+  let changed=false;
+  for(const row of result.data){
+    if(pending.has(row.id)) continue; // local edit wins until pushed
+    const p=patients.find(x=>x.id===row.id); if(!p) continue;
+    const raw=row.location_json||{};
+    const loc={zone:sanitizeRemoteText(raw.zone), detail:sanitizeRemoteText(raw.detail), label:sanitizeRemoteText(raw.label)};
+    if(!loc.zone && !loc.detail) continue;
+    const ref=JSON.stringify(patientLocationPayload({zone:loc.zone, locDetail:loc.detail, location:loc.label}));
+    if(p._locationSyncRef===ref) continue;
+    if(loc.zone) p.zone=loc.zone;
+    if(loc.detail) p.locDetail=loc.detail;
+    if(loc.label) p.location=loc.label;
+    p._locationSyncRef=ref;
+    changed=true;
+  }
+  if(changed){ saveDemoState(); refreshActiveScreenData(); }
+}
 function applyProjectedPatientState(rows){
   if(!rows || !rows.length) return;
   const pending=patientsWithPendingLocalEdits();
@@ -11918,7 +12248,7 @@ function applyProjectedPatientState(rows){
       changed=true;
       patients.push({
         id:row.id, visualId:row.visual_id, triage:serverTriage, _triageSyncRef:serverTriage, accessibility:access.accessibility, trapStatus:access.trapStatus,
-        location:'לא צוין (התקבל ממכשיר אחר)', locDetail:'',
+        location:REMOTE_LOCATION_PLACEHOLDER, locDetail:'',
         injury:null, injuryZones:[], patientStatus:status||'identified',
         needsFullAssessment:!!row.needs_full_assessment,
         patientAgeGroup:row.is_pediatric?'pediatric':'adult', patientAge:row.pediatric_age_years||null,
@@ -11949,7 +12279,62 @@ async function pullProjectedPatientState(incidentId){
   applyProjectedPatientState(result.data);
 }
 function pullProjectedPatientStateAll(){
-  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>pullProjectedPatientState(id));
+  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id); });
+}
+// ── Evacuation tracking + external reports pull (V2.99.31, database/043) ──
+// Separate queries from the main patient pull on purpose: until 043 is applied these columns do
+// not exist and the query errors - that must never break pullProjectedPatientState().
+const EVACUATION_TRACKING_COLUMNS = 'id,evacuation_destination,mda_classification,evacuation_updated_at';
+async function pullEvacuationTracking(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let result;
+  try{ result=await client.from('patients').select(EVACUATION_TRACKING_COLUMNS).eq('incident_id', incidentId).not('evacuation_updated_at','is',null); }
+  catch(e){ return; }
+  if(result.error || !result.data) return;
+  applyEvacuationTracking(result.data);
+}
+function applyEvacuationTracking(rows){
+  const pending=patientsWithPendingLocalEdits();
+  let changed=false;
+  for(const row of rows){
+    if(pending.has(row.id)) continue; // local edit wins until pushed
+    const p=patients.find(x=>x.id===row.id); if(!p) continue;
+    const serverAt=Date.parse(row.evacuation_updated_at)||0;
+    if(p.evacUpdatedAt && p.evacUpdatedAt>serverAt) continue;
+    const dest=sanitizeRemoteText(row.evacuation_destination) || p.evacDestination || '';
+    const mda=C5Rules.isValidMdaClassification(row.mda_classification) ? row.mda_classification : (p.mdaClassification||null);
+    if(dest===(p.evacDestination||'') && mda===(p.mdaClassification||null)){ p.evacUpdatedAt=Math.max(p.evacUpdatedAt||0, serverAt); continue; }
+    p.evacDestination=dest; p.mdaClassification=mda; p.evacUpdatedAt=serverAt;
+    (p.events||(p.events=[])).push({type:'REMOTE_STATE_APPLIED',time:nowT(),detail:`עדכון פינוי מסנכרון · ${dest||'יעד לא ידוע'} · מד״א ${mdaClassificationLabel(mda)}`});
+    changed=true;
+  }
+  if(changed){ saveDemoState(); refreshActiveScreenData(); }
+}
+function mapRemoteExternalReport(row){
+  const at=row.created_at ? new Date(row.created_at) : null;
+  return {id:'srv-'+row.id, serverId:row.id, externalReference:row.external_reference||null, source:row.source,
+    sourceLabel:SERVER_EXTERNAL_SOURCE_LABELS[row.source]||'אחר', red:Number(row.reported_red)||0, yellow:Number(row.reported_yellow)||0,
+    green:Number(row.reported_green)||0, black:Number(row.reported_black)||0, evacDest:sanitizeRemoteText(row.evacuation_destination), notes:sanitizeRemoteText(row.notes, 500),
+    time:at && !isNaN(at) ? at.getHours().toString().padStart(2,'0')+':'+at.getMinutes().toString().padStart(2,'0') : '',
+    status:'new', fromServer:true};
+}
+async function pullExternalReports(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let result;
+  try{
+    result=await client.from('external_reports')
+      .select('id,source,reported_red,reported_yellow,reported_green,reported_black,evacuation_destination,notes,external_reference,created_at')
+      .eq('incident_id', incidentId).order('created_at',{ascending:true});
+  }catch(e){ return; }
+  if(result.error || !result.data) return;
+  const mapped=result.data.map(mapRemoteExternalReport);
+  const before=JSON.stringify(_remoteExternalReports[incidentId]||[]);
+  _remoteExternalReports[incidentId]=mapped;
+  if(before!==JSON.stringify(mapped)) refreshActiveScreenData();
 }
 setInterval(()=>{ if(currentUser) pullProjectedPatientStateAll(); }, 45000);
 

@@ -91,6 +91,13 @@ Known limits:
 - `MEDIC_ASSIGNED_TO_INCIDENT` remains a local log entry only; the membership row is the source of truth.
 - Local demo mode (not signed in) keeps the single-device assignment described earlier.
 
+## Evacuation tracking and casualty board by location (V2.99.31)
+
+- **Handover** ("הועבר למד״א — עכשיו") opens a short sheet: destination hospital (free text with suggestions) and MDA's classification (קל / נפגע חרדה / בינוני / קשה / אנוש / נקבע מותו). Both are optional, because they are often unknown at handover. The confirm button is the same one-tap handover.
+- **Later update** of destination / MDA classification: pc, cc, chamal, physician, admin (`PATIENT_EVACUATION_UPDATED`), from the patient card or the board's "עדכן" button. A medic or paramedic records them only at handover. The update never changes triage or status. If MDA's classification differs from field triage, the board shows "⚠ שונה ממיון שדה" for information only.
+- **Casualty board by location** ("לוח נפגעים לפי מיקום"): on the PC role dashboard (all sites), the CC role dashboard (the CC's own company site) and the command screen panel. For each site it shows casualties on scene grouped by zone, evacuated casualties grouped by destination with MDA's classification, the initial-evacuation counter and external-report totals per source. An unknown zone or destination is shown as such, never hidden. Zones now sync between phones (`PATIENT_LOCATION_UPDATED`).
+- **External reports** add איחוד הצלה (United Hatzalah) as a source, with ידידים (Yedidim) kept separate, and איחוד הצלה is also on the initial-evacuation source chips. Reports from pc/cc/chamal/physician/admin sync to `external_reports` and appear on every command device. Other roles keep them on their own device, as before.
+
 ## PC can go hands-on
 
 חוג״ד's server-side clinical write authority (`app.can_write_clinical_event()`, `ROLE_ALLOWED_EVENT_TYPES.pc`, `patients_insert`) has always matched medic's — the in-app read-only authorization matrix already documented this. What was missing was a client-side entry point: pc's dashboard had no button to create a new patient or reach the MSTART sweep/field workflow screen, so in practice pc could only treat patients already in its scope (via the shared `openPatient`/`openQuickVitals` path, which has never had a role check), not create new ones.
