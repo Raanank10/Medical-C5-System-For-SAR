@@ -164,6 +164,27 @@ Verified live by impersonation inside a transaction that was always rolled back 
 
 Every other function that updates `incidents` (`confirm_draft`, `acknowledge_draft`, `finalize_incident_aar`) was checked: none sets `status='closed'`, so none is affected by the trigger.
 
+## Follow-up: platoon command scope (`database/044`)
+
+Decided with the repo owner 2026-10-18: מ״פ רפואה (cc, company) sees every site; חוג״ד (pc, platoon) only its own platoon's site, enforced on the server and not only in the UI. A site is an incident, one incident per platoon. A medic's draft goes to the PC of that medic's platoon. Medics and paramedics follow the same no-self-join rule.
+
+The cc side was already true (`app.can_access_incident` gives cc/chamal/admin/physician/rpc/rcc every incident). The pc was not actually confined, because membership was self-service. Gaps found live:
+
+| Gap | Fix |
+|---|---|
+| `join_incident()` let any role self-join any open incident | pc/medic/paramedic may join only what `app.can_access_incident` already allows. logistics_officer unchanged |
+| `list_open_incidents()` listed every open incident (address, patient count) to everyone | pc/medic/paramedic list only incidents they can access |
+| `confirm_draft` / `reject_draft` / `acknowledge_draft` checked only `is_command_role()` | also `app.can_access_incident` (a pc acts only on its own platoon's drafts) |
+| `incident_memberships` insert/update/delete: any pc, any row, any incident; read: every roster | pc only in incidents it belongs to, only for its own platoon's medics/paramedics, never itself or a command role (`app.pc_may_manage_membership`). Read: own rows, company-level all, pc only its incidents' rosters |
+| `profiles` read: a pc read every account | pc reads itself and its own platoon only |
+| `incidents` update/delete USING checked the role only | also `app.can_access_incident(id)` (defense in depth; the SELECT policy happened to scope it) |
+
+New: `profiles.platoon_commander_id` (the platoon roster), `set_platoon_commander()` (cc/chamal/admin/physician only), a trigger that refuses any other roster change even with RLS bypassed, `app.is_incident_member()`, `app.pc_may_manage_membership()`. `app.can_access_incident()` additionally lets a pc see a draft drafted by a medic of its platoon.
+
+Verified before applying, on a local PostgreSQL 16 built like Supabase (an `authenticated` role, `auth.uid()` from the JWT claim, RLS enabled, the live pre-044 definitions), 45 checks, each run as the real role in a rolled-back transaction: CC sees every incident and patient; PC1 sees its own incident plus its own platoon's draft only; an unassigned paramedic sees nothing; the picker list is scoped for pc/medic and unchanged for cc and logistics; PC2 and an unassigned medic cannot self-join; a PC may join and confirm its own platoon's draft but cannot join, confirm, reject or acknowledge another platoon's; confirming makes the PC a member; a PC assigns its own platoon's medic into its own incident but not another platoon's medic, an unrostered paramedic, itself into another site, its medic into another site, or a physician; a PC's delete in another site affects nothing; CC assigns a PC anywhere; a PC reads only itself and its platoon; a PC or medic cannot change the roster, CC can; the roster target must be a pc and the member a medic/paramedic; a direct profile update changes nothing; the trigger refuses a pc roster change even with RLS bypassed; a PC cannot update or delete another platoon's incident. Applying 044 twice is a no-op. Live verification against the real accounts is still pending (not yet applied).
+
+Not changed: `logistics_officer` keeps self-join (its supply work spans incidents, not part of the decision); `app.can_write_incident_event` still grants pc blanket, but no live policy uses it (checked).
+
 ## Explicitly not re-litigated here
 
 - T6 (leaked-password protection) and T5 (service-role key handling) — out of scope, not RLS/authorization, already tracked in `docs/THREAT_MODEL.md`.

@@ -4074,10 +4074,10 @@ async function openMedicAssignModal(medicId){
   if(real){
     await loadRealMedicProfiles();
     document.getElementById('medic-assign-real-medic').innerHTML=_realMedicProfiles.length
-      ? _realMedicProfiles.map(p=>`<option value="${escAttr(p.id)}">${escAttr(p.display_name||'חובש ללא שם')}${p.role==='paramedic'?' (פראמדיק)':''}</option>`).join('')
-      : '<option value="">לא נמצאו חשבונות חובש</option>';
+      ? _realMedicProfiles.map(p=>`<option value="${escAttr(p.id)}">${escAttr(p.display_name||'חובש ללא שם')}${p.role==='paramedic'?' (פראמדיק)':p.role==='pc'?' (חוג״ד)':''}</option>`).join('')
+      : `<option value="">${currentUser?.role==='pc'?'אין חובשים במחלקה שלך · מ״פ רפואה משייך חובשים למחלקה':'לא נמצאו חשבונות חובש'}</option>`;
   }
-  document.getElementById('medic-assign-title').textContent=real?`שיוך חובש לאירוע ${incidentDisplayName(activeIncident)}`:`שיוך ${displayUser(medicId)} לאירוע`;
+  document.getElementById('medic-assign-title').textContent=real?`${COMPANY_COMMAND_ROLES.has(currentUser?.role)?'שיוך חובש / חוג״ד':'שיוך חובש'} לאירוע ${incidentDisplayName(activeIncident)}`:`שיוך ${displayUser(medicId)} לאירוע`;
   document.getElementById('medic-assign-address').value=real?(activeIncident.address||''):(current?.address||siteAddressFromName(pendingMedicAssign.siteId));
   document.getElementById('medic-assign-note').value=current?.note||'';
   renderMedicAssignSites();
@@ -4140,7 +4140,10 @@ async function loadRealMedicProfiles(){
   const client=getSupabaseClient();
   if(!client || !currentUser) return;
   try{
-    const res=await client.from('profiles').select('id,display_name,role').in('role',['medic','paramedic']).eq('is_active',true).order('display_name');
+    // database/044: company-level command may also assign a PC to a site; a PC's list is limited
+    // by RLS to its own platoon's medics/paramedics.
+    const roles=COMPANY_COMMAND_ROLES.has(currentUser.role) ? ['medic','paramedic','pc'] : ['medic','paramedic'];
+    const res=await client.from('profiles').select('id,display_name,role').in('role',roles).eq('is_active',true).order('display_name');
     if(!res.error) _realMedicProfiles=res.data||[];
     const me=await client.from('profiles').select('display_name').eq('id',currentUser.id).single();
     _myDisplayName=me.data?.display_name||'';
@@ -6326,12 +6329,47 @@ function renderRoleDashboard(role=activeRoleDashboard){
     ${role==='medic'?renderMedicActionPanel():''}
     ${role==='pc'?renderPcResponsibilityBoard():''}
     ${['pc','cc'].includes(role)?roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds(role))):''}
+    ${role==='cc'&&canManagePlatoonRoster()?roleSection('מחלקות — שיוך חובשים לחוג״ד', '<div id="platoon-roster-panel" style="font-size:13px;color:var(--muted)">טוען…</div>'):''}
     ${role==='physician'?renderDoctorLegacyNote():''}
     ${role==='medic'||role==='pc'?'':role==='cc'
       ? `<details style="margin:12px 0 0"><summary style="cursor:pointer;font-weight:900;color:var(--muted);padding:10px 0">פירוט נוסף / אחריות ותורים</summary>${genericSections}</details>`
       : genericSections}
   `;
+  if(role==='cc' && canManagePlatoonRoster()) loadPlatoonRoster();
   updateDemoStatus();
+}
+// ── Platoon roster (database/044) ──
+// Which PC each medic/paramedic belongs to. It decides whose drafts a PC sees and confirms, and
+// which medics a PC may assign. Only company-level command changes it (set_platoon_commander()).
+function canManagePlatoonRoster(){ return !!currentUser && COMPANY_COMMAND_ROLES.has(currentUser.role); }
+let _platoonRoster=null;
+async function loadPlatoonRoster(){
+  const el=document.getElementById('platoon-roster-panel'); if(!el) return;
+  const client=getSupabaseClient(); if(!client) return;
+  let res;
+  try{ res=await client.from('profiles').select('id,display_name,role,platoon_commander_id').in('role',['medic','paramedic','pc']).eq('is_active',true).order('display_name'); }
+  catch(e){ res={error:e}; }
+  const target=document.getElementById('platoon-roster-panel'); if(!target) return;
+  if(res.error){ target.textContent='רשימת המחלקות תהיה זמינה אחרי עדכון השרת (database/044).'; return; }
+  _platoonRoster=Array.isArray(res.data) ? res.data : [];
+  const pcs=_platoonRoster.filter(p=>p.role==='pc');
+  const medics=_platoonRoster.filter(p=>p.role!=='pc');
+  if(!medics.length){ target.textContent='אין חשבונות חובש / פראמדיק פעילים.'; return; }
+  target.innerHTML=medics.map(m=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--border)">
+      <span style="color:var(--text);font-weight:700">${escAttr(m.display_name||'ללא שם')}${m.role==='paramedic'?' (פראמדיק)':''}</span>
+      <select data-roster-medic="${escAttr(m.id)}" onchange="setPlatoonCommander('${escAttr(m.id)}', this.value)" style="max-width:55%">
+        <option value="">— ללא מחלקה —</option>
+        ${pcs.map(pc=>`<option value="${escAttr(pc.id)}"${pc.id===m.platoon_commander_id?' selected':''}>${escAttr(pc.display_name||'חוג״ד')}</option>`).join('')}
+      </select>
+    </div>`).join('');
+}
+async function setPlatoonCommander(profileId, pcId){
+  const client=getSupabaseClient(); if(!client) return;
+  let r;
+  try{ r=await client.rpc('set_platoon_commander', {p_profile_id:profileId, p_pc_id:pcId||null}); }catch(e){ r={error:e}; }
+  if(r.error){ toast('שיוך למחלקה נכשל · '+(r.error.message||'')); }
+  else toast(pcId ? 'החובש שויך למחלקה' : 'החובש הוסר מהמחלקה');
+  loadPlatoonRoster();
 }
 function reassignPatient(patientId, {toMedicId=null, toPlatoonId=null, assignedByRole='pc', reason='הקצאה מחדש'}={}){
   const p=patients.find(x=>x.id===patientId); if(!p) return;
@@ -11490,6 +11528,8 @@ const ACTIVE_INCIDENT_KEY='c5_active_incident_v1';
 const INCIDENT_DRAFT_OPEN_ROLES=new Set(['medic','paramedic']);
 const INCIDENT_OFFICIAL_OPEN_ROLES=new Set(['pc','cc','chamal','admin','physician','rpc','rcc']);
 const INCIDENT_COMMAND_ROLES=new Set(['pc','cc','chamal','admin','physician']); // app.is_command_role()
+// Company-level command (database/044): every site, assigns PCs, owns the platoon roster.
+const COMPANY_COMMAND_ROLES=new Set(['cc','chamal','admin','physician']);
 const INCIDENT_BLANKET_ROLES=new Set(['cc','chamal','admin','rpc','rcc','physician']); // app.can_access_incident() without membership
 const SERVER_INCIDENT_STATUS_LABELS={draft:'טיוטה, ממתין לאישור',staging:'בהכנה',active:'פעיל',closed:'סגור'};
 let activeIncident=null; // {id, visual_id, status, location_name, address, incident_type, draft_resolution}
@@ -11704,7 +11744,8 @@ async function enterIncidentFromPicker(incidentId){
     const client=getSupabaseClient();
     let r;
     try{ r=await client.rpc('join_incident', {p_incident_id:incidentId}); }catch(e){ r={error:e}; }
-    if(r.error){ toast('ההצטרפות נכשלה, בדוק/י חיבור'); return; }
+    // database/044: no self-join into another platoon's site - only an assignment opens it.
+    if(r.error){ toast(r.error.code==='42501' ? 'נדרש שיבוץ לאירוע · פנה/י למ״פ רפואה או לחוג״ד שלך' : 'ההצטרפות נכשלה, בדוק/י חיבור'); return; }
     inc.is_member=true;
   }
   await activateIncident(inc);
