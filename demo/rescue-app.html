@@ -555,6 +555,14 @@ textarea{resize:vertical;min-height:70px;}
 .auth-status-strip{display:none;align-items:center;justify-content:space-between;gap:8px;background:var(--surface2);border-bottom:1px solid var(--border);padding:8px 16px;font-size:12px;color:var(--muted);position:sticky;top:0;z-index:101;}
 .auth-status-strip button{background:none;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer;}
 .login-error{color:var(--red);font-size:13px;min-height:18px;margin-top:4px;}
+.admin-badge{display:inline-block;border:1px solid var(--border);border-radius:6px;padding:1px 7px;font-size:11px;font-weight:800;margin-inline-start:6px;vertical-align:middle;}
+.admin-badge.active{color:var(--green);border-color:var(--green);}
+.admin-badge.pending{color:var(--yellow);border-color:var(--yellow);}
+.admin-badge.off{color:var(--red);border-color:var(--red);}
+.admin-user-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px;}
+.admin-user-actions select{margin:0;}
+.admin-link-box{background:var(--surface2);border:1px solid var(--accent);border-radius:10px;padding:10px;margin-top:10px;}
+.admin-link-box input{direction:ltr;text-align:left;font-family:var(--mono);font-size:12px;margin:8px 0 0;}
 /* ── INCIDENT CONTEXT (logged-in mode) ── */
 .incident-strip{display:none;align-items:center;justify-content:space-between;gap:8px;background:var(--surface);border-bottom:1px solid var(--border);padding:7px 16px;font-size:12px;color:var(--text);}
 .incident-strip.draft{background:rgba(255,107,53,0.14);border-bottom-color:var(--orange);}
@@ -588,6 +596,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="auth-status-strip" class="auth-status-strip">
   <span class="auth-status-text"></span>
   <div style="display:flex;gap:6px">
+    <button id="auth-admin-users-btn" style="display:none" onclick="openAdminUsers()">👥 ניהול משתמשים</button>
     <button onclick="openFeedbackModal()">🐞 דווח על תקלה</button>
     <button onclick="signOut()">התנתק</button>
   </div>
@@ -702,11 +711,49 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 
+<!-- ══════════════════════ ADMIN: USER MANAGEMENT (admin role only) ══ -->
+<div id="screen-admin-users" class="screen">
+  <div class="header">
+    <div class="header-left">
+      <div class="header-subtitle">C5 SENTINEL-SAR // ADMIN</div>
+      <div class="header-title">ניהול משתמשים</div>
+    </div>
+  </div>
+  <div class="demo-panel" style="margin:16px">
+    <div class="demo-strip-title">הזמנת משתמש חדש</div>
+    <div class="demo-strip-sub" style="margin-bottom:12px">התפקיד נקבע כאן על ידי מנהל המערכת, לא על ידי המוזמן. המוזמן קובע לעצמו סיסמה בכניסה הראשונה.</div>
+    <input type="email" id="admin-invite-email" placeholder="אימייל של המוזמן" style="margin-bottom:10px;direction:ltr;text-align:left" autocomplete="off">
+    <input type="text" id="admin-invite-name" placeholder="שם לתצוגה (אופציונלי)" style="margin-bottom:10px" autocomplete="off">
+    <select id="admin-invite-role" style="margin-bottom:10px"></select>
+    <div class="demo-strip-sub" style="margin-bottom:6px">אופן מסירת ההזמנה:</div>
+    <label style="display:block;font-size:13px;margin-bottom:4px"><input type="radio" name="admin-delivery" value="link" checked style="width:auto;margin-inline-end:6px">קישור חד-פעמי להעתקה (מומלץ: שלח/י בעצמך, למשל בוואטסאפ)</label>
+    <label style="display:block;font-size:13px;margin-bottom:10px"><input type="radio" name="admin-delivery" value="email" style="width:auto;margin-inline-end:6px">מייל מ-Supabase (נשלח רק לכתובות של חברי צוות הפרויקט, אלא אם הוגדר שרת מייל)</label>
+    <div class="login-error" id="admin-invite-error"></div>
+    <button class="btn-primary" id="admin-invite-btn" onclick="submitAdminInvite()">הזמן משתמש</button>
+    <div id="admin-invite-result"></div>
+  </div>
+  <div class="demo-panel" style="margin:16px">
+    <div class="demo-strip-title">משתמשים</div>
+    <div class="demo-strip-sub" style="margin-bottom:10px">אי אפשר לשנות את התפקיד של החשבון שלך או להשבית אותו, כדי שתמיד יישאר מנהל מערכת פעיל.</div>
+    <div class="login-error" id="admin-users-error"></div>
+    <div id="admin-users-list" class="role-list"></div>
+    <button class="demo-mini-btn" style="width:100%;margin-top:8px" onclick="refreshAdminUsers()">רענן רשימה</button>
+  </div>
+  <div class="demo-panel" style="margin:16px">
+    <div class="demo-strip-title">יומן שינויי הרשאות</div>
+    <div class="demo-strip-sub" style="margin-bottom:10px">כל הזמנה, שינוי תפקיד, השבתה והפעלה מחדש נרשמים כאן ולא ניתנים למחיקה.</div>
+    <div id="admin-audit-list" class="role-list"></div>
+  </div>
+  <div style="margin:16px">
+    <button class="demo-mini-btn" style="width:100%" onclick="closeAdminUsers()">חזרה</button>
+  </div>
+</div>
+
 <!-- ══════════════════════ MEDICAL COMMAND DEMO LAUNCHER ══ -->
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9930</div>
+      <div class="demo-kicker">Demo V2.9931</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -803,7 +850,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9930</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9931</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -813,7 +860,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9930</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9931</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2710,6 +2757,18 @@ if(!C5Rules) throw new Error('C5 domain rules failed to load');
 // and clears the #access_token hash on its own schedule once the client exists, so this signal
 // must be captured independently and early, not read lazily later.
 const AUTH_LINK_SIGNAL = captureAuthLinkSignal();
+// One-time invite/recovery token (?token_hash=...): removed from the address bar once the app
+// has tried it, so a later reload, bookmark or screenshot never carries a spent token. Not
+// removed earlier, so a reload while a brand-new device is still at the PIN screen keeps it.
+function clearAuthLinkFromUrl(){
+  try{
+    const search=new URLSearchParams(window.location.search);
+    if(!search.has('token_hash')) return;
+    search.delete('token_hash'); search.delete('type');
+    const q=search.toString();
+    history.replaceState(null, '', window.location.pathname+(q?'?'+q:'')+window.location.hash);
+  }catch(e){}
+}
 function captureAuthLinkSignal(){
   try{
     const hash = window.location.hash.length>1 ? new URLSearchParams(window.location.hash.slice(1)) : null;
@@ -2741,7 +2800,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.30';
+const APP_VERSION = '2.99.31';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3471,6 +3530,7 @@ async function restoreSession(){
     let otpResult;
     try{ otpResult=await client.auth.verifyOtp({token_hash:AUTH_LINK_SIGNAL.tokenHash, type:AUTH_LINK_SIGNAL.type}); }
     catch(e){ otpResult={error:e}; }
+    clearAuthLinkFromUrl();
     if(otpResult.error || !otpResult.data?.session){
       setSetPasswordTitle(AUTH_LINK_SIGNAL.type);
       goTo('set-password');
@@ -3505,6 +3565,239 @@ function renderAuthStatus(){
   }else{
     strip.style.display='none';
   }
+  const adminBtn=document.getElementById('auth-admin-users-btn');
+  if(adminBtn) adminBtn.style.display=isAdminUser()?'':'none';
+}
+
+// ── Admin user management (database/042, supabase/functions/admin-users) ──
+// Only an active admin sees this, and every action is checked again on the server. The admin
+// picks the role for each invitation; the invitee never does. Inviting or promoting someone to
+// admin, and deactivating anyone, always asks for confirmation first.
+const ADMIN_USERS_FUNCTION_URL = SUPABASE_URL + '/functions/v1/admin-users';
+const ADMIN_ROLE_NAMES = {medic:'חובש', paramedic:'פראמדיק', physician:'רופא', pc:'חוג"ד', cc:'מ״פ רפואה', chamal:'חמ״ל', logistics_officer:'קצין לוגיסטיקה', rpc:'מ״מ חילוץ', rcc:'מ״פ חילוץ', admin:'מנהל מערכת'};
+const ADMIN_ERROR_TEXT = {
+  invalid_email:'כתובת האימייל אינה תקינה',
+  invalid_role:'יש לבחור תפקיד',
+  already_registered:'כתובת זו כבר רשומה במערכת. אפשר לנהל אותה ברשימת המשתמשים למטה.',
+  already_invited_different_role:'כתובת זו כבר הוזמנה בתפקיד אחר. שנה/י את התפקיד ברשימה למטה ושלח/י קישור חדש.',
+  email_not_authorized:'שירות המייל של Supabase שולח רק לכתובות של חברי צוות הפרויקט. בחר/י "קישור חד-פעמי" ושלח/י אותו בעצמך.',
+  rate_limited:'הגעת למגבלת שליחת המיילים לשעה. בחר/י "קישור חד-פעמי".',
+  user_deactivated:'המשתמש מושבת. יש להפעיל אותו מחדש לפני שליחת קישור.',
+  user_not_found:'המשתמש לא נמצא',
+  no_profile:'למשתמש אין פרופיל במערכת',
+  admin_only:'הפעולה זמינה למנהל מערכת פעיל בלבד',
+  invalid_session:'פג תוקף ההתחברות. התחבר/י מחדש.',
+  no_session:'פג תוקף ההתחברות. התחבר/י מחדש.',
+  network:'שגיאת רשת. בדוק/י חיבור אינטרנט ונסה/י שוב.'
+};
+let _adminUsers=[];
+let _adminReturnScreen=null;
+function isAdminUser(){ return !!currentUser && currentUser.role==='admin'; }
+function adminRoleName(role){ return ADMIN_ROLE_NAMES[role]||role||'-'; }
+function adminErrorText(code){ return ADMIN_ERROR_TEXT[code]||('הפעולה נכשלה ('+code+')'); }
+function adminUserLabel(u){ return u.display_name && u.display_name!==u.email ? `${u.display_name} (${u.email})` : (u.email||u.user_id); }
+function adminFormatTime(ts){
+  if(!ts) return '-';
+  try{ return new Date(ts).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'}); }catch(e){ return String(ts); }
+}
+function adminUserStatus(u){
+  if(!u.has_profile) return {key:'off', label:'ללא פרופיל'};
+  if(!u.is_active) return {key:'off', label:'מושבת'};
+  if(!u.email_confirmed_at || !u.has_password) return {key:'pending', label:'ממתין להצטרפות'};
+  return {key:'active', label:'פעיל'};
+}
+function adminDelivery(){ return document.querySelector('input[name="admin-delivery"]:checked')?.value==='email'?'email':'link'; }
+function openAdminUsers(){
+  if(!isAdminUser()){ toast('ניהול משתמשים זמין למנהל מערכת בלבד'); return; }
+  const active=document.querySelector('.screen.active');
+  const activeId=active?active.id.replace(/^screen-/,''):null;
+  if(activeId && activeId!=='admin-users') _adminReturnScreen=activeId;
+  const roleSel=document.getElementById('admin-invite-role');
+  if(roleSel) roleSel.innerHTML='<option value="">בחר/י תפקיד למוזמן (חובה)</option>'+Object.entries(ADMIN_ROLE_NAMES).map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+  const err=document.getElementById('admin-invite-error'); if(err) err.textContent='';
+  const result=document.getElementById('admin-invite-result'); if(result) result.innerHTML='';
+  goTo('admin-users');
+  refreshAdminUsers();
+}
+function closeAdminUsers(){ goTo(_adminReturnScreen||'incident-picker'); }
+async function adminAccessToken(){
+  const client=getSupabaseClient();
+  if(!client) return null;
+  try{ const r=await client.auth.getSession(); return r?.data?.session?.access_token||null; }catch(e){ return null; }
+}
+async function callAdminUsersFunction(body){
+  const token=await adminAccessToken();
+  if(!token) return {error:'no_session'};
+  let resp;
+  try{
+    resp=await fetch(ADMIN_USERS_FUNCTION_URL,{method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}, body:JSON.stringify(body)});
+  }catch(e){ return {error:'network'}; }
+  let data={};
+  try{ data=await resp.json(); }catch(e){}
+  if(!resp.ok) return {...data, error:data.error||('http_'+resp.status)};
+  return data;
+}
+function adminLinkBox(link, email, linkType){
+  const what=linkType==='recovery'?'לקביעת סיסמה חדשה':'להצטרפות';
+  return `<div class="admin-link-box">
+    <div class="role-row-sub">קישור חד-פעמי ${what} עבור <span dir="ltr">${escAttr(email)}</span>. שלח/י אותו רק לאדם הזה: מי שמחזיק בקישור יכול לקבוע את הסיסמה לחשבון. תוקף הקישור מוגבל בזמן; אם פג, צור/י קישור חדש מהרשימה.</div>
+    <input type="text" readonly value="${escAttr(link)}" onclick="this.select()">
+    <div class="admin-user-actions" style="grid-template-columns:1fr 1fr">
+      <button class="demo-mini-btn" data-link="${escAttr(link)}" onclick="adminCopyLink(this)">העתק קישור</button>
+      ${navigator.share?`<button class="demo-mini-btn" data-link="${escAttr(link)}" onclick="adminShareLink(this)">שתף</button>`:''}
+    </div>
+  </div>`;
+}
+async function adminCopyLink(btn){
+  const link=btn.getAttribute('data-link')||'';
+  try{ await navigator.clipboard.writeText(link); toast('הקישור הועתק'); return; }catch(e){}
+  const input=btn.closest('.admin-link-box')?.querySelector('input');
+  if(input){ input.select(); try{ document.execCommand('copy'); toast('הקישור הועתק'); return; }catch(e){} }
+  toast('לא ניתן להעתיק אוטומטית. סמן/י את הקישור והעתק/י ידנית.');
+}
+async function adminShareLink(btn){
+  const link=btn.getAttribute('data-link')||'';
+  try{ await navigator.share({title:'C5 Sentinel-SAR', text:'הזמנה למערכת C5 Sentinel-SAR. הקישור לשימוש חד-פעמי:', url:link}); }catch(e){}
+}
+function adminResultHtml(res, email){
+  const auditWarn=res.audit_logged===false?'<div class="login-error">שים/י לב: רישום הפעולה ביומן השינויים נכשל.</div>':'';
+  if(res.link) return adminLinkBox(res.link, email, res.link_type)+auditWarn;
+  const what=res.link_type==='recovery'?'מייל לקביעת סיסמה חדשה':'מייל הזמנה';
+  return `<div class="admin-link-box"><div class="role-row-sub">${what} נשלח אל <span dir="ltr">${escAttr(email)}</span>.</div></div>`+auditWarn;
+}
+async function submitAdminInvite(){
+  if(!isAdminUser()) return;
+  const email=(document.getElementById('admin-invite-email')?.value||'').trim();
+  const name=(document.getElementById('admin-invite-name')?.value||'').trim();
+  const role=document.getElementById('admin-invite-role')?.value||'';
+  const errEl=document.getElementById('admin-invite-error');
+  const resultEl=document.getElementById('admin-invite-result');
+  if(errEl) errEl.textContent='';
+  if(resultEl) resultEl.innerHTML='';
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ if(errEl) errEl.textContent=adminErrorText('invalid_email'); return; }
+  if(!ADMIN_ROLE_NAMES[role]){ if(errEl) errEl.textContent=adminErrorText('invalid_role'); return; }
+  if(role==='admin' && !confirm(`אישור הזמנת מנהל מערכת\n\nמנהל מערכת יכול להזמין משתמשים, לשנות תפקידים ולהשבית חשבונות של כל המשתמשים.\n\nלהזמין את ${email} כמנהל מערכת?`)) return;
+  const btn=document.getElementById('admin-invite-btn');
+  if(btn){ btn.disabled=true; btn.textContent='שולח...'; }
+  const res=await callAdminUsersFunction({action:'invite', email, role, display_name:name, delivery:adminDelivery()});
+  if(btn){ btn.disabled=false; btn.textContent='הזמן משתמש'; }
+  if(res.error){
+    let msg=adminErrorText(res.error);
+    if(res.error==='already_invited_different_role' && res.existing_role) msg+=` (התפקיד הקיים: ${adminRoleName(res.existing_role)})`;
+    if(errEl) errEl.textContent=msg;
+    return;
+  }
+  if(resultEl) resultEl.innerHTML=adminResultHtml(res, email.toLowerCase());
+  document.getElementById('admin-invite-email').value='';
+  document.getElementById('admin-invite-name').value='';
+  document.getElementById('admin-invite-role').value='';
+  refreshAdminUsers();
+}
+async function refreshAdminUsers(){
+  const client=getSupabaseClient();
+  const errEl=document.getElementById('admin-users-error');
+  if(errEl) errEl.textContent='';
+  if(!client){ if(errEl) errEl.textContent=adminErrorText('network'); return; }
+  let res;
+  try{ res=await client.rpc('admin_list_users'); }catch(e){ res={error:{message:'network'}}; }
+  if(res.error){
+    if(errEl) errEl.textContent='טעינת רשימת המשתמשים נכשלה: '+(res.error.message||'');
+    return;
+  }
+  _adminUsers=res.data||[];
+  renderAdminUsers();
+  refreshAdminAudit();
+}
+function renderAdminUsers(){
+  const list=document.getElementById('admin-users-list');
+  if(!list) return;
+  if(!_adminUsers.length){ list.innerHTML=roleRow('אין משתמשים להצגה',''); return; }
+  list.innerHTML=_adminUsers.map(u=>{
+    const st=adminUserStatus(u);
+    const isMe=currentUser && u.user_id===currentUser.id;
+    const id=escAttr(u.user_id);
+    const title=`${escAttr(u.display_name||u.email||'')} <span class="admin-badge ${st.key}">${st.label}</span>${isMe?' <span class="admin-badge">החשבון שלך</span>':''}`;
+    const sub=`<span dir="ltr">${escAttr(u.email||'')}</span> · ${escAttr(adminRoleName(u.role))}`;
+    const times=`הוזמן/נוצר: ${adminFormatTime(u.invited_at||u.created_at)} · כניסה אחרונה: ${adminFormatTime(u.last_sign_in_at)}`;
+    let actions='';
+    if(u.has_profile && !isMe){
+      const pending=st.key==='pending';
+      actions=`<div class="admin-user-actions">
+        <select data-user-id="${id}" onchange="adminChangeRole(this)">${Object.entries(ADMIN_ROLE_NAMES).map(([v,l])=>`<option value="${v}"${v===u.role?' selected':''}>${l}</option>`).join('')}</select>
+        <button class="demo-mini-btn" data-user-id="${id}" onclick="adminResend(this)"${u.is_active?'':' disabled'}>${pending?'קישור הזמנה חדש':'קישור לאיפוס סיסמה'}</button>
+        <button class="demo-mini-btn" data-user-id="${id}" onclick="adminToggleActive(this)">${u.is_active?'השבת':'הפעל מחדש'}</button>
+      </div>`;
+    }
+    return `<div class="role-row" data-admin-user="${id}"><div class="role-row-title">${title}</div><div class="role-row-sub">${sub}</div><div class="role-row-sub">${times}</div>${actions}<div class="admin-row-result"></div></div>`;
+  }).join('');
+}
+function adminFindUser(el){
+  const id=el.getAttribute('data-user-id');
+  return {id, user:_adminUsers.find(u=>u.user_id===id), row:el.closest('[data-admin-user]')};
+}
+function adminRowMessage(row, html){ const box=row?.querySelector('.admin-row-result'); if(box) box.innerHTML=html; }
+async function adminChangeRole(sel){
+  const {id, user, row}=adminFindUser(sel);
+  const newRole=sel.value;
+  if(!user || newRole===user.role) return;
+  const who=adminUserLabel(user);
+  const ok=newRole==='admin'
+    ? confirm(`אישור מינוי מנהל מערכת\n\nמנהל מערכת יכול להזמין משתמשים, לשנות תפקידים ולהשבית חשבונות של כל המשתמשים.\n\nלתת ל-${who} הרשאת מנהל מערכת?`)
+    : confirm(`לשנות את התפקיד של ${who} מ-${adminRoleName(user.role)} ל-${adminRoleName(newRole)}?`);
+  if(!ok){ sel.value=user.role; return; }
+  const client=getSupabaseClient();
+  let res;
+  try{ res=await client.rpc('admin_set_user_role',{p_user_id:id, p_role:newRole}); }catch(e){ res={error:{message:'network'}}; }
+  if(res.error){ sel.value=user.role; adminRowMessage(row, `<div class="login-error">שינוי התפקיד נכשל: ${escAttr(res.error.message||'')}</div>`); return; }
+  toast(`התפקיד עודכן: ${adminRoleName(newRole)}`);
+  refreshAdminUsers();
+}
+async function adminToggleActive(btn){
+  const {id, user, row}=adminFindUser(btn);
+  if(!user) return;
+  const who=adminUserLabel(user);
+  const activate=!user.is_active;
+  const ok=activate
+    ? confirm(`להפעיל מחדש את ${who} בתפקיד ${adminRoleName(user.role)}?${user.role==='admin'?'\n\nשים/י לב: זהו חשבון מנהל מערכת.':''}`)
+    : confirm(`להשבית את ${who}?\n\nהמשתמש לא יוכל לגשת לשום מידע במערכת עד שיופעל מחדש. ההיסטוריה והאירועים שלו נשמרים.`);
+  if(!ok) return;
+  const client=getSupabaseClient();
+  let res;
+  try{ res=await client.rpc('admin_set_user_active',{p_user_id:id, p_active:activate}); }catch(e){ res={error:{message:'network'}}; }
+  if(res.error){ adminRowMessage(row, `<div class="login-error">הפעולה נכשלה: ${escAttr(res.error.message||'')}</div>`); return; }
+  toast(activate?'המשתמש הופעל מחדש':'המשתמש הושבת');
+  refreshAdminUsers();
+}
+async function adminResend(btn){
+  const {id, user, row}=adminFindUser(btn);
+  if(!user) return;
+  btn.disabled=true;
+  const res=await callAdminUsersFunction({action:'resend', user_id:id, delivery:adminDelivery()});
+  btn.disabled=false;
+  if(res.error){ adminRowMessage(row, `<div class="login-error">${escAttr(adminErrorText(res.error))}</div>`); return; }
+  adminRowMessage(row, adminResultHtml(res, user.email||''));
+  refreshAdminAudit();
+}
+const ADMIN_AUDIT_ACTION_TEXT = {invited:'הוזמן', reinvited:'נשלח קישור חדש', role_changed:'שינוי תפקיד', deactivated:'הושבת', reactivated:'הופעל מחדש'};
+async function refreshAdminAudit(){
+  const list=document.getElementById('admin-audit-list');
+  const client=getSupabaseClient();
+  if(!list || !client) return;
+  let res;
+  try{ res=await client.from('admin_user_audit').select('created_at,actor_id,target_email,action,old_role,new_role,details').order('created_at',{ascending:false}).limit(30); }
+  catch(e){ res={error:{message:'network'}}; }
+  if(res.error){ list.innerHTML=roleRow('טעינת היומן נכשלה', escAttr(res.error.message||'')); return; }
+  const rows=res.data||[];
+  if(!rows.length){ list.innerHTML=roleRow('אין רישומים עדיין',''); return; }
+  list.innerHTML=rows.map(r=>{
+    const actor=r.actor_id ? (_adminUsers.find(u=>u.user_id===r.actor_id)?.email||r.actor_id) : 'לא ידוע (שינוי ישיר במסד הנתונים)';
+    let change='';
+    if(r.action==='role_changed') change=` · ${adminRoleName(r.old_role)} ← ${adminRoleName(r.new_role)}`;
+    else if(r.new_role) change=` · ${adminRoleName(r.new_role)}`;
+    const via=r.details?.delivery ? ` · ${r.details.delivery==='email'?'במייל':'בקישור'}` : '';
+    return roleRow(`${ADMIN_AUDIT_ACTION_TEXT[r.action]||escAttr(r.action)}: <span dir="ltr">${escAttr(r.target_email||'')}</span>${change}`,
+      `${adminFormatTime(r.created_at)} · על ידי <span dir="ltr">${escAttr(actor)}</span>${via}`);
+  }).join('');
 }
 
 // ── In-app bug/feedback reporting — for testers with no GitHub account ──
