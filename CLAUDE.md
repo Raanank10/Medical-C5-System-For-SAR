@@ -37,7 +37,7 @@ node scripts/browser_collapse_brief_test.js       # Movement screen: building co
 node scripts/browser_medic_assignment_test.js     # cross-device PC -> medic assignment: PC, medic and rescue tabs sharing one stubbed backend
 node scripts/browser_evacuation_tracking_test.js  # cross-device evacuation destination/MDA classification, location board, UH report: PC, CC and medic tabs
 node scripts/browser_command_scope_test.js        # command hierarchy: CC (company) sees every site, PC (platoon) only its own
-node scripts/browser_platoon_security_test.js     # database/044 client side: no self-join, CC roster + PC assignment, PC sees only its platoon
+node scripts/browser_platoon_security_test.js     # database/045 client side: no self-join, CC roster + PC assignment, PC sees only its platoon
 
 # Analytics package
 cd analytics/c5_sentinel_sar_analytics_v1_1

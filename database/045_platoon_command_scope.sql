@@ -35,7 +35,7 @@ alter table profiles add column if not exists platoon_commander_id uuid referenc
 create index if not exists idx_profiles_platoon_commander on profiles(platoon_commander_id) where platoon_commander_id is not null;
 
 comment on column profiles.platoon_commander_id is
-  'The PC (חוג״ד) whose platoon this medic/paramedic belongs to. Set only by cc/chamal/admin/physician via set_platoon_commander() (database/044).';
+  'The PC (חוג״ד) whose platoon this medic/paramedic belongs to. Set only by cc/chamal/admin/physician via set_platoon_commander() (database/045).';
 
 create or replace function app.guard_platoon_commander_change()
 returns trigger
@@ -163,7 +163,7 @@ begin
   if v_status not in ('draft','staging','active') then
     raise exception 'incident % is %, not open for joining', p_incident_id, v_status using errcode = '42501';
   end if;
-  -- database/044: no self-join into someone else's site. A pc/medic/paramedic joins only what it
+  -- database/045: no self-join into someone else's site. A pc/medic/paramedic joins only what it
   -- can already access (assigned, opened/drafted, or - for a pc - its own platoon's draft).
   if v_role in ('pc','medic','paramedic') and not app.can_access_incident(p_incident_id) then
     raise exception 'assignment required to join incident %', p_incident_id using errcode = '42501';
@@ -198,7 +198,7 @@ begin
   left join profiles op on op.id = i.opened_by
   left join profiles dc on dc.id = i.draft_created_by
   where i.status in ('draft','staging','active')
-    -- database/044: pc/medic/paramedic list only incidents they can access.
+    -- database/045: pc/medic/paramedic list only incidents they can access.
     and (app.current_user_role() not in ('pc','medic','paramedic') or app.can_access_incident(i.id))
   order by (i.status = 'draft') desc, i.opened_at desc;
 end;

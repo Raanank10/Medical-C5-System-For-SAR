@@ -2989,7 +2989,7 @@ const BP_LABELS = {
 };
 const ACCESS_LABELS = {partial:'לכוד', trapped:'לכוד', full:'לא לכוד', free:'לא לכוד', none:'לכוד', not_trapped:'לא לכוד'};
 const TRAP_LABELS = {trapped:'לכוד', not_trapped:'לא לכוד', unknown:'לא תועד'};
-// Evacuation tracking (V2.99.31, database/042-043): where each casualty was taken and how MDA
+// Evacuation tracking (V2.99.31, database/043-044): where each casualty was taken and how MDA
 // classified them. MDA's classification sits beside field triage and never replaces it
 // (src/domain/rules.js mdaClassificationDiffersFromTriage).
 const MDA_CLASSIFICATION_LABELS = {minor:'קל', anxiety:'נפגע חרדה', moderate:'בינוני', serious:'קשה', critical:'אנוש', deceased:'נקבע מותו'};
@@ -4140,7 +4140,7 @@ async function loadRealMedicProfiles(){
   const client=getSupabaseClient();
   if(!client || !currentUser) return;
   try{
-    // database/044: company-level command may also assign a PC to a site; a PC's list is limited
+    // database/045: company-level command may also assign a PC to a site; a PC's list is limited
     // by RLS to its own platoon's medics/paramedics.
     const roles=COMPANY_COMMAND_ROLES.has(currentUser.role) ? ['medic','paramedic','pc'] : ['medic','paramedic'];
     const res=await client.from('profiles').select('id,display_name,role').in('role',roles).eq('is_active',true).order('display_name');
@@ -6338,7 +6338,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
   if(role==='cc' && canManagePlatoonRoster()) loadPlatoonRoster();
   updateDemoStatus();
 }
-// ── Platoon roster (database/044) ──
+// ── Platoon roster (database/045) ──
 // Which PC each medic/paramedic belongs to. It decides whose drafts a PC sees and confirms, and
 // which medics a PC may assign. Only company-level command changes it (set_platoon_commander()).
 function canManagePlatoonRoster(){ return !!currentUser && COMPANY_COMMAND_ROLES.has(currentUser.role); }
@@ -6350,7 +6350,7 @@ async function loadPlatoonRoster(){
   try{ res=await client.from('profiles').select('id,display_name,role,platoon_commander_id').in('role',['medic','paramedic','pc']).eq('is_active',true).order('display_name'); }
   catch(e){ res={error:e}; }
   const target=document.getElementById('platoon-roster-panel'); if(!target) return;
-  if(res.error){ target.textContent='רשימת המחלקות תהיה זמינה אחרי עדכון השרת (database/044).'; return; }
+  if(res.error){ target.textContent='רשימת המחלקות תהיה זמינה אחרי עדכון השרת (database/045).'; return; }
   _platoonRoster=Array.isArray(res.data) ? res.data : [];
   const pcs=_platoonRoster.filter(p=>p.role==='pc');
   const medics=_platoonRoster.filter(p=>p.role!=='pc');
@@ -8326,7 +8326,7 @@ function saveReport(){
     }
   }
   siteData.externalReports.push(r);
-  // Synced so every command device sees the same reports (database/043 projects the event into
+  // Synced so every command device sees the same reports (database/044 projects the event into
   // external_reports). Roles sync-log would reject stay local, as before V2.99.31.
   if(src && (!currentUser || EVAC_REPORTING_ROLES.has(currentUser.role))){
     saveLocalEvent({type:'EXTERNAL_REPORT_CREATED', detail:`${r.sourceLabel} · קשה ${r.red} · בינוני ${r.yellow} · קל ${r.green}${r.evacDest?' · '+r.evacDest:''}`, warn:false,
@@ -8530,7 +8530,7 @@ function markPatientAtCollectionPoint(id){
 // ── Evacuation tracking (V2.99.31): destination + MDA classification ──
 // Optional at handover (often unknown at that moment) and updatable later by command roles once
 // MDA reports back. Never touches triage or status. The server keeps the newest value by
-// local_timestamp (database/043), so a late-syncing older update cannot overwrite a newer one.
+// local_timestamp (database/044), so a late-syncing older update cannot overwrite a newer one.
 // Before V2.99.31 the handover sent the placeholder 'pending', which the server stored as the
 // destination; unknown fields are now simply left out.
 function evacuationActorRole(){ return currentUser ? currentUser.role : activeRoleDashboard; }
@@ -11083,7 +11083,7 @@ function casualtyBoardSiteIds(role){
   return role==='pc' ? [pcPlatoonSite()] : allSites.filter(s=>s.id!=='ALL').map(s=>s.id);
 }
 // External reports = this device's own (persisted locally) + the synced ones from the server
-// (database/043), deduplicated by the local report id the server keeps as external_reference.
+// (database/044), deduplicated by the local report id the server keeps as external_reference.
 let _remoteExternalReports={}; // incidentId -> mapped rows, replaced on each pull
 function mergeRemoteExternalReports(local, siteId){
   const remote=currentUser ? (_remoteExternalReports[SITE_TO_INCIDENT_ID[siteId]]||[]) : [];
@@ -11528,7 +11528,7 @@ const ACTIVE_INCIDENT_KEY='c5_active_incident_v1';
 const INCIDENT_DRAFT_OPEN_ROLES=new Set(['medic','paramedic']);
 const INCIDENT_OFFICIAL_OPEN_ROLES=new Set(['pc','cc','chamal','admin','physician','rpc','rcc']);
 const INCIDENT_COMMAND_ROLES=new Set(['pc','cc','chamal','admin','physician']); // app.is_command_role()
-// Company-level command (database/044): every site, assigns PCs, owns the platoon roster.
+// Company-level command (database/045): every site, assigns PCs, owns the platoon roster.
 const COMPANY_COMMAND_ROLES=new Set(['cc','chamal','admin','physician']);
 const INCIDENT_BLANKET_ROLES=new Set(['cc','chamal','admin','rpc','rcc','physician']); // app.can_access_incident() without membership
 const SERVER_INCIDENT_STATUS_LABELS={draft:'טיוטה, ממתין לאישור',staging:'בהכנה',active:'פעיל',closed:'סגור'};
@@ -11744,7 +11744,7 @@ async function enterIncidentFromPicker(incidentId){
     const client=getSupabaseClient();
     let r;
     try{ r=await client.rpc('join_incident', {p_incident_id:incidentId}); }catch(e){ r={error:e}; }
-    // database/044: no self-join into another platoon's site - only an assignment opens it.
+    // database/045: no self-join into another platoon's site - only an assignment opens it.
     if(r.error){ toast(r.error.code==='42501' ? 'נדרש שיבוץ לאירוע · פנה/י למ״פ רפואה או לחוג״ד שלך' : 'ההצטרפות נכשלה, בדוק/י חיבור'); return; }
     inc.is_member=true;
   }
@@ -12343,8 +12343,8 @@ async function pullProjectedPatientState(incidentId){
 function pullProjectedPatientStateAll(){
   Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id); });
 }
-// ── Evacuation tracking + external reports pull (V2.99.31, database/043) ──
-// Separate queries from the main patient pull on purpose: until 043 is applied these columns do
+// ── Evacuation tracking + external reports pull (V2.99.31, database/044) ──
+// Separate queries from the main patient pull on purpose: until 044 is applied these columns do
 // not exist and the query errors - that must never break pullProjectedPatientState().
 const EVACUATION_TRACKING_COLUMNS = 'id,evacuation_destination,mda_classification,evacuation_updated_at';
 async function pullEvacuationTracking(incidentId){

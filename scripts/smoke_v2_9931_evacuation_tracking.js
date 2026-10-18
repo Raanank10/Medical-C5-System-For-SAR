@@ -50,9 +50,9 @@ for (const rel of files) {
   // Location now syncs, and new pulls never break the main patient pull.
   assert(/function reconcileLocationSync\(\)\{[\s\S]{0,700}?type:'PATIENT_LOCATION_UPDATED'/.test(html), `${rel}: patient zone must sync`);
   assert(html.includes('pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id);'), `${rel}: separate pulls for location, evacuation and reports`);
-  assert(html.includes("const PROJECTED_PATIENT_COLUMNS = 'id,incident_id,visual_id,current_triage,current_status,access_status,needs_full_assessment,is_pediatric,pediatric_age_years,last_vitals_at,version,optional_name,identifying_description,physician_death_confirmed_at,physician_death_confirmed_by';"), `${rel}: the main patient pull must not depend on database/043 columns`);
+  assert(html.includes("const PROJECTED_PATIENT_COLUMNS = 'id,incident_id,visual_id,current_triage,current_status,access_status,needs_full_assessment,is_pediatric,pediatric_age_years,last_vitals_at,version,optional_name,identifying_description,physician_death_confirmed_at,physician_death_confirmed_by';"), `${rel}: the main patient pull must not depend on database/044 columns`);
 
-  // database/044 client side: refused self-join explained, CC assigns PCs and owns the roster.
+  // database/045 client side: refused self-join explained, CC assigns PCs and owns the roster.
   assert(html.includes("toast(r.error.code==='42501' ? 'נדרש שיבוץ לאירוע · פנה/י למ״פ רפואה או לחוג״ד שלך'"), `${rel}: a refused self-join must say an assignment is needed`);
   assert(html.includes("const roles=COMPANY_COMMAND_ROLES.has(currentUser.role) ? ['medic','paramedic','pc'] : ['medic','paramedic'];"), `${rel}: only company-level command may assign a PC`);
   assert(html.includes("function canManagePlatoonRoster(){ return !!currentUser && COMPANY_COMMAND_ROLES.has(currentUser.role); }"), `${rel}: roster panel for company-level command only`);

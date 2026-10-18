@@ -10,7 +10,7 @@
 --   button as Yedidim; both now exist as separate sources.
 --
 -- Own file/transaction: Postgres forbids using a new enum value in the same transaction that
--- adds it (same reason 006/019/024/032 split their enum adds this way) - 043 uses these values.
+-- adds it (same reason 006/019/024/032 split their enum adds this way) - 044 uses these values.
 
 alter type event_type add value if not exists 'PATIENT_EVACUATION_UPDATED';
 alter type external_source add value if not exists 'yedidim';

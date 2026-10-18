@@ -5,9 +5,9 @@
 // mirrors what the real server does with the events this feature sends:
 // - role gating as in supabase/functions/sync-log/index.ts (PATIENT_EVACUATION_UPDATED and
 //   EXTERNAL_REPORT_CREATED: pc/cc/chamal/physician/admin; clinical events: medic/pc/...)
-// - projection as in database/043 (destination + MDA classification, newest local_timestamp wins,
+// - projection as in database/044 (destination + MDA classification, newest local_timestamp wins,
 //   never touching triage/status) and database/041's PATIENT_LOCATION_UPDATED branch.
-// It proves client behavior only; database/043 itself was exercised against a real Postgres.
+// It proves client behavior only; database/044 itself was exercised against a real Postgres.
 //
 // Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
 // Run: npm install && node scripts/browser_evacuation_tracking_test.js
@@ -58,7 +58,7 @@ function newServer() {
   };
 }
 
-// sync-log POST: role gate, create patient rows, insert, project (database/041 + 043 subset).
+// sync-log POST: role gate, create patient rows, insert, project (database/041 + 044 subset).
 function push(server, userId, body) {
   const u = userById(userId);
   const accepted = []; const rejected = [];

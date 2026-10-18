@@ -1,6 +1,6 @@
-// Real-browser test of the platoon security scope's client side (database/044, V2.99.31): CC, PC
+// Real-browser test of the platoon security scope's client side (database/045, V2.99.31): CC, PC
 // and medic phones share one fake backend in this Node process (same harness as
-// scripts/browser_medic_assignment_test.js). The fake enforces the database/044 rules the client
+// scripts/browser_medic_assignment_test.js). The fake enforces the database/045 rules the client
 // depends on: no self-join for pc/medic/paramedic without access; list_open_incidents scoped;
 // profiles readable by a PC only for itself and its own platoon; memberships written by a PC only
 // for its own platoon's medics in incidents it belongs to; set_platoon_commander() for

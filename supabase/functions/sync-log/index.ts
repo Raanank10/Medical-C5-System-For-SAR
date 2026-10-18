@@ -96,7 +96,7 @@ const SUPPLY_LOGISTICS_EVENTS = [
   "PC_TRUCK_RESUPPLY_UNAVAILABLE_ESCALATED", "RESUPPLY_ESCALATED_TO_CC",
 ];
 const EXTERNAL_REPORT_EVENTS = ["EXTERNAL_REPORT_CREATED", "EXTERNAL_REPORT_LINKED"];
-// Later update of where a casualty was taken and how MDA classified them (database/042-043),
+// Later update of where a casualty was taken and how MDA classified them (database/043-044),
 // once MDA reports back. Command roles only: the medic records the same two fields on
 // PATIENT_HANDED_OVER itself when they are known at handover. Never changes triage or status.
 const EVACUATION_TRACKING_EVENTS = ["PATIENT_EVACUATION_UPDATED"];

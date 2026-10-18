@@ -1,4 +1,4 @@
--- Evacuation tracking (V2.99.31) - projection. Depends on 042's enum values.
+-- Evacuation tracking (V2.99.31) - projection. Depends on 043's enum values.
 --
 -- Gaps found 2026-10-17 (checked live):
 -- - The client's handover always sent destination_facility:'pending', so project_patient_state()
@@ -39,9 +39,9 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 comment on column patients.evacuation_destination is
-  'Where the casualty was taken (hospital / receiving facility), from PATIENT_HANDED_OVER or PATIENT_EVACUATION_UPDATED (database/043).';
+  'Where the casualty was taken (hospital / receiving facility), from PATIENT_HANDED_OVER or PATIENT_EVACUATION_UPDATED (database/044).';
 comment on column patients.mda_classification is
-  'Magen David Adom''s own classification (minor/anxiety/moderate/serious/critical/deceased). Beside current_triage, never replaces it (database/043).';
+  'Magen David Adom''s own classification (minor/anxiety/moderate/serious/critical/deceased). Beside current_triage, never replaces it (database/044).';
 
 alter table external_reports add column if not exists source_event_id uuid references events(id) on delete set null;
 create unique index if not exists idx_external_reports_source_event on external_reports(source_event_id) where source_event_id is not null;
