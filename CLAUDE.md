@@ -36,6 +36,7 @@ node scripts/browser_incident_lifecycle_test.js   # logged-in incident picker/dr
 node scripts/browser_collapse_brief_test.js       # Movement screen: building collapse with any incident type
 node scripts/browser_medic_assignment_test.js     # cross-device PC -> medic assignment: PC, medic and rescue tabs sharing one stubbed backend
 node scripts/browser_evacuation_tracking_test.js  # cross-device evacuation destination/MDA classification, location board, UH report: PC, CC and medic tabs
+node scripts/browser_command_scope_test.js        # command hierarchy: CC (company) sees every site, PC (platoon) only its own
 
 # Analytics package
 cd analytics/c5_sentinel_sar_analytics_v1_1

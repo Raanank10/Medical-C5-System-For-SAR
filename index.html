@@ -2956,6 +2956,12 @@ const DEMO_PLATOONS = [
   {platoonId:'PLT-A', name:'מחלקה רפואית א', pcId:'USR-BARAK', companyId:'COMP-1'},
   {platoonId:'PLT-B', name:'מחלקה רפואית ב', pcId:'USR-BARAK', companyId:'COMP-1'}
 ];
+// Command hierarchy (docs/ROLE_COMMAND_MODEL_v2.7.md): חוג״ד commands one platoon, מ״פ רפואה the
+// whole company. Each demo platoon works one site (same mapping the demo loader uses for
+// assignedPlatoonId); the PC's platoon is PLT-A, as in roleScopedPatients('pc'). Signed in, only
+// the active incident exists as SITE_A, so the PC's scope is that incident.
+const PLATOON_SITE = Object.freeze({'PLT-A':'SITE_A', 'PLT-B':'SITE_B'});
+let pcPlatoonId='PLT-A';
 const INTERVENTION_SUPPLY = {
   tourniquet:{item:'tourniquets', qty:1},
   bandage:{item:'pressureDressings', qty:1},
@@ -4823,7 +4829,7 @@ function openLegacyForRole(role){
 }
 function roleScopedPatients(role){
   if(role==='medic') return sortedPatients(patients.filter(p=>(p.assignedMedicId||userIdFromMedic(p.medic||p.lastTouchedBy))==='USR-COHEN'));
-  if(role==='pc') return sortedPatients(patients.filter(p=>(p.assignedPlatoonId||'PLT-A')==='PLT-A'));
+  if(role==='pc') return sortedPatients(patients.filter(p=>(p.assignedPlatoonId||'PLT-A')===pcPlatoonId));
   if(role==='rpc') return sortedPatients(patients.filter(p=>(p.assignedPlatoonId||'PLT-A')==='PLT-A'));
   if(role==='rcc'){
     const myPlatoonIds=DEMO_PLATOONS.filter(pl=>pl.companyId==='COMP-1').map(pl=>pl.platoonId);
@@ -5441,7 +5447,8 @@ const DecisionSupportEngine=(()=>{
     ]);
   }
   function forPc(){
-    const ctx=defaultContext();
+    // חוג״ד's recommendations cover its own platoon only, like its dashboard and command screen.
+    const ctx={...defaultContext(),patients:roleScopedPatients('pc')};
     const recommendations=evaluate(ctx).filter(r=>['PC','Medic','Logistics'].includes(r.responsibleRole));
     return {recommendations,sectorRisk:SectorRiskScore(ctx),operationalPressure:OperationalPressureIndex(ctx)};
   }
@@ -6318,7 +6325,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
     ${role==='cc'?renderCcCommandBoard():`<div class="role-top-grid">${metrics}</div>`}
     ${role==='medic'?renderMedicActionPanel():''}
     ${role==='pc'?renderPcResponsibilityBoard():''}
-    ${['pc','cc'].includes(role)?roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds())):''}
+    ${['pc','cc'].includes(role)?roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds(role))):''}
     ${role==='physician'?renderDoctorLegacyNote():''}
     ${role==='medic'||role==='pc'?'':role==='cc'
       ? `<details style="margin:12px 0 0"><summary style="cursor:pointer;font-weight:900;color:var(--muted);padding:10px 0">פירוט נוסף / אחריות ותורים</summary>${genericSections}</details>`
@@ -9906,23 +9913,31 @@ function getSitePatients(siteId){
   if(siteId==='SITE_B') return patients.filter(p=>(p.siteId||'SITE_A')==='SITE_B');
   return [];
 }
-let cmdActiveSite='ALL', cmdFilter='all', alertFilter='critical', cmdAlertFilter='critical', commandRole='pc', ccCompanySite='SITE_A';
+let cmdActiveSite='SITE_A', cmdFilter='all', alertFilter='critical', cmdAlertFilter='critical', commandRole='pc';
 let cmdPanelOpen={priority:true,locations:true,reinforcement:true,heatmap:false,devices:false,serverstate:false,quarantine:false,watchdogs:false,duplicates:false,alerts:true};
 function companyLabelForSite(siteId){
   return siteId==='SITE_B' ? 'פלוגה ב / BRAVO' : siteId==='SITE_A' ? 'פלוגה א / ALFA' : 'כל הפלוגות';
 }
+// The PC's command screen shows its own platoon's site only; מ״פ רפואה, חמ״ל and every other
+// command role see every site, including the "all sites" tab.
+function pcPlatoonSite(){
+  const site=PLATOON_SITE[pcPlatoonId]||'SITE_A';
+  return allSites.some(s=>s.id===site) ? site : 'SITE_A';
+}
 function commandVisibleSites(){
-  if(commandRole==='cc') return [ccCompanySite];
+  if(commandRole==='pc') return [pcPlatoonSite()];
   return allSites.map(s=>s.id);
 }
 function canSeeCommandSite(siteId){
-  return commandVisibleSites().includes(siteId) || siteId==='ALL' && commandRole!=='cc';
+  return commandVisibleSites().includes(siteId);
 }
+function defaultCommandSite(){ return commandRole==='pc' ? pcPlatoonSite() : 'ALL'; }
+function ensureCommandSiteVisible(){ if(!canSeeCommandSite(cmdActiveSite)) cmdActiveSite=defaultCommandSite(); }
 function switchCommandRole(role, btn){
   commandRole=role;
   document.querySelectorAll('#command-role-slicer .alert-slice').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
-  cmdActiveSite = role==='cc' ? ccCompanySite : 'ALL';
+  cmdActiveSite = defaultCommandSite();
   renderCmdTabs();
   renderCmdContent();
 }
@@ -9982,6 +9997,7 @@ function setCmdPanelMeta(name, summary){
   meta.textContent=summary;
 }
 function renderCmdTabs(){
+  ensureCommandSiteVisible();
   const el=document.getElementById('cmd-site-tabs'); if(!el) return;
   const visible=allSites.filter(s=>canSeeCommandSite(s.id));
   el.innerHTML=visible.map(s=>{
@@ -10005,7 +10021,7 @@ function renderCmdTabs(){
 }
 function switchCmdSite(id){
   if(!canSeeCommandSite(id)){
-    toast('מ״פ רפואה רואה רק את אירועי הפלוגה שלו אלא אם חוג"ד/חמ״ל משנים הרשאה');
+    toast('חוג״ד רואה רק את מוקד המחלקה שלו · מ״פ רפואה וחמ״ל רואים את כל המוקדים');
     return;
   }
   cmdActiveSite=id; cmdFilter='all';
@@ -10707,7 +10723,7 @@ function updateReinforcementStatus(id, status){
 }
 function renderReinforcementPanel(){
   const body=document.getElementById('cmd-reinforcement-requests'); if(!body) return;
-  const visible=reinforcementRequests.filter(r=>commandRole!=='cc' || r.siteId===ccCompanySite);
+  const visible=reinforcementRequests.filter(r=>commandRole!=='pc' || (r.siteId||'SITE_A')===pcPlatoonSite());
   const open=visible.filter(isRequestOpen);
   setCmdPanelMeta('reinforcement', `${open.length} פתוחות מתוך ${visible.length}`);
   const createButton=`<div style="padding:8px 16px 0"><button class="btn-primary" onclick="openReinforcementRequest()" style="background:var(--accent)">+ בקשת תגבור רפואי</button></div>`;
@@ -10884,12 +10900,15 @@ function renderCommandOperationalPanels(pts, site){
 function renderCmdContent(){
   ensureSiteReadiness();
   updateCmdBriefingBadge();
+  ensureCommandSiteVisible();
   const pts=getSitePatients(cmdActiveSite);
   const site=allSites.find(s=>s.id===cmdActiveSite)||allSites[0];
   const hdr=document.getElementById('cmd-header-label');
-  if(hdr) hdr.textContent=commandRole==='cc'
-    ? `${site.name} — מ״פ רפואה (${companyLabelForSite(site.id)})`
-    : (cmdActiveSite==='ALL'?'כל המוקדים מכל הפלוגות — חוג"ד / חמ״ל':site.name);
+  if(hdr) hdr.textContent=commandRole==='pc'
+    ? `${site.name} — חוג״ד (${platoonName(pcPlatoonId)})`
+    : commandRole==='cc'
+      ? (cmdActiveSite==='ALL'?'כל המוקדים בפלוגה — מ״פ רפואה':`${site.name} — מ״פ רפואה`)
+      : (cmdActiveSite==='ALL'?'כל המוקדים מכל הפלוגות — חמ״ל':site.name);
   const c={red:0,yellow:0,green:0,black:0};
   pts.forEach(p=>{if(c[p.triage]!==undefined)c[p.triage]++;});
   if(cmdActiveSite==='ALL' || cmdActiveSite==='SITE_A'){
@@ -10958,7 +10977,7 @@ function renderCmdContent(){
   const rpts=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id).map(r=>({...r,_site:s.name.split('—')[0].trim()}))):siteExternalReports(cmdActiveSite);
   document.getElementById('cmd-ext-reports').innerHTML=rpts.length?rpts.map(r=>externalReportCardHtml(r, r._site||'')).join(''):'<div style="color:var(--muted);font-size:13px;padding:8px 0">אין דיווחים</div>';
   const locBoard=document.getElementById('cmd-location-board');
-  if(locBoard) locBoard.innerHTML=renderCasualtyLocationBoard(cmdActiveSite==='ALL'||commandRole==='cc'?casualtyBoardSiteIds():[cmdActiveSite]);
+  if(locBoard) locBoard.innerHTML=renderCasualtyLocationBoard(cmdActiveSite==='ALL'?commandVisibleSites().filter(id=>id!=='ALL'):[cmdActiveSite]);
   applyCmdPanelState();
 }
 // ── Casualty board by location (V2.99.31): site, then zone inside it ──
@@ -11020,11 +11039,10 @@ function renderCasualtyLocationBoard(siteIds){
   }).join('');
   return blocks || '<div style="color:var(--muted);font-size:13px;padding:8px 0">אין מוקדים להצגה</div>';
 }
-// מ״פ רפואה (company) is senior to חוג״ד (platoon) and owns cross-platoon evacuation bottlenecks
-// (docs/ROLE_COMMAND_MODEL_v2.7.md), so the CC's board never shows less than the PC's: both get
-// every site this device knows.
-function casualtyBoardSiteIds(){
-  return allSites.filter(s=>s.id!=='ALL').map(s=>s.id);
+// מ״פ רפואה (company) sees every site; חוג״ד (platoon) only its own platoon's site
+// (docs/ROLE_COMMAND_MODEL_v2.7.md), the same scope as the command screen.
+function casualtyBoardSiteIds(role){
+  return role==='pc' ? [pcPlatoonSite()] : allSites.filter(s=>s.id!=='ALL').map(s=>s.id);
 }
 // External reports = this device's own (persisted locally) + the synced ones from the server
 // (database/043), deduplicated by the local report id the server keeps as external_reference.

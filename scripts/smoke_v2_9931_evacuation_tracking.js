@@ -35,10 +35,16 @@ for (const rel of files) {
   assert(/saveLocalEvent\(\{type:'EXTERNAL_REPORT_CREATED'[\s\S]{0,900}?linked_patient_id/.test(html), `${rel}: reports must sync, with the patient link kept out of events.patient_id`);
 
   // Board by location on the PC and CC dashboards and the command screen.
-  assert(html.includes("${['pc','cc'].includes(role)?roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds())):''}"), `${rel}: PC and CC role dashboards must show the location board`);
+  assert(html.includes("${['pc','cc'].includes(role)?roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds(role))):''}"), `${rel}: PC and CC role dashboards must show the location board`);
   assert(html.includes('id="cmd-location-board"') && html.includes('locations:true'), `${rel}: command screen must have the location board panel`);
-  assert(html.includes("function casualtyBoardSiteIds(){\n  return allSites.filter(s=>s.id!=='ALL').map(s=>s.id);"), `${rel}: CC (senior to PC) must never see fewer sites than the PC on the board`);
-  assert(html.includes("renderCasualtyLocationBoard(cmdActiveSite==='ALL'||commandRole==='cc'?casualtyBoardSiteIds():[cmdActiveSite])"), `${rel}: CC command screen board must cover every site`);
+  assert(html.includes("return role==='pc' ? [pcPlatoonSite()] : allSites.filter(s=>s.id!=='ALL').map(s=>s.id);"), `${rel}: board: CC (company) every site, PC (platoon) its own site`);
+  assert(html.includes("renderCasualtyLocationBoard(cmdActiveSite==='ALL'?commandVisibleSites().filter(id=>id!=='ALL'):[cmdActiveSite])"), `${rel}: command screen board follows the command scope`);
+
+  // Command hierarchy: PC (platoon) scoped to its platoon's site, CC (company) sees every site.
+  assert(html.includes("function commandVisibleSites(){\n  if(commandRole==='pc') return [pcPlatoonSite()];\n  return allSites.map(s=>s.id);"), `${rel}: only the PC is narrowed on the command screen`);
+  assert(!html.includes('ccCompanySite'), `${rel}: the CC must no longer be pinned to one site`);
+  assert(html.includes("const visible=reinforcementRequests.filter(r=>commandRole!=='pc' || (r.siteId||'SITE_A')===pcPlatoonSite());"), `${rel}: PC sees its own platoon's reinforcement requests, CC all`);
+  assert(html.includes("const ctx={...defaultContext(),patients:roleScopedPatients('pc')};"), `${rel}: PC recommendations cover its own platoon only`);
   assert(html.includes("const border=color?`2px solid ${color}`:'2px dashed var(--muted)';"), `${rel}: pending triage must never get a triage colour on the board`);
 
   // Location now syncs, and new pulls never break the main patient pull.
