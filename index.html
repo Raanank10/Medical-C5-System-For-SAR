@@ -753,7 +753,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9931</div>
+      <div class="demo-kicker">Demo V2.9932</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -850,7 +850,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9931</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9932</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -860,7 +860,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9931</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9932</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2800,7 +2800,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.31';
+const APP_VERSION = '2.99.32';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -2860,7 +2860,15 @@ const SYNC_ELIGIBLE_EVENT_TYPES = new Set([
   'EXTERNAL_REPORT_CREATED','EXTERNAL_REPORT_LINKED','WATCHDOG_ALERT','WATCHDOG_ACKNOWLEDGED',
   'WATCHDOG_RESOLVED','DEAD_MAN_SWITCH_ESCALATED','SYNC_CONFLICT','CONFLICT_LOG_ENTRY',
   'TREATMENT_SAFETY_WARNING','COMMAND_CONTEXT_NOTE_ADDED','VOICE_MEMO_ADDED',
-  'HIGH_RISK_CLINICAL_VIOLATION','NOTE_ADDED','AAR_CONTEXT_NOTE_ADDED','PATIENT_DEATH_CONFIRMED'
+  'HIGH_RISK_CLINICAL_VIOLATION','NOTE_ADDED','AAR_CONTEXT_NOTE_ADDED','PATIENT_DEATH_CONFIRMED',
+  // A medic's resupply request (submitMedicResupplyRequest). database/032 added both to the
+  // event_type enum, sync-log allows them for medic/paramedic/pc/cc/physician/logistics, and
+  // database/033 projects them into supply_requests, which pc/cc/logistics read through
+  // get_supply_request_queue. Without them here they were marked synced locally and never sent,
+  // so no other device ever saw a field resupply request. The PC-side status updates
+  // (RESUPPLY_APPROVED_FROM_PC_TRUCK etc.) stay local: 033 matches those by the creating
+  // device's id, so from the PC's device they would never find the request.
+  'RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE','RESUPPLY_REQUEST_ESCALATED_CC'
 ]);
 const SUPPLY_BASELINE = Object.freeze({tourniquets:3, pressureDressings:4, hemostaticGauze:2, airwayEquipment:2, ivKits:1, blankets:2, batteryPacks:1});
 const PC_TRUCK_BASELINE = Object.freeze({tourniquets:20, pressureDressings:30, hemostaticGauze:15, airwayEquipment:10, ivKits:8, blankets:25, batteryPacks:6});
@@ -3945,6 +3953,10 @@ function ensureSiteReadiness(){
 
 // BASELINES — used to reset, not carry over
 const VITALS_BASELINE = {pulse:80, spo2:null, bp_estimate:null, rr:16, avpu:null};
+// A patient received from another device has no measured vitals on this device (the pull only
+// carries last_vitals_at, never values). Never show VITALS_BASELINE's starting stepper values
+// for it as if they were measured.
+const VITALS_NOT_ON_DEVICE = Object.freeze({pulse:null, spo2:null, bp_estimate:null, rr:null, avpu:null});
 const COUNT_BASELINE = {pulse15:20, rr30:8, mpulse15:20, mrr30:8};
 
 function freshState(){
@@ -8708,7 +8720,7 @@ function handoverPatient(id){
     payload_json:{
       handover_method:'mist_logged_local',
       receiving_unit_transport:'pending',
-      mist_summary:{mechanism:p.injury, injuries:p.injury, signs:`HR ${p.vitals.pulse}, RR ${p.vitals.rr}, AVPU=${p.vitals.avpu||'—'}`, treatment:(p.txHistory||[]).map(tx=>tx.text).join('; ')||'none recorded'}
+      mist_summary:{mechanism:p.injury, injuries:p.injury, signs:`HR ${p.vitals.pulse ?? 'not measured'}, RR ${p.vitals.rr ?? 'not measured'}, AVPU=${p.vitals.avpu||'—'}`, treatment:(p.txHistory||[]).map(tx=>tx.text).join('; ')||'none recorded'}
     }
   };
   p.events.push(event);
@@ -8763,7 +8775,7 @@ async function generateQrHandover(id){
       token_hash:tokenHash,
       token_signature:tokenSignature,
       token_expires_at:expiresAt,
-      mist_summary:{mechanism:p.injury, injuries:p.injury, signs:`HR ${p.vitals.pulse}, RR ${p.vitals.rr}, AVPU=${p.vitals.avpu||'—'}`, treatment:(p.txHistory||[]).map(tx=>tx.text).join('; ')||'none recorded'}
+      mist_summary:{mechanism:p.injury, injuries:p.injury, signs:`HR ${p.vitals.pulse ?? 'not measured'}, RR ${p.vitals.rr ?? 'not measured'}, AVPU=${p.vitals.avpu||'—'}`, treatment:(p.txHistory||[]).map(tx=>tx.text).join('; ')||'none recorded'}
     }
   };
   p.events.push(event);
@@ -9813,10 +9825,10 @@ function openQuickVitals(pid){
   modalSpo2Active=p.vitals.spo2 != null;
   modalTreatmentNeeded=null;
   modalTreatments=new Set();
-  counts.mpulse15=Math.round(p.vitals.pulse/4);
-  counts.mrr30=Math.round(p.vitals.rr/2);
+  counts.mpulse15=p.vitals.pulse!=null?Math.round(p.vitals.pulse/4):COUNT_BASELINE.mpulse15;
+  counts.mrr30=p.vitals.rr!=null?Math.round(p.vitals.rr/2):COUNT_BASELINE.mrr30;
   document.getElementById('modal-pid-title').textContent=`עדכון מדדים — ${p.visualId||p.id}`;
-  document.getElementById('modal-last-vitals').textContent=`אחרון: דופק ${p.vitals.pulse} · נשימות ${p.vitals.rr ?? '—'} · SpO₂ ${p.vitals.spo2||'—'} · AVPU ${p.vitals.avpu||'—'}`;
+  document.getElementById('modal-last-vitals').textContent=`אחרון: דופק ${p.vitals.pulse ?? '—'} · נשימות ${p.vitals.rr ?? '—'} · SpO₂ ${p.vitals.spo2||'—'} · AVPU ${p.vitals.avpu||'—'}`;
   document.getElementById('mv-spo2').textContent=p.vitals.spo2 ?? '—';
   document.getElementById('modal-spo2-ctrl').style.display=modalSpo2Active?'flex':'none';
   document.getElementById('modal-spo2-toggle').textContent=modalSpo2Active?'✕ הסר':'+ הוסף';
@@ -11096,7 +11108,8 @@ function renderCmdPatients(){
         <div class="next-action-box">פעולה: ${nextActionForPatient(p,commandRole==='cc'?'cc':'pc')}</div>
       </div>
       <div class="cmd-vitals">
-        <div style="color:var(--accent);font-weight:700">${p.vitals.pulse}♥</div>
+        <div style="color:var(--accent);font-weight:700">${p.vitals.pulse ?? '—'}♥</div>
+        ${p.sourcedFromRemote && p.vitals.pulse==null ? `<div style="color:var(--muted);font-size:10px">מדדים אצל החובש</div>` : ''}
         <div style="color:${sCol(p.vitals.spo2)};font-weight:700">${p.vitals.spo2?p.vitals.spo2+'%':'—'}</div>
         <div style="color:var(--muted);font-size:10px">${p.vitals.avpu||'—'}</div>
       </div>
@@ -12174,6 +12187,12 @@ function applyProjectedPatientState(rows){
     const status=VALID_LOCAL_STATUS.has(row.current_status) ? row.current_status : null;
     const existing=patients.find(x=>x.id===row.id);
     if(existing){
+      // Remote patients cached before V2.99.32 were created with VITALS_BASELINE; clear those
+      // placeholder values unless this device has actually recorded vitals for the patient.
+      if(existing.sourcedFromRemote && !(existing.vitalsHistory||[]).length && existing.vitals?.pulse===VITALS_BASELINE.pulse && existing.vitals?.rr===VITALS_BASELINE.rr){
+        existing.vitals={...VITALS_NOT_ON_DEVICE};
+        changed=true;
+      }
       if(existing._serverVersion!=null && row.version!=null && row.version<=existing._serverVersion) continue;
       const before=JSON.stringify([existing.triage,existing.patientStatus,existing.accessibility,existing.trapStatus,existing.needsFullAssessment,existing.fullName,existing.temporaryDescription,existing.physicianDeathConfirmedAt]);
       // Server 'pending'/null means the server has no triage for this patient yet (e.g. a patient
@@ -12219,7 +12238,7 @@ function applyProjectedPatientState(rows){
         assignedMedicId:null, assignedPlatoonId:null, tempPatientId:null,
         stockSnapshot:{}, lastTouchedBy:'(remote)', lastModifiedAt:new Date().toISOString(),
         confirmedClinical:true, unsyncedEvents:0, locationHistory:[], possibleDuplicate:false,
-        time:nowT(), vitals:{...VITALS_BASELINE}, vitalsCapture:null, txHistory:[],
+        time:nowT(), vitals:{...VITALS_NOT_ON_DEVICE}, vitalsCapture:null, txHistory:[],
         alert:false, deterioration:[], lastVitalsAt:row.last_vitals_at?Date.parse(row.last_vitals_at):null,
         vitalsHistory:[], tourniquet:null, medic:'(remote)', siteId:INCIDENT_ID_TO_SITE[row.incident_id]||'SITE_A',
         _serverVersion:row.version, sourcedFromRemote:true,
