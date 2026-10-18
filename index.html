@@ -9827,7 +9827,19 @@ function savePatient(){
   });
   // PATIENT_CREATED is what actually creates the server-side patients row — must be queued
   // before any later event (e.g. vitals) referencing this patient_id, or those fail their FK.
-  saveLocalEvent({type:'PATIENT_CREATED',detail:`${newId} נפתח — הערכה מלאה`,warn:false,patient_id:patientUuid,payload_json:{visual_id:newId,triage:state.triage}});
+  // A quick-flow patient is created with QUICK_PATIENT_CREATED: the server projection sets
+  // needs_full_assessment=true only for that type, and PATIENT_CREATED leaves the column's
+  // default (false), which the 45s pull would then copy back over the medic's own flag.
+  const quickCapture=state.needsFullAssessment && state.triage!=='black';
+  saveLocalEvent({type:quickCapture?'QUICK_PATIENT_CREATED':'PATIENT_CREATED',detail:`${newId} נפתח — ${quickCapture?'מסלול מהיר, יש לקחת מדדים':'הערכה מלאה'}`,warn:false,patient_id:patientUuid,
+    payload_json:{visual_id:newId,triage:state.triage,needs_full_assessment:quickCapture,capture_mode:state.flowMode}});
+  // Vitals taken in the full flow: the server sets last_vitals_at (and clears
+  // needs_full_assessment) from this event, so other devices do not show the patient as
+  // vitals overdue. Never sent for a quick capture, which must stay flagged for assessment.
+  if(!quickCapture && (state.localEvents||[]).some(e=>e.type==='VITALS_RECORDED')){
+    saveLocalEvent({type:'VITALS_RECORDED',detail:`${newId} · מדדים בפתיחת פצוע`,warn:false,patient_id:patientUuid,
+      payload_json:{...flowVitals,capture:vitalsCapture,capture_mode:state.flowMode,siteId:'SITE_A'}});
+  }
   const savedPatient=patients[patients.length-1];
   if(tqEntries.length){
     syncLegacyTourniquetAlias(savedPatient);
@@ -11461,6 +11473,7 @@ function checkStep7() {
   document.getElementById('btn-step7').disabled = false;
 }
 
+const FLOW_EVENTS_SENT_AT_SAVE = new Set(['TOURNIQUET_APPLIED','VITALS_RECORDED','QUICK_PATIENT_CREATED']);
 function saveLocalEvent(event){
   if(!state.localEvents) state.localEvents=[];
   const entry={
@@ -11482,10 +11495,10 @@ function saveLocalEvent(event){
   // Events outside the server's known vocabulary are demo/UI-only — mark synced immediately
   // so they never sit in the "pending sync" count (see SYNC_ELIGIBLE_EVENT_TYPES).
   entry.synced=!SYNC_ELIGIBLE_EVENT_TYPES.has(entry.type);
-  // A tourniquet marked during the New Patient flow is logged before the patient exists, so it
-  // has no patient_id and the server could never place it. savePatient() sends the
-  // patient-scoped TOURNIQUET_APPLIED instead (V2.99.33).
-  if(entry.type==='TOURNIQUET_APPLIED' && !entry.patient_id){ entry.synced=true; entry.localOnly=true; }
+  // The New Patient flow logs these before the patient exists, so they have no patient_id and
+  // the server could never place them. savePatient() sends patient-scoped versions instead
+  // (V2.99.33); the in-flow entries stay in the local log only.
+  if(FLOW_EVENTS_SENT_AT_SAVE.has(entry.type) && !entry.patient_id){ entry.synced=true; entry.localOnly=true; }
   state.localEvents.push(entry);
   if(_demoSandbox) return; // sandboxed demo events never reach the outbox
   saveActiveRecoveryState(activeScreenId());

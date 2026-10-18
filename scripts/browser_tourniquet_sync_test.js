@@ -1,4 +1,4 @@
-// Real-browser test for V2.99.33 tourniquet sync:
+// Real-browser test for V2.99.33 New Patient flow sync (tourniquets, create event, vitals):
 // 1. The New Patient flow sends one patient-scoped TOURNIQUET_APPLIED per limb, after
 //    PATIENT_CREATED, with the time the medic entered. The in-flow event logged before the
 //    patient existed stays local (no patient_id, the server could never place it).
@@ -6,6 +6,10 @@
 //    on this device shares that server limb.
 // 3. Another device's patient gets its active tourniquets (and timer) from the server's
 //    tourniquets table; a patient created on this device is never overwritten.
+// 4. The same flow fix for the create event and vitals: a quick capture is created with
+//    QUICK_PATIENT_CREATED (the server sets needs_full_assessment only for that type) and sends
+//    no vitals; a full-flow save sends VITALS_RECORDED with the patient id so other devices get
+//    last_vitals_at. The in-flow copies without a patient stay local.
 //
 // Runs in local demo mode and calls the page's own functions; no Supabase client is involved,
 // so this proves client behavior only, not the server-side projection.
@@ -40,6 +44,7 @@ async function checkFile(browser, file) {
     patients = [];
     state = freshState();
     state.flowMode = 'quick';
+    state.needsFullAssessment = true;
     state.triage = 'red';
     state.trapStatus = 'not_trapped';
     state.injury = 'דימום';
@@ -47,6 +52,7 @@ async function checkFile(browser, file) {
     quickTqData.time = '1015';
     quickTqData.limbs = new Set(['yl', 'rr']);
     projectPatientStatus('stabilizing', 'TOURNIQUET_APPLIED', { source: 'quick_patient_flow' });
+    saveLocalEvent({ type: 'QUICK_PATIENT_CREATED', detail: 'in-flow', payload_json: { needs_full_assessment: true } });
     const before = getOutbox().length;
     const inFlow = getOutbox().filter((e) => e.type === 'TOURNIQUET_APPLIED' && !e.patient_id);
     savePatient();
@@ -54,6 +60,8 @@ async function checkFile(browser, file) {
     const added = getOutbox().slice(before);
     return {
       inFlow: inFlow.map((e) => ({ synced: e.synced, localOnly: !!e.localOnly })),
+      inFlowCreate: getOutbox().filter((e) => e.type === 'QUICK_PATIENT_CREATED' && !e.patient_id).map((e) => !!e.localOnly),
+      create: added.filter((e) => /PATIENT_CREATED$/.test(e.type)).map((e) => ({ type: e.type, nfa: e.payload_json.needs_full_assessment })),
       order: added.map((e) => e.type),
       tq: added.filter((e) => e.type === 'TOURNIQUET_APPLIED').map((e) => ({ pid: e.patient_id, synced: e.synced, limb: e.payload_json.limb, at: e.payload_json.application_time })),
       patientId: p.id,
@@ -68,6 +76,32 @@ async function checkFile(browser, file) {
   assert(flow.tq.every((t) => t.at === flow.expectedAt), `${rel}: application_time must be the time the medic entered`);
   assert(flow.order.indexOf('PATIENT_CREATED') < flow.order.indexOf('TOURNIQUET_APPLIED'), `${rel}: PATIENT_CREATED must be queued before the tourniquet events`);
   assert(flow.localCount === 2, `${rel}: the medic's own patient must show both tourniquets, got ${flow.localCount}`);
+  assert(flow.inFlowCreate.length === 1 && flow.inFlowCreate[0], `${rel}: the in-flow QUICK_PATIENT_CREATED without a patient must stay local`);
+  assert(flow.create.length === 1 && flow.create[0].type === 'QUICK_PATIENT_CREATED' && flow.create[0].nfa === true, `${rel}: a quick capture must be created with QUICK_PATIENT_CREATED, got ${JSON.stringify(flow.create)}`);
+  assert(!flow.order.includes('VITALS_RECORDED'), `${rel}: a quick capture must not send vitals (it would clear needs_full_assessment)`);
+
+  // 4. Full flow with vitals taken.
+  const full = await page.evaluate(() => {
+    state = freshState();
+    state.flowMode = 'full';
+    state.triage = 'yellow';
+    state.trapStatus = 'not_trapped';
+    state.injury = 'שבר';
+    quickTqData.applied = false;
+    projectPatientStatus('observing', 'VITALS_RECORDED');
+    const inFlow = getOutbox().filter((e) => e.type === 'VITALS_RECORDED' && !e.patient_id).map((e) => !!e.localOnly);
+    const before = getOutbox().length;
+    savePatient();
+    const p = patients[patients.length - 1];
+    const added = getOutbox().slice(before);
+    return { inFlow, pid: p.id, added: added.map((e) => ({ type: e.type, pid: e.patient_id, synced: e.synced })) };
+  });
+  assert(full.inFlow.length >= 1 && full.inFlow.every(Boolean), `${rel}: the in-flow VITALS_RECORDED without a patient must stay local`);
+  const fullTypes = full.added.map((e) => e.type);
+  assert(fullTypes[0] === 'PATIENT_CREATED', `${rel}: a full-flow save must create with PATIENT_CREATED, got ${fullTypes}`);
+  const vit = full.added.find((e) => e.type === 'VITALS_RECORDED');
+  assert(vit && vit.pid === full.pid && vit.synced === false, `${rel}: full-flow vitals must be sent with the new patient id`);
+  assert(!fullTypes.includes('TOURNIQUET_APPLIED'), `${rel}: no tourniquet event without a tourniquet`);
 
   // 2. Typo-cancel releases the server row only when it is the last one on that server limb.
   const cancel = await page.evaluate(() => {
