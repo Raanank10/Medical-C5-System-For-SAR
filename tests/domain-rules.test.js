@@ -224,4 +224,23 @@ assert.equal(rules.canChangePatientStatus(patient({ patientStatus: "handed_over"
 assert.equal(rules.canChangePatientStatus(patient({ patientStatus: "evacuated" })), false);
 assert.equal(rules.canChangePatientStatus(null), true);
 
+// MDA classification is recorded beside field triage, never instead of it. The mismatch flag is
+// informational only and never fires when either side is unknown.
+assert.deepEqual([...rules.MDA_CLASSIFICATIONS], ["minor", "anxiety", "moderate", "serious", "critical", "deceased"]);
+assert.equal(rules.isValidMdaClassification("serious"), true);
+assert.equal(rules.isValidMdaClassification("red"), false);
+assert.equal(rules.isValidMdaClassification(undefined), false);
+assert.equal(rules.mdaClassificationDiffersFromTriage("red", "critical"), false);
+assert.equal(rules.mdaClassificationDiffersFromTriage("red", "serious"), false);
+assert.equal(rules.mdaClassificationDiffersFromTriage("red", "minor"), true);
+assert.equal(rules.mdaClassificationDiffersFromTriage("yellow", "moderate"), false);
+assert.equal(rules.mdaClassificationDiffersFromTriage("yellow", "serious"), true);
+assert.equal(rules.mdaClassificationDiffersFromTriage("green", "anxiety"), false);
+assert.equal(rules.mdaClassificationDiffersFromTriage("green", "moderate"), true);
+assert.equal(rules.mdaClassificationDiffersFromTriage("black", "deceased"), false);
+assert.equal(rules.mdaClassificationDiffersFromTriage("black", "critical"), true);
+assert.equal(rules.mdaClassificationDiffersFromTriage("pending", "minor"), false);
+assert.equal(rules.mdaClassificationDiffersFromTriage("red", null), false);
+assert.equal(rules.mdaClassificationDiffersFromTriage("red", "bogus"), false);
+
 console.log("Domain rule tests passed.");

@@ -368,6 +368,15 @@ The projection is event-driven (`project_patient_state()` in the schema - the si
 - `PATIENT_STATUS_UPDATED` with payload `status` -> that status (e.g. `evacuating` for the collection-point step)
 - `PATIENT_HANDED_OVER` -> `handed_over`
 
+One deliberate exception to "single trigger function": `project_evacuation_tracking()` (`database/044`, V2.99.33) writes only `patients.evacuation_destination`, `mda_classification` and `evacuation_updated_at` (plus `version`/`updated_at`), from `PATIENT_HANDED_OVER` and `PATIENT_EVACUATION_UPDATED`, and inserts `external_reports` rows from `EXTERNAL_REPORT_CREATED`. It never touches triage, status or any column `project_patient_state()` owns, so the race that consolidation fixed cannot recur. It was kept separate so the triage-authority logic in `project_patient_state()` (021/041) did not have to be redefined to add three columns.
+
+`PATIENT_HANDED_OVER` / `PATIENT_EVACUATION_UPDATED` evacuation fields (both optional, either may be sent alone):
+- `destination_facility`: free text (hospital / receiving facility). Clients before V2.99.33 sent the placeholder `'pending'`; the projection ignores it.
+- `mda_classification`: Magen David Adom's own scale, one of `minor` (קל), `anxiety` (נפגע חרדה), `moderate` (בינוני), `serious` (קשה), `critical` (אנוש), `deceased` (נקבע מותו). Recorded beside `current_triage`, never replacing it. Unknown values are ignored, not rejected.
+- The newest `local_timestamp` wins, so an older offline update that syncs late cannot overwrite a newer one.
+
+`EXTERNAL_REPORT_CREATED` payload: `source` (`mda`/`united_hatzalah`/`yedidim`/`police`/`idf`/`civilian`/`other`; anything else becomes `other`), `reported_red`/`reported_yellow`/`reported_green`/`reported_black`, `evacuation_destination`, `notes`, `external_reference` (the client's local report id, used to de-duplicate on pull), and optional `linked_patient_id` (kept in the payload rather than `events.patient_id` so a report about a patient that never synced cannot fail the events FK). Idempotent by `external_reports.source_event_id`.
+
 Every branch above except the black-triage fast path refuses to run once a patient is already in a terminal status (`deceased`, `handed_over`, `closed`, `self_evacuated`) - a stray or replayed event cannot reopen or overwrite a closed patient record.
 
 ---
