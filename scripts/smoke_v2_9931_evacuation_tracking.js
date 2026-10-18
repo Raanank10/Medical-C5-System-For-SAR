@@ -35,9 +35,10 @@ for (const rel of files) {
   assert(/saveLocalEvent\(\{type:'EXTERNAL_REPORT_CREATED'[\s\S]{0,900}?linked_patient_id/.test(html), `${rel}: reports must sync, with the patient link kept out of events.patient_id`);
 
   // Board by location on the PC and CC dashboards and the command screen.
-  assert(html.includes("${['pc','cc'].includes(role)?roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds(role))):''}"), `${rel}: PC and CC role dashboards must show the location board`);
+  assert(html.includes("${['pc','cc'].includes(role)?roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds())):''}"), `${rel}: PC and CC role dashboards must show the location board`);
   assert(html.includes('id="cmd-location-board"') && html.includes('locations:true'), `${rel}: command screen must have the location board panel`);
-  assert(html.includes("return role==='cc' ? [ccCompanySite] : allSites.filter(s=>s.id!=='ALL').map(s=>s.id);"), `${rel}: CC sees its own company site, PC all sites`);
+  assert(html.includes("function casualtyBoardSiteIds(){\n  return allSites.filter(s=>s.id!=='ALL').map(s=>s.id);"), `${rel}: CC (senior to PC) must never see fewer sites than the PC on the board`);
+  assert(html.includes("renderCasualtyLocationBoard(cmdActiveSite==='ALL'||commandRole==='cc'?casualtyBoardSiteIds():[cmdActiveSite])"), `${rel}: CC command screen board must cover every site`);
   assert(html.includes("const border=color?`2px solid ${color}`:'2px dashed var(--muted)';"), `${rel}: pending triage must never get a triage colour on the board`);
 
   // Location now syncs, and new pulls never break the main patient pull.

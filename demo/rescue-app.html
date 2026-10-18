@@ -6318,7 +6318,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
     ${role==='cc'?renderCcCommandBoard():`<div class="role-top-grid">${metrics}</div>`}
     ${role==='medic'?renderMedicActionPanel():''}
     ${role==='pc'?renderPcResponsibilityBoard():''}
-    ${['pc','cc'].includes(role)?roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds(role))):''}
+    ${['pc','cc'].includes(role)?roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds())):''}
     ${role==='physician'?renderDoctorLegacyNote():''}
     ${role==='medic'||role==='pc'?'':role==='cc'
       ? `<details style="margin:12px 0 0"><summary style="cursor:pointer;font-weight:900;color:var(--muted);padding:10px 0">פירוט נוסף / אחריות ותורים</summary>${genericSections}</details>`
@@ -10958,7 +10958,7 @@ function renderCmdContent(){
   const rpts=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id).map(r=>({...r,_site:s.name.split('—')[0].trim()}))):siteExternalReports(cmdActiveSite);
   document.getElementById('cmd-ext-reports').innerHTML=rpts.length?rpts.map(r=>externalReportCardHtml(r, r._site||'')).join(''):'<div style="color:var(--muted);font-size:13px;padding:8px 0">אין דיווחים</div>';
   const locBoard=document.getElementById('cmd-location-board');
-  if(locBoard) locBoard.innerHTML=renderCasualtyLocationBoard(cmdActiveSite==='ALL'?commandVisibleSites().filter(id=>id!=='ALL'):[cmdActiveSite]);
+  if(locBoard) locBoard.innerHTML=renderCasualtyLocationBoard(cmdActiveSite==='ALL'||commandRole==='cc'?casualtyBoardSiteIds():[cmdActiveSite]);
   applyCmdPanelState();
 }
 // ── Casualty board by location (V2.99.31): site, then zone inside it ──
@@ -11020,8 +11020,11 @@ function renderCasualtyLocationBoard(siteIds){
   }).join('');
   return blocks || '<div style="color:var(--muted);font-size:13px;padding:8px 0">אין מוקדים להצגה</div>';
 }
-function casualtyBoardSiteIds(role){
-  return role==='cc' ? [ccCompanySite] : allSites.filter(s=>s.id!=='ALL').map(s=>s.id);
+// מ״פ רפואה (company) is senior to חוג״ד (platoon) and owns cross-platoon evacuation bottlenecks
+// (docs/ROLE_COMMAND_MODEL_v2.7.md), so the CC's board never shows less than the PC's: both get
+// every site this device knows.
+function casualtyBoardSiteIds(){
+  return allSites.filter(s=>s.id!=='ALL').map(s=>s.id);
 }
 // External reports = this device's own (persisted locally) + the synced ones from the server
 // (database/043), deduplicated by the local report id the server keeps as external_reference.
