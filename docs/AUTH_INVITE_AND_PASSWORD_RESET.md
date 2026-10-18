@@ -12,7 +12,7 @@ An admin invites someone via `scripts/invite_user.js` (calls Supabase's Auth Adm
 
 1. **`captureAuthLinkSignal()`** (near the top of `index.html`'s main script, runs before `getSupabaseClient()` is ever called) synchronously inspects `location.hash` and `location.search` for the invite/recovery signal, before supabase-js gets a chance to consume and clear the hash. Stored in the module-level `AUTH_LINK_SIGNAL` constant. Handles three cases:
    - `mode:'implicit'` — the default template's shape: `#access_token=...&type=invite|recovery`. A session already exists by the time our code checks.
-   - `mode:'pkce'`: `?token_hash=...&type=invite|recovery`. No session yet; the app must call `client.auth.verifyOtp({token_hash, type})` itself. In use since V2.99.30: the in-app invite links (below) have this shape. The token is removed from the address bar right after the app has tried it (`clearAuthLinkFromUrl()`), so a later reload, bookmark or screenshot never carries a spent token; it is kept until then, so a reload while a new device is still at the PIN screen does not lose the link.
+   - `mode:'pkce'`: `?token_hash=...&type=invite|recovery`. No session yet; the app must call `client.auth.verifyOtp({token_hash, type})` itself. In use since V2.99.31: the in-app invite links (below) have this shape. The token is removed from the address bar right after the app has tried it (`clearAuthLinkFromUrl()`), so a later reload, bookmark or screenshot never carries a spent token; it is kept until then, so a reload while a new device is still at the PIN screen does not lose the link.
    - `mode:'error'` — GoTrue redirected with `#error=...&error_code=otp_expired` etc. (expired or already-used link, no session ever created).
 
 2. **`restoreSession()`** checks `AUTH_LINK_SIGNAL` before its normal `loadProfileAndEnter()` dashboard-entry path: on `'error'` or a failed `verifyOtp`, shows the expired-link panel; on `'implicit'` or a successful `'pkce'` exchange, routes to `screen-set-password` via `enterSetPasswordFlow()` instead of entering the app.
@@ -23,7 +23,7 @@ An admin invites someone via `scripts/invite_user.js` (calls Supabase's Auth Adm
 
 5. **Forgot password**: `screen-login` has a "שכחתי סיסמה" button calling `requestPasswordReset()` → `client.auth.resetPasswordForEmail(email)`. The resulting recovery email link is handled by the exact same machinery above (`type=recovery` instead of `type=invite`, differing only in the screen's title text).
 
-## In-app invitations (V2.99.30)
+## In-app invitations (V2.99.31)
 
 An active admin invites people from the "ניהול משתמשים" screen (`supabase/functions/admin-users/index.ts`, `database/042_admin_user_management.sql`; roles and audit in `docs/AUTH_AND_ROLE_MODEL.md`'s Account Lifecycle). Two delivery modes:
 

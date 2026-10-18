@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Invite a real user with their correct role baked in from the start.
 //
-// Fallback only: the normal path is the in-app admin screen ("ניהול משתמשים", V2.99.30), which
+// Fallback only: the normal path is the in-app admin screen ("ניהול משתמשים", V2.99.31), which
 // calls supabase/functions/admin-users and keeps the service-role key on the server. Use this
 // script when no admin account exists yet (e.g. to create the first admin).
 //

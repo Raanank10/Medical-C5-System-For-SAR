@@ -54,7 +54,7 @@ Incident type follows the site-authority rule above: **rescue (RPC/RCC) wins.**
 
 חוג״ד can also assign a medic to an existing incident ("שייך לאירוע" on each medic panel in the PC medic-load board), with an optional address and note. An assigned medic's Movement screen shows who assigned them and what is already known: incident type and who set it, rescue site status, patients already registered at the site, and the PC's address and note. The address and note are pre-filled into the editable fields, but only into empty ones, so nothing the medic typed is overwritten. A medic correction to a pre-filled value is logged on arrival as `SITE_PREFILL_CORRECTED` with the old and new values.
 
-**Local-demo only for now.** `MEDIC_ASSIGNED_TO_INCIDENT`, `INCIDENT_TYPE_MISMATCH_REPORTED`, `SITE_PREFILL_CORRECTED` and (as before) `INCIDENT_TYPE_SET` are outside `SYNC_ELIGIBLE_EVENT_TYPES`, so they are never pushed. While signed in, `currentSiteId()` ignores a local assignment, and a PC cannot assign a medic to any site other than SITE_A. That is because the live medic test account is an `incident_memberships` member of incident A only, and RLS would reject its pushes to any other incident. The real, synced version belongs on `incident_memberships` (`assigned_by` already exists) and is a separate follow-up.
+**Local demo mode:** as described above, single-device. Signed in, assignment now syncs across phones on real incidents; see "Cross-device PC → medic assignment on real incidents (V2.99.30)" below. `MEDIC_ASSIGNED_TO_INCIDENT`, `INCIDENT_TYPE_MISMATCH_REPORTED`, `SITE_PREFILL_CORRECTED` and `INCIDENT_TYPE_SET` stay outside `SYNC_ELIGIBLE_EVENT_TYPES` (never pushed).
 
 ## Briefing demo and guided tour (V2.99.25)
 
@@ -67,17 +67,29 @@ The 60-second PC/CC briefing ("הצג תדריך מ״פ / חוג״ד ב־60 שנ
 
 "סיור מודרך במסכי חוג״ד / מ״פ" is a read-only, 15-step walkthrough that highlights the real PC and CC dashboard panels and explains each one. It creates no data.
 
-## Cross-device PC → medic assignment: verified design, held for the incident lifecycle
+## Cross-device PC → medic assignment on real incidents (V2.99.30)
 
-A synced version of the assignment above was built and checked against the live access rules (impersonating the real PC, medic and rescue accounts inside transactions that were forced to roll back, so nothing persisted). It needs **no schema, RLS or Edge Function change**:
+Signed in, a PC (or any command role: pc/cc/chamal/admin/physician) can assign a real medic or paramedic account to **the incident the PC is currently in**, from "שייך חובש לאירוע" on the medic-load board, with an optional address and note. It works across phones and needs **no schema, RLS or Edge Function change**. It uses only existing tables and access rules, verified live against the real PC, medic and rescue accounts on a real open incident, inside transactions forced to roll back so nothing persisted.
 
-1. The assigning PC adds itself to the target incident's `incident_memberships` (a PC can only see and update incidents it is a member of; its role may insert memberships).
-2. The PC writes the address to `incidents.address` and the note to `incidents.metadata.medic_assignments[<medic profile id>] = {note, assigned_by_name, assigned_at}`. The assigner's name goes in metadata because a medic cannot read other profiles. Each update is checked to have changed exactly one row.
-3. The PC upserts the medic's `incident_memberships` row (`assigned_by` = PC, `created_at` = now). That membership is also what lets the medic's pushes into that incident pass RLS.
-4. The medic phone reads its newest membership that has `assigned_by` set, plus that incident's row, at login, every 45 seconds and when the Movement screen opens, and pre-fills from it.
-5. Rescue (`rpc`/`rcc`) writes its incident type to `incidents.incident_type` (+ `metadata.incident_type_set_by`), and every phone with access reads it, so rescue's type reaches the medic and PC phones. The medic's own pick and the mismatch alert stay on the medic's phone, because medics may not update an active incident.
+PC phone:
+1. Writes the address to `incidents.address` and the note to `incidents.metadata.medic_assignments[<medic profile id>] = {note, assigned_by_name, assigned_at}`. The assigner's name goes in metadata because a medic cannot read other profiles. An update that changes no row fails loudly instead of silently.
+2. Then upserts the medic's `incident_memberships` row (`assigned_by` = PC, `created_at` = now). That membership is also what lets the medic enter and push into the incident.
 
-All five steps passed live. It was not shipped because it targeted the two fixed test incidents (`SITE_TO_INCIDENT_ID`), which a parallel incident-lifecycle change (`database/038`/`039`, real incidents via `list_open_incidents` / `join_incident` / `open_incident`) has since closed. Port it onto that model, using the picked incident instead of SITE_A/SITE_B, once it lands. Known limit: `metadata` is read-modify-write, so two writers in the same instant can drop one change.
+Medic phone:
+- Reads its newest membership with `assigned_by` set, plus that incident's row, at login, on every 45-second incident refresh and when the Movement screen opens.
+- **Not in any incident yet:** goes straight into the assigned one and opens the Movement screen.
+- **Already working in another incident:** sees a "שובצת ע״י … לאירוע …" banner with "עבור לאירוע" / "לא עכשיו". It is never moved silently mid-treatment. A dismissed banner stays dismissed on that phone until a newer assignment arrives.
+- **In the assigned incident:** the Movement screen shows who assigned them, the note, rescue status and patient count, and pre-fills the address and note into the editable fields.
+
+Incident type now follows the server:
+- The incident's `incident_type`, set when it was opened or later by rescue, is applied to the Movement screen on every phone in the incident. Before this, `activateIncident()` reset it and a medic always saw "סוג אירוע טרם נבחר".
+- Rescue (`rpc`/`rcc`) changing the type writes `incidents.incident_type` + `metadata.incident_type_set_by`.
+- The server type wins over a type picked locally on a phone, consistent with "rescue wins" above. A medic's own pick and the mismatch alert stay on the medic's phone, because medics may not update an active incident (verified: 0 rows).
+
+Known limits:
+- `metadata` is read-modify-write, so two writers in the same instant can drop one change.
+- `MEDIC_ASSIGNED_TO_INCIDENT` remains a local log entry only; the membership row is the source of truth.
+- Local demo mode (not signed in) keeps the single-device assignment described earlier.
 
 ## PC can go hands-on
 

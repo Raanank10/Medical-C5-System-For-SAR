@@ -1,4 +1,4 @@
-// Real-browser test of the admin user-management screen (V2.99.30, database/042,
+// Real-browser test of the admin user-management screen (V2.99.31, database/042,
 // supabase/functions/admin-users): only an admin sees the entry point, the admin picks the role
 // per invitation, inviting or promoting to admin and deactivating ask for confirmation (and a
 // dismissed confirmation sends nothing), the admin's own row has no controls, a one-time link is
