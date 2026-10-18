@@ -753,7 +753,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9932</div>
+      <div class="demo-kicker">Demo V2.9933</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -850,7 +850,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9932</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9933</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -860,7 +860,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9932</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9933</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2800,7 +2800,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.32';
+const APP_VERSION = '2.99.33';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -6973,6 +6973,33 @@ function tourniquetLimbMeta(value='unknown'){
   const key=tourniquetLimbKey(value);
   return {key,...TOURNIQUET_LIMBS[key]};
 }
+// Tourniquet sync (V2.99.33). The server's project_tourniquet_events() trigger builds the
+// tourniquets table from TOURNIQUET_APPLIED / TOURNIQUET_RELEASED, keyed by (patient_id, limb),
+// and reads application_time from the payload (same shape as scripts/inject_scenario.js).
+// Other devices read that table back (applyServerTourniquets), so a tourniquet and its timer
+// are visible on the CC/PC phone, not only on the phone that recorded it.
+// tq.serverLimb is the limb the server row was created with; a limb recorded later stays local.
+function queueTourniquetAppliedEvent(p, tq, extra={}){
+  const limb=tourniquetLimbKey(tq.limb);
+  tq.serverLimb=limb;
+  saveLocalEvent({type:'TOURNIQUET_APPLIED',detail:`${p.visualId||p.id} · ${tq.id} · ${tq.limbLabel||tourniquetLimbMeta(limb).label}`,warn:true,patient_id:p.id,
+    payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb,application_time:new Date(tq.appliedAt||Date.now()).toISOString(),clinical_context:'unknown',...extra}});
+}
+// The flow's limb buttons (LIMB_LABELS keys) mapped to TOURNIQUET_LIMBS keys.
+const FLOW_LIMB_TO_TOURNIQUET_LIMB={yl:'left_arm', yr:'right_arm', rl:'left_leg', rr:'right_leg'};
+// One entry per limb marked in the New Patient flow (quick or full), or one 'unknown' entry when
+// a tourniquet was marked without a limb. Same time for all, the time the medic entered.
+function tourniquetEntriesFromState(){
+  const src=quickTqData.applied ? quickTqData : state.interventions.has('tourniquet') ? tqData : null;
+  if(!src) return [];
+  const appliedAt=timeCodeToTodayMs(src.time) || Date.now();
+  const limbs=[...(src.limbs||[])].map(l=>FLOW_LIMB_TO_TOURNIQUET_LIMB[l]||tourniquetLimbKey(l));
+  return (limbs.length?limbs:['unknown']).map((limb,i)=>{
+    const meta=tourniquetLimbMeta(limb);
+    return {id:`TQ-${String(i+1).padStart(3,'0')}`, appliedAt, timeCode:src.time||null, limb:meta.key, limbLabel:meta.label, side:meta.side, bodyPart:meta.bodyPart,
+      appliedBy:currentMedicName(), source:'patient_flow', status:'active', effectiveness:'unknown', reasonForAdditional:null, note:''};
+  });
+}
 function tourniquetStatusLabel(tq={}){
   if(tq.status==='ineffective' || tq.effectiveness==='bleeding_continues') return 'לא יעיל · דימום ממשיך';
   if(tq.status==='replaced') return 'הוחלף';
@@ -7484,7 +7511,7 @@ function recordSweepTreatment(type, meta={}){
     hideTourniquetLimbModal();
     p.events=p.events||[];
     p.events.unshift({type:'TOURNIQUET_APPLIED',time:nowT(),detail:`${tq.id} · ${tq.limbLabel}`,warn:true});
-    saveLocalEvent({type:'TOURNIQUET_APPLIED',detail:`${p.id} · ${tq.id} · ${tq.limbLabel}`,warn:true,payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb:tq.limb,reasonForAdditional:tq.reasonForAdditional}});
+    queueTourniquetAppliedEvent(p, tq, {reasonForAdditional:tq.reasonForAdditional, source:'mstart_sweep'});
     if(tq.reasonForAdditional){
       const addedType=tq.reasonForAdditional==='different_limb'?'TOURNIQUET_ADDED_DIFFERENT_LIMB':'TOURNIQUET_ADDED_SAME_LIMB';
       p.events.unshift({type:addedType,time:nowT(),detail:`${tq.id} · ${tq.limbLabel}`,warn:true});
@@ -7558,6 +7585,10 @@ function cancelLastTourniquetEntry(tourniquetId=null){
   p.events=p.events||[];
   p.events.unshift({type:'TOURNIQUET_ENTRY_CANCELLED',time:nowT(),detail:`${tq.id} · בוטל רישום חסם — טעות הקלדה`,warn:false});
   saveLocalEvent({type:'TOURNIQUET_ENTRY_CANCELLED',detail:`${p.id} · ${tq.id} · בוטל רישום חסם — טעות הקלדה`,warn:false,payload_json:{patient_id:p.id,tourniquet_id:tq.id}});
+  if(tq.serverLimb && !activeTourniquets(p).some(x=>x.serverLimb===tq.serverLimb)){
+    saveLocalEvent({type:'TOURNIQUET_RELEASED',detail:`${p.id} · ${tq.id} · בוטל רישום חסם — טעות הקלדה`,warn:false,patient_id:p.id,
+      payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb:tq.serverLimb,reason:'entry_cancelled'}});
+  }
   saveDemoState();
   renderMstartSweep();
 }
@@ -8281,6 +8312,14 @@ function saveImmediateCasualtyAndContinue(){
   // QUICK_PATIENT_CREATED actually creates the server-side patients row; queue it before the
   // IMMEDIATE_FIELD_ASSESSMENT event below, which references the same patient_id.
   saveLocalEvent({type:'QUICK_PATIENT_CREATED',detail:`${visualId} נפתח בסריקת MSTART`,warn:false,patient_id:id,payload_json:{visual_id:visualId,triage}});
+  if(isTq){
+    const limb={right_upper:'right_arm',left_upper:'left_arm',right_lower:'right_leg',left_lower:'left_leg'}[im.tqLimb]||'unknown';
+    const meta=tourniquetLimbMeta(limb);
+    p.tourniquets=[{id:'TQ-001', appliedAt:p.tourniquet.appliedAt, timeCode:nowT().replace(':',''), limb:meta.key, limbLabel:meta.label, side:meta.side, bodyPart:meta.bodyPart,
+      appliedBy:currentMedicName(), source:'mstart_immediate', status:'active', effectiveness:'unknown', reasonForAdditional:null, note:''}];
+    syncLegacyTourniquetAlias(p);
+    queueTourniquetAppliedEvent(p, p.tourniquets[0], {source:'mstart_immediate'});
+  }
   saveLocalEvent({type:'IMMEDIATE_FIELD_ASSESSMENT',detail:`${visualId} נפתח בסריקת MSTART`,warn:['red','black'].includes(triage),patient_id:id,payload_json:{triage,site:siteData.name,zone:zoneLabel(),immediate:im,life_saving_actions:actions,tourniquet_limb:isTq?tqLimbLabel:null}});
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   state=freshState(); state.flowMode='quick';
@@ -9714,6 +9753,7 @@ function savePatient(){
   const locStr=buildLocStr();
   const deviceId=getDeviceId();
   const tqRecord=tourniquetRecordFromState();
+  const tqEntries=tourniquetEntriesFromState();
   const t=nowT();
   const vitalsCapture=vitalsCapturePayload('flow');
   queueMedicationEventsBeforeSave();
@@ -9774,6 +9814,7 @@ function savePatient(){
     alert:false, deterioration:[], lastVitalsAt:Date.now(),
     vitalsHistory:[{t:Date.now(),pulse:flowVitals.pulse,spo2:flowVitals.spo2,rr:flowVitals.rr,avpu:flowVitals.avpu,bp_estimate:flowVitals.bp_estimate}],
     tourniquet:tqRecord,
+    tourniquets:tqEntries,
     medic:deviceId,
     siteId:'SITE_A',
     events:[
@@ -9788,6 +9829,10 @@ function savePatient(){
   // before any later event (e.g. vitals) referencing this patient_id, or those fail their FK.
   saveLocalEvent({type:'PATIENT_CREATED',detail:`${newId} נפתח — הערכה מלאה`,warn:false,patient_id:patientUuid,payload_json:{visual_id:newId,triage:state.triage}});
   const savedPatient=patients[patients.length-1];
+  if(tqEntries.length){
+    syncLegacyTourniquetAlias(savedPatient);
+    tqEntries.forEach(tq=>queueTourniquetAppliedEvent(savedPatient, tq, {source:'patient_flow'}));
+  }
   if(savedPatient.triage==='black' || savedPatient.patientStatus==='deceased'){
     createDeathCertificationRequest(savedPatient);
   }
@@ -11437,6 +11482,10 @@ function saveLocalEvent(event){
   // Events outside the server's known vocabulary are demo/UI-only — mark synced immediately
   // so they never sit in the "pending sync" count (see SYNC_ELIGIBLE_EVENT_TYPES).
   entry.synced=!SYNC_ELIGIBLE_EVENT_TYPES.has(entry.type);
+  // A tourniquet marked during the New Patient flow is logged before the patient exists, so it
+  // has no patient_id and the server could never place it. savePatient() sends the
+  // patient-scoped TOURNIQUET_APPLIED instead (V2.99.33).
+  if(entry.type==='TOURNIQUET_APPLIED' && !entry.patient_id){ entry.synced=true; entry.localOnly=true; }
   state.localEvents.push(entry);
   if(_demoSandbox) return; // sandboxed demo events never reach the outbox
   saveActiveRecoveryState(activeScreenId());
@@ -11466,7 +11515,7 @@ function ensureSyncConfirmStack(){
 }
 function trackHighStakesSync(entry){
   if(!currentUser) return; // local-demo mode never pushes to the network - nothing to confirm
-  if(!HIGH_STAKES_SYNC_EVENT_TYPES.has(entry.type)) return;
+  if(!HIGH_STAKES_SYNC_EVENT_TYPES.has(entry.type) || entry.localOnly) return;
   const label=HIGH_STAKES_SYNC_LABELS[entry.type]||'אירוע';
   const el=document.createElement('div');
   el.id='sync-confirm-'+entry.local_event_id;
@@ -12259,6 +12308,38 @@ async function pullProjectedPatientState(incidentId){
   catch(e){ return; } // offline/network failure — next interval retries
   if(result.error || !result.data) return;
   applyProjectedPatientState(result.data);
+  let tqResult;
+  try{ tqResult=await client.from('tourniquets').select(SERVER_TOURNIQUET_COLUMNS).eq('incident_id', incidentId).eq('is_active', true); }
+  catch(e){ return; }
+  if(tqResult.error || !tqResult.data) return;
+  applyServerTourniquets(tqResult.data, incidentId);
+}
+// Active tourniquets from the server (tourniquets table, RLS-scoped by app.can_access_incident).
+// Applied only to patients this device received from another device: a patient created here
+// keeps its own, richer tourniquet records (effectiveness, later limb correction, notes).
+const SERVER_TOURNIQUET_COLUMNS='id,patient_id,limb,applied_at,is_active';
+function applyServerTourniquets(rows, incidentId){
+  const site=INCIDENT_ID_TO_SITE[incidentId];
+  const pending=patientsWithPendingLocalEdits();
+  let changed=false;
+  for(const p of patients){
+    if(!p.sourcedFromRemote || pending.has(p.id)) continue; // local edit wins until pushed
+    if(site && p.siteId && p.siteId!==site) continue;
+    const next=rows.filter(r=>r.patient_id===p.id && r.is_active!==false).map(r=>{
+      const meta=tourniquetLimbMeta(r.limb);
+      return {id:`SRV-${r.id}`, appliedAt:Date.parse(r.applied_at)||null, limb:meta.key, limbLabel:meta.label, side:meta.side, bodyPart:meta.bodyPart,
+        appliedBy:'(מכשיר אחר)', source:'server', status:'active', effectiveness:'unknown', reasonForAdditional:null, note:''};
+    }).filter(t=>t.appliedAt);
+    const key=list=>JSON.stringify((list||[]).filter(t=>t.source==='server').map(t=>[t.id,t.limb,t.appliedAt]));
+    if(key(p.tourniquets)===key(next) && (p.tourniquets||[]).every(t=>t.source==='server')) continue;
+    // Clear the legacy p.tourniquet alias first: ensureTourniquetArray() rebuilds an empty
+    // list from it, which would bring back a tourniquet the server has released.
+    p.tourniquet=null;
+    p.tourniquets=next;
+    syncLegacyTourniquetAlias(p);
+    changed=true;
+  }
+  if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
 function pullProjectedPatientStateAll(){
   Object.values(SITE_TO_INCIDENT_ID).forEach(id=>pullProjectedPatientState(id));
