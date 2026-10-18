@@ -1,4 +1,4 @@
-// Real-browser test for V2.99.33 New Patient flow sync (tourniquets, create event, vitals):
+// Real-browser test for V2.99.34 New Patient flow sync (tourniquets, create event, vitals):
 // 1. The New Patient flow sends one patient-scoped TOURNIQUET_APPLIED per limb, after
 //    PATIENT_CREATED, with the time the medic entered. The in-flow event logged before the
 //    patient existed stays local (no patient_id, the server could never place it).
