@@ -164,6 +164,34 @@ Verified live by impersonation inside a transaction that was always rolled back 
 
 Every other function that updates `incidents` (`confirm_draft`, `acknowledge_draft`, `finalize_incident_aar`) was checked: none sets `status='closed'`, so none is affected by the trigger.
 
+## Follow-up: admin user management (`database/042`)
+
+Gap (verified live 2026-10-16): `profiles` has only a SELECT policy, so no signed-in user could change a role or `is_active`; the only paths were `scripts/invite_user.js` with the service-role key on a laptop, or hand edits in the dashboard. Those changes left no record. Design decided with the repo owner (2026-10-16): only an active admin invites, picks the role per invitation, changes roles and (de)activates; confirmation for anything that grants admin and for deactivation.
+
+New: table `admin_user_audit` (RLS on, one SELECT policy for `app.current_user_role() = 'admin'`, all privileges revoked from `public`/`anon`/`authenticated` except SELECT for `authenticated`, no INSERT/UPDATE/DELETE policy; append-only trigger `app.reject_admin_user_audit_mutation()`); trigger function `app.log_profile_access_change()` (`SECURITY DEFINER`, `EXECUTE` revoked) on `AFTER UPDATE OF role, is_active ON profiles`; RPCs `admin_list_users()`, `admin_set_user_role()`, `admin_set_user_active()` (`SECURITY DEFINER`, `EXECUTE` for `authenticated` only, own admin check). No existing policy changed; no UPDATE policy was added to `profiles`.
+
+**Not yet applied to the live project** (the repo owner chose to review the PR first). Verified on a local PostgreSQL 16 with stand-ins copied from the live definitions (`user_role`, `auth.users`, `auth.uid()`, `profiles` with its live policy and grants, `app.current_user_role()`), impersonating each role as `authenticated` with a JWT subject:
+
+| Check | Result |
+|---|---|
+| migration applied twice | second run is a no-op (idempotent) |
+| admin `admin_list_users()` | all accounts, including one with no profile and one pending (`has_password=false`) |
+| cc / anon `admin_list_users()` | cc: denied by the function's admin check; anon: `permission denied for function` |
+| admin changes medic to paramedic | allowed; one `role_changed` audit row with the admin as actor |
+| same role again | no-op, no audit row |
+| admin changes own role / deactivates self | denied |
+| admin deactivates cc | allowed; `deactivated` audit row |
+| role change for an account with no profile | denied (`no profile for this user`) |
+| deactivated cc, deactivated admin2, medic call the RPCs | all denied (`only an active admin`) |
+| signed-in direct `update profiles set role='admin'` | `UPDATE 0` (no UPDATE policy) |
+| direct change outside a session (superuser) | audited, actor `NULL` |
+| medic reads `admin_user_audit` | 0 rows |
+| signed-in insert into `admin_user_audit` | `permission denied` |
+| UPDATE / DELETE on `admin_user_audit` as superuser | rejected by the append-only trigger |
+| `service_role` insert (the Edge Function path) | allowed |
+
+To do once applied live: the same matrix against the real project inside a rolled-back transaction, `get_advisors`, and one real invite with a synthetic address.
+
 ## Follow-up: platoon command scope (`database/045`)
 
 Decided with the repo owner 2026-10-18: מ״פ רפואה (cc, company) sees every site; חוג״ד (pc, platoon) only its own platoon's site, enforced on the server and not only in the UI. A site is an incident, one incident per platoon. A medic's draft goes to the PC of that medic's platoon. Medics and paramedics follow the same no-self-join rule.

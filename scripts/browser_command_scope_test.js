@@ -1,4 +1,4 @@
-// Real-browser test of the command hierarchy on the command screen and role dashboards (V2.99.31):
+// Real-browser test of the command hierarchy on the command screen and role dashboards (V2.99.33):
 // מ״פ רפואה (cc, company) sees every site; חוג״ד (pc, platoon) only its own platoon's site
 // (docs/ROLE_COMMAND_MODEL_v2.7.md). Local demo mode, which has two sites (SITE_A = PLT-A,
 // SITE_B = PLT-B); signed in there is only the active incident, so nothing narrows further there.

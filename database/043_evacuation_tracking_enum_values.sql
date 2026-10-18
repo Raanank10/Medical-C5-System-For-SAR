@@ -1,4 +1,4 @@
--- Evacuation tracking (V2.99.31): where each casualty was taken and how Magen David Adom
+-- Evacuation tracking (V2.99.33): where each casualty was taken and how Magen David Adom
 -- classified them, plus external casualty counts from United Hatzalah and Yedidim alongside
 -- MDA and police.
 --

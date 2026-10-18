@@ -1,4 +1,4 @@
--- Evacuation tracking (V2.99.31) - projection. Depends on 043's enum values.
+-- Evacuation tracking (V2.99.33) - projection. Depends on 043's enum values.
 --
 -- Gaps found 2026-10-17 (checked live):
 -- - The client's handover always sent destination_facility:'pending', so project_patient_state()
@@ -61,7 +61,7 @@ declare
 begin
   if new.type in ('PATIENT_HANDED_OVER','PATIENT_EVACUATION_UPDATED') and new.patient_id is not null then
     v_destination := nullif(btrim(coalesce(new.payload_json->>'destination_facility','')), '');
-    -- Pre-V2.99.31 clients sent the placeholder 'pending'; it is not a destination.
+    -- Pre-V2.99.33 clients sent the placeholder 'pending'; it is not a destination.
     if v_destination = 'pending' then v_destination := null; end if;
     v_mda := new.payload_json->>'mda_classification';
     if v_mda is not null and v_mda not in ('minor','anxiety','moderate','serious','critical','deceased') then

@@ -13,10 +13,10 @@ function assert(condition, message) {
 for (const rel of files) {
   const html = fs.readFileSync(path.join(root, rel), 'utf8');
 
-  assert(html.includes("const APP_VERSION = '2.99.31';"), `${rel}: APP_VERSION must be V2.9931`);
-  assert(html.includes('Demo V2.9931'), `${rel}: launcher label must be Demo V2.9931`);
-  assert(html.includes('ROLE // V2.9931'), `${rel}: role header must be Demo V2.9931`);
-  assert(html.includes('Role-Based Medical Command System V2.9931'), `${rel}: role system strip must be Demo V2.9931`);
+  assert(html.includes("const APP_VERSION = '2.99.33';"), `${rel}: APP_VERSION must be V2.9933`);
+  assert(html.includes('Demo V2.9933'), `${rel}: launcher label must be Demo V2.9933`);
+  assert(html.includes('ROLE // V2.9933'), `${rel}: role header must be Demo V2.9933`);
+  assert(html.includes('Role-Based Medical Command System V2.9933'), `${rel}: role system strip must be Demo V2.9933`);
 
   // Handover: optional destination + MDA classification, never the old 'pending' placeholder.
   assert(html.includes(`onclick="openEvacuationSheet('\${p.id}','handover')">הועבר למד״א — עכשיו</button>`), `${rel}: handover button must open the evacuation sheet`);
@@ -25,7 +25,8 @@ for (const rel of files) {
 
   // Later update: command roles only, synced as PATIENT_EVACUATION_UPDATED.
   assert(html.includes("const EVAC_REPORTING_ROLES = new Set(['pc','cc','chamal','physician','admin']);"), `${rel}: evacuation/report roles must match sync-log`);
-  assert(/'PATIENT_DEATH_CONFIRMED',\s*'PATIENT_EVACUATION_UPDATED'\s*\]\);/.test(html), `${rel}: PATIENT_EVACUATION_UPDATED must be sync-eligible`);
+  const eligibleSet = html.match(/const SYNC_ELIGIBLE_EVENT_TYPES = new Set\(\[([\s\S]*?)\]\);/);
+  assert(eligibleSet && eligibleSet[1].includes("'PATIENT_EVACUATION_UPDATED'"), `${rel}: PATIENT_EVACUATION_UPDATED must be sync-eligible`);
   assert(/function updatePatientEvacuation\([\s\S]{0,200}?if\(!canUpdateEvacuationTracking\(\)\)/.test(html), `${rel}: later update must be gated by role`);
 
   // External reports: United Hatzalah and Yedidim are separate sources, and reports sync.
@@ -58,5 +59,5 @@ for (const rel of files) {
   assert(html.includes("function canManagePlatoonRoster(){ return !!currentUser && COMPANY_COMMAND_ROLES.has(currentUser.role); }"), `${rel}: roster panel for company-level command only`);
   assert(html.includes("client.rpc('set_platoon_commander', {p_profile_id:profileId, p_pc_id:pcId||null})"), `${rel}: roster changes go through set_platoon_commander()`);
 
-  console.log(`${rel}: Demo V2.9931 evacuation tracking + location board smoke passed`);
+  console.log(`${rel}: Demo V2.9933 evacuation tracking + location board smoke passed`);
 }

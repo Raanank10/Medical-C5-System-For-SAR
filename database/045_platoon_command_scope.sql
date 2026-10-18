@@ -1,4 +1,4 @@
--- Command hierarchy as a security scope (V2.99.31), decided with the repo owner 2026-10-18:
+-- Command hierarchy as a security scope (V2.99.33), decided with the repo owner 2026-10-18:
 -- מ״פ רפואה (cc, company) sees every site; חוג״ד (pc, platoon) only its own platoon's site.
 -- A site is an incident, and one incident belongs to one platoon (no platoon split inside an
 -- incident). docs/ROLE_COMMAND_MODEL_v2.8.md "Command scope follows the hierarchy".

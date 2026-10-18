@@ -1,4 +1,4 @@
-// Real-browser test of evacuation tracking and the casualty board by location (V2.99.31): a PC,
+// Real-browser test of evacuation tracking and the casualty board by location (V2.99.33): a PC,
 // a CC and a medic phone (three tabs, one browser context) share one fake backend in this Node
 // process, reached through a Playwright binding, the same harness as
 // scripts/browser_medic_assignment_test.js. The fake also answers the sync-log Edge Function and
