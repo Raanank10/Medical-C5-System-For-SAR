@@ -99,10 +99,11 @@ Could a new signup grant itself an elevated role (e.g. `admin`, `cc`) via the in
 
 ### T5: Service-role key leakage
 
-The Supabase service-role key (`SUPABASE_SERVICE_ROLE_KEY`, bypasses RLS entirely) is the single highest-blast-radius credential in the system, since it isn't scoped by role or incident like every other access path is. It has three real usage sites in this repo, not just one:
+The Supabase service-role key (`SUPABASE_SERVICE_ROLE_KEY`, bypasses RLS entirely) is the single highest-blast-radius credential in the system, since it isn't scoped by role or incident like every other access path is. It has four real usage sites in this repo, not just one:
 
 - `analytics/c5_sentinel_sar_analytics_v1_1/export_live_incident.py` — offline reporting script, reads it via `os.environ.get(...)`.
 - `scripts/invite_user.js` — the operator-run invite CLI, reads it via `process.env.SUPABASE_SERVICE_ROLE_KEY`; its own header comment already warns never to commit it or pass it as a bare CLI arg.
+- `supabase/functions/admin-users/index.ts` (V2.99.31): the in-app invite endpoint, reads it via `Deno.env.get(...)`, server side only. It creates a service-role client only after checking, under the caller's own JWT, that the caller is an active `admin`, and uses it only for the Auth Admin API (generate link / invite / look up a user) and to append to `admin_user_audit`. This replaces the need to copy the key onto an operator's laptop for every invite.
 - `supabase/functions/sync-log/index.ts` — the deployed Edge Function, reads it via `Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")`. This one is the narrowest of the three: the service-role client it creates is used only to write `sync_ingestion_errors`, not as a blanket RLS bypass for the whole push/pull flow — the actual `events` insert/select run under the calling user's own JWT.
 
 *Mitigation status*: audited, no vulnerability found. All three sites read the key from an environment variable exclusively — no hardcoded value anywhere in the working tree or in git history (`git log --all -S"SERVICE_ROLE"` shows only documentation/env-var-reading code across every commit that touches the string). It never appears in any client-loaded file (`index.html`/`demo/rescue-app.html` only ever embed the public anon key, T7's concern, not this one). `export_live_incident.py`'s default output (`live_incident.db`) is gitignored so an export can't be accidentally committed either.

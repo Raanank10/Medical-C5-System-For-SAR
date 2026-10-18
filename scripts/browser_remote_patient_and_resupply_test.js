@@ -1,4 +1,4 @@
-// Real-browser test for V2.99.31, two field-test fixes:
+// Real-browser test for V2.99.32, two field-test fixes:
 // 1. A patient received from another device has no measured vitals on this device (the pull
 //    carries last_vitals_at only). It must show "—", never VITALS_BASELINE's starting values
 //    (pulse 80 / RR 16) as if they were measured, and remote patients cached before this fix
@@ -58,7 +58,7 @@ async function checkFile(browser, file) {
   assert(!fresh.html.includes('80♥') && !fresh.html.includes('null♥'), `${rel}: the CC patient list must not show a placeholder or null pulse`);
   assert(fresh.html.includes('—♥') && fresh.html.includes('מדדים אצל החובש'), `${rel}: the CC patient list must say the vitals are on the medic's device`);
 
-  // 1b. A remote patient cached before V2.99.31 (baseline vitals) is cleared on the next pull,
+  // 1b. A remote patient cached before V2.99.32 (baseline vitals) is cleared on the next pull,
   // even when the server version has not changed; one with real local vitals is left alone.
   const migrated = await page.evaluate(() => {
     const base = { incident_id: SITE_TO_INCIDENT_ID.SITE_A, current_triage: 'yellow', current_status: 'observing', access_status: 'accessible',
