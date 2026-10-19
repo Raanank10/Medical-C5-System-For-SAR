@@ -40,7 +40,7 @@ Some WPs cannot finish without one of these. Ask before starting the WP that nee
 | D4 | Alert acknowledgment: event only, or also mark `watchdog_alerts.acknowledged_at` on the server? | WP-4 | Suggested: both, via a projection |
 | D5 | `demo/rescue-app.html`: keep as a byte-identical copy, generate it, or replace with a redirect to `index.html`? | WP-14 | Check what the GitHub Pages demo link and smoke scripts rely on before choosing |
 | D6 | Supabase Pro plan, required for leaked-password protection. | Track T5 | Cost decision |
-| D7 | Can the `admin` role record patients? `sync-log` allows admin every event type, but the `patients_insert` RLS policy allows only medic/pc/paramedic/rpc/rcc, so an admin's patients are rejected (see Baseline results). | WP-0 part 2, WP-1 | (a) keep RLS as is and stop an admin from opening the patient flow with a clear message; (b) add admin to `patients_insert` for testing; (c) leave as is and always test with role accounts |
+| D7 | Can the `admin` role record patients? `sync-log` allows admin every event type, but the `patients_insert` RLS policy allowed only medic/pc/paramedic/rpc/rcc, so an admin's patients were rejected (see Baseline results). | WP-0 part 2, WP-1 | **Decided 2026-10-19: admin may do everything**, matching `AUTH_MATRIX` in `index.html`. `database/047_admin_full_access.sql` adds admin to `patients_insert`, `high_risk_override_insert`, `death_confirmations_insert` and the physician-death guard in `project_patient_state()`. `app.role_authority_rank()` keeps admin at 0 (it only breaks ties between concurrent edits). |
 
 ## Work packages
 
@@ -350,7 +350,7 @@ The whole `events` table holds 28 rows: 26 from August, 2 from October (both `IN
 | 10-18 10:51 to 10:52 | PHONE-LTKE | `QUICK_PATIENT_CREATED` x2 | same RLS rejection |
 | 10-18 10:51 | PHONE-LTKE | `TOURNIQUET_APPLIED` | same FK error |
 
-**Root cause of the October rejections.** Both phones were logged in with an `admin` account (active, a member of the incident, its opener). `patients_insert` allows only `medic`, `pc`, `paramedic`, `rpc`, `rcc`, while `sync-log` allows admin every event type, so the event passes the Edge Function and fails in the database. Every later event for those patients then fails its foreign key. The phone shows this only as a "נדחו" count in the sync pill and a red toast for high-stakes events. This is a testing setup issue, not a medic-path bug, but it means no phone test has ever stored a patient through the current client. Decision D7.
+**Root cause of the October rejections.** Both phones were logged in with an `admin` account (active, a member of the incident, its opener). `patients_insert` allows only `medic`, `pc`, `paramedic`, `rpc`, `rcc`, while `sync-log` allows admin every event type, so the event passes the Edge Function and fails in the database. Every later event for those patients then fails its foreign key. The phone shows this only as a "נדחו" count in the sync pill and a red toast for high-stakes events. This is a testing setup issue, not a medic-path bug, but it means no phone test has ever stored a patient through the current client. Decision D7 (decided: admin may do everything, `database/047`).
 
 **What this means for the plan.** The live data cannot confirm or refute the client-side gaps: there is no successful field test to measure. The code evidence stands. Part 2 below produces a real baseline.
 
