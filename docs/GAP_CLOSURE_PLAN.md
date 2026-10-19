@@ -289,7 +289,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP | Priority | Status | PR | Notes |
 | --- | --- | --- | --- | --- |
 | WP-0 Live baseline | - | Part 1 done 2026-10-19 | | live data too thin to confirm gaps; part 2 (scripted two-phone run) pending |
-| WP-0b Admin full access | P0 | 047 patients rule live; rest of 047 + 048 pending live apply | #75, #76 | owner: admin may do everything (D7), wins tie-breaks; history stays append-only |
+| WP-0b Admin full access | P0 | 047 fully live (verified 2026-10-19); 048 pending live apply | #75, #76 | owner: admin may do everything (D7), wins tie-breaks; history stays append-only |
 | WP-1 Event contract check | guardrail | Not started | | |
 | WP-2 Tourniquets | P1 | Mostly done (#73, V2.99.34) | #73 | WP-2b remainder: release, reassessment, later limb, close row at handover, live check |
 | WP-3 Treatments, intake vitals, injuries | P1 | Partly done (#73: intake vitals) | | step 1 not needed; medications without patient_id added |
