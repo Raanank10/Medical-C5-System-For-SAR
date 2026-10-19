@@ -28,7 +28,7 @@ Five `app.*()` SQL helper functions (all `SECURITY DEFINER`, `stable`, live in t
 
 Three more `app.*()` helpers exist specifically for F3's role-authority tie-break (`database/021_field_level_conflict_resolution.sql`), not general-purpose RLS predicates like the five above — `execute` is revoked from `public`/`anon`/`authenticated` on all three, since they're meant to be called only from inside `project_patient_state()`'s trigger body, never as a direct RPC:
 
-- `app.role_authority_rank(r user_role)` — maps a role to its numeric rank for the tie-break: `physician`=5, `paramedic`=4, `cc`=3, `pc`=2, `medic`=1, everything else (`chamal`/`admin`/`logistics_officer`/`rpc`/`rcc`)=0.
+- `app.role_authority_rank(r user_role)` — maps a role to its numeric rank for the tie-break: `admin`=6 (since `database/048`), `physician`=5, `paramedic`=4, `cc`=3, `pc`=2, `medic`=1, everything else (`chamal`/`logistics_officer`/`rpc`/`rcc`)=0.
 - `app.resolve_field_authority(...)` — given an incumbent field value/role/timestamp and a new one, decides whether the new value wins, and whether this was a genuine authority-decided collision (see `docs/CONFLICT_RESOLUTION_DECISION.md` for the full decision logic).
 - `app.log_field_authority_conflict(...)` — writes the resulting override to `conflict_log` when a genuine collision occurred, so it's surfaced to command review rather than silently lost.
 
