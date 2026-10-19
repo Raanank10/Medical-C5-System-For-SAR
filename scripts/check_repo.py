@@ -7,6 +7,7 @@ before any project-specific environment exists.
 from __future__ import annotations
 
 import ast
+import json
 import re
 import sys
 from pathlib import Path
@@ -35,6 +36,7 @@ REQUIRED_PATHS = [
     "database/002_seed_demo_data_v1.2.sql",
     "database/003_mci_ui_alignment.sql",
     "src/domain/rules.js",
+    "src/domain/event-contract.json",
     "tests/domain-rules.test.js",
     "analytics/c5_sentinel_sar_analytics_v1_1/README.md",
     "analytics/c5_sentinel_sar_analytics_v1_1/requirements.txt",
@@ -256,12 +258,91 @@ def check_python_syntax(errors: list[str]) -> None:
             fail(f"Python syntax error in {rel}:{exc.lineno}: {exc.msg}", errors)
 
 
+EVENT_TYPE_LITERAL_RE = re.compile(r"'([A-Z][A-Z0-9_]{3,})'")
+EVENT_TYPE_SOURCES = [
+    # type:'X', eventType:'X', const type=cond?'X':'Y', addedType=... (events, timeline entries, alerts)
+    re.compile(r"\b\w*[Tt]ype\s*[:=]\s*([^,;}\n)]{1,200})"),
+    # queueEventOnce('X', ...)
+    re.compile(r"queueEventOnce\(\s*([^,]{1,120}),"),
+    # projectPatientStatus(status, 'X', ...)
+    re.compile(r"projectPatientStatus\([^,]*,\s*([^,)]{1,160})"),
+]
+
+
+def check_event_contract(errors: list[str]) -> None:
+    """Every event type index.html writes is classified in src/domain/event-contract.json.
+
+    Catches the class of gap where an event is written on the phone but never synced (or synced
+    under a name the server does not know) and nobody notices. See docs/GAP_CLOSURE_PLAN.md WP-1.
+    """
+    contract_path = ROOT / "src/domain/event-contract.json"
+    html_path = ROOT / "index.html"
+    sync_log_path = ROOT / "supabase/functions/sync-log/index.ts"
+    if not (contract_path.exists() and html_path.exists() and sync_log_path.exists()):
+        return
+    try:
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        fail(f"src/domain/event-contract.json: invalid JSON ({exc})", errors)
+        return
+
+    groups: dict[str, list[str]] = {"synced": list(contract.get("synced", []))}
+    for section in ("local_only", "not_events", "known_gaps"):
+        for key, types in contract.get(section, {}).items():
+            groups[f"{section} [{key}]"] = list(types)
+
+    seen: dict[str, str] = {}
+    for group, types in groups.items():
+        for event_type in types:
+            if event_type in seen:
+                fail(
+                    f"src/domain/event-contract.json: {event_type} is listed twice "
+                    f"({seen[event_type]} and {group}); each type belongs to exactly one list.",
+                    errors,
+                )
+            seen[event_type] = group
+
+    html = html_path.read_text(encoding="utf-8", errors="ignore")
+    match = re.search(r"const SYNC_ELIGIBLE_EVENT_TYPES = new Set\(\[(.*?)\]\);", html, re.DOTALL)
+    if not match:
+        fail("index.html: SYNC_ELIGIBLE_EVENT_TYPES not found; the event contract check cannot run.", errors)
+        return
+    sync_eligible = set(EVENT_TYPE_LITERAL_RE.findall(match.group(1)))
+    synced = set(contract.get("synced", []))
+    for event_type in sorted(sync_eligible - synced):
+        fail(f"index.html: {event_type} is in SYNC_ELIGIBLE_EVENT_TYPES but not in the contract's 'synced' list.", errors)
+    for event_type in sorted(synced - sync_eligible):
+        fail(f"src/domain/event-contract.json: {event_type} is listed as 'synced' but is not in SYNC_ELIGIBLE_EVENT_TYPES, so it never leaves the phone.", errors)
+
+    sync_log = sync_log_path.read_text(encoding="utf-8", errors="ignore")
+    server_types = set(re.findall(r'"([A-Z][A-Z0-9_]{3,})"', sync_log))
+    for event_type in sorted(synced - server_types):
+        fail(
+            f"supabase/functions/sync-log/index.ts: synced event type {event_type} is not in "
+            "ROLE_ALLOWED_EVENT_TYPES, so the server rejects it for every role but admin.",
+            errors,
+        )
+
+    emitted: set[str] = set()
+    for pattern in EVENT_TYPE_SOURCES:
+        for found in pattern.finditer(html):
+            emitted.update(EVENT_TYPE_LITERAL_RE.findall(found.group(1)))
+    for event_type in sorted(emitted - set(seen)):
+        fail(
+            f"index.html writes event type {event_type}, which src/domain/event-contract.json does not "
+            "classify. Add it to 'synced' (plus SYNC_ELIGIBLE_EVENT_TYPES, sync-log and the event_type "
+            "enum), 'local_only' with a reason, 'not_events', or 'known_gaps' with its work package.",
+            errors,
+        )
+
+
 def main() -> int:
     errors: list[str] = []
     check_required_paths(errors)
     check_html_files(errors)
     check_markdown_links(errors)
     check_domain_rules_sync(errors)
+    check_event_contract(errors)
     check_sql_structure(errors)
     check_python_syntax(errors)
 
