@@ -117,7 +117,7 @@ V2.7's "Doctor / Paramedic" (senior clinical review: red/black patient review, d
 
 **Client-side, physician and doctor are one identity, not two.** Earlier builds mapped the server `physician` role onto a separate client dashboard key, `doctor`, as a reuse shortcut. That was later recognized as an unnecessary duplication of the same role and consolidated: the client now uses `physician` as the single key throughout (role config, labels, dashboard routing, the in-app Roles & Authorization matrix). `docs/AUTH_AND_ROLE_MODEL.md` has the full detail.
 
-**Role-authority tie-break**: when two devices genuinely collide on the same patient field within a short window, the higher-ranked role wins: **physician > paramedic > cc (מ״פ רפואה) > pc (חוג״ד) > medic**. Every such override is logged and surfaced to command, never silent — see `docs/CONFLICT_RESOLUTION_DECISION.md` for the full mechanism.
+**Role-authority tie-break**: when two devices genuinely collide on the same patient field within a short window, the higher-ranked role wins: **admin > physician > paramedic > cc (מ״פ רפואה) > pc (חוג״ד) > medic** (admin added in `database/048`: admin may do everything). Every such override is logged and surfaced to command, never silent — see `docs/CONFLICT_RESOLUTION_DECISION.md` for the full mechanism.
 
 ## First Responder Quick Report
 

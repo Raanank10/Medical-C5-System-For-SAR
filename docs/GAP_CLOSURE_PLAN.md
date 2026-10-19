@@ -39,8 +39,8 @@ Some WPs cannot finish without one of these. Ask before starting the WP that nee
 | D3 | Who sees reinforcement and death-certification requests from other devices? | WP-5 | Suggested: requests visible to pc/cc/chamal/physician/admin of the incident; death-certification requests also to every physician in the incident |
 | D4 | Alert acknowledgment: event only, or also mark `watchdog_alerts.acknowledged_at` on the server? | WP-4 | Suggested: both, via a projection |
 | D5 | `demo/rescue-app.html`: keep as a byte-identical copy, generate it, or replace with a redirect to `index.html`? | WP-14 | Check what the GitHub Pages demo link and smoke scripts rely on before choosing |
-| D7 | Admin patient creation (WP-0b): RLS blocks it, `sync-log` and `AUTH_MATRIX` allow it. | WP-0b | (a) add `admin` to `patients_insert`; (b) keep admin blocked and make the client refuse patient creation for admin with a clear message; also make any rejected patient-create highly visible on the phone in both cases |
 | D6 | Supabase Pro plan, required for leaked-password protection. | Track T5 | Cost decision |
+| D7 | Can the `admin` role record patients? `sync-log` allows admin every event type, but the `patients_insert` RLS policy allowed only medic/pc/paramedic/rpc/rcc, so an admin's patients were rejected (see Baseline results). | WP-0 part 2, WP-1 | **Decided 2026-10-19: admin may do everything**, matching `AUTH_MATRIX` in `index.html`. `database/047_admin_full_access.sql` adds admin to `patients_insert`, `high_risk_override_insert`, `death_confirmations_insert` and the physician-death guard in `project_patient_state()`. Follow-up decision the same day: admin also **wins** the concurrent-edit tie-break (`database/048`, rank above physician). Event log and audit tables stay append-only for every role, admin included (CLAUDE.md: never remove audit history). The rejected-patient warning on the phone (V2.99.35) is a separate part of the same fix. |
 
 ## Work packages
 
@@ -288,11 +288,11 @@ These need a decision, people or money rather than a code change in this repo. L
 
 | WP | Priority | Status | PR | Notes |
 | --- | --- | --- | --- | --- |
-| WP-0 Live baseline | - | Done 2026-10-19 | | see Baseline results; found WP-0b |
-| WP-0b Admin cannot create patients | P0 | Done: 047 live and verified 2026-10-19 | #76 | V2.99.35; D7 = allow admin; rejected patients now loud on the phone |
+| WP-0 Live baseline | - | Part 1 done 2026-10-19 | | live data too thin to confirm gaps; part 2 (scripted two-phone run) pending |
+| WP-0b Admin full access | P0 | 047 patients rule live; rest of 047 + 048 pending live apply | #75, #76 | owner: admin may do everything (D7), wins tie-breaks; history stays append-only |
 | WP-1 Event contract check | guardrail | Not started | | |
-| WP-2 Tourniquets | P1 | Partly done | #73 | V2.99.34: apply events carry patient id, limb and time; other devices read active `tourniquets` rows. Left: align the timer to the server cadence (D1), keep the 120 min critical alert, send reassessment and real release |
-| WP-3 Treatments, intake vitals, injuries | P1 | Partly done | #73 | V2.99.34: full-flow vitals and the quick-capture flag now carry the patient id. Left: treatments as `INTERVENTION_RECORDED`, injuries, the `queueEventOnce` scope bug (re-check after #73) |
+| WP-2 Tourniquets | P1 | Mostly done (#73, V2.99.34) | #73 | WP-2b remainder: release, reassessment, later limb, close row at handover, live check |
+| WP-3 Treatments, intake vitals, injuries | P1 | Partly done (#73: intake vitals) | | step 1 not needed; medications without patient_id added |
 | WP-4 Alert acknowledgment | P1 | Not started | | needs D4 |
 | WP-5 Reinforcement / death-cert requests | P1 | Not started | | needs D3 |
 | WP-6 PC resupply decisions | P2 | Not started | | |
@@ -305,22 +305,65 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-13 Tests in CI | P3 | Not started | | |
 | WP-14 Duplicate HTML, doc drift | P3 | Not started | | needs D5 |
 
+## Revisions after #73 (2026-10-19)
+
+The plan was written against V2.99.33 (`a4f6c81`). PR #73 (V2.99.34) merged after it. Re-checked against `main` @ `02198e1`:
+
+- **WP-2** is mostly done by #73: every entry path sends a patient-scoped `TOURNIQUET_APPLIED` (`queueTourniquetAppliedEvent`), other devices read active `tourniquets` rows (`applyServerTourniquets`), and a typo-cancel sends `TOURNIQUET_RELEASED`. Remote devices run the client `tourniquetTimer` from the server `applied_at`, which in practice is D1 option (a) for display; D1 is still open for the server reassessment schedule (WP-12). Remaining, now **WP-2b**: a real (non-typo) release, `TOURNIQUET_REASSESSMENT` and `TOURNIQUET_CONTEXT_UPDATED` are never sent; `TOURNIQUET_LIMB_RECORDED` stays local; a handed-over patient's tourniquet row stays active; the live two-device check of #73 has not run.
+- **WP-3** step 1 is not needed. `queueEventOnce` checks `state.localEvents`, and `startNewPatient()` resets `state` with `freshState()` for every patient, so it is per patient, not per device. Intake vitals are done by #73. New: `queueMedicationEventsBeforeSave()` sends `MEDICATION_ADMINISTERED` before `PATIENT_CREATED` and with no `patient_id`, including pediatric high-risk overrides; it is on the sync list, so it is pushed but cannot be placed. Treatments (`INTERVENTION_LOGGED`, `IMMEDIATE_INTERVENTION_RECORDED`, `LIFE_SAVING_ACTION_RECORDED`, vitals-modal `TREATMENT_NEEDED_RECORDED`) and injuries (`PATIENT_INJURY_UPDATED` never sent) are unchanged.
+- **WP-5** root cause wording: the client already uses the event types `MEDICAL_REINFORCEMENT_REQUESTED` and `MEDICAL_REINFORCEMENT_STATUS_UPDATED`; the lowercase strings are the request's internal `type` field. Neither event type is in the enum, `sync-log` or `SYNC_ELIGIBLE_EVENT_TYPES`, so `saveLocalEvent` marks them synced at once and they never leave the phone. The design is unchanged.
+- **Order** after WP-0 and WP-1: WP-3 (client only, fixes high-risk dose records), WP-5, WP-4, WP-2b, then P2 and P3 as listed.
+- **WP-14** drift still present: `index.html` is now 13,595 lines; `FIELD_EXPERIMENT_GAPS.md` still says the injector and unit scoping are missing.
+
 ## Baseline results
 
-Run 2026-10-19, read-only, against the live project (`btvvjmuwdzirjyauyijx`).
+### Part 1: read-only queries, 2026-10-19
 
-**Volume.** 35 events in total across 4 incidents. 25 are in the closed seeded incident `...a1` (August verification runs, synthetic test devices). The two active incidents (`66898709...`, opened 2026-10-16, and `854d1d17...`, 2026-10-18) have one event each (`INCIDENT_OPENED`) and **0 patients**. No real multi-phone run has reached the server yet, so most gaps below are confirmed from code, not from data.
+Run with the Supabase MCP connector against project `c5-sentinel-sar`, across all incidents (there are only four).
 
-| Check | Result | Meaning |
-| --- | --- | --- |
-| `tourniquets` rows | 0 | WP-2 confirmed: no tourniquet has ever been projected |
-| `watchdog_alerts` acknowledged | 1 of 2 (test data) | WP-4: no client path writes acknowledgment |
-| `patients` with `last_vitals_at is null` | 4 of 5 | consistent with WP-3 (intake vitals not sent) |
-| `supply_requests` rows | 0, although 4 `RESUPPLY_REQUESTED_*` events exist | the events are from `033`/`034` verification devices in the closed incident; rows were most likely cleaned up after verification. Re-check after the next real resupply test |
-| `inventory_ledger` / `inventory_ledger_v12` rows | 0 / 0 | WP-9 confirmed |
-| `BUILDING_STATUS_UPDATED` events | 3 (August) | WP-8 still needs a read-back check |
-| `sync_ingestion_errors` unresolved | 18 of 18 | nobody resolves quarantined events; see WP-0b |
+| Incident | Status | Events | Devices | Patients | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `INC-261018-854D1D` | active | 1 | 1 | 0 | opened 2026-10-18, no activity |
+| `INC-261016-668987` | active | 1 | 1 | 0 | used for the 2026-10-17 and 2026-10-18 phone tests; every patient rejected (below) |
+| `TEST-INC-A` | closed (`039`) | 25 | 14 | 5 | August RLS test data |
+| `TEST-INC-B` | closed (`039`) | 1 | 1 | 0 | August isolation check |
 
-**New finding: WP-0b, an admin account cannot create patients.** On 2026-10-17 and 2026-10-18 two real phones (`PHONE-SPSZ`, `PHONE-LTKE`) logged in as **admin**, members of active incident `66898709...`, created 5 quick patients. Every `QUICK_PATIENT_CREATED` was rejected with `new row violates row-level security policy for table "patients"`. Everything attached to those patients (2 `TOURNIQUET_APPLIED`, 1 `VITALS_RECORDED`, 2 `PATIENT_HANDED_OVER`) then failed the `events_patient_id_fkey` foreign key. Cause: the live `patients_insert` policy allows only `medic`, `pc`, `paramedic`, `rpc`, `rcc`, while `sync-log` and the client `AUTH_MATRIX` ("Register new patient": admin `yes`) allow admin. The phone kept working locally, so the tester had no clear sign that nothing reached the server. Fix options are under "Decisions" (D7).
+The whole `events` table holds 28 rows: 26 from August, 2 from October (both `INCIDENT_OPENED`).
 
-The two Oct 17 `TOURNIQUET_APPLIED` payloads did carry `patient_id` and `limb` (path at `index.html` ~7588), which confirms that path is shaped correctly for `project_tourniquet_events()`.
+| Query | Result |
+| --- | --- |
+| 1. Event types stored | `BUILDING_STATUS_UPDATED` 3, `FIRST_RESPONDER_REPORT` 2, `INCIDENT_OPENED` 2, `MEDICATION_ADMINISTERED` 2, `NOTE_ADDED` 1, `PATIENT_HANDED_OVER` 4, `PC_TRUCK_RESUPPLY_UNAVAILABLE_ESCALATED` 1, `QUICK_PATIENT_CREATED` 1, `RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE` 4, `SUPPLY_REQUEST_DISPATCHED` 2, `SUPPLY_REQUEST_IN_TRANSIT` 3, `SUPPLY_REQUEST_RECEIVED` 2, `VITALS_RECORDED` 1 |
+| 2. Clinical events stored without a patient | 0 (a missing `patient_id` is rejected before storage, so these appear in `sync_ingestion_errors` instead) |
+| 3. Patients with no server vitals | `TEST-INC-A`: 4 of 5 |
+| 4. `tourniquets` rows | 0 total, 0 active |
+| 5. `watchdog_alerts` acknowledged | 1 of 2 (August test data) |
+| 6. Building status / site clear | 3 `BUILDING_STATUS_UPDATED` (August, payload `{status}` only), no `SITE_CLEAR_CONFIRMED`; `incident_command_state.state_json` has only `sectors` and `summary`, nothing for building or site state. WP-8 is confirmed. |
+| New: `MEDICATION_ADMINISTERED` without patient | 0 stored |
+| New: `tourniquets` rows since #73 | 0 (no client test since the merge) |
+| New: `sync_ingestion_errors`, unresolved | 18 rows, all unresolved (8 from August, 10 from October, below) |
+
+`sync_ingestion_errors` since 2026-10-01, all in `INC-261016-668987`:
+
+| When (UTC) | Device | Event | Error |
+| --- | --- | --- | --- |
+| 10-17 19:01 to 19:01:50 | PHONE-SPSZ | `QUICK_PATIENT_CREATED` x3 | `PATIENT_CREATE_FAILED`: new row violates RLS on `patients` |
+| 10-17 19:01 to 19:09 | PHONE-SPSZ | `TOURNIQUET_APPLIED`, `VITALS_RECORDED`, `PATIENT_HANDED_OVER` x2 | FK `events_patient_id_fkey` (the patient was never created) |
+| 10-18 10:51 to 10:52 | PHONE-LTKE | `QUICK_PATIENT_CREATED` x2 | same RLS rejection |
+| 10-18 10:51 | PHONE-LTKE | `TOURNIQUET_APPLIED` | same FK error |
+
+**Root cause of the October rejections.** Both phones were logged in with an `admin` account (active, a member of the incident, its opener). `patients_insert` allows only `medic`, `pc`, `paramedic`, `rpc`, `rcc`, while `sync-log` allows admin every event type, so the event passes the Edge Function and fails in the database. Every later event for those patients then fails its foreign key. The phone shows this only as a "נדחו" count in the sync pill and a red toast for high-stakes events. This is a testing setup issue, not a medic-path bug, but it means no phone test has ever stored a patient through the current client. Decision D7 (decided: admin may do everything, `database/047`).
+
+**What this means for the plan.** The live data cannot confirm or refute the client-side gaps: there is no successful field test to measure. The code evidence stands. Part 2 below produces a real baseline.
+
+### Part 2: scripted two-phone run (pending)
+
+Two phones (or two browsers), logged in as a real `medic` and a real `pc` account (not admin), in one new incident, about 10 minutes:
+
+1. Medic: full-flow patient with vitals, one treatment, morphine, a tourniquet on a known limb.
+2. Medic: quick capture with a tourniquet, limb recorded later.
+3. Medic: MSTART immediate casualty marked black (auto death-certification request).
+4. Medic: resupply request. PC: approve from truck.
+5. PC: request a doctor. Either: acknowledge an alert ("בטיפול").
+6. Medic: hand over the first patient.
+
+Then rerun the Part 1 queries for that incident, plus `sync_ingestion_errors` for it. Each WP is then marked confirmed, changed or not needed here.
