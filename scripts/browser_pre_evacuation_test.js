@@ -1,12 +1,12 @@
-// Real-browser test of the pre-evacuation report (V2.99.35, database/048-049): casualties
+// Real-browser test of the pre-evacuation report (V2.99.36, database/049-050): casualties
 // evacuated before the medical force arrived. Two medic phones, a PC and a CC (four browser
 // contexts, so four separate devices) share one fake backend in this Node process, the same harness as
 // scripts/browser_evacuation_tracking_test.js. The fake mirrors what the real server does:
 // - sync-log role gating: SITE_PRE_EVACUATION_REPORTED from medic/paramedic/physician/pc/cc
-// - project_pre_evacuation() (database/049): the first medical report to sync creates the row,
+// - project_pre_evacuation() (database/050): the first medical report to sync creates the row,
 //   after that only pc/cc/admin replace it (newest local_timestamp wins); anyone else's version is
 //   kept in the event log and logged to conflict_log as PRE_EVACUATION_REPORT_LOCKED.
-// It proves client behavior only; database/049 itself must be exercised against real Postgres.
+// It proves client behavior only; database/050 itself must be exercised against real Postgres.
 //
 // Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
 // Run: npm install && node scripts/browser_pre_evacuation_test.js
@@ -53,7 +53,7 @@ function newServer() {
   };
 }
 
-// Port of project_pre_evacuation() (database/049).
+// Port of project_pre_evacuation() (database/050).
 function projectPreEvacuation(server, evt, actorId) {
   const u = userById(actorId);
   const groups = [];

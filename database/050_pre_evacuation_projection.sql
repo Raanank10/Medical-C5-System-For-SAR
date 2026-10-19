@@ -1,4 +1,4 @@
--- Pre-evacuation report (V2.99.35) - projection and lock. Depends on 048's enum value.
+-- Pre-evacuation report (V2.99.36) - projection and lock. Depends on 049's enum value.
 --
 -- Requirement (repo owner, 2026-10-19): casualties evacuated from the site before the medical
 -- force arrived are entered once, by the first medical staff on site. After that only the PC
@@ -53,7 +53,7 @@ create table if not exists incident_pre_evacuations (
 );
 
 comment on table incident_pre_evacuations is
-  'Casualties evacuated before the medical force arrived, per incident. Written only by project_pre_evacuation() from SITE_PRE_EVACUATION_REPORTED events: first medical reporter creates it, then only pc/cc/admin may replace it (database/049).';
+  'Casualties evacuated before the medical force arrived, per incident. Written only by project_pre_evacuation() from SITE_PRE_EVACUATION_REPORTED events: first medical reporter creates it, then only pc/cc/admin may replace it (database/050).';
 comment on column incident_pre_evacuations.groups is
   'Array of {count, condition: light|moderate|severe, evacuated_by, destination}.';
 comment on column incident_pre_evacuations.updated_at is

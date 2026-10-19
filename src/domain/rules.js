@@ -299,7 +299,7 @@
     return !expected.includes(mdaClassification);
   }
 
-  // Casualties evacuated before the medical force arrived (V2.99.35, database/049). The first
+  // Casualties evacuated before the medical force arrived (V2.99.36, database/050). The first
   // medical staff on site enters the report; after that only pc / cc (and admin) may change it.
   // The server applies the same rule in project_pre_evacuation(), first sync wins; this copy
   // decides what the device lets its user edit. Conditions map onto the triage colors that the

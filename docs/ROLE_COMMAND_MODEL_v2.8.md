@@ -99,7 +99,7 @@ Known limits:
 - **Command scope follows the hierarchy** (decided with the repo owner): מ״פ רפואה (company) is senior to חוג״ד (platoon). On the command screen the CC, חמ״ל and other command roles see every site, including the "all sites" tab. The PC sees only its own platoon's site (demo: PLT-A = SITE_A, PLT-B = SITE_B), cannot switch to another platoon's site, and sees only that site's reinforcement requests and its own platoon's recommendations, as its role dashboard already did. Before V2.99.33 this was inverted: the PC saw every site and the CC was pinned to one. Signed in, only the active incident is loaded as a site, so the PC's scope is that incident. Since `database/045` this is also a server-side security scope: a PC reaches only incidents it opened or was assigned to (plus its own platoon's medic drafts, which it confirms), cannot self-join another platoon's site, and assigns only its own platoon's medics. The CC (and chamal/physician/admin) keeps every incident, assigns PCs to sites, and manages the platoon roster from the "מחלקות — שיוך חובשים לחוג״ד" panel on its dashboard. Medics and paramedics also enter only incidents they were assigned to or drafted.
 - **External reports** add איחוד הצלה (United Hatzalah) as a source, with ידידים (Yedidim) kept separate, and איחוד הצלה is also on the initial-evacuation source chips. Reports from pc/cc/chamal/physician/admin sync to `external_reports` and appear on every command device. Other roles keep them on their own device, as before.
 
-## Casualties evacuated before the medical force arrived (V2.99.35)
+## Casualties evacuated before the medical force arrived (V2.99.36)
 
 Requested by the repo owner: casualties who left the site before any medical staff arrived (taken by MDA, United Hatzalah, civilians, ...) are recorded without opening patient records, and it must be clear who evacuated them, where to, and in what condition.
 
@@ -128,7 +128,7 @@ V2.7's "Doctor / Paramedic" (senior clinical review: red/black patient review, d
 
 **Client-side, physician and doctor are one identity, not two.** Earlier builds mapped the server `physician` role onto a separate client dashboard key, `doctor`, as a reuse shortcut. That was later recognized as an unnecessary duplication of the same role and consolidated: the client now uses `physician` as the single key throughout (role config, labels, dashboard routing, the in-app Roles & Authorization matrix). `docs/AUTH_AND_ROLE_MODEL.md` has the full detail.
 
-**Role-authority tie-break**: when two devices genuinely collide on the same patient field within a short window, the higher-ranked role wins: **physician > paramedic > cc (מ״פ רפואה) > pc (חוג״ד) > medic**. Every such override is logged and surfaced to command, never silent — see `docs/CONFLICT_RESOLUTION_DECISION.md` for the full mechanism.
+**Role-authority tie-break**: when two devices genuinely collide on the same patient field within a short window, the higher-ranked role wins: **admin > physician > paramedic > cc (מ״פ רפואה) > pc (חוג״ד) > medic** (admin added in `database/048`: admin may do everything). Every such override is logged and surfaced to command, never silent — see `docs/CONFLICT_RESOLUTION_DECISION.md` for the full mechanism.
 
 ## First Responder Quick Report
 

@@ -2709,7 +2709,7 @@ textarea{resize:vertical;min-height:70px;}
     return !expected.includes(mdaClassification);
   }
 
-  // Casualties evacuated before the medical force arrived (V2.99.35, database/049). The first
+  // Casualties evacuated before the medical force arrived (V2.99.36, database/050). The first
   // medical staff on site enters the report; after that only pc / cc (and admin) may change it.
   // The server applies the same rule in project_pre_evacuation(), first sync wins; this copy
   // decides what the device lets its user edit. Conditions map onto the triage colors that the
@@ -2859,7 +2859,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.35';
+const APP_VERSION = '2.99.36';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -2929,7 +2929,7 @@ const SYNC_ELIGIBLE_EVENT_TYPES = new Set([
   // (RESUPPLY_APPROVED_FROM_PC_TRUCK etc.) stay local: 033 matches those by the creating
   // device's id, so from the PC's device they would never find the request.
   'RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE','RESUPPLY_REQUEST_ESCALATED_CC',
-  // Casualties evacuated before the medical force arrived (database/048-049): the server keeps
+  // Casualties evacuated before the medical force arrived (database/049-050): the server keeps
   // the first medical reporter's version, then accepts changes only from pc/cc/admin.
   'SITE_PRE_EVACUATION_REPORTED'
 ]);
@@ -3088,12 +3088,12 @@ const TRAP_LABELS = {trapped:'לכוד', not_trapped:'לא לכוד', unknown:'�
 // (src/domain/rules.js mdaClassificationDiffersFromTriage).
 const MDA_CLASSIFICATION_LABELS = {minor:'קל', anxiety:'נפגע חרדה', moderate:'בינוני', serious:'קשה', critical:'אנוש', deceased:'נקבע מותו'};
 const MDA_CLASSIFICATION_COLORS = {minor:'var(--green)', anxiety:'var(--green)', moderate:'var(--yellow)', serious:'var(--red)', critical:'var(--red)', deceased:'var(--muted)'};
-// Pre-evacuation report labels (V2.99.35, see openPreEvacuationSheet). Declared up here because
+// Pre-evacuation report labels (V2.99.36, see openPreEvacuationSheet). Declared up here because
 // ensureSiteReadiness() reads them while saved state is still loading.
 const PRE_EVAC_CONDITION_LABELS = {light:'קל', moderate:'בינוני', severe:'קשה'};
 const PRE_EVAC_CONDITION_COLORS = {light:'var(--green)', moderate:'var(--yellow)', severe:'var(--red)'};
 const PRE_EVAC_EVACUATOR_LABELS = {mda:'מד״א', united_hatzalah:'איחוד הצלה', yedidim:'ידידים', fire:'כב״א', police:'משטרה', idf:'צה״ל', civilian:'אזרחים', self:'פינוי עצמי', other:'אחר'};
-// Pre-V2.99.35 saved state had one "report source" for the whole site.
+// Pre-V2.99.36 saved state had one "report source" for the whole site.
 const LEGACY_REPORT_SOURCE_TO_EVACUATOR = {civilian:'civilian', fire:'fire', mda:'mda', uh:'united_hatzalah', police:'police', other:'other'};
 const EVAC_DESTINATION_SUGGESTIONS = ['שיבא','איכילוב','בילינסון','וולפסון','אסף הרופא','מאיר','לניאדו','הלל יפה','רמב״ם','העמק','הדסה עין כרם','שערי צדק','ברזילי','אסותא אשדוד','סורוקה'];
 // Add-report sources: client key -> label + server external_source value. UH is United Hatzalah;
@@ -4034,7 +4034,7 @@ function ensureSiteReadiness(){
   siteData.initialEvacuation=siteData.initialEvacuation||{green:siteData.initialEvacuatedGreen||0,yellow:0,red:0,summary:'',source:null};
   const ie=siteData.initialEvacuation;
   if(!Array.isArray(ie.groups)){
-    // Pre-V2.99.35 state: three bare counters and one source for the whole site. Kept as groups
+    // Pre-V2.99.36 state: three bare counters and one source for the whole site. Kept as groups
     // so nothing already counted disappears; the destination was only ever the free-text note.
     // It never reached the server, so it stays an unsent draft the medic can review and send.
     const by=LEGACY_REPORT_SOURCE_TO_EVACUATOR[ie.source]||'other';
@@ -5140,7 +5140,9 @@ function updateDemoStatus(){
   ['sync-pill-dashboard','sync-pill-command','sync-pill-aar','sync-pill-logistics','sync-pill-roles','sync-pill-detail'].forEach(id=>{
     const el=document.getElementById(id); if(!el) return;
     el.textContent=label;
-    el.className='sync-pill '+(demoSyncMode==='fresh'?'':demoSyncMode);
+    // Any rejected event turns the pill red regardless of freshness: rejected data is data
+    // command will never see, which matters more than how recent the last sync was (V2.99.35).
+    el.className='sync-pill '+(rejected?'offline':demoSyncMode==='fresh'?'':demoSyncMode);
   });
   const openAlerts=patients.filter(p=>p.alert || (isVitalsOverdue(p))).length;
   const handed=patients.filter(p=>['evacuating','evacuated'].includes(p.patientStatus)).length;
@@ -7051,6 +7053,7 @@ function renderDashboard(){
           ${p.needsFullAssessment?'<span class="badge badge-orange">חסר הערכה</span>':''}
           ${patientHasFieldConflict(p)?'<span class="badge badge-orange">⚠ עדכון תפקידי</span>':''}
           ${ageBand==='infant'?'<span class="badge badge-yellow">תינוק</span>':ageBand==='child'?'<span class="badge badge-yellow">ילד</span>':ageBand==='elderly'?'<span class="badge badge-orange">קשיש</span>':''}
+          ${patientSyncRejection(p)?`<span class="badge badge-red">⛔ לא הגיע לשרת</span>`:''}
           ${p.unsyncedEvents?`<span class="badge badge-accent">${p.unsyncedEvents} unsynced</span>`:''}
           ${timer?`<span class="vitals-timer ${timer.cls}" onclick="event.stopPropagation();openQuickVitals('${p.id}')">${timer.label}</span>`:''}
           ${tq?`<span class="tq-timer ${tq.cls}">${tq.label}</span>`:''}
@@ -8591,7 +8594,7 @@ function selectEnrouteType(btn,val){
   // A newly reported collapse changes what to expect for the type already chosen: show the brief.
   if(!hadCollapse && siteHasBuildingCollapse(siteId) && s.incidentType && collapseAddsToType(s.incidentType, siteId)) showIncidentTypeBriefModal(s.incidentType, siteId);
 }
-// ── Pre-evacuation report (V2.99.35, database/048-049) ──
+// ── Pre-evacuation report (V2.99.36, database/049-050) ──
 // Casualties evacuated before the medical force arrived: groups of {count, condition,
 // evacuatedBy, destination}. The first medical staff on site enters the report; after that only
 // חוג״ד / מ״פ רפואה (and admin) may change it (C5Rules.canWritePreEvacuationReport). The server
@@ -8923,6 +8926,7 @@ function openPatient(id){
   };
   const tq=tourniquetTimerLabel(p);
   document.getElementById('detail-body').innerHTML=`
+    ${patientSyncRejectionBanner(p)}
     <div class="summary-card">
       <div class="summary-row"><span class="summary-key">מיון</span><span class="summary-val">${triagePill(p.triage)}</span></div>
       <div class="summary-row"><span class="summary-key">מיקום</span><span class="summary-val">${p.location}${p.locDetail?' · '+p.locDetail:''}</span></div>
@@ -10587,6 +10591,43 @@ function localOutboxCount(){
 }
 function rejectedOutboxCount(){
   return getOutbox().filter(e=>e.syncRejected).length;
+}
+// Events for this patient that the server rejected. createRejected means the patient itself never
+// reached the server, so no other device and no command view can see it, and every later event
+// for it fails too (V2.99.35; found live: admin patient creates blocked by patients_insert RLS).
+function patientSyncRejection(p){
+  if(!p) return null;
+  const rejected=getOutbox().filter(e=>e.syncRejected && e.patient_id===p.id);
+  if(!rejected.length) return null;
+  const create=rejected.find(e=>PATIENT_CREATE_SYNC_TYPES.has(e.type));
+  const first=create||rejected[0];
+  return {count:rejected.length, createRejected:!!create, code:first.syncRejectReason||null, message:first.syncRejectMessage||null};
+}
+function patientSyncRejectionBanner(p){
+  const r=patientSyncRejection(p);
+  if(!r) return '';
+  const title=r.createRejected ? 'פצוע זה לא נקלט בשרת' : `${r.count} עדכונים לפצוע זה נדחו בשרת`;
+  const detail=r.createRejected ? 'הפיקוד ומכשירים אחרים לא רואים את הפצוע ואת הטיפול בו.' : 'הפיקוד ומכשירים אחרים לא רואים את העדכונים האלה.';
+  return `<div class="summary-card" style="border-color:var(--red);background:rgba(255,59,59,0.10)">
+    <div style="font-weight:900;font-size:14px;color:var(--red)">⛔ ${title}</div>
+    <div style="font-size:12px;margin-top:4px">${detail}</div>
+    ${r.code?`<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px">${escAttr(r.code)}${r.message?' · '+escAttr(r.message):''}</div>`:''}
+    <button class="btn-secondary" style="margin-top:8px" onclick="retryPatientSync('${p.id}')">שלח שוב לשרת</button>
+  </div>`;
+}
+// Re-queue this patient's rejected events (create first, in original outbox order) for the next
+// push, e.g. after a permission fix. Duplicates are safe: the server dedupes by device_id +
+// local_event_id, and a rejected event was never inserted.
+async function retryPatientSync(id){
+  const entries=getOutbox().filter(e=>e.syncRejected && e.patient_id===id);
+  if(!entries.length) return;
+  entries.forEach(e=>{ e.synced=false; e.syncRejected=false; delete e.syncRejectReason; delete e.syncRejectMessage; });
+  await persistOutbox();
+  updateDemoStatus();
+  toast(`${entries.length} עדכונים נשלחים שוב`);
+  if(currentUser) await syncPush();
+  if(document.getElementById('screen-patient').classList.contains('active')) openPatient(id);
+  renderDashboard();
 }
 function sectorFromLocation(location=''){
   const building=(location.match(/בניין\s*([^,]+)/)||[])[1] || (location.includes('חצר')?'חצר':'לא ידוע');
@@ -12548,6 +12589,7 @@ async function syncPush(){
   const groups=new Map(); // incidentId -> entries[]
   const doneIds=new Set();
   const rejectedIds=new Set();
+  const rejectedReasons=new Map();
   let anyRejected=false;
   for(const e of pending){
     // Only events stamped with a real incident at creation (saveLocalEvent) are pushed. An
@@ -12584,7 +12626,9 @@ async function syncPush(){
     let result;
     try{ result=await resp.json(); }catch(e){ continue; }
     [...(result.accepted||[]),...(result.duplicates||[])].forEach(x=>doneIds.add(x.local_event_id));
-    (result.rejected||[]).forEach(x=>{ rejectedIds.add(x.local_event_id); anyRejected=true; });
+    // Keep the server's reason with each rejected entry: a rejected patient create means command
+    // can't see that casualty at all, so the patient card has to say so (V2.99.35).
+    (result.rejected||[]).forEach(x=>{ rejectedIds.add(x.local_event_id); rejectedReasons.set(x.local_event_id, {code:x.error_code||null, message:x.message||null}); anyRejected=true; });
     // blocked_dependency entries are left as-is (unsynced) for retry on the next push.
     if(result.next_pull_cursor!=null) setPullCursor(incidentId, result.next_pull_cursor);
     // high_risk_flags: read back from watchdog_alerts by the sync-log function itself (not
@@ -12602,7 +12646,11 @@ async function syncPush(){
   // localStorage in a partially-updated state.
   outbox.forEach(e=>{
     if(doneIds.has(e.local_event_id)) e.synced=true;
-    if(rejectedIds.has(e.local_event_id)){ e.synced=true; e.syncRejected=true; }
+    if(rejectedIds.has(e.local_event_id)){
+      e.synced=true; e.syncRejected=true;
+      const why=rejectedReasons.get(e.local_event_id);
+      if(why){ e.syncRejectReason=why.code; e.syncRejectMessage=why.message; }
+    }
   });
   await persistOutbox();
   lastSyncAt=Date.now();
@@ -12905,7 +12953,7 @@ function applyServerTourniquets(rows, incidentId){
 function pullProjectedPatientStateAll(){
   Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id); pullPreEvacuation(id); });
 }
-// ── Pre-evacuation report pull (V2.99.35, database/049) ──
+// ── Pre-evacuation report pull (V2.99.36, database/050) ──
 // incident_pre_evacuations is the server's verdict on who owns the report (first medical
 // reporter to sync) and what it currently says. A local report still waiting in the outbox wins
 // until it is pushed; after that the server row replaces it, including when this device's first

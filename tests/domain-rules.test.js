@@ -243,7 +243,7 @@ assert.equal(rules.mdaClassificationDiffersFromTriage("pending", "minor"), false
 assert.equal(rules.mdaClassificationDiffersFromTriage("red", null), false);
 assert.equal(rules.mdaClassificationDiffersFromTriage("red", "bogus"), false);
 
-// Pre-evacuation report (database/049): the first medical staff on site enters it, after that only
+// Pre-evacuation report (database/050): the first medical staff on site enters it, after that only
 // pc / cc (and admin) may change it. Same rule the server trigger applies.
 for (const role of ["medic", "paramedic", "physician", "pc", "cc", "admin"]) {
   assert.equal(rules.canWritePreEvacuationReport(role, false), true, `${role} may enter the first report`);

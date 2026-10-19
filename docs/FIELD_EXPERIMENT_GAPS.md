@@ -14,6 +14,10 @@ This repo is a development prototype, not a field-ready shared system. This regi
 | Role separation | Real Supabase Auth; role comes from the server profile; RLS audited (`docs/RLS_AUDIT_v1.md`). | Unit (platoon/company) scoping; any active account can currently list and join any open incident. |
 | Watchdog timers | Browser-derived for visibility; server-side `watchdog_alerts` exist for some rules. | Durable backend watchdog worker with idempotent alert dedupe. |
 
+## Before Testing With an Admin Account
+
+Until V2.99.35 / `database/047`, an admin account could not create patients on the server (RLS), and the phone did not make that obvious. With `047` applied, admin works like a medic for patient intake. A patient the server rejects for any reason now shows "לא הגיע לשרת" on its tile and a red banner on its card, and the sync pill turns red. Treat any red pill during a test as "command cannot see this", and use the banner's resend button once the cause is fixed.
+
 ## Trap Status Decision
 
 The patient flow treats extraction status as binary:

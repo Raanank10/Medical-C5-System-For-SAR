@@ -100,7 +100,7 @@ const EXTERNAL_REPORT_EVENTS = ["EXTERNAL_REPORT_CREATED", "EXTERNAL_REPORT_LINK
 // once MDA reports back. Command roles only: the medic records the same two fields on
 // PATIENT_HANDED_OVER itself when they are known at handover. Never changes triage or status.
 const EVACUATION_TRACKING_EVENTS = ["PATIENT_EVACUATION_UPDATED"];
-// Casualties evacuated before the medical force arrived (database/048-049). Every medical role may
+// Casualties evacuated before the medical force arrived (database/049-050). Every medical role may
 // send it; who actually gets to set or change the report is decided in project_pre_evacuation():
 // the first medical reporter to sync creates it, after that only pc/cc/admin replace it. A
 // rejected version is still accepted here and kept in the events log as the audit record.
