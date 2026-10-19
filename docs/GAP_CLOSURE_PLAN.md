@@ -34,11 +34,12 @@ Some WPs cannot finish without one of these. Ask before starting the WP that nee
 
 | ID | Decision | Needed by | Options |
 | --- | --- | --- | --- |
-| D1 | Tourniquet timing has two different rule sets. The client (`src/domain/rules.js` `tourniquetTimer`) uses a 45 min notice, 60 min warning and 120 min critical from application. The server (`project_tourniquet_events()` in `database/001_postgresql_schema_v1.2.sql`, around line 1180) schedules reassessment every 30 min for crush/uncertain and 60 min for bleeding, clamped to 10-120. Which one is authoritative for remote devices and for server watchdogs? | WP-2, WP-12 | (a) show the client rule everywhere and keep the server value as data only; (b) align the server to the client; (c) clinical review first (`CLINICAL_GOVERNANCE_REVIEW_FRAMEWORK.md`) |
+| D1 | **Decided 2026-10-19 by the owner: the server rule is authoritative; the phone is aligned to it.** Remaining detail to confirm before WP-2: whether the phone keeps its 120 min total-time critical alert on top of the server's reassessment cadence. Original question: tourniquet timing has two different rule sets. The client (`src/domain/rules.js` `tourniquetTimer`) uses a 45 min notice, 60 min warning and 120 min critical from application. The server (`project_tourniquet_events()` in `database/001_postgresql_schema_v1.2.sql`, around line 1180) schedules reassessment every 30 min for crush/uncertain and 60 min for bleeding, clamped to 10-120. Which one is authoritative for remote devices and for server watchdogs? | WP-2, WP-12 | (a) show the client rule everywhere and keep the server value as data only; (b) align the server to the client; (c) clinical review first (`CLINICAL_GOVERNANCE_REVIEW_FRAMEWORK.md`) |
 | D2 | Two inventory ledger tables, `inventory_ledger` (v1.1) and `inventory_ledger_v12`. Neither is written by the client today. | WP-9 | (a) keep `inventory_ledger_v12`, archive v1.1; (b) the reverse; (c) defer inventory sync |
 | D3 | Who sees reinforcement and death-certification requests from other devices? | WP-5 | Suggested: requests visible to pc/cc/chamal/physician/admin of the incident; death-certification requests also to every physician in the incident |
 | D4 | Alert acknowledgment: event only, or also mark `watchdog_alerts.acknowledged_at` on the server? | WP-4 | Suggested: both, via a projection |
 | D5 | `demo/rescue-app.html`: keep as a byte-identical copy, generate it, or replace with a redirect to `index.html`? | WP-14 | Check what the GitHub Pages demo link and smoke scripts rely on before choosing |
+| D7 | Admin patient creation (WP-0b): RLS blocks it, `sync-log` and `AUTH_MATRIX` allow it. | WP-0b | (a) add `admin` to `patients_insert`; (b) keep admin blocked and make the client refuse patient creation for admin with a clear message; also make any rejected patient-create highly visible on the phone in both cases |
 | D6 | Supabase Pro plan, required for leaked-password protection. | Track T5 | Cost decision |
 
 ## Work packages
@@ -287,7 +288,8 @@ These need a decision, people or money rather than a code change in this repo. L
 
 | WP | Priority | Status | PR | Notes |
 | --- | --- | --- | --- | --- |
-| WP-0 Live baseline | - | Not started | | |
+| WP-0 Live baseline | - | Done 2026-10-19 | | see Baseline results; found WP-0b |
+| WP-0b Admin cannot create patients | P0 | Not started | | blocks all field testing with an admin account |
 | WP-1 Event contract check | guardrail | Not started | | |
 | WP-2 Tourniquets | P1 | Not started | | needs D1 |
 | WP-3 Treatments, intake vitals, injuries | P1 | Not started | | |
@@ -305,4 +307,20 @@ These need a decision, people or money rather than a code change in this repo. L
 
 ## Baseline results
 
-Fill in from WP-0.
+Run 2026-10-19, read-only, against the live project (`btvvjmuwdzirjyauyijx`).
+
+**Volume.** 35 events in total across 4 incidents. 25 are in the closed seeded incident `...a1` (August verification runs, synthetic test devices). The two active incidents (`66898709...`, opened 2026-10-16, and `854d1d17...`, 2026-10-18) have one event each (`INCIDENT_OPENED`) and **0 patients**. No real multi-phone run has reached the server yet, so most gaps below are confirmed from code, not from data.
+
+| Check | Result | Meaning |
+| --- | --- | --- |
+| `tourniquets` rows | 0 | WP-2 confirmed: no tourniquet has ever been projected |
+| `watchdog_alerts` acknowledged | 1 of 2 (test data) | WP-4: no client path writes acknowledgment |
+| `patients` with `last_vitals_at is null` | 4 of 5 | consistent with WP-3 (intake vitals not sent) |
+| `supply_requests` rows | 0, although 4 `RESUPPLY_REQUESTED_*` events exist | the events are from `033`/`034` verification devices in the closed incident; rows were most likely cleaned up after verification. Re-check after the next real resupply test |
+| `inventory_ledger` / `inventory_ledger_v12` rows | 0 / 0 | WP-9 confirmed |
+| `BUILDING_STATUS_UPDATED` events | 3 (August) | WP-8 still needs a read-back check |
+| `sync_ingestion_errors` unresolved | 18 of 18 | nobody resolves quarantined events; see WP-0b |
+
+**New finding: WP-0b, an admin account cannot create patients.** On 2026-10-17 and 2026-10-18 two real phones (`PHONE-SPSZ`, `PHONE-LTKE`) logged in as **admin**, members of active incident `66898709...`, created 5 quick patients. Every `QUICK_PATIENT_CREATED` was rejected with `new row violates row-level security policy for table "patients"`. Everything attached to those patients (2 `TOURNIQUET_APPLIED`, 1 `VITALS_RECORDED`, 2 `PATIENT_HANDED_OVER`) then failed the `events_patient_id_fkey` foreign key. Cause: the live `patients_insert` policy allows only `medic`, `pc`, `paramedic`, `rpc`, `rcc`, while `sync-log` and the client `AUTH_MATRIX` ("Register new patient": admin `yes`) allow admin. The phone kept working locally, so the tester had no clear sign that nothing reached the server. Fix options are under "Decisions" (D7).
+
+The two Oct 17 `TOURNIQUET_APPLIED` payloads did carry `patient_id` and `limb` (path at `index.html` ~7588), which confirms that path is shaped correctly for `project_tourniquet_events()`.
