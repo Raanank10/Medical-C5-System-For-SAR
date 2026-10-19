@@ -289,10 +289,10 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP | Priority | Status | PR | Notes |
 | --- | --- | --- | --- | --- |
 | WP-0 Live baseline | - | Done 2026-10-19 | | see Baseline results; found WP-0b |
-| WP-0b Admin cannot create patients | P0 | Built, awaiting live apply of 047 | | V2.99.34; D7 = allow admin; rejected patients now loud on the phone |
+| WP-0b Admin cannot create patients | P0 | Built, awaiting live apply of 047 | #76 | V2.99.35; D7 = allow admin; rejected patients now loud on the phone |
 | WP-1 Event contract check | guardrail | Not started | | |
-| WP-2 Tourniquets | P1 | Not started | | needs D1 |
-| WP-3 Treatments, intake vitals, injuries | P1 | Not started | | |
+| WP-2 Tourniquets | P1 | Partly done | #73 | V2.99.34: apply events carry patient id, limb and time; other devices read active `tourniquets` rows. Left: align the timer to the server cadence (D1), keep the 120 min critical alert, send reassessment and real release |
+| WP-3 Treatments, intake vitals, injuries | P1 | Partly done | #73 | V2.99.34: full-flow vitals and the quick-capture flag now carry the patient id. Left: treatments as `INTERVENTION_RECORDED`, injuries, the `queueEventOnce` scope bug (re-check after #73) |
 | WP-4 Alert acknowledgment | P1 | Not started | | needs D4 |
 | WP-5 Reinforcement / death-cert requests | P1 | Not started | | needs D3 |
 | WP-6 PC resupply decisions | P2 | Not started | | |
