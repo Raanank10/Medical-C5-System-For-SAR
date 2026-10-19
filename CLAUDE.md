@@ -40,6 +40,7 @@ node scripts/browser_command_scope_test.js        # command hierarchy: CC (compa
 node scripts/browser_platoon_security_test.js     # database/045 client side: no self-join, CC roster + PC assignment, PC sees only its platoon
 node scripts/browser_admin_users_test.js          # admin user management + invite-link handling, stubbed Supabase client
 node scripts/browser_remote_patient_and_resupply_test.js  # remote patients show no placeholder vitals; medic resupply requests are queued for push
+node scripts/browser_tourniquet_sync_test.js      # tourniquets pushed per patient/limb from every entry path, read back on other devices
 
 # Analytics package
 cd analytics/c5_sentinel_sar_analytics_v1_1
