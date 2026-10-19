@@ -289,7 +289,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP | Priority | Status | PR | Notes |
 | --- | --- | --- | --- | --- |
 | WP-0 Live baseline | - | Done 2026-10-19 | | see Baseline results; found WP-0b |
-| WP-0b Admin cannot create patients | P0 | Not started | | blocks all field testing with an admin account |
+| WP-0b Admin cannot create patients | P0 | Built, awaiting live apply of 047 | | V2.99.34; D7 = allow admin; rejected patients now loud on the phone |
 | WP-1 Event contract check | guardrail | Not started | | |
 | WP-2 Tourniquets | P1 | Not started | | needs D1 |
 | WP-3 Treatments, intake vitals, injuries | P1 | Not started | | |

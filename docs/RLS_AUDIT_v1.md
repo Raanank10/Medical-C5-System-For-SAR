@@ -229,6 +229,10 @@ Checks that need a raw `UPDATE`/`DELETE` (a pc updating or deleting another plat
 
 Not changed: `logistics_officer` keeps self-join (its supply work spans incidents, not part of the decision); `app.can_write_incident_event` still grants pc blanket, but no live policy uses it (checked).
 
+## Follow-up: admin patient creation (`database/047`)
+
+Found from live data on 2026-10-19 (`docs/GAP_CLOSURE_PLAN.md` WP-0): two phones logged in as admin, members of an active incident, had every `QUICK_PATIENT_CREATED` quarantined with `PATIENT_CREATE_FAILED` ("new row violates row-level security policy for table patients"), and every later event for those patients failed `events_patient_id_fkey`. `patients_insert` (last defined in `020`) allowed medic/pc/paramedic/rpc/rcc only, while `sync-log`'s role gate and the client `AUTH_MATRIX` allow admin. A live scan of every INSERT/UPDATE policy whose role list lacks admin found only `patients_insert`, `death_confirmations_insert` (physician-only by design) and `high_risk_override_insert`. `047` adds `admin` to `patients_insert` only, by the repo owner's decision (admin is the technical test role and must be able to run the full field flow; revisit before any real-world use). The incident-membership check is unchanged, so an admin still cannot create a patient in an incident it has not joined.
+
 ## Explicitly not re-litigated here
 
 - T6 (leaked-password protection) and T5 (service-role key handling) — out of scope, not RLS/authorization, already tracked in `docs/THREAT_MODEL.md`.
