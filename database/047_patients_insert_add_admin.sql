@@ -15,7 +15,9 @@
 -- Decision (repo owner, 2026-10-19): allow admin, matching AUTH_MATRIX. Admin is the technical
 -- test role and must be able to run the full field flow. Revisit before any real-world use.
 --
--- Same shape as 020, only 'admin' added. The incident-membership check is unchanged.
+-- Same shape as 020, only 'admin' added. app.can_access_incident() is unchanged; it already lets
+-- admin (like cc/chamal/rpc/rcc/physician) access every incident without a membership row, so admin
+-- can now create a patient in any incident, as rpc/rcc already could.
 
 drop policy if exists patients_insert on patients;
 create policy patients_insert on patients for insert to authenticated with check (
