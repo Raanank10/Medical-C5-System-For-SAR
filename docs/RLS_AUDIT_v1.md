@@ -235,6 +235,8 @@ Found from live data on 2026-10-19 (`docs/GAP_CLOSURE_PLAN.md` WP-0): two phones
 
 The `patients_insert` part was verified live on 2026-10-19 after the owner applied it, by role impersonation inside a single block that was forced to roll back (no data left behind): admin in a joined incident ALLOWED; admin in a non-joined incident ALLOWED (by design, see above); logistics_officer with a membership row DENIED (`new row violates row-level security policy`); medic with a membership row ALLOWED (regression check). `get_advisors` (security) shows nothing new: the remaining WARN/INFO items are the pre-existing client-facing `SECURITY DEFINER` RPCs, the two intentional no-policy tables covered above, and leaked-password protection (`docs/THREAT_MODEL.md` T6).
 
+The rest of `047` and all of `048` were applied by the owner and verified live on 2026-10-19, again by role impersonation in one block forced to roll back (no data left behind): admin created a patient and set triage red; admin inserted into `death_confirmations` and `high_risk_override_confirmations` (both ALLOWED); a physician then set the same patient yellow one minute later, inside the 5-minute window, and the projected triage stayed red (admin rank 6 beats physician 5) with one `conflict_log` row recording the override. `project_patient_state()` and `app.role_authority_rank()` remain non-executable by `authenticated`. `get_advisors` (security) unchanged: the same pre-existing items listed above.
+
 ## Explicitly not re-litigated here
 
 - T6 (leaked-password protection) and T5 (service-role key handling) — out of scope, not RLS/authorization, already tracked in `docs/THREAT_MODEL.md`.
