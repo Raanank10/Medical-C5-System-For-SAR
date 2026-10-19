@@ -31,6 +31,17 @@ npm install
 npm run test:browser-smoke            # or: node scripts/browser_smoke_test.js
 ```
 
+## Event Contract
+
+Every event type `index.html` writes is classified in `src/domain/event-contract.json`, and `python scripts/check_repo.py` (CI) fails on any type that is not. The lists are:
+
+- `synced`: must equal `SYNC_ELIGIBLE_EVENT_TYPES` in `index.html`, and every entry must be allowed by `ROLE_ALLOWED_EVENT_TYPES` in `supabase/functions/sync-log/index.ts`.
+- `local_only`: written on the device on purpose (patient-card timeline text, device-local audit), grouped by reason.
+- `not_events`: alert or UI type strings that look like event names but are never written as events.
+- `known_gaps`: should reach the server but does not yet, keyed by the `docs/GAP_CLOSURE_PLAN.md` work package that will fix it. Moving a type out of here is part of finishing that work package.
+
+When you add an event, classify it in the same change. A new synced type also needs the `event_type` enum (a numbered migration) and `sync-log`. The check reads string literals in `type:`/`eventType:`/`queueEventOnce(...)`/`projectPatientStatus(...)` positions; a type built entirely at runtime is not seen.
+
 ## Validating SQL Drafts
 
 `database/*.sql` are draft files, not an executable migration chain (see "Current Technical Debt" below), so there's no automated migration runner to check them against. Two layers of validation exist:

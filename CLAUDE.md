@@ -62,6 +62,7 @@ CI (`.github/workflows/validate.yml`) runs exactly two things on every PR and pu
 - the domain-rules module inlined in `index.html`/`demo/rescue-app.html` hasn't drifted from `src/domain/rules.js`
 - `database/*.sql` structural sanity: balanced parens/`$$` dollar-quoted blocks, and every `references table(...)` target resolves to a real `create table` — see docs/DEVELOPMENT.md's "Validating SQL Drafts" for what this does and doesn't catch (it's not a real SQL parser; a Postgres instance is still the only full validation)
 - every `*.py` file parses without a syntax error
+- every event type `index.html` writes is classified in `src/domain/event-contract.json` (`synced` must equal `SYNC_ELIGIBLE_EVENT_TYPES` and be allowed by `sync-log`; otherwise `local_only`, `not_events` or `known_gaps` with its work package) - see docs/DEVELOPMENT.md "Event Contract"
 
 ## Architecture
 
