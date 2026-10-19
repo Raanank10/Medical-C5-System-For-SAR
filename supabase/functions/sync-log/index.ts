@@ -100,6 +100,11 @@ const EXTERNAL_REPORT_EVENTS = ["EXTERNAL_REPORT_CREATED", "EXTERNAL_REPORT_LINK
 // once MDA reports back. Command roles only: the medic records the same two fields on
 // PATIENT_HANDED_OVER itself when they are known at handover. Never changes triage or status.
 const EVACUATION_TRACKING_EVENTS = ["PATIENT_EVACUATION_UPDATED"];
+// Casualties evacuated before the medical force arrived (database/048-049). Every medical role may
+// send it; who actually gets to set or change the report is decided in project_pre_evacuation():
+// the first medical reporter to sync creates it, after that only pc/cc/admin replace it. A
+// rejected version is still accepted here and kept in the events log as the audit record.
+const PRE_EVACUATION_EVENTS = ["SITE_PRE_EVACUATION_REPORTED"];
 // Real physician-only clinical death confirmation (docs/CONFLICT_RESOLUTION_DECISION.md's
 // "Official death certification" section) - deliberately its own array, not folded into
 // CLINICAL_EVENTS, since CLINICAL_EVENTS is shared by medic/pc/paramedic/physician and
@@ -130,9 +135,9 @@ const MEDIC_SUPPLY_EVENTS = [
 ];
 
 const ROLE_ALLOWED_EVENT_TYPES: Record<string, string[]> = {
-  medic: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, "INCIDENT_DRAFT_CREATED", "MEDIC_SITE_CLOSE_REQUESTED", ...MEDIC_SUPPLY_EVENTS, ...SYSTEM_EVENTS],
-  pc: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, ...INCIDENT_COMMAND_EVENTS, ...SITE_AUTHORITY_EVENTS, ...SUPPLY_LOGISTICS_EVENTS, ...EXTERNAL_REPORT_EVENTS, ...EVACUATION_TRACKING_EVENTS, ...SYSTEM_EVENTS],
-  cc: [...INCIDENT_COMMAND_EVENTS, ...SITE_AUTHORITY_EVENTS, ...SUPPLY_LOGISTICS_EVENTS, ...EXTERNAL_REPORT_EVENTS, ...EVACUATION_TRACKING_EVENTS, ...SYSTEM_EVENTS],
+  medic: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, "INCIDENT_DRAFT_CREATED", "MEDIC_SITE_CLOSE_REQUESTED", ...MEDIC_SUPPLY_EVENTS, ...PRE_EVACUATION_EVENTS, ...SYSTEM_EVENTS],
+  pc: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, ...INCIDENT_COMMAND_EVENTS, ...SITE_AUTHORITY_EVENTS, ...SUPPLY_LOGISTICS_EVENTS, ...EXTERNAL_REPORT_EVENTS, ...EVACUATION_TRACKING_EVENTS, ...PRE_EVACUATION_EVENTS, ...SYSTEM_EVENTS],
+  cc: [...INCIDENT_COMMAND_EVENTS, ...SITE_AUTHORITY_EVENTS, ...SUPPLY_LOGISTICS_EVENTS, ...EXTERNAL_REPORT_EVENTS, ...EVACUATION_TRACKING_EVENTS, ...PRE_EVACUATION_EVENTS, ...SYSTEM_EVENTS],
   chamal: [...INCIDENT_COMMAND_EVENTS, ...SITE_AUTHORITY_EVENTS, ...EXTERNAL_REPORT_EVENTS, ...EVACUATION_TRACKING_EVENTS, ...SYSTEM_EVENTS],
   logistics_officer: [...SUPPLY_LOGISTICS_EVENTS, ...SYSTEM_EVENTS],
   rpc: [...FIRST_RESPONDER_EVENTS, ...SITE_AUTHORITY_EVENTS, ...SYSTEM_EVENTS],
@@ -142,10 +147,10 @@ const ROLE_ALLOWED_EVENT_TYPES: Record<string, string[]> = {
   // PATIENT_STATUS_UPDATED and defeat the point of the F3 role-authority
   // tie-break (docs/CONFLICT_RESOLUTION_DECISION.md). physician = cc's full
   // command-adjacent scope plus medic/pc-level clinical write access.
-  physician: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, ...INCIDENT_COMMAND_EVENTS, ...SITE_AUTHORITY_EVENTS, ...SUPPLY_LOGISTICS_EVENTS, ...EXTERNAL_REPORT_EVENTS, ...EVACUATION_TRACKING_EVENTS, ...SYSTEM_EVENTS, ...PHYSICIAN_ONLY_EVENTS],
+  physician: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, ...INCIDENT_COMMAND_EVENTS, ...SITE_AUTHORITY_EVENTS, ...SUPPLY_LOGISTICS_EVENTS, ...EXTERNAL_REPORT_EVENTS, ...EVACUATION_TRACKING_EVENTS, ...PRE_EVACUATION_EVENTS, ...SYSTEM_EVENTS, ...PHYSICIAN_ONLY_EVENTS],
   // Exact mirror of medic's scope - paramedic is a clinical-seniority tier
   // for the F3 tie-break, not a different set of app capabilities.
-  paramedic: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, "INCIDENT_DRAFT_CREATED", "MEDIC_SITE_CLOSE_REQUESTED", ...MEDIC_SUPPLY_EVENTS, ...SYSTEM_EVENTS],
+  paramedic: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, "INCIDENT_DRAFT_CREATED", "MEDIC_SITE_CLOSE_REQUESTED", ...MEDIC_SUPPLY_EVENTS, ...PRE_EVACUATION_EVENTS, ...SYSTEM_EVENTS],
 };
 
 function isEventTypeAllowed(role: string, type: string): boolean {

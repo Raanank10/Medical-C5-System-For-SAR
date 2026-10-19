@@ -299,6 +299,49 @@
     return !expected.includes(mdaClassification);
   }
 
+  // Casualties evacuated before the medical force arrived (V2.99.35, database/049). The first
+  // medical staff on site enters the report; after that only pc / cc (and admin) may change it.
+  // The server applies the same rule in project_pre_evacuation(), first sync wins; this copy
+  // decides what the device lets its user edit. Conditions map onto the triage colors that the
+  // site counters already use: light = green, moderate = yellow, severe = red.
+  const PRE_EVAC_CONDITIONS = Object.freeze(["light", "moderate", "severe"]);
+  const PRE_EVAC_CONDITION_TO_TRIAGE = Object.freeze({ light: "green", moderate: "yellow", severe: "red" });
+  const PRE_EVAC_EVACUATORS = Object.freeze([
+    "mda", "united_hatzalah", "yedidim", "fire", "police", "idf", "civilian", "self", "other",
+  ]);
+  const PRE_EVAC_FIRST_REPORT_ROLES = Object.freeze(["medic", "paramedic", "physician", "pc", "cc", "admin"]);
+  const PRE_EVAC_EDIT_ROLES = Object.freeze(["pc", "cc", "admin"]);
+  const PRE_EVAC_MAX_GROUPS = 50;
+  const PRE_EVAC_MAX_GROUP_COUNT = 9999;
+
+  function canWritePreEvacuationReport(role, alreadyReported) {
+    return (alreadyReported ? PRE_EVAC_EDIT_ROLES : PRE_EVAC_FIRST_REPORT_ROLES).includes(role);
+  }
+
+  function normalizePreEvacuationGroups(groups) {
+    if (!Array.isArray(groups)) return [];
+    const out = [];
+    for (const g of groups.slice(0, PRE_EVAC_MAX_GROUPS)) {
+      if (!g || typeof g !== "object") continue;
+      const count = Number(g.count);
+      if (!Number.isInteger(count) || count < 1 || count > PRE_EVAC_MAX_GROUP_COUNT) continue;
+      if (!PRE_EVAC_CONDITIONS.includes(g.condition)) continue;
+      const evacuatedBy = PRE_EVAC_EVACUATORS.includes(g.evacuatedBy) ? g.evacuatedBy : "other";
+      const destination = String(g.destination || "").trim().slice(0, 200);
+      out.push({ count, condition: g.condition, evacuatedBy, destination });
+    }
+    return out;
+  }
+
+  function preEvacuationTotals(groups) {
+    const totals = { light: 0, moderate: 0, severe: 0, total: 0 };
+    for (const g of normalizePreEvacuationGroups(groups)) {
+      totals[g.condition] += g.count;
+      totals.total += g.count;
+    }
+    return totals;
+  }
+
   return {
     AVPU_RANK,
     DEVICE_SILENCE_MS,
@@ -311,6 +354,7 @@
     VITALS_INTERVAL_MS_BY_TRIAGE,
     VITALS_WARN_BUFFER_MS,
     canChangePatientStatus,
+    canWritePreEvacuationReport,
     computeMstartTriage,
     detectDeterioration,
     elapsedMinutes,
@@ -327,8 +371,15 @@
     mdaClassificationDiffersFromTriage,
     minutesToStockout,
     needsVitals,
+    normalizePreEvacuationGroups,
     PEDIATRIC_AGE_CUTOFF,
     PEDIATRIC_HIGH_RISK_DOSE_LIMITS,
+    PRE_EVAC_CONDITIONS,
+    PRE_EVAC_CONDITION_TO_TRIAGE,
+    PRE_EVAC_EDIT_ROLES,
+    PRE_EVAC_EVACUATORS,
+    PRE_EVAC_FIRST_REPORT_ROLES,
+    preEvacuationTotals,
     suggestedSweepColor,
     suggestMstartTriage,
     supplyBurnAlertLevel,
