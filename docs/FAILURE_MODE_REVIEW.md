@@ -52,7 +52,7 @@ The command view's sync-freshness indicator (`.sync-pill`, fresh/stale/offline) 
 
 | # | Failure mode | Status |
 |---|---|---|
-| F1 | Outbox cap could silently drop unsynced data | **Fixed** in this review (verified with 3 Playwright cases) |
+| F1 | Outbox cap could silently drop unsynced data | **Fixed** in this review (verified with 3 Playwright cases, committed as `scripts/test_outbox_eviction.js`) |
 | F2 | Platform-level `localStorage` eviction | Open — architectural, addressed by Phase 4's move away from `localStorage` for new apps |
 | F3 | Cross-device concurrent edits to the same patient | **Fixed** — hybrid field-level-merge + role-authority resolution, `docs/CONFLICT_RESOLUTION_DECISION.md`. Built ahead of `docs/PHASE_4_PLAN.md` (`database/019`-`021`), verified live |
 | F4 | Passive stale-data indicator may go unnoticed | Open — needs field-validation data before deciding whether to make it more aggressive |
