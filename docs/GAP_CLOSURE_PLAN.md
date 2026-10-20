@@ -292,7 +292,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-0b Admin full access | P0 | Done: 047 + 048 live and verified 2026-10-19 | #75, #76 | owner: admin may do everything (D7), wins tie-breaks; history stays append-only |
 | WP-1 Event contract check | guardrail | Done | #77 | `src/domain/event-contract.json` + `check_repo.py`; 68 synced, 27 local-only, 18 alert types, 34 known gaps across WP-2b/3/5/6/7/8/9/11. Each WP removes its entries from `known_gaps` |
 | WP-2 Tourniquets | P1 | Mostly done (#73, V2.99.34) | #73 | WP-2b remainder: release, reassessment, later limb, close row at handover, live check |
-| WP-3 Treatments, intake vitals, injuries | P1 | Done (V2.99.36) | this PR | treatments as `INTERVENTION_RECORDED`/`AIRWAY_MANAGED`, intake medications and pediatric overrides patient-scoped after the create event, injury zones in the create payload, vitals-modal medications; verified live (rolled back). Follow-up: `vw_patient_treatment_history` does not list `AIRWAY_MANAGED`; vitals-modal tourniquet is WP-2b |
+| WP-3 Treatments, intake vitals, injuries | P1 | Done (V2.99.37) | #80 | treatments as `INTERVENTION_RECORDED`/`AIRWAY_MANAGED`, intake medications and pediatric overrides patient-scoped after the create event, injury zones in the create payload, vitals-modal medications; verified live (rolled back). Follow-up: `vw_patient_treatment_history` does not list `AIRWAY_MANAGED`; vitals-modal tourniquet is WP-2b |
 | WP-4 Alert acknowledgment | P1 | Not started | | needs D4 |
 | WP-5 Reinforcement / death-cert requests | P1 | Not started | | needs D3 |
 | WP-6 PC resupply decisions | P2 | Not started | | |

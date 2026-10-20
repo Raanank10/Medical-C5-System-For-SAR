@@ -243,4 +243,49 @@ assert.equal(rules.mdaClassificationDiffersFromTriage("pending", "minor"), false
 assert.equal(rules.mdaClassificationDiffersFromTriage("red", null), false);
 assert.equal(rules.mdaClassificationDiffersFromTriage("red", "bogus"), false);
 
+// Pre-evacuation report (database/050): the first medical staff on site enters it, after that only
+// pc / cc (and admin) may change it. Same rule the server trigger applies.
+for (const role of ["medic", "paramedic", "physician", "pc", "cc", "admin"]) {
+  assert.equal(rules.canWritePreEvacuationReport(role, false), true, `${role} may enter the first report`);
+}
+for (const role of ["rpc", "rcc", "chamal", "logistics", "logistics_officer", undefined]) {
+  assert.equal(rules.canWritePreEvacuationReport(role, false), false, `${role} may not enter it`);
+}
+for (const role of ["pc", "cc", "admin"]) {
+  assert.equal(rules.canWritePreEvacuationReport(role, true), true, `${role} may change it`);
+}
+for (const role of ["medic", "paramedic", "physician", "rpc", "chamal"]) {
+  assert.equal(rules.canWritePreEvacuationReport(role, true), false, `${role} may not change it once entered`);
+}
+assert.deepEqual(rules.PRE_EVAC_CONDITION_TO_TRIAGE, { light: "green", moderate: "yellow", severe: "red" });
+assert.deepEqual(
+  rules.normalizePreEvacuationGroups([
+    { count: 3, condition: "light", evacuatedBy: "mda", destination: "  Hospital A  " },
+    { count: "2", condition: "severe", evacuatedBy: "civilian" },
+    { count: 1, condition: "moderate", evacuatedBy: "unknown-org", destination: "B" },
+    { count: 0, condition: "light", evacuatedBy: "mda" },
+    { count: 1.5, condition: "light", evacuatedBy: "mda" },
+    { count: 4, condition: "critical", evacuatedBy: "mda" },
+    { count: 10000, condition: "light", evacuatedBy: "mda" },
+    null,
+  ]),
+  [
+    { count: 3, condition: "light", evacuatedBy: "mda", destination: "Hospital A" },
+    { count: 2, condition: "severe", evacuatedBy: "civilian", destination: "" },
+    { count: 1, condition: "moderate", evacuatedBy: "other", destination: "B" },
+  ],
+);
+assert.deepEqual(rules.normalizePreEvacuationGroups(undefined), []);
+assert.equal(rules.normalizePreEvacuationGroups(Array.from({ length: 60 }, () => ({ count: 1, condition: "light" }))).length, 50);
+assert.deepEqual(
+  rules.preEvacuationTotals([
+    { count: 3, condition: "light", evacuatedBy: "mda" },
+    { count: 2, condition: "light", evacuatedBy: "self" },
+    { count: 1, condition: "moderate", evacuatedBy: "fire" },
+    { count: 4, condition: "severe", evacuatedBy: "united_hatzalah" },
+    { count: 9, condition: "bogus" },
+  ]),
+  { light: 5, moderate: 1, severe: 4, total: 10 },
+);
+
 console.log("Domain rule tests passed.");

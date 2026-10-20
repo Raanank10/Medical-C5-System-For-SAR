@@ -880,7 +880,7 @@ textarea{resize:vertical;min-height:70px;}
   <div class="demo-strip">
     <div>
       <div class="demo-strip-title"><span style="display:inline-block;animation:blink 1.2s infinite;color:var(--red)">ALARM</span> אזעקה → נסיעה → הגעה</div>
-      <div class="demo-strip-sub">לפני שיש פצועים, החובש מזין מוקד משוער ופצועים קלים שכבר פונו. זה בונה לחוג"ד תמונת מצב עוד לפני הטיפול הראשון.</div>
+      <div class="demo-strip-sub">לפני שיש פצועים, החובש מזין מוקד משוער ופצועים שכבר פונו (מי פינה, לאן ובאיזה מצב). זה בונה לחוג"ד תמונת מצב עוד לפני הטיפול הראשון.</div>
     </div>
     <div class="sync-pill">LOCAL</div>
   </div>
@@ -915,23 +915,10 @@ textarea{resize:vertical;min-height:70px;}
     <input type="text" id="enroute-zone" placeholder="לדוגמה: קומה 2, אגף צפוני, ליד חדר מדרגות" style="margin-bottom:12px" oninput="siteData.currentZone=this.value">
     <div class="field-label">דיווח ראשוני / צפי נפגעים</div>
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px">
-      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px">מונה מוקד בלבד: נספר בתמונת החוג"ד בלי לפתוח רשומות פצוע בודדות.</div>
-      <div style="display:grid;grid-template-columns:1fr;gap:10px">
-        <div><div class="field-label" style="color:var(--green)">פצועים קלים שפונו כבר</div><div class="vital-ctrl" style="justify-content:center"><button class="vital-btn" style="border-radius:10px 0 0 10px" onclick="changeInitialEvac('green',-1)">−</button><div class="vital-val" id="enroute-evac-green" style="min-width:64px">0</div><button class="vital-btn" style="border-radius:0 10px 10px 0" onclick="changeInitialEvac('green',1)">+</button></div></div>
-        <div><div class="field-label" style="color:var(--yellow)">פצועים בינוניים שפונו כבר</div><div class="vital-ctrl" style="justify-content:center"><button class="vital-btn" style="border-radius:10px 0 0 10px" onclick="changeInitialEvac('yellow',-1)">−</button><div class="vital-val" id="enroute-evac-yellow" style="min-width:64px">0</div><button class="vital-btn" style="border-radius:0 10px 10px 0" onclick="changeInitialEvac('yellow',1)">+</button></div></div>
-        <div><div class="field-label" style="color:var(--red)">פצועים קשים שפונו / דווחו</div><div class="vital-ctrl" style="justify-content:center"><button class="vital-btn" style="border-radius:10px 0 0 10px" onclick="changeInitialEvac('red',-1)">−</button><div class="vital-val" id="enroute-evac-red" style="min-width:64px">0</div><button class="vital-btn" style="border-radius:0 10px 10px 0" onclick="changeInitialEvac('red',1)">+</button></div></div>
-      </div>
-      <div class="field-label" style="margin-top:12px">לאן פונו / הערה קצרה</div>
-      <input type="text" id="enroute-evac-summary" placeholder="לדוגמה: 3 קלים למד״א ברחוב, 1 בינוני לשער צפוני" style="margin-bottom:12px" oninput="siteData.initialEvacuation.summary=this.value">
-      <div class="field-label">מקור הדיווח</div>
-      <div class="chip-row" id="enroute-report-source-grid">
-        <button class="chip" onclick="selectInitialReportSource(this,'civilian')">אזרח</button>
-        <button class="chip" onclick="selectInitialReportSource(this,'fire')">כב״א</button>
-        <button class="chip" onclick="selectInitialReportSource(this,'mda')">מד״א</button>
-        <button class="chip" onclick="selectInitialReportSource(this,'uh')">איחוד הצלה</button>
-        <button class="chip" onclick="selectInitialReportSource(this,'police')">משטרה</button>
-        <button class="chip" onclick="selectInitialReportSource(this,'other')">אחר</button>
-      </div>
+      <div class="field-label">פונו לפני הגעת כוח רפואי</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px">מי פינה, לאן ובאיזה מצב. נספר בתמונת החוג"ד בלי לפתוח רשומות פצוע. הגורם הרפואי הראשון בזירה מזין; אחר כך רק חוג״ד / מ״פ רפואה משנים.</div>
+      <div data-preevac-summary></div>
+      <button class="btn-secondary" data-preevac-open style="margin-top:8px" onclick="openPreEvacuationSheet()">פינוי מוקדם — הזנה / צפייה</button>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
         <input type="number" id="enroute-est-trapped" placeholder="לכודים משוערים" oninput="siteData.expectedCasualties.trapped=Number(this.value)||0">
         <input type="number" id="enroute-est-immobile" placeholder="לא יכולים לנוע" oninput="siteData.expectedCasualties.immobile=Number(this.value)||0">
@@ -1083,23 +1070,9 @@ textarea{resize:vertical;min-height:70px;}
       </div>
       <div class="field-label">פינוי ראשוני</div>
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px">
-        <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px">פצועים שפונו לפני הגעת הכוח הרפואי. נספרים בתמונת חוג"ד בלי לפתוח רשומת פצוע.</div>
-        <div style="display:grid;grid-template-columns:1fr;gap:8px">
-          <div><div class="field-label" style="color:var(--green)">קל</div><div class="vital-ctrl" style="justify-content:center"><button class="vital-btn" style="border-radius:10px 0 0 10px" onclick="changeSiteInitialEvac('green',-1)">−</button><div class="vital-val" id="site-initial-evac-green" style="min-width:64px">0</div><button class="vital-btn" style="border-radius:0 10px 10px 0" onclick="changeSiteInitialEvac('green',1)">+</button></div></div>
-          <div><div class="field-label" style="color:var(--yellow)">בינוני</div><div class="vital-ctrl" style="justify-content:center"><button class="vital-btn" style="border-radius:10px 0 0 10px" onclick="changeSiteInitialEvac('yellow',-1)">−</button><div class="vital-val" id="site-initial-evac-yellow" style="min-width:64px">0</div><button class="vital-btn" style="border-radius:0 10px 10px 0" onclick="changeSiteInitialEvac('yellow',1)">+</button></div></div>
-          <div><div class="field-label" style="color:var(--red)">קשה</div><div class="vital-ctrl" style="justify-content:center"><button class="vital-btn" style="border-radius:10px 0 0 10px" onclick="changeSiteInitialEvac('red',-1)">−</button><div class="vital-val" id="site-initial-evac-red" style="min-width:64px">0</div><button class="vital-btn" style="border-radius:0 10px 10px 0" onclick="changeSiteInitialEvac('red',1)">+</button></div></div>
-        </div>
-        <div class="field-label" style="margin-top:12px">לאן פונו / הערה קצרה</div>
-        <input type="text" id="site-evac-summary" placeholder="אופציונלי: לאן פונו ומה מקור המידע" oninput="siteData.initialEvacuation.summary=this.value">
-        <div class="field-label" style="margin-top:12px">מקור הדיווח</div>
-        <div class="chip-row" id="site-report-source-grid">
-          <button class="chip" onclick="selectInitialReportSource(this,'civilian')">אזרח</button>
-          <button class="chip" onclick="selectInitialReportSource(this,'fire')">כב״א</button>
-          <button class="chip" onclick="selectInitialReportSource(this,'mda')">מד״א</button>
-        <button class="chip" onclick="selectInitialReportSource(this,'uh')">איחוד הצלה</button>
-          <button class="chip" onclick="selectInitialReportSource(this,'police')">משטרה</button>
-          <button class="chip" onclick="selectInitialReportSource(this,'other')">אחר</button>
-        </div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px">פצועים שפונו לפני הגעת הכוח הרפואי: מי פינה, לאן ובאיזה מצב. נספרים בתמונת חוג"ד בלי לפתוח רשומת פצוע.</div>
+        <div data-preevac-summary></div>
+        <button class="btn-secondary" data-preevac-open style="margin-top:8px" onclick="openPreEvacuationSheet()">פינוי מוקדם — הזנה / צפייה</button>
       </div>
       <div class="field-label">תיאור חופשי</div>
       <textarea id="site-description" placeholder="פרטים נוספים, סכנות ידועות..."></textarea>
@@ -2736,6 +2709,49 @@ textarea{resize:vertical;min-height:70px;}
     return !expected.includes(mdaClassification);
   }
 
+  // Casualties evacuated before the medical force arrived (V2.99.36, database/050). The first
+  // medical staff on site enters the report; after that only pc / cc (and admin) may change it.
+  // The server applies the same rule in project_pre_evacuation(), first sync wins; this copy
+  // decides what the device lets its user edit. Conditions map onto the triage colors that the
+  // site counters already use: light = green, moderate = yellow, severe = red.
+  const PRE_EVAC_CONDITIONS = Object.freeze(["light", "moderate", "severe"]);
+  const PRE_EVAC_CONDITION_TO_TRIAGE = Object.freeze({ light: "green", moderate: "yellow", severe: "red" });
+  const PRE_EVAC_EVACUATORS = Object.freeze([
+    "mda", "united_hatzalah", "yedidim", "fire", "police", "idf", "civilian", "self", "other",
+  ]);
+  const PRE_EVAC_FIRST_REPORT_ROLES = Object.freeze(["medic", "paramedic", "physician", "pc", "cc", "admin"]);
+  const PRE_EVAC_EDIT_ROLES = Object.freeze(["pc", "cc", "admin"]);
+  const PRE_EVAC_MAX_GROUPS = 50;
+  const PRE_EVAC_MAX_GROUP_COUNT = 9999;
+
+  function canWritePreEvacuationReport(role, alreadyReported) {
+    return (alreadyReported ? PRE_EVAC_EDIT_ROLES : PRE_EVAC_FIRST_REPORT_ROLES).includes(role);
+  }
+
+  function normalizePreEvacuationGroups(groups) {
+    if (!Array.isArray(groups)) return [];
+    const out = [];
+    for (const g of groups.slice(0, PRE_EVAC_MAX_GROUPS)) {
+      if (!g || typeof g !== "object") continue;
+      const count = Number(g.count);
+      if (!Number.isInteger(count) || count < 1 || count > PRE_EVAC_MAX_GROUP_COUNT) continue;
+      if (!PRE_EVAC_CONDITIONS.includes(g.condition)) continue;
+      const evacuatedBy = PRE_EVAC_EVACUATORS.includes(g.evacuatedBy) ? g.evacuatedBy : "other";
+      const destination = String(g.destination || "").trim().slice(0, 200);
+      out.push({ count, condition: g.condition, evacuatedBy, destination });
+    }
+    return out;
+  }
+
+  function preEvacuationTotals(groups) {
+    const totals = { light: 0, moderate: 0, severe: 0, total: 0 };
+    for (const g of normalizePreEvacuationGroups(groups)) {
+      totals[g.condition] += g.count;
+      totals.total += g.count;
+    }
+    return totals;
+  }
+
   return {
     AVPU_RANK,
     DEVICE_SILENCE_MS,
@@ -2748,6 +2764,7 @@ textarea{resize:vertical;min-height:70px;}
     VITALS_INTERVAL_MS_BY_TRIAGE,
     VITALS_WARN_BUFFER_MS,
     canChangePatientStatus,
+    canWritePreEvacuationReport,
     computeMstartTriage,
     detectDeterioration,
     elapsedMinutes,
@@ -2764,8 +2781,15 @@ textarea{resize:vertical;min-height:70px;}
     mdaClassificationDiffersFromTriage,
     minutesToStockout,
     needsVitals,
+    normalizePreEvacuationGroups,
     PEDIATRIC_AGE_CUTOFF,
     PEDIATRIC_HIGH_RISK_DOSE_LIMITS,
+    PRE_EVAC_CONDITIONS,
+    PRE_EVAC_CONDITION_TO_TRIAGE,
+    PRE_EVAC_EDIT_ROLES,
+    PRE_EVAC_EVACUATORS,
+    PRE_EVAC_FIRST_REPORT_ROLES,
+    preEvacuationTotals,
     suggestedSweepColor,
     suggestMstartTriage,
     supplyBurnAlertLevel,
@@ -2835,7 +2859,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.36';
+const APP_VERSION = '2.99.37';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -2904,7 +2928,10 @@ const SYNC_ELIGIBLE_EVENT_TYPES = new Set([
   // so no other device ever saw a field resupply request. The PC-side status updates
   // (RESUPPLY_APPROVED_FROM_PC_TRUCK etc.) stay local: 033 matches those by the creating
   // device's id, so from the PC's device they would never find the request.
-  'RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE','RESUPPLY_REQUEST_ESCALATED_CC'
+  'RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE','RESUPPLY_REQUEST_ESCALATED_CC',
+  // Casualties evacuated before the medical force arrived (database/049-050): the server keeps
+  // the first medical reporter's version, then accepts changes only from pc/cc/admin.
+  'SITE_PRE_EVACUATION_REPORTED'
 ]);
 const SUPPLY_BASELINE = Object.freeze({tourniquets:3, pressureDressings:4, hemostaticGauze:2, airwayEquipment:2, ivKits:1, blankets:2, batteryPacks:1});
 const PC_TRUCK_BASELINE = Object.freeze({tourniquets:20, pressureDressings:30, hemostaticGauze:15, airwayEquipment:10, ivKits:8, blankets:25, batteryPacks:6});
@@ -3061,6 +3088,13 @@ const TRAP_LABELS = {trapped:'לכוד', not_trapped:'לא לכוד', unknown:'�
 // (src/domain/rules.js mdaClassificationDiffersFromTriage).
 const MDA_CLASSIFICATION_LABELS = {minor:'קל', anxiety:'נפגע חרדה', moderate:'בינוני', serious:'קשה', critical:'אנוש', deceased:'נקבע מותו'};
 const MDA_CLASSIFICATION_COLORS = {minor:'var(--green)', anxiety:'var(--green)', moderate:'var(--yellow)', serious:'var(--red)', critical:'var(--red)', deceased:'var(--muted)'};
+// Pre-evacuation report labels (V2.99.36, see openPreEvacuationSheet). Declared up here because
+// ensureSiteReadiness() reads them while saved state is still loading.
+const PRE_EVAC_CONDITION_LABELS = {light:'קל', moderate:'בינוני', severe:'קשה'};
+const PRE_EVAC_CONDITION_COLORS = {light:'var(--green)', moderate:'var(--yellow)', severe:'var(--red)'};
+const PRE_EVAC_EVACUATOR_LABELS = {mda:'מד״א', united_hatzalah:'איחוד הצלה', yedidim:'ידידים', fire:'כב״א', police:'משטרה', idf:'צה״ל', civilian:'אזרחים', self:'פינוי עצמי', other:'אחר'};
+// Pre-V2.99.36 saved state had one "report source" for the whole site.
+const LEGACY_REPORT_SOURCE_TO_EVACUATOR = {civilian:'civilian', fire:'fire', mda:'mda', uh:'united_hatzalah', police:'police', other:'other'};
 const EVAC_DESTINATION_SUGGESTIONS = ['שיבא','איכילוב','בילינסון','וולפסון','אסף הרופא','מאיר','לניאדו','הלל יפה','רמב״ם','העמק','הדסה עין כרם','שערי צדק','ברזילי','אסותא אשדוד','סורוקה'];
 // Add-report sources: client key -> label + server external_source value. UH is United Hatzalah;
 // Yedidim is a separate organization (before V2.99.33 the 'UH' button was labelled Yedidim).
@@ -3992,12 +4026,24 @@ let siteData = {
   floorHint:'', apartmentHint:'', eta:'', currentZone:'', lastMechanism:'',
   likelyMechanisms:[], sweepSessions:[], hazardNote:'',
   initialEvacuatedGreen:0,
-  initialEvacuation:{green:0,yellow:0,red:0,summary:'',source:null},
+  initialEvacuation:{green:0,yellow:0,red:0,summary:'',source:null,groups:[],report:null},
   expectedCasualties:{trapped:0,immobile:0,missing:0,severe:0}
 };
 let reportState = {source:null, red:0, yellow:0, green:0, patientId:null};
 function ensureSiteReadiness(){
   siteData.initialEvacuation=siteData.initialEvacuation||{green:siteData.initialEvacuatedGreen||0,yellow:0,red:0,summary:'',source:null};
+  const ie=siteData.initialEvacuation;
+  if(!Array.isArray(ie.groups)){
+    // Pre-V2.99.36 state: three bare counters and one source for the whole site. Kept as groups
+    // so nothing already counted disappears; the destination was only ever the free-text note.
+    // It never reached the server, so it stays an unsent draft the medic can review and send.
+    const by=LEGACY_REPORT_SOURCE_TO_EVACUATOR[ie.source]||'other';
+    ie.groups=C5Rules.normalizePreEvacuationGroups([['light','green'],['moderate','yellow'],['severe','red']]
+      .map(([condition,color])=>({count:Number(ie[color])||0, condition, evacuatedBy:by, destination:''})));
+    ie.report=null;
+  }
+  ie.report=ie.report||null;
+  applyPreEvacCounters(ie);
   siteData.expectedCasualties=siteData.expectedCasualties||{trapped:0,immobile:0,missing:0,severe:0};
   siteData.floorHint=siteData.floorHint||'';
   siteData.apartmentHint=siteData.apartmentHint||'';
@@ -4752,7 +4798,7 @@ function safeScopedDemoReset({confirmReset=false, preserveFieldMode=true}={}){
   return true;
 }
 function emptySiteData(){
-  return {name:'', address:'', eventType:null, buildingType:null, floorHint:'', apartmentHint:'', eta:'', currentZone:'', lastMechanism:'', likelyMechanisms:[], sweepSessions:[], description:'', externalReports:[], initialEvacuatedGreen:0, initialEvacuation:{green:0,yellow:0,red:0,summary:'',source:null}, expectedCasualties:{trapped:0,immobile:0,missing:0,severe:0}};
+  return {name:'', address:'', eventType:null, buildingType:null, floorHint:'', apartmentHint:'', eta:'', currentZone:'', lastMechanism:'', likelyMechanisms:[], sweepSessions:[], description:'', externalReports:[], initialEvacuatedGreen:0, initialEvacuation:{green:0,yellow:0,red:0,summary:'',source:null,groups:[],report:null}, expectedCasualties:{trapped:0,immobile:0,missing:0,severe:0}};
 }
 function clearDemoScenario({confirmReset=true}={}){
   if(blockDemoDataWhileLoggedIn()) return false;
@@ -4939,7 +4985,9 @@ function startBriefingDemo(){
     apartmentHint:'כניסה ב',
     description:'רצף מודגם: חובש פועל, תמונת חוג"ד מתעדכנת.',
     initialEvacuatedGreen:3,
-    initialEvacuation:{green:3,yellow:0,red:0,summary:'3 קלים פונו לנקודת מד״א ברחוב',source:'mda'},
+    initialEvacuation:{green:3,yellow:0,red:0,summary:'',source:null,
+      groups:[{count:3,condition:'light',evacuatedBy:'mda',destination:'נקודת מד״א ברחוב'}],
+      report:{reportedByName:'חובש דמו',reportedByRole:'medic',reportedAt:new Date(Date.now()-6*60000).toISOString()}},
     expectedCasualties:{trapped:2,immobile:1,missing:1,severe:1}
   };
   ensureSiteReadiness();
@@ -5212,28 +5260,14 @@ function renderDoctorLegacyNote(){
 }
 function renderExtractedCounterBoard(){
   ensureSiteReadiness();
+  const label=canWritePreEvac() ? (preEvacReported()?'עדכן דיווח':'הזן דיווח') : 'פירוט';
   return `
     <div class="role-section" style="border-color:rgba(76,201,240,0.45)">
-      <div class="role-section-title">פגועים שחולצו / פונו עצמאית</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="role-row" style="text-align:center;border-bottom:4px solid var(--green)">
-          <div class="role-row-sub">מחולצים קל (ירוק) — פונו עצמאית</div>
-          <div data-extracted-count="green" style="font-family:var(--mono);font-size:28px;font-weight:900;margin:8px 0;color:var(--green)">${siteData.initialEvacuation.green||0}</div>
-          <div style="display:flex;justify-content:center;gap:10px">
-            <button class="vital-btn" style="width:40px;height:40px" onclick="adjustExtractedCount('green',-1)">-</button>
-            <button class="vital-btn" style="width:40px;height:40px" onclick="adjustExtractedCount('green',1)">+</button>
-          </div>
-        </div>
-        <div class="role-row" style="text-align:center;border-bottom:4px solid var(--yellow)">
-          <div class="role-row-sub">מחולצים בינוני (צהוב) — מחוץ להרס</div>
-          <div data-extracted-count="yellow" style="font-family:var(--mono);font-size:28px;font-weight:900;margin:8px 0;color:var(--yellow)">${siteData.initialEvacuation.yellow||0}</div>
-          <div style="display:flex;justify-content:center;gap:10px">
-            <button class="vital-btn" style="width:40px;height:40px" onclick="adjustExtractedCount('yellow',-1)">-</button>
-            <button class="vital-btn" style="width:40px;height:40px" onclick="adjustExtractedCount('yellow',1)">+</button>
-          </div>
-        </div>
+      <div class="role-section-title">פונו לפני הגעת כוח רפואי</div>
+      <div class="role-row">${preEvacSummaryHtml()}
+        <button class="demo-mini-btn" style="margin-top:8px" onclick="openPreEvacuationSheet()">${label}</button>
       </div>
-      <div class="role-row-sub" style="margin-top:10px">מונה מוקד בלבד: נחשב בתמונת חוג"ד ומ״פ רפואה בלי לפתוח רשומות פצוע ירוקות.</div>
+      <div class="role-row-sub" style="margin-top:10px">מונה מוקד בלבד: נחשב בתמונת חוג"ד ומ״פ רפואה בלי לפתוח רשומות פצוע. הגורם הרפואי הראשון בזירה מזין; שינויים: חוג״ד / מ״פ רפואה.</div>
     </div>`;
 }
 function renderPcTruckStockChips(){
@@ -6632,7 +6666,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
     <div class="demo-actions" style="margin:0;grid-template-columns:1fr 1fr">${actions}</div>`;
   document.getElementById('role-dashboard-body').innerHTML=`
     ${dashboardFocusBanner()}
-    ${role==='cc'?renderCcCommandBoard():`<div class="role-top-grid">${metrics}</div>`}
+    ${role==='cc'?renderCcCommandBoard()+renderExtractedCounterBoard():`<div class="role-top-grid">${metrics}</div>`}
     ${role==='medic'?renderMedicActionPanel():''}
     ${role==='pc'?renderPcResponsibilityBoard():''}
     ${['pc','cc'].includes(role)?roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds(role))):''}
@@ -6997,8 +7031,7 @@ function renderDashboard(){
   updateMedicBriefingBadge(medicDse);
 
   const evacTotal=(siteData.initialEvacuation.green||0)+(siteData.initialEvacuation.yellow||0)+(siteData.initialEvacuation.red||0);
-  const sourceLabel={civilian:'אזרח',fire:'כב״א',mda:'מד״א',uh:'איחוד הצלה',police:'משטרה',other:'אחר'}[siteData.initialEvacuation.source]||'לא צוין';
-  const evacNote=evacTotal ? `<div class="patient-card green" style="cursor:default"><div class="patient-id">MASS</div><div class="patient-info"><div style="font-weight:700">פינוי ראשוני לפני הגעת כוח רפואי</div><div style="font-size:12px;color:var(--muted);margin-top:2px">קל ${siteData.initialEvacuation.green||0} · בינוני ${siteData.initialEvacuation.yellow||0} · קשה ${siteData.initialEvacuation.red||0} · מקור: ${sourceLabel}</div><div style="font-size:12px;color:var(--muted);margin-top:2px">${siteData.initialEvacuation.summary||'ללא יעד פינוי קצר'}</div><div class="patient-badges"><span class="triage-pill green">מונה מוקד</span><span class="badge badge-muted">לא רשומת פצוע</span></div></div></div>` : '';
+  const evacNote=evacTotal ? `<div class="patient-card green" style="cursor:pointer" onclick="openPreEvacuationSheet()"><div class="patient-id">MASS</div><div class="patient-info"><div style="font-weight:700">פונו לפני הגעת כוח רפואי</div><div style="margin-top:2px">${preEvacSummaryHtml({compact:true})}</div><div class="patient-badges"><span class="triage-pill green">מונה מוקד</span><span class="badge badge-muted">לא רשומת פצוע</span></div></div></div>` : '';
   const active=sortedPatientsByColorThenUrgency(patients.filter(p=>!['evacuating','evacuated','handed_over'].includes(p.patientStatus)).filter(patientMatchesBoardFilter));
   document.getElementById('patient-list').innerHTML=evacNote+active.map(p=>{
     const timer=vitalsTimerLabel(p);
@@ -8564,40 +8597,163 @@ function selectEnrouteType(btn,val){
   // A newly reported collapse changes what to expect for the type already chosen: show the brief.
   if(!hadCollapse && siteHasBuildingCollapse(siteId) && s.incidentType && collapseAddsToType(s.incidentType, siteId)) showIncidentTypeBriefModal(s.incidentType, siteId);
 }
+// ── Pre-evacuation report (V2.99.36, database/049-050) ──
+// Casualties evacuated before the medical force arrived: groups of {count, condition,
+// evacuatedBy, destination}. The first medical staff on site enters the report; after that only
+// חוג״ד / מ״פ רפואה (and admin) may change it (C5Rules.canWritePreEvacuationReport). The server
+// applies the same rule in project_pre_evacuation(), first sync wins: a later medic's version is
+// kept in the event log but not applied, and command sees it as a rejected version.
+// siteData.initialEvacuation.green / yellow / red stay the derived counters every board reads.
+function preEvacActorRole(){ return currentUser ? currentUser.role : activeRoleDashboard; }
+function preEvacReported(){ return !!ensureSiteReadiness().initialEvacuation.report; }
+function canWritePreEvac(){ return C5Rules.canWritePreEvacuationReport(preEvacActorRole(), preEvacReported()); }
+function applyPreEvacCounters(ie){
+  const t=C5Rules.preEvacuationTotals(ie.groups);
+  ie.green=t.light; ie.yellow=t.moderate; ie.red=t.severe;
+  siteData.initialEvacuatedGreen=t.light;
+  return t;
+}
+function preEvacGroupLine(g){
+  return `<span style="color:${PRE_EVAC_CONDITION_COLORS[g.condition]};font-weight:900">${g.count} ${PRE_EVAC_CONDITION_LABELS[g.condition]}</span> · פונו ע״י ${escAttr(PRE_EVAC_EVACUATOR_LABELS[g.evacuatedBy]||'אחר')} · ${g.destination?'לאן: '+escAttr(g.destination):'יעד לא ידוע'}`;
+}
+function preEvacWhoLine(ie){
+  const r=ie.report; if(!r) return 'טרם הוזן דיווח';
+  const who=(name, role, mine)=>mine?'את/ה':`${escAttr(name||'')}${name?' · ':''}${escAttr(ROLE_LABELS[mapServerRole(role)]||role||'')}`;
+  const first=`הוזן ע״י ${who(r.reportedByName, r.reportedByRole, r.mine)}${r.reportedAt?' · '+escAttr(timeLabelFromIso(r.reportedAt)):''}`;
+  const edited=r.updatedAt && r.updatedAt!==r.reportedAt ? ` · עודכן ע״י ${who(r.updatedByName, r.updatedByRole, r.updatedMine)} ${escAttr(timeLabelFromIso(r.updatedAt))}` : '';
+  const pending=r.pending ? ' · ממתין לסנכרון' : '';
+  return first+edited+pending;
+}
+function timeLabelFromIso(iso){
+  const d=new Date(iso); if(isNaN(d)) return '';
+  return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+}
+function preEvacSummaryHtml({compact=false}={}){
+  const ie=ensureSiteReadiness().initialEvacuation;
+  const t=C5Rules.preEvacuationTotals(ie.groups);
+  const rejected=ie.rejectedNotice ? `<div style="font-size:12px;color:var(--orange);font-weight:700;margin-top:6px">⚠ הדיווח שלך לא נקלט: דיווח קודם כבר הוזן. שינויים: חוג״ד / מ״פ רפואה בלבד.</div>` : '';
+  const conflicts=(ie.rejectedVersions||[]).length ? `<div style="font-size:12px;color:var(--orange);font-weight:700;margin-top:6px">⚠ ${ie.rejectedVersions.length} דיווחים נוספים נדחו (נשמרו ביומן) — פתח לבדיקה</div>` : '';
+  if(!ie.groups.length) return `<div style="font-size:12px;color:var(--muted)">${ie.report?'דווח: לא פונו פצועים לפני הגעת כוח רפואי':'טרם הוזן דיווח'}${ie.report?' · '+preEvacWhoLine(ie):''}</div>${rejected}${conflicts}`;
+  const lines=(compact?ie.groups.slice(0,4):ie.groups).map(g=>`<div style="font-size:12px;line-height:1.6">${preEvacGroupLine(g)}</div>`).join('');
+  const more=compact && ie.groups.length>4 ? `<div style="font-size:12px;color:var(--muted)">ועוד ${ie.groups.length-4} שורות</div>` : '';
+  const draft=ie.report ? '' : '<div style="font-size:12px;color:var(--orange);font-weight:700;margin-top:4px">טיוטה: טרם נשלח</div>';
+  return `${draft}<div style="font-size:13px;font-weight:900;margin-bottom:4px">סה״כ ${t.total} · קשה ${t.severe} · בינוני ${t.moderate} · קל ${t.light}</div>${lines}${more}${ie.summary?`<div style="font-size:12px;color:var(--muted)">הערה: ${escAttr(ie.summary)}</div>`:''}<div style="font-size:11px;color:var(--muted);margin-top:4px">${preEvacWhoLine(ie)}</div>${rejected}${conflicts}`;
+}
 function updateInitialEvacDisplays(){
   ensureSiteReadiness();
-  ['green','yellow','red'].forEach(color=>{
-    ['enroute-evac-'+color,'site-initial-evac-'+color].forEach(id=>{
-      const el=document.getElementById(id);
-      if(el) el.textContent=siteData.initialEvacuation[color]||0;
-    });
-    document.querySelectorAll(`[data-extracted-count="${color}"]`).forEach(el=>{ el.textContent=siteData.initialEvacuation[color]||0; });
-  });
-  const summary=document.getElementById('enroute-evac-summary'); if(summary && !summary.value) summary.value=siteData.initialEvacuation.summary||'';
-  const siteSummary=document.getElementById('site-evac-summary'); if(siteSummary && !siteSummary.value) siteSummary.value=siteData.initialEvacuation.summary||'';
-  document.querySelectorAll('#enroute-report-source-grid .chip,#site-report-source-grid .chip').forEach(b=>{
-    b.classList.toggle('selected', b.getAttribute('onclick')?.includes(`'${siteData.initialEvacuation.source}'`));
-  });
+  const html=preEvacSummaryHtml();
+  const label=canWritePreEvac() ? (preEvacReported()?'עדכון פינוי מוקדם (חוג״ד / מ״פ רפואה)':'הזנת פינוי מוקדם') : 'צפייה בפינוי מוקדם';
+  document.querySelectorAll('[data-preevac-summary]').forEach(el=>{ el.innerHTML=html; });
+  document.querySelectorAll('[data-preevac-open]').forEach(el=>{ el.textContent=label; });
 }
-function changeInitialEvac(color, delta){
-  ensureSiteReadiness();
-  siteData.initialEvacuation[color]=Math.max(0,(siteData.initialEvacuation[color]||0)+delta);
-  siteData.initialEvacuatedGreen=siteData.initialEvacuation.green||0;
+let preEvacSheet={groups:[], condition:null, evacuatedBy:null};
+function openPreEvacuationSheet(){
+  const ie=ensureSiteReadiness().initialEvacuation;
+  ensureEvacDestinationDatalist();
+  preEvacSheet={groups:ie.groups.map(g=>({...g})), condition:null, evacuatedBy:null};
+  let modal=document.getElementById('preevac-sheet-modal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='preevac-sheet-modal';
+    modal.className='modal-overlay hidden';
+    modal.onclick=function(event){ if(event.target===this) closePreEvacuationSheet(); };
+    document.body.appendChild(modal);
+  }
+  renderPreEvacuationSheet();
+  modal.classList.remove('hidden');
+}
+function closePreEvacuationSheet(){ document.getElementById('preevac-sheet-modal')?.classList.add('hidden'); }
+function renderPreEvacuationSheet(){
+  const modal=document.getElementById('preevac-sheet-modal'); if(!modal) return;
+  const ie=ensureSiteReadiness().initialEvacuation;
+  const editable=canWritePreEvac();
+  const reported=preEvacReported();
+  const t=C5Rules.preEvacuationTotals(preEvacSheet.groups);
+  const rows=preEvacSheet.groups.map((g,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)"><div style="flex:1">${preEvacGroupLine(g)}</div>${editable?`<button class="demo-mini-btn" style="margin:0;padding:5px 9px" onclick="removePreEvacGroup(${i})" aria-label="הסר שורה">✕</button>`:''}</div>`).join('')
+    || '<div style="font-size:12px;color:var(--muted);padding:8px 0">אין שורות. אם לא פונו פצועים לפני ההגעה, אפשר לשלוח דיווח ריק.</div>';
+  const lockNote=!reported
+    ? 'הגורם הרפואי הראשון בזירה מזין. לאחר השליחה הדיווח ננעל, ורק חוג״ד / מ״פ רפואה יכולים לשנות אותו.'
+    : editable
+      ? `${preEvacWhoLine(ie)}. עדכון שלך מחליף את הדיווח ונשמר ביומן.`
+      : `${preEvacWhoLine(ie)}. הדיווח נעול: שינויים רק ע״י חוג״ד / מ״פ רפואה.`;
+  const rejectedVersions=(ie.rejectedVersions||[]).map(v=>`<div style="font-size:12px;padding:6px 0;border-top:1px solid var(--border)"><strong>${escAttr(v.name||'')}</strong> ${escAttr(ROLE_LABELS[mapServerRole(v.role)]||v.role||'')} · ${escAttr(timeLabelFromIso(v.at))}: ${(v.groups||[]).map(g=>`${g.count} ${PRE_EVAC_CONDITION_LABELS[g.condition]||''} · ${escAttr(PRE_EVAC_EVACUATOR_LABELS[g.evacuatedBy]||'אחר')}${g.destination?' · '+escAttr(g.destination):''}`).join(' | ')||'ללא שורות'}</div>`).join('');
+  const form=editable ? `
+    <div class="field-label" style="margin-top:12px">שורה חדשה: כמה</div>
+    <input type="number" id="preevac-count" min="1" max="9999" inputmode="numeric" placeholder="מספר פצועים" style="margin-bottom:8px">
+    <div class="field-label">מצב</div>
+    <div class="chip-row" id="preevac-condition">${C5Rules.PRE_EVAC_CONDITIONS.map(k=>`<button class="chip${preEvacSheet.condition===k?' selected':''}" style="color:${PRE_EVAC_CONDITION_COLORS[k]}" onclick="selectPreEvacCondition('${k}')">${PRE_EVAC_CONDITION_LABELS[k]}</button>`).join('')}</div>
+    <div class="field-label" style="margin-top:8px">מי פינה</div>
+    <div class="chip-row" id="preevac-evacuator">${C5Rules.PRE_EVAC_EVACUATORS.map(k=>`<button class="chip${preEvacSheet.evacuatedBy===k?' selected':''}" onclick="selectPreEvacEvacuator('${k}')">${PRE_EVAC_EVACUATOR_LABELS[k]}</button>`).join('')}</div>
+    <div class="field-label" style="margin-top:8px">לאן פונו</div>
+    <input type="text" id="preevac-destination" list="evac-destination-options" placeholder="לדוגמה: שיבא / נקודת מד״א ברחוב" style="margin-bottom:8px">
+    <button class="btn-secondary" onclick="addPreEvacGroup()">+ הוסף שורה</button>
+    <div class="field-label" style="margin-top:12px">הערה (רשות)</div>
+    <input type="text" id="preevac-note" value="${escAttr(ie.summary||'')}" placeholder="לדוגמה: מקור המידע, חסרים פרטים">
+    <button class="btn-primary" style="background:var(--green);margin-top:14px" onclick="submitPreEvacuationReport()">${reported?'שמור עדכון':'שלח דיווח ונעל'}</button>` : '';
+  modal.innerHTML=`<div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">פונו לפני הגעת כוח רפואי</div>
+    <div style="font-size:12px;color:var(--muted);margin:6px 0 10px;line-height:1.5">${lockNote}</div>
+    <div style="font-size:13px;font-weight:900">סה״כ ${t.total} · קשה ${t.severe} · בינוני ${t.moderate} · קל ${t.light}</div>
+    <div id="preevac-rows">${rows}</div>
+    ${form}
+    ${rejectedVersions?`<div class="field-label" style="margin-top:12px;color:var(--orange)">גרסאות שנדחו (נשמרו ביומן, לא שינו את הדיווח)</div>${rejectedVersions}`:''}
+    <button class="btn-secondary" style="margin-top:8px" onclick="closePreEvacuationSheet()">${editable?'ביטול':'סגור'}</button>
+  </div>`;
+}
+function selectPreEvacCondition(k){ preEvacSheet.condition=preEvacSheet.condition===k?null:k; keepPreEvacDraftInputs(renderPreEvacuationSheet); }
+function selectPreEvacEvacuator(k){ preEvacSheet.evacuatedBy=preEvacSheet.evacuatedBy===k?null:k; keepPreEvacDraftInputs(renderPreEvacuationSheet); }
+// Re-rendering the sheet must not wipe what the user already typed in the open row.
+function keepPreEvacDraftInputs(fn){
+  const ids=['preevac-count','preevac-destination','preevac-note'];
+  const vals=Object.fromEntries(ids.map(id=>[id, document.getElementById(id)?.value]));
+  fn();
+  ids.forEach(id=>{ const el=document.getElementById(id); if(el && vals[id]!=null) el.value=vals[id]; });
+}
+function addPreEvacGroup(){
+  const count=Number(document.getElementById('preevac-count')?.value);
+  if(!Number.isInteger(count) || count<1){ toast('הזן מספר פצועים'); return; }
+  if(!preEvacSheet.condition){ toast('בחר מצב: קל / בינוני / קשה'); return; }
+  if(!preEvacSheet.evacuatedBy){ toast('בחר מי פינה'); return; }
+  const group=C5Rules.normalizePreEvacuationGroups([{count, condition:preEvacSheet.condition, evacuatedBy:preEvacSheet.evacuatedBy, destination:document.getElementById('preevac-destination')?.value||''}])[0];
+  if(!group){ toast('שורה לא תקינה'); return; }
+  preEvacSheet.groups.push(group);
+  preEvacSheet.condition=null; preEvacSheet.evacuatedBy=null;
+  const note=document.getElementById('preevac-note')?.value;
+  renderPreEvacuationSheet();
+  const noteEl=document.getElementById('preevac-note'); if(noteEl && note!=null) noteEl.value=note;
+}
+function removePreEvacGroup(i){ preEvacSheet.groups.splice(i,1); keepPreEvacDraftInputs(renderPreEvacuationSheet); }
+function submitPreEvacuationReport(){
+  const ie=ensureSiteReadiness().initialEvacuation;
+  const role=preEvacActorRole();
+  const reported=preEvacReported();
+  if(!C5Rules.canWritePreEvacuationReport(role, reported)){ toast(reported?'הדיווח נעול: שינויים רק ע״י חוג״ד / מ״פ רפואה':'הזנת פינוי מוקדם: גורם רפואי בלבד'); return; }
+  if(currentUser && !activeIncident){ toast('אין אירוע פעיל: בחר אירוע לפני שליחת הדיווח'); return; }
+  const pendingCount=Number(document.getElementById('preevac-count')?.value);
+  if(pendingCount>0 && !confirm('יש שורה שלא נוספה (לחץ "+ הוסף שורה"). לשלוח בלעדיה?')) return;
+  if(!reported && !confirm('לאחר השליחה הדיווח ננעל, ורק חוג״ד / מ״פ רפואה יוכלו לשנות אותו. לשלוח?')) return;
+  const groups=C5Rules.normalizePreEvacuationGroups(preEvacSheet.groups);
+  const note=String(document.getElementById('preevac-note')?.value||'').trim().slice(0,500);
+  const nowIso=new Date().toISOString();
+  ie.groups=groups;
+  ie.summary=note;
+  const t=applyPreEvacCounters(ie);
+  ie.report = reported
+    ? {...ie.report, updatedByName:'', updatedByRole:role, updatedAt:nowIso, updatedMine:true, pending:!!currentUser}
+    : {reportedByName:'', reportedByRole:role, reportedAt:nowIso, mine:true, updatedAt:nowIso, updatedByRole:role, updatedMine:true, pending:!!currentUser};
+  ie.rejectedNotice=false;
+  saveLocalEvent({
+    type:'SITE_PRE_EVACUATION_REPORTED',
+    detail:`${reported?'עדכון':'דיווח'} פינוי מוקדם · סה״כ ${t.total} · קשה ${t.severe} · בינוני ${t.moderate} · קל ${t.light}`,
+    warn:false,
+    payload_json:{groups:groups.map(g=>({count:g.count, condition:g.condition, evacuated_by:g.evacuatedBy, destination:g.destination||null})), note:note||null, visible_to:['חוג"ד','מ״פ רפואה']}
+  });
+  lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
+  closePreEvacuationSheet();
+  toast(reported?'עדכון פינוי מוקדם נשמר':'דיווח פינוי מוקדם נשלח ונעל');
   updateInitialEvacDisplays();
-}
-function adjustExtractedCount(color, delta){
-  changeInitialEvac(color, delta);
-  saveLocalEvent({type:'SITE_EXTRACTED_COUNTER_UPDATED',detail:`מונה מחולצים עודכן: ${color} ${delta>0?'+':'-'}1`,warn:false,payload_json:{color,delta,current:siteData.initialEvacuation[color]||0}});
-  saveDemoState();
-  if(document.getElementById('screen-dashboard')?.classList.contains('active')) renderDashboard();
-  if(document.getElementById('screen-commander')?.classList.contains('active')) renderCommander();
-  if(document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard(activeRoleDashboard);
-}
-function selectInitialReportSource(btn, source){
-  ensureSiteReadiness();
-  siteData.initialEvacuation.source=source;
-  document.querySelectorAll('#enroute-report-source-grid .chip,#site-report-source-grid .chip').forEach(b=>b.classList.remove('selected'));
-  if(btn) btn.classList.add('selected');
+  refreshActiveScreenData();
 }
 function arriveAtSite(){
   const address=document.getElementById('enroute-address')?.value.trim() || siteData.address || 'מוקד חדש';
@@ -8628,9 +8784,6 @@ function arriveAtSite(){
   state.flowMode='quick';
   state.locFree=[siteData.address,siteData.floorHint,siteData.apartmentHint].filter(Boolean).join(' · ');
   goTo('sweep');
-}
-function changeSiteInitialEvac(color, delta){
-  changeInitialEvac(color, delta);
 }
 function saveSite(){
   siteData.name=document.getElementById('site-name-input').value||siteData.name;
@@ -9897,7 +10050,7 @@ function queueMedicationEventsBeforeSave(){
     saveLocalEvent({type:'MEDICATION_ADMINISTERED', detail:`${med.label} ${med.dosage}`, warn:!!override, payload_json:payload});
   });
 }
-// WP-3 (V2.99.36): medications, pediatric high-risk confirmations and treatments entered during
+// WP-3 (V2.99.37): medications, pediatric high-risk confirmations and treatments entered during
 // intake, sent with the new patient's id and after its create event so the server can place them.
 function queueIntakeClinicalEventsAtSave(patientId){
   medicationEntriesFromState().forEach(({med, override, payload})=>{
@@ -10224,7 +10377,7 @@ function queueModalTreatmentEvents(patient, text, medicName){
     warn:false,
     payload_json:{patient_id:patient.id, treatments:[...modalTreatments], note:text}
   });
-  // WP-3 (V2.99.36): each treatment and medication also reaches the server under the name it
+  // WP-3 (V2.99.37): each treatment and medication also reaches the server under the name it
   // knows. The modal records no dose, so a medication is sent with dosage null.
   const otherText=(document.getElementById('modal-treatment-other')?.value||'').trim();
   modalTreatments.forEach(key=>{
@@ -11236,7 +11389,7 @@ function renderCommandOperationalPanels(pts, site){
   const commandMacro = commandRole==='pc'
     ? renderExtractedCounterBoard()
     : commandRole==='cc'
-      ? roleSection('תעדוף פינוי פלוגתי', companyEvacuationPriorityRows(pts))
+      ? roleSection('תעדוף פינוי פלוגתי', companyEvacuationPriorityRows(pts)) + (cmdActiveSite==='ALL' || cmdActiveSite==='SITE_A' ? renderExtractedCounterBoard() : '')
       : '';
   document.getElementById('cmd-priority-board').innerHTML=commandMacro+[
     {n:pts.filter(p=>p.triage==='red').length,l:'איפה האדומים?',c:'critical',i:'🩸'},
@@ -11500,7 +11653,7 @@ function renderCasualtyLocationBoard(siteIds){
       </div>`).join('') || '<div style="font-size:12px;color:var(--muted);padding:6px 0">טרם פונו פצועים רשומים</div>';
     const ie=siteId==='SITE_A' ? siteData.initialEvacuation : null;
     const ieTotal=ie ? (ie.green||0)+(ie.yellow||0)+(ie.red||0) : 0;
-    const ieRow=ieTotal?`<div style="font-size:12px;color:var(--muted);padding:6px 0;border-top:1px solid var(--border)">פינוי ראשוני (מונה בלבד): קשה ${ie.red||0} · בינוני ${ie.yellow||0} · קל ${ie.green||0}${ie.summary?' · '+escAttr(ie.summary):''}</div>`:'';
+    const ieRow=ieTotal?`<div style="padding:6px 0;border-top:1px solid var(--border)"><div style="font-size:12px;color:var(--muted)">פונו לפני הגעת כוח רפואי (מונה בלבד):</div>${preEvacSummaryHtml({compact:true})}</div>`:'';
     const bySource=new Map();
     siteExternalReports(siteId).forEach(r=>{ const k=r.sourceLabel||'אחר'; const s=bySource.get(k)||{red:0,yellow:0,green:0}; s.red+=r.red||0; s.yellow+=r.yellow||0; s.green+=r.green||0; bySource.set(k,s); });
     const extRow=bySource.size?`<div style="font-size:12px;padding:6px 0;border-top:1px solid var(--border)"><span style="color:var(--muted)">דיווחים חיצוניים:</span> ${[...bySource.entries()].map(([k,s])=>`<strong>${escAttr(k)}</strong> קשה ${s.red} · בינוני ${s.yellow} · קל ${s.green}`).join(' · ')}</div>`:'';
@@ -11870,11 +12023,11 @@ function checkStep7() {
   document.getElementById('btn-step7').disabled = false;
 }
 
-// Medications and their pediatric high-risk confirmations joined in V2.99.36 (WP-3): written
+// Medications and their pediatric high-risk confirmations joined in V2.99.37 (WP-3): written
 // during intake without a patient, they could never be placed on the server.
 const FLOW_EVENTS_SENT_AT_SAVE = new Set(['TOURNIQUET_APPLIED','VITALS_RECORDED','QUICK_PATIENT_CREATED','MEDICATION_ADMINISTERED','HIGH_RISK_OVERRIDE_CONFIRMED']);
 // A treatment reaches the server as INTERVENTION_RECORDED (AIRWAY_MANAGED for an opened airway)
-// with payload_json.treatment_type, which vw_patient_treatment_history reads (WP-3, V2.99.36).
+// with payload_json.treatment_type, which vw_patient_treatment_history reads (WP-3, V2.99.37).
 // Before this, treatments were logged under client-only names (INTERVENTION_LOGGED,
 // IMMEDIATE_INTERVENTION_RECORDED, LIFE_SAVING_TREATMENT_RECORDED) and never left the phone.
 // Tourniquets and medications have their own events and are skipped here.
@@ -12552,6 +12705,9 @@ async function syncPush(){
   if(!anyRejected) demoSyncMode='fresh';
   updateDemoStatus();
   syncPullAll(); // pull opportunistically right after a push so the AAR feed feels responsive
+  // A pre-evacuation report's fate (kept, or lost to another medic's first report) is decided
+  // server-side on insert; read it back now rather than on the next 45-second poll.
+  if(outbox.some(e=>e.type==='SITE_PRE_EVACUATION_REPORTED' && doneIds.has(e.local_event_id))) pullPreEvacuation(SITE_TO_INCIDENT_ID.SITE_A);
 }
 setInterval(()=>{ if(currentUser) syncPush(); }, 45000);
 
@@ -12843,7 +12999,62 @@ function applyServerTourniquets(rows, incidentId){
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
 function pullProjectedPatientStateAll(){
-  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id); });
+  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id); pullPreEvacuation(id); });
+}
+// ── Pre-evacuation report pull (V2.99.36, database/050) ──
+// incident_pre_evacuations is the server's verdict on who owns the report (first medical
+// reporter to sync) and what it currently says. A local report still waiting in the outbox wins
+// until it is pushed; after that the server row replaces it, including when this device's first
+// report lost the race to another medic. Separate query: until 049 is applied the table does not
+// exist, and that must not break the other pulls (same reason as pullEvacuationTracking).
+const PRE_EVAC_COLUMNS='incident_id,groups,note,reported_by,reported_by_name,reported_by_role,reported_at,updated_by,updated_by_name,updated_by_role,updated_at';
+function hasPendingPreEvacPush(){ return getOutbox().some(e=>!e.synced && e.type==='SITE_PRE_EVACUATION_REPORTED'); }
+async function pullPreEvacuation(incidentId){
+  if(!currentUser || incidentId!==SITE_TO_INCIDENT_ID.SITE_A) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let result;
+  try{ result=await client.from('incident_pre_evacuations').select(PRE_EVAC_COLUMNS).eq('incident_id', incidentId).maybeSingle(); }
+  catch(e){ return; }
+  if(result.error) return;
+  let rejected=null;
+  if(INCIDENT_COMMAND_ROLES.has(currentUser.role)){
+    try{
+      const r=await client.from('conflict_log').select('payload_json,created_at').eq('incident_id', incidentId)
+        .eq('conflict_type','PRE_EVACUATION_REPORT_LOCKED').is('resolved_at', null).order('created_at',{ascending:false}).limit(20);
+      if(!r.error && r.data) rejected=r.data;
+    }catch(e){}
+  }
+  // The user may have switched incident while the queries were in flight.
+  if(incidentId!==SITE_TO_INCIDENT_ID.SITE_A) return;
+  applyRemotePreEvacuation(result.data||null, rejected);
+}
+function applyRemotePreEvacuation(row, rejected){
+  const ie=ensureSiteReadiness().initialEvacuation;
+  const before=JSON.stringify([ie.groups, ie.summary, ie.report, ie.rejectedNotice, ie.rejectedVersions]);
+  if(rejected){
+    ie.rejectedVersions=rejected.map(c=>({name:sanitizeRemoteText(c.payload_json?.rejected_name), role:c.payload_json?.rejected_role||null, at:c.created_at,
+      groups:C5Rules.normalizePreEvacuationGroups((c.payload_json?.groups||[]).map(g=>({count:g.count, condition:g.condition, evacuatedBy:g.evacuated_by, destination:sanitizeRemoteText(g.destination)})))}));
+  }
+  if(row && !hasPendingPreEvacPush()){
+    const wasMineFirst=!!(ie.report?.mine && !ie.report?.fromServer);
+    ie.groups=C5Rules.normalizePreEvacuationGroups((Array.isArray(row.groups)?row.groups:[]).map(g=>({count:g.count, condition:g.condition, evacuatedBy:g.evacuated_by, destination:sanitizeRemoteText(g.destination)})));
+    ie.summary=sanitizeRemoteText(row.note, 500);
+    ie.report={fromServer:true, reportedByName:sanitizeRemoteText(row.reported_by_name), reportedByRole:row.reported_by_role, reportedAt:row.reported_at,
+      mine:row.reported_by===currentUser.id, updatedByName:sanitizeRemoteText(row.updated_by_name), updatedByRole:row.updated_by_role, updatedAt:row.updated_at,
+      updatedMine:row.updated_by===currentUser.id, pending:false};
+    // This device sent a first report but another medic's synced first: say so once.
+    if(wasMineFirst && row.reported_by!==currentUser.id && !C5Rules.canWritePreEvacuationReport(currentUser.role, true)){
+      ie.rejectedNotice=true;
+      toast('הדיווח שלך על פינוי מוקדם לא נקלט: דיווח קודם כבר הוזן');
+    }
+    applyPreEvacCounters(ie);
+  }
+  if(before!==JSON.stringify([ie.groups, ie.summary, ie.report, ie.rejectedNotice, ie.rejectedVersions])){
+    saveDemoState();
+    updateInitialEvacDisplays();
+    refreshActiveScreenData();
+  }
 }
 // ── Evacuation tracking + external reports pull (V2.99.33, database/044) ──
 // Separate queries from the main patient pull on purpose: until 044 is applied these columns do

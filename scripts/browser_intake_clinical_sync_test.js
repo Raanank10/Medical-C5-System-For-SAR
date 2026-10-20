@@ -1,4 +1,4 @@
-// Real-browser test for V2.99.36 (docs/GAP_CLOSURE_PLAN.md WP-3): treatments, medications,
+// Real-browser test for V2.99.37 (docs/GAP_CLOSURE_PLAN.md WP-3): treatments, medications,
 // pediatric high-risk confirmations and injury zones reach the outbox with the patient's id,
 // under event names the server knows, and after the event that creates the patient.
 //
