@@ -2859,7 +2859,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.38';
+const APP_VERSION = '2.99.39';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -8936,6 +8936,7 @@ function openPatient(id){
   const tq=tourniquetTimerLabel(p);
   document.getElementById('detail-body').innerHTML=`
     ${patientSyncRejectionBanner(p)}
+    ${alertAcknowledgmentLine(p)}
     <div class="summary-card">
       <div class="summary-row"><span class="summary-key">מיון</span><span class="summary-val">${triagePill(p.triage)}</span></div>
       <div class="summary-row"><span class="summary-key">מיקום</span><span class="summary-val">${p.location}${p.locDetail?' · '+p.locDetail:''}</span></div>
@@ -9287,8 +9288,7 @@ function manualTriageOverride(id, triage){
   p.lastModifiedAt=new Date().toISOString();
   p.unsyncedEvents=(p.unsyncedEvents||0)+1;
   if(['red','black'].includes(triage)){
-    delete p.alertAcknowledgedAt;
-    delete p.alertAcknowledgedBy;
+    clearAlertAcknowledgment(p, 'triage_'+triage);
   }
   if(triage==='black'){
     p.patientStatus='deceased';
@@ -10460,8 +10460,7 @@ async function saveModalVitals(){
     });
   }
   if(criticalEvent || ['red','black'].includes(priorityRecommendation)){
-    delete p.alertAcknowledgedAt;
-    delete p.alertAcknowledgedBy;
+    clearAlertAcknowledgment(p, criticalEvent?'critical_vitals':'priority_'+priorityRecommendation);
   }
 
   // ── Commit vitals ────────────────────────────
@@ -10547,14 +10546,43 @@ function acknowledgeAlert(id){
   const p=patients.find(x=>x.id===id); if(!p) return;
   p.alertAcknowledgedAt=new Date().toISOString();
   p.alertAcknowledgedBy=getDeviceId();
+  p.alertAcknowledgedByName=null; // this device: shown as "את/ה"
+  p.alertAckFromServer=false;
   p.lastTouchedBy=getDeviceId();
   p.lastModifiedAt=new Date().toISOString();
   p.events=p.events||[];
-  p.events.unshift({type:'WATCHDOG_ACKNOWLEDGED',time:nowT(),detail:`Acknowledged — in treatment by ${getDeviceId()}`,warn:false});
-  p.unsyncedEvents=(p.unsyncedEvents||0)+1;
+  // WP-4 (V2.99.39, database/053): sent patient-scoped, so every device sees the alert as handled.
+  saveLocalEvent({type:'WATCHDOG_ACKNOWLEDGED',patient_id:p.id,detail:`${p.visualId||p.id} · בטיפול`,
+    payload_json:{patient_id:p.id, alert_kind:alertKindForAck(p)},warn:false});
+  p.events.unshift({type:'WATCHDOG_ACKNOWLEDGED',time:nowT(),detail:'התראה אושרה — בטיפול',warn:false});
   saveDemoState(); renderDashboard(); renderAlerts();
   if(document.getElementById('screen-commander').classList.contains('active')) renderCommander();
   toast('התראה אושרה — בטיפול');
+}
+// What was showing when "בטיפול" was pressed; informational only, the server acknowledges per patient.
+function alertKindForAck(p){
+  if(C5Rules.isCriticalAlert(p)) return 'critical';
+  if(p.tourniquet) return 'tourniquet';
+  if(isVitalsOverdue(p)) return 'vitals_overdue';
+  return p.alert ? 'deterioration' : 'other';
+}
+// The patient got worse after someone pressed "בטיפול" (red/black triage, critical vitals): the
+// alert must show again on every device, not only here (WP-4, database/053).
+function clearAlertAcknowledgment(p, cause){
+  const had=!!p.alertAcknowledgedAt;
+  delete p.alertAcknowledgedAt;
+  delete p.alertAcknowledgedBy;
+  delete p.alertAcknowledgedByName;
+  delete p.alertAckFromServer;
+  if(had) saveLocalEvent({type:'WATCHDOG_ALERT',patient_id:p.id,detail:`${p.visualId||p.id} · התראה חזרה (${cause})`,
+    payload_json:{patient_id:p.id, reason:'reescalated', cause},warn:true});
+}
+function alertAcknowledgmentLine(p){
+  if(!p?.alertAcknowledgedAt) return '';
+  const at=new Date(p.alertAcknowledgedAt);
+  const when=isNaN(at)?'':at.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+  const who=p.alertAckFromServer ? (p.alertAcknowledgedByName||'מכשיר אחר') : 'את/ה';
+  return `<div class="alert-banner muted" style="margin:6px 0;border-color:var(--green)"><span>✓</span><div><div class="alert-banner-title" style="color:var(--green)">התראה בטיפול</div><div class="alert-banner-sub">${who}${when?` · ${when}`:''}</div></div></div>`;
 }
 function setAlertFilter(f,btn){
   alertFilter=f;
@@ -13020,7 +13048,7 @@ function applyServerTourniquets(rows, incidentId){
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
 function pullProjectedPatientStateAll(){
-  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); });
+  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); pullAlertAcknowledgments(id); });
 }
 // ── Pre-evacuation report pull (V2.99.36, database/050) ──
 // incident_pre_evacuations is the server's verdict on who owns the report (first medical
@@ -13076,6 +13104,48 @@ function applyRemotePreEvacuation(row, rejected){
     updateInitialEvacDisplays();
     refreshActiveScreenData();
   }
+}
+// ── Alert acknowledgment pull (V2.99.39, WP-4, database/053) ──
+// patients.alert_acknowledged_* is the newest "בטיפול" for each patient, from any device, cleared by
+// a later re-escalation. Applied unless this device has an unsent acknowledgment or re-escalation
+// for that patient (the local one wins until pushed). Separate query: until 053 is applied the
+// columns do not exist, and that must not break the main patient pull.
+const ALERT_ACK_COLUMNS='id,alert_acknowledged_at,alert_acknowledged_by,alert_acknowledged_by_name,alert_acknowledged_by_role';
+async function pullAlertAcknowledgments(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let result;
+  try{ result=await client.from('patients').select(ALERT_ACK_COLUMNS).eq('incident_id', incidentId); }
+  catch(e){ return; }
+  if(result.error || !Array.isArray(result.data)) return;
+  applyAlertAcknowledgments(result.data);
+}
+function applyAlertAcknowledgments(rows){
+  const pending=new Set(getOutbox().filter(e=>!e.synced && !e.syncRejected && e.patient_id
+    && (e.type==='WATCHDOG_ACKNOWLEDGED' || e.type==='WATCHDOG_ALERT')).map(e=>e.patient_id));
+  let changed=false;
+  for(const row of rows){
+    if(!row || pending.has(row.id)) continue;
+    const p=patients.find(x=>x.id===row.id); if(!p) continue;
+    const serverAt=row.alert_acknowledged_at ? Date.parse(row.alert_acknowledged_at) : null;
+    const localAt=p.alertAcknowledgedAt ? Date.parse(p.alertAcknowledgedAt) : null;
+    if(serverAt){
+      if(localAt && localAt>serverAt) continue; // this device acknowledged later; its event is on the way
+      const mine=row.alert_acknowledged_by===currentUser.id;
+      const name=mine?null:(sanitizeRemoteText(row.alert_acknowledged_by_name)||ROLE_LABELS[mapServerRole(row.alert_acknowledged_by_role||'')]||null);
+      if(localAt===serverAt && !!p.alertAckFromServer===!mine && (p.alertAcknowledgedByName||null)===name) continue;
+      p.alertAcknowledgedAt=new Date(serverAt).toISOString();
+      p.alertAcknowledgedByName=name;
+      p.alertAckFromServer=!mine;
+      changed=true;
+    }else if(localAt){
+      // Cleared on the server: re-escalated on another device after the acknowledgment.
+      delete p.alertAcknowledgedAt; delete p.alertAcknowledgedBy; delete p.alertAcknowledgedByName; delete p.alertAckFromServer;
+      changed=true;
+    }
+  }
+  if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
 // ── Medical reinforcement / death-certification requests pull (V2.99.38, WP-5, database/052) ──
 // medical_resource_requests is readable (RLS, decision D3) by pc/cc/chamal/physician/admin of the
