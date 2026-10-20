@@ -47,6 +47,8 @@ node scripts/browser_intake_clinical_sync_test.js # treatments, medications, hig
 node scripts/browser_reinforcement_sync_test.js   # reinforcement / death-certification requests across medic, PC, physician devices; status by server id, D3 visibility (WP-5)
 node scripts/browser_alert_ack_sync_test.js       # "בטיפול" acknowledgment shared across medic and PC devices; re-escalation brings the alert back everywhere (WP-4)
 node scripts/browser_remote_treatments_test.js    # treatments, medications and airway from another device listed on the patient card, not mixed into this device's own history (WP-3 step 6)
+node scripts/browser_tourniquet_followups_test.js # later limb, effectiveness check, vitals-screen tourniquet sent; remote effectiveness shown (WP-2b)
+node scripts/browser_tourniquet_offline_alert_test.js # D1: network off, fake clock; 60/120-minute tourniquet alerts vibrate + banner, once per level
 
 # Analytics package
 cd analytics/c5_sentinel_sar_analytics_v1_1
@@ -76,7 +78,7 @@ CI (`.github/workflows/validate.yml`) runs exactly two things on every PR and pu
 `index.html` and `demo/rescue-app.html` are **byte-identical** (verify with `diff` before assuming otherwise). Both are ~8,600 lines of self-contained HTML/CSS/JS — no bundler, no framework, no `<script src>` to other JS files except `src/domain/rules.js`-equivalent logic that is inlined directly into the HTML (the standalone `src/domain/rules.js` module is a separately extracted, testable copy of a subset of that logic — see below). When you change prototype behavior, **you almost always need to edit both `index.html` and `demo/rescue-app.html` identically** unless a doc explicitly says they should diverge (currently they should not).
 
 Inside the HTML, look for:
-- `const APP_VERSION = '2.99.41';` — bump this and the visible "Demo X.Y" / "ROLE // X.Y" label strings together when shipping a version; smoke scripts assert on these exact strings.
+- `const APP_VERSION = '2.99.42';` — bump this and the visible "Demo X.Y" / "ROLE // X.Y" label strings together when shipping a version; smoke scripts assert on these exact strings.
 - `const ROLE_LABELS` / `const ROLE_DEFS` — defines the role-based views. Ten roles exist in the live `user_role` enum: `medic`, `paramedic` and `physician` (added in `database/019`/`020`), `pc` (חוג"ד — platoon commander), `cc` (מ״פ רפואה — company/command medical), `logistics_officer` (mapped to the client-side `logistics` key via `SERVER_ROLE_TO_CLIENT_ROLE`), `chamal` (command system), `rpc`/`rcc` (rescue-chain platoon/company commander — site-authority actions per `docs/ROLE_COMMAND_MODEL_v2.8.md`, added in `database/006`/`007`), and `admin`. New users are invited by an admin from the in-app "ניהול משתמשים" screen (`supabase/functions/admin-users/index.ts`, `database/042`), or with the fallback CLI `scripts/invite_user.js`; never the Supabase dashboard button, which can't set a role. Both keep a `VALID_ROLES` list that must match this enum.
 - `render*` functions (e.g. `renderDashboard`, `renderCommander`, `renderMstartSweep`, `renderAar`, `renderCcHeroDashboard`, `renderLogisticsOfficer`) — each is a self-contained view renderer for one role/screen. Grep for `^function render` to find the current screen inventory before adding a new one.
 - A legacy step-based New Patient flow (`screen-step1`..`screen-step8`, guarded by a `LEGACY_FULL_ASSESSMENT_DO_NOT_DELETE_WITHOUT_TESTS` comment) coexists with the newer Quick/Extended patient flows — don't delete it without checking what still depends on it (smoke scripts assert on its presence).
@@ -87,7 +89,7 @@ This is the one piece of logic that has been pulled out of the HTML prototype in
 
 It owns:
 - vitals reassessment timing (`vitalsTimer`, interval varies by triage color — red 10m / yellow 20m / green 30m — 1-minute warning buffer before each)
-- tourniquet timing (`tourniquetTimer`, 45-minute heads-up notice / 60-minute warning / 120-minute critical)
+- tourniquet timing (`tourniquetTimer`, 45-minute heads-up notice / 60-minute warning / 120-minute critical) and when the phone raises each level (`tourniquetAlertToRaise`: once per level per tourniquet, from the device clock, offline too; D1)
 - device-silence detection (`isDeviceSilent`, 10-minute threshold, one shared constant across the medic load board, command-view device panel, and Dead Man's Switch watchdog row)
 - MSTART triage computation (`computeMstartTriage`, `suggestMstartTriage`) — the auto-triage suggestion logic from vitals/SABCDE
 - pediatric detection and high-risk medication dose guardrails (`isPediatricPatient`, `isHighRiskDose` — age cutoff 8, dose limits currently hardcoded for morphine/fentanyl)

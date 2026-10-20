@@ -288,6 +288,10 @@ No new table or policy. Four new `patients` columns (`alert_acknowledged_at`, `_
 
 `vw_patient_treatment_history` re-created with the same columns plus `device_id` and `local_event_id`, and `AIRWAY_MANAGED` added to its event types; `security_invoker = true` is restated in the file and confirmed live afterwards, so `events` RLS still decides who reads it. Verified 2026-10-20 in a rolled-back block: a member medic read its three treatment events with their device id, the CC read 3, a non-member medic read 0.
 
+## Follow-up: tourniquet follow-ups (`database/056`-`058`)
+
+No new table or policy. `project_tourniquet_followups()` is a new `SECURITY DEFINER` trigger function (execute revoked from `public`, `anon`, `authenticated`) that updates `tourniquets` rows (limb, `is_active`); `tourniquets_read` is unchanged. 058 widens `tourniquets_tourniquet_status_check` by two values. Incident during apply, 2026-10-20: the first 057 wrote `tourniquet_status = 'handed_over'`, rejected by that check constraint inside the trigger, which would have rolled back any handover of a patient with an active tourniquet; it was replaced within about 5 minutes (live history `057_tourniquet_followups`, `057b_tourniquet_followups_no_raise`) and no events reached the server in that window. Verified afterwards in a rolled-back block as a member medic: later limb moved the row; effectiveness checks stored with a 30-minute next reassessment; a colliding limb move skipped without rejecting the event; handover closed both rows without `released_at`; all 7 events kept. `get_advisors` (security): nothing new.
+
 ## Explicitly not re-litigated here
 
 - T6 (leaked-password protection) and T5 (service-role key handling) — out of scope, not RLS/authorization, already tracked in `docs/THREAT_MODEL.md`.

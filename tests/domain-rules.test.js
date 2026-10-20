@@ -288,4 +288,16 @@ assert.deepEqual(
   { light: 5, moderate: 1, severe: 4, total: 10 },
 );
 
+// D1: the phone alerts each tourniquet time level once, on its own clock.
+assert.equal(rules.tourniquetAlertToRaise("", null), null);
+assert.equal(rules.tourniquetAlertToRaise("notice", null), "notice");
+assert.equal(rules.tourniquetAlertToRaise("notice", "notice"), null);
+assert.equal(rules.tourniquetAlertToRaise("warn", "notice"), "warn");
+assert.equal(rules.tourniquetAlertToRaise("critical", "warn"), "critical");
+assert.equal(rules.tourniquetAlertToRaise("critical", "critical"), null);
+// Opened after a long time closed: only the current level alerts, not every level missed.
+assert.equal(rules.tourniquetAlertToRaise("critical", null), "critical");
+// Never alerts downwards (e.g. a clock correction).
+assert.equal(rules.tourniquetAlertToRaise("warn", "critical"), null);
+
 console.log("Domain rule tests passed.");
