@@ -284,6 +284,10 @@ Asked by the repo owner on 2026-10-20 ("add platoons but one company, check all"
 
 No new table or policy. Four new `patients` columns (`alert_acknowledged_at`, `_by`, `_by_name`, `_by_role`), readable through the existing `patients` read policy and written only by the `SECURITY DEFINER` trigger function `project_alert_acknowledgment()` (execute revoked from `public`, `anon`, `authenticated`). It also sets `watchdog_alerts.acknowledged_at` / `acknowledged_by`. Applied 2026-10-20 as `053_alert_acknowledgment` (renumbered to `054` when merging `main`, whose `053_platoons.sql` took `053`; without its `drop trigger if exists` line, a no-op on a first apply) and verified the same day by role impersonation in one block forced to roll back: a member medic's acknowledgment set the patient columns and the patient's open watchdog row; a CC read it; an older re-escalation and a `WATCHDOG_ALERT` without `reason` left it; a newer re-escalation cleared it while the watchdog row kept its acknowledgment; a newer CC acknowledgment replaced it; a medic who is not an incident member could not insert the event at all (42501, `events_insert_by_role`).
 
+## Follow-up: treatment history view (`database/055`)
+
+`vw_patient_treatment_history` re-created with the same columns plus `device_id` and `local_event_id`, and `AIRWAY_MANAGED` added to its event types; `security_invoker = true` is restated in the file and confirmed live afterwards, so `events` RLS still decides who reads it. Verified 2026-10-20 in a rolled-back block: a member medic read its three treatment events with their device id, the CC read 3, a non-member medic read 0.
+
 ## Explicitly not re-litigated here
 
 - T6 (leaked-password protection) and T5 (service-role key handling) — out of scope, not RLS/authorization, already tracked in `docs/THREAT_MODEL.md`.
