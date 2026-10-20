@@ -245,40 +245,45 @@ New table `medical_resource_requests` (WP-5 of `docs/GAP_CLOSURE_PLAN.md`), writ
 
 Applied 2026-10-20 (`052` without its two `drop ... if exists` lines, no-ops on a first apply) and verified the same day by role impersonation in one block forced to roll back, against real profiles: a medic's death-certification request and a PC's paramedic request each created one row (a re-sent creation did not duplicate; a junk reason code and a non-uuid patient id were dropped; an unknown resource type created nothing); the requesting medic read 1 row, another medic 0, the PC 2, a physician (not a member) 2, a paramedic and a logistics officer 0; a physician's acknowledgment from another device applied by server id; the medic's attempt to resolve their own request and to cancel the PC's were ignored, the medic's urgency change on their own request applied; an older PC update did not undo the physician's newer one; a direct insert as the PC failed with 42501; the physician's `PATIENT_DEATH_CONFIRMED` resolved the death-certification request; all 10 events stayed in the log. `get_advisors` (security) showed no new finding.
 
-## Follow-up: platoons and rescue-chain scope (`database/053`)
+## Follow-up: companies, platoons and rescue-chain scope (`database/053`)
 
-Asked by the repo owner on 2026-10-20 ("add platoons but one company, check all"); decisions: a platoon is one shared site team (pc, rpc, medics/paramedics), rpc sees only its own platoon's sites, and the rescue chain is blocked from clinical data in the database.
+Asked by the repo owner on 2026-10-20 ("add platoons ... check all"). Structure confirmed the same day: one מ״פ רפואה; three rescue companies, each with one מ״פ חילוץ, one חוג״ד with medics and three platoons under a מ״מ; one ambulance team. Decisions: מ״פ רפואה, חמ״ל, admin, physician and paramedic see every site; pc and rcc their company's; rpc its platoon's; the rescue chain is blocked from clinical data in the database. A first version of `053` assumed one company (merged in #82 as V2.99.39) and was tested live in rolled-back transactions, but never applied; it was rewritten in place for the confirmed structure.
 
 **Measured live before the change** (read-only, rpc account impersonated with `set local role authenticated` + JWT claims): with no incident membership the rpc read all 5 incidents, all 5 patients, all 29 events (including 3 `VITALS_RECORDED` / `MEDICATION_ADMINISTERED` / `INTERVENTION_RECORDED`), 1 row of `vw_patient_latest_vitals` and 2 of `vw_patient_treatment_history`. `PATIENT_HANDED_OVER` payloads carry a MIST summary with HR/RR/AVPU and treatments (`index.html`, handover), so the block has to cover more than the obvious vitals types.
 
 **Policy shape.** An allowlist, not a denylist, on `events_read_authenticated` for rpc/rcc: a new event type stays hidden from rescue until someone decides otherwise. Own events stay readable. The two clinical views are `security_invoker`, so they follow the events policy with no change of their own. The `sync-log` GET runs with the caller's JWT, so the pull is covered too.
 
-**Verified on the live database before merge**, in three transactions that each ended with a raised error (nothing persisted; checked afterwards that no table, column or function definition remained). Fixtures: two platoons, pc + rpc + one medic in A, one medic in B, `TEST-INC-A` in A, an active incident in B.
+**Verified before applying** with `scripts/rls_test_053_platoons.sql` on a local PostgreSQL 16 built from the live definitions read on 2026-10-20 (column lists, enums, `app.*` helper bodies, the policies `053` replaces), with synthetic accounts shaped like the live test accounts. The run ends with a raised error, so nothing persists; the same script runs in the Supabase SQL editor. It passed with `042` applied and without it, and `053` re-applies without error. Before writing the local copy, the live definitions `053` replaces were checked unchanged by hash.
 
 | Check | Result |
 | --- | --- |
-| rpc (platoon A, no membership): incidents visible | 1 (was 5) |
-| rpc: clinical events / clinical view rows | 0 / 0+0 (was 3 / 1+2) |
-| rpc: non-clinical events of its site | 11 |
-| rpc: join the other platoon's site; set a site's platoon | both refused |
-| rpc opens a site | site gets platoon A |
-| rcc: incidents / clinical events | 5 / 0 |
-| pc (A): clinical events | 3 (unchanged) |
-| pc: profiles readable | 3 (its platoon), other platoon's medic 0 |
-| pc: may assign own medic / other platoon's medic | true / false |
-| pc: change roster, move a site to another platoon, create platoon, write `platoon_audit`, rename | all refused |
-| medic (A) drafts a site; pc (A) lists and confirms it | draft gets platoon A; listed; confirmed |
-| paramedic with no platoon drafts; pc (A) | not visible |
-| cc: create / rename platoon, place a medic, move a site; duplicate name; place a logistics officer | succeed; duplicate refused; logistics refused |
-| `set_platoon_commander()` (045 wrapper) | places the medic in that pc's platoon |
-| role change to a non-platoon role | platoon cleared, audited |
-| `platoon_audit` update | refused (append-only) |
+| site company follows its platoon; a contradicting company | follows; refused (raised, not silently replaced) |
+| rpc (platoon A1, no membership): sites visible | 1 |
+| rpc: clinical events / clinical view rows | 0 / 0+0 |
+| rpc: join company B's site; move a site | both refused |
+| rpc opens a site | site gets platoon A1 (and company A) |
+| rcc (company A): A site yes, B site no; clinical events | 1 of 2; 0 |
+| rcc: move a site A1 -> A2 / take company B's site / create a platoon | allowed / refused / refused |
+| rpc of A1 after the site moved to A2 | site no longer visible |
+| pc (company A): company A sites; clinical events | both; 3 (unchanged) |
+| pc: profiles readable | own company's medic, rcc and the company's rpc; company B / ambulance 0 |
+| pc: may assign own company's medic / company B's medic | true / false |
+| pc: change roster, move a site (with or without a platoon), write `unit_audit` | all refused |
+| medic (company A) drafts; pc (A) lists and confirms it | draft gets company A; listed; confirmed |
+| medic of company B: company A's site | not visible |
+| paramedic (ambulance), cc: sites visible | all |
+| cc: create platoon, duplicate name, platoon in the ambulance, rpc placed in a company | ok; refused; refused; refused |
+| placement guards: logistics officer in a company, rcc in the ambulance, pc in a platoon | all refused |
+| cc: place a medic, move a site, `set_platoon_commander()` (045 wrapper) | all work |
+| with `042`: admin changes an rcc to logistics officer | company cleared; recorded in both `admin_user_audit` and `unit_audit` |
+| role change medic -> paramedic / rpc -> pc | keeps company / clears platoon |
+| `unit_audit` update | refused (append-only) |
 
-**Gap found by the test and fixed in the file:** a draft that company command moved to platoon B stayed visible to platoon A's pc, because 045's drafter rule did not look at the site's platoon. The drafter rule now applies only while `incidents.platoon_id` is null; re-verified (visible before the move, hidden after).
+**Gap found by the local test and fixed in the file:** a pc's direct `update incidents set company_id = ...` on a site with a platoon was silently replaced by the platoon's company instead of being refused. It changed nothing, but a silent no-op hides a forbidden write, so the guard now raises.
 
 **Not covered** (documented, not fixed): `patients.pulse_present`, `breathing_present` and `injury_zones` stay readable to rpc/rcc on patients they can reach. Hiding single columns per role needs a view or RPC for the rescue read path, not RLS. `watchdog_alerts` rows stay readable to rpc/rcc (alert type and timing, no values).
 
-**Not applied live yet.** After applying: run `get_advisors` (security), and repeat the rpc row of the table with the real rpc account.
+**Not applied live yet.** After applying: run `get_advisors` (security), run `scripts/rls_test_053_platoons.sql` once in the SQL editor, and check one real rpc account.
 
 ## Follow-up: shared alert acknowledgment (`database/054`)
 
@@ -287,6 +292,10 @@ No new table or policy. Four new `patients` columns (`alert_acknowledged_at`, `_
 ## Follow-up: treatment history view (`database/055`)
 
 `vw_patient_treatment_history` re-created with the same columns plus `device_id` and `local_event_id`, and `AIRWAY_MANAGED` added to its event types; `security_invoker = true` is restated in the file and confirmed live afterwards, so `events` RLS still decides who reads it. Verified 2026-10-20 in a rolled-back block: a member medic read its three treatment events with their device id, the CC read 3, a non-member medic read 0.
+
+## Follow-up: tourniquet follow-ups (`database/056`-`058`)
+
+No new table or policy. `project_tourniquet_followups()` is a new `SECURITY DEFINER` trigger function (execute revoked from `public`, `anon`, `authenticated`) that updates `tourniquets` rows (limb, `is_active`); `tourniquets_read` is unchanged. 058 widens `tourniquets_tourniquet_status_check` by two values. Incident during apply, 2026-10-20: the first 057 wrote `tourniquet_status = 'handed_over'`, rejected by that check constraint inside the trigger, which would have rolled back any handover of a patient with an active tourniquet; it was replaced within about 5 minutes (live history `057_tourniquet_followups`, `057b_tourniquet_followups_no_raise`) and no events reached the server in that window. Verified afterwards in a rolled-back block as a member medic: later limb moved the row; effectiveness checks stored with a 30-minute next reassessment; a colliding limb move skipped without rejecting the event; handover closed both rows without `released_at`; all 7 events kept. `get_advisors` (security): nothing new.
 
 ## Explicitly not re-litigated here
 

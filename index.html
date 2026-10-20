@@ -753,7 +753,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9941</div>
+      <div class="demo-kicker">Demo V2.9942</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -850,7 +850,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9941</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9942</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -860,7 +860,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9941</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9942</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2529,6 +2529,17 @@ textarea{resize:vertical;min-height:70px;}
     return { cls, minutes, limb: tourniquet.limb || "לא צוין" };
   }
 
+  // D1 (repo owner, 2026-10-20): the phone raises tourniquet time alerts itself, from its own clock,
+  // with or without a server connection. Given the timer level now (tourniquetTimer().cls) and the
+  // level this tourniquet was last alerted at, returns the level to alert now, or null. Each level
+  // alerts once; a level skipped while the app was closed is not replayed, only the current one.
+  const TOURNIQUET_ALERT_RANK = { "": 0, notice: 1, warn: 2, critical: 3 };
+  function tourniquetAlertToRaise(timerCls, lastAlertedCls) {
+    const now = TOURNIQUET_ALERT_RANK[timerCls || ""] || 0;
+    const last = TOURNIQUET_ALERT_RANK[lastAlertedCls || ""] || 0;
+    return now > last ? timerCls : null;
+  }
+
   function isDeviceSilent(lastSeenMs, nowMs = Date.now()) {
     return !lastSeenMs || nowMs - lastSeenMs > DEVICE_SILENCE_MS;
   }
@@ -2797,6 +2808,7 @@ textarea{resize:vertical;min-height:70px;}
     supplyCriticalThreshold,
     supplyRiskTier,
     timeCodeToTodayMs,
+    tourniquetAlertToRaise,
     tourniquetTimer,
     vitalsAgeMs,
     vitalsIntervalMsFor,
@@ -2859,7 +2871,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.41';
+const APP_VERSION = '2.99.42';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -2908,7 +2920,7 @@ const SYNC_ELIGIBLE_EVENT_TYPES = new Set([
   'PATIENT_T_INJURY_UPDATED','PATIENT_HANDED_OVER','PATIENT_TRIAGED_EXPECTANT','VITALS_RECORDED',
   'MINIMAL_TRIAGE_RECORDED','SABCDE_RECORDED','MSTART_SUGGESTED','JUMPSTART_SUGGESTED','MSTART_OVERRIDE',
   'JUMPSTART_OVERRIDE','TOURNIQUET_APPLIED','TOURNIQUET_REASSESSMENT','TOURNIQUET_RELEASED',
-  'TOURNIQUET_CONTEXT_UPDATED','INTERVENTION_RECORDED','MEDICATION_ADMINISTERED','AIRWAY_MANAGED',
+  'TOURNIQUET_CONTEXT_UPDATED','TOURNIQUET_LIMB_RECORDED','INTERVENTION_RECORDED','MEDICATION_ADMINISTERED','AIRWAY_MANAGED',
   'HIGH_RISK_OVERRIDE_CONFIRMED','FIRST_RESPONDER_REPORT','OFFICIAL_INCIDENT_OPENED_BY_RESCUE',
   'INCIDENT_CLOSE_TOGGLED','BUILDING_STATUS_UPDATED','SITE_CLEAR_CONFIRMED','INCIDENT_DRAFT_CREATED',
   'INCIDENT_OPENED','INCIDENT_CONFIRMED','INCIDENT_DRAFT_MERGED','INCIDENT_DRAFT_REJECTED',
@@ -3059,55 +3071,77 @@ const DEMO_PLATOONS = [
 // the active incident exists as SITE_A, so the PC's scope is that incident.
 const PLATOON_SITE = Object.freeze({'PLT-A':'SITE_A', 'PLT-B':'SITE_B'});
 let pcPlatoonId='PLT-A';
-// ── Real platoons (database/053, V2.99.39) ──
-// Signed in, the command views use the server's platoons instead of DEMO_PLATOONS. There is one
-// company, so every platoon belongs to it. Only the active incident is loaded as a site, so every
-// loaded patient belongs to that incident's platoon; a site with no platoon yet is shown under
-// "ללא מחלקה", never hidden. Before 053 is applied the platoons read fails and the demo list stays.
-const NO_PLATOON_ID='__no_platoon__';
-let _realPlatoons=null;      // [{id,name,is_active}] signed in once 053 is applied; null otherwise
-let _realPlatoonMembers=[];  // company-level command: everyone in a platoon; pc: its own platoon (RLS)
+// ── Real units (database/053, V2.99.42) ──
+// Signed in, the command views use the server's units instead of DEMO_PLATOONS: rescue companies
+// (each with its מ״פ חילוץ, its חוג״ד and medics, and platoons led by a מ״מ) and an ambulance team.
+// מ״פ רפואה and the other company-level roles get one tile per rescue company; a מ״פ חילוץ gets one
+// tile per platoon of its own company. Only the active incident is loaded as a site, so every
+// loaded patient belongs to that site's company / platoon; a site with no unit yet shows under
+// "ללא שיוך", never hidden. Before 053 is applied the companies read fails and the demo list stays.
+const NO_PLATOON_ID='__no_unit__';
+let _realCompanies=null;       // [{id,name,kind,is_active}] signed in once 053 is applied; null otherwise
+let _realPlatoons=[];          // [{id,company_id,name,is_active}]
+let _realPlatoonMembers=[];    // company-level command: everyone with a unit; pc: its own company (RLS)
+let _myCompanyId=null;
 let _myPlatoonId=null;
+let _activeIncidentCompanyId=null;
 let _activeIncidentPlatoonId=null;
-function usingRealPlatoons(){ return !!currentUser && Array.isArray(_realPlatoons); }
+function usingRealPlatoons(){ return !!currentUser && Array.isArray(_realCompanies); }
+function unitTilesArePlatoons(){ return currentUser?.role==='rcc'; }
+function activeSiteUnitKey(){ return (unitTilesArePlatoons() ? _activeIncidentPlatoonId : _activeIncidentCompanyId) || NO_PLATOON_ID; }
 function patientPlatoonId(p){
   if(!usingRealPlatoons()) return p.assignedPlatoonId||'PLT-A';
-  return _activeIncidentPlatoonId||NO_PLATOON_ID;
+  return activeSiteUnitKey();
 }
+function realCompanyName(id){ return _realCompanies?.find(c=>c.id===id)?.name || ''; }
+function realUnitName(id){
+  const c=_realCompanies?.find(x=>x.id===id); if(c) return c.name;
+  const pl=_realPlatoons.find(x=>x.id===id); if(pl) return `${realCompanyName(pl.company_id)} · ${pl.name}`;
+  return '';
+}
+function unitPluralLabel(){ return usingRealPlatoons() && !unitTilesArePlatoons() ? 'פלוגות' : 'מחלקות'; }
 function commandPlatoons(){
   if(!usingRealPlatoons()) return DEMO_PLATOONS;
-  const list=_realPlatoons.filter(p=>p.is_active || p.id===_activeIncidentPlatoonId)
-    .map(p=>({platoonId:p.id, name:p.name, companyId:'COMP-1', real:true}));
-  if(patients.some(p=>patientPlatoonId(p)===NO_PLATOON_ID)) list.push({platoonId:NO_PLATOON_ID, name:'ללא מחלקה', companyId:'COMP-1', real:true});
+  const src=unitTilesArePlatoons()
+    ? _realPlatoons.filter(p=>p.company_id===_myCompanyId && (p.is_active || p.id===_activeIncidentPlatoonId))
+    : _realCompanies.filter(c=>(c.kind==='rescue' && c.is_active) || c.id===_activeIncidentCompanyId);
+  const list=src.map(u=>({platoonId:u.id, name:u.name, companyId:'COMP-1', real:true}));
+  if(patients.some(p=>patientPlatoonId(p)===NO_PLATOON_ID)) list.push({platoonId:NO_PLATOON_ID, name:'ללא שיוך', companyId:'COMP-1', real:true});
   return list;
 }
-function platoonMembers(platoonId, roles){
-  return _realPlatoonMembers.filter(m=>m.platoon_id===platoonId && (!roles || roles.includes(m.role)));
+// People of one unit: a company's pc / rcc / medics, or a platoon's rpc.
+function platoonMembers(unitId, roles){
+  return _realPlatoonMembers.filter(m=>(m.company_id===unitId || m.platoon_id===unitId) && (!roles || roles.includes(m.role)));
 }
 function platoonCommanderLabel(pl){
   if(!pl.real) return displayUser(pl.pcId);
-  const pcs=platoonMembers(pl.platoonId,['pc']);
+  const pcs=platoonMembers(pl.platoonId, unitTilesArePlatoons() ? ['rpc'] : ['pc']);
   return pcs.length ? pcs.map(m=>m.display_name||'חוג״ד').join(', ') : 'לא שובץ';
 }
 function myPlatoonRow(){
   if(!usingRealPlatoons()) return '';
-  return roleRow('המחלקה שלי', _myPlatoonId ? platoonName(_myPlatoonId) : 'לא שובצת למחלקה · מ״פ רפואה משבץ/ת מחלקות');
+  if(currentUser.role==='rpc') return roleRow('המחלקה שלי', _myPlatoonId ? realUnitName(_myPlatoonId) : 'לא שובצת למחלקה · מ״פ רפואה משבץ/ת');
+  return roleRow('הפלוגה שלי', _myCompanyId ? realCompanyName(_myCompanyId) : 'לא שובצת לפלוגה · מ״פ רפואה משבץ/ת');
 }
 // Separate queries, so a server without database/053 leaves everything else working.
 async function pullRealPlatoons(client){
   if(!currentUser) return;
   try{
-    const pl=await client.from('platoons').select('id,name,is_active').order('name');
-    if(pl.error || !Array.isArray(pl.data)){ _realPlatoons=null; return; }
-    _realPlatoons=pl.data;
-    const me=await client.from('profiles').select('platoon_id').eq('id',currentUser.id).single();
+    const co=await client.from('companies').select('id,name,kind,is_active').order('name');
+    if(co.error || !Array.isArray(co.data)){ _realCompanies=null; return; }
+    const pl=await client.from('platoons').select('id,company_id,name,is_active').order('name');
+    _realCompanies=co.data;
+    _realPlatoons=(!pl.error && Array.isArray(pl.data)) ? pl.data : [];
+    const me=await client.from('profiles').select('company_id,platoon_id').eq('id',currentUser.id).single();
     _myPlatoonId=me.error ? null : (me.data?.platoon_id||null);
+    _myCompanyId=me.error ? null : (me.data?.company_id || _realPlatoons.find(p=>p.id===_myPlatoonId)?.company_id || null);
     if(activeIncident){
-      const inc=await client.from('incidents').select('platoon_id').eq('id',activeIncident.id).single();
+      const inc=await client.from('incidents').select('company_id,platoon_id').eq('id',activeIncident.id).single();
+      _activeIncidentCompanyId=inc.error ? null : (inc.data?.company_id||null);
       _activeIncidentPlatoonId=inc.error ? null : (inc.data?.platoon_id||null);
-    }else _activeIncidentPlatoonId=null;
+    }else{ _activeIncidentCompanyId=null; _activeIncidentPlatoonId=null; }
     if(COMPANY_COMMAND_ROLES.has(currentUser.role) || currentUser.role==='pc'){
-      const m=await client.from('profiles').select('id,display_name,role,platoon_id').in('role',['pc','rpc','medic','paramedic']).eq('is_active',true).order('display_name');
+      const m=await client.from('profiles').select('id,display_name,role,company_id,platoon_id').in('role',['pc','rpc','rcc','medic','paramedic','physician']).eq('is_active',true).order('display_name');
       _realPlatoonMembers=(!m.error && Array.isArray(m.data)) ? m.data : [];
     }else _realPlatoonMembers=[];
   }catch(e){}
@@ -3667,7 +3701,7 @@ async function signOut(){
   const client=getSupabaseClient();
   if(client){ try{ await client.auth.signOut(); }catch(e){} }
   currentUser=null;
-  _realPlatoons=null; _realPlatoonMembers=[]; _myPlatoonId=null;
+  _realCompanies=null; _realPlatoons=[]; _realPlatoonMembers=[]; _myCompanyId=null; _myPlatoonId=null;
   deactivateIncidentContext();
   renderAuthStatus();
   goTo('login');
@@ -4790,7 +4824,7 @@ function siteNameById(id){
   return (allSites.find(s=>s.id===id)?.name) || (siteData.name || 'מוקד לא מזוהה');
 }
 function platoonName(id){
-  return (commandPlatoons().find(p=>p.platoonId===id)?.name) || (usingRealPlatoons() && _realPlatoons.find(p=>p.id===id)?.name) || (DEMO_PLATOONS.find(p=>p.platoonId===id)?.name) || 'מחלקה לא מזוהה';
+  return (commandPlatoons().find(p=>p.platoonId===id)?.name) || (usingRealPlatoons() && realUnitName(id)) || (DEMO_PLATOONS.find(p=>p.platoonId===id)?.name) || 'מחלקה לא מזוהה';
 }
 function minutesSinceIso(value){
   const t=Date.parse(value);
@@ -4963,6 +4997,8 @@ function loadStoredDemoState(){
       experimentStartedAt=saved.experimentStartedAt||experimentStartedAt;
       experimentPhase=saved.experimentPhase||experimentPhase;
       allSites.find(s=>s.id==='SITE_A').externalReports=siteData.externalReports||[];
+      // D1: a tourniquet that crossed a time level while the app was closed alerts on open.
+      setTimeout(()=>checkTourniquetTimeAlerts(), 0);
       return true;
     }catch(e){ return false; }
   });
@@ -6393,7 +6429,7 @@ function renderCcHeroDashboard(ctx={}){
     const noVitals=pts.filter(p=>assessmentDebtList(p).includes('full_vitals')).length;
     // Signed in, every loaded request belongs to the active incident, so to its platoon.
     const openReqs=pl.real
-      ? (pl.platoonId===(_activeIncidentPlatoonId||NO_PLATOON_ID) ? (reinforcementRequests||[]).filter(isRequestOpen).length : 0)
+      ? (pl.platoonId===activeSiteUnitKey() ? (reinforcementRequests||[]).filter(isRequestOpen).length : 0)
       : (reinforcementRequests||[]).filter(r=>isRequestOpen(r) && (r.siteId||'SITE_A')===pl.defaultSiteId).length;
     const activeMedics=pl.real ? platoonMembers(pl.platoonId,['medic','paramedic']).length
       : DEMO_USERS.filter(u=>u.role==='medic' && u.active && u.platoonId===pl.platoonId).length;
@@ -6495,7 +6531,7 @@ function renderCcCommandBoard(){
   const shortageItems=logisticsCompanies().flatMap(c=>c.lowItems.map(item=>({company:c,...item}))).filter(item=>focusMatchesLogisticsTask({itemTypes:[item.item],siteIds:[item.company.siteId],urgency:item.qty<=0?'CRITICAL':'MEDIUM'}));
   const shortageRows=shortageItems.map(item=>roleRow(`${item.company.name} · ${SUPPLY_LABELS[item.item]||item.item}`,`${item.qty} נותרו · משפיע על טיפול פעיל אם יש אדום/צהוב במוקד`)).join('');
   const snapshot=[
-    roleMetric(commandPlatoons().length,'מחלקות פעילות'),
+    roleMetric(commandPlatoons().length,`${unitPluralLabel()} פעילות`),
     roleMetric(allSites.filter(s=>s.id!=='ALL').length,'מוקדים פעילים'),
     roleMetric(patients.filter(p=>['red','yellow'].includes(p.triage)).length,'אדום / צהוב'),
     roleMetric(openReqs.length,'בקשות חוג"ד פתוחות'),
@@ -6552,7 +6588,7 @@ function renderCcCommandBoard(){
     ${renderCcEvacuationFunnel()}
     ${renderCcActiveSitesSnapshot()}
     ${renderCcResupplyCommandBoard()}
-    ${renderCollapsibleSection('cc-platoon-load','עומס מחלקות — אדום/צהוב לפי מחלקה', platoonRows, commandPlatoons().length)}
+    ${renderCollapsibleSection('cc-platoon-load',`עומס ${unitPluralLabel()} — אדום/צהוב לפי ${unitPluralLabel()==='פלוגות'?'פלוגה':'מחלקה'}`, platoonRows, commandPlatoons().length)}
     ${renderCollapsibleSection('cc-evac-priority','תעדוף פינוי פלוגתי', companyEvacuationPriorityRows(focusFilteredList(patients, focusMatchesPatient)), focusFilteredList(patients, focusMatchesPatient).length, {criticalCount:patients.filter(p=>p.triage==='red'&&!['evacuating','evacuated','handed_over','deceased'].includes(p.patientStatus)).length, emptyMessage:'אין פצועים במיקוד הנוכחי'})}
     ${renderCollapsibleSection('cc-resource-requests','בקשות משאב רפואי פתוחות', reqQueue || renderOperationalEmptyState('אין בקשות במיקוד הנוכחי'), focusedOpenReqs.length, {criticalCount:focusedOpenReqs.filter(isCriticalRequestForFocus).length, emptyMessage:'אין בקשות במיקוד הנוכחי'})}
     ${renderCollapsibleSection('cc-death-queue','תור רופא — קביעת מוות / אישור מוות', deathQueue || renderOperationalEmptyState('אין בקשות במיקוד הנוכחי'), focusedDeathReqs.length, {criticalCount:focusedDeathReqs.length, emptyMessage:'אין בקשות במיקוד הנוכחי'})}
@@ -6614,14 +6650,14 @@ function renderRoleDashboard(role=activeRoleDashboard){
     roleMetric(pts.length, role==='medic'?'הפצועים שלי':role==='pc'?'פצועי המחלקה':role==='rpc'?'פצועי המחלקה (טקטי)':role==='rcc'?'פצועי הפלוגה (טקטי)':'פצועים גלויים'),
     roleMetric(alerts.length, 'התראות לפעולה'),
     roleMetric(requests.filter(isRequestOpen).length, 'בקשות פתוחות'),
-    roleMetric(['cc','rcc'].includes(role)?commandPlatoons().length:allSites.filter(s=>s.id!=='ALL').length, ['cc','rcc'].includes(role)?'מחלקות':'מוקדים')
+    roleMetric(['cc','rcc'].includes(role)?commandPlatoons().length:allSites.filter(s=>s.id!=='ALL').length, ['cc','rcc'].includes(role)?unitPluralLabel():'מוקדים')
   ].join('');
   const responsibilities=cfg.responsibilities.map(x=>roleRow(x,'אחריות תפקיד')).join('');
   const alertHtml=alerts.slice(0,8).map(a=>renderAlertCard(a,'commander')).join('');
   let objects='';
   if(role==='pc'){
     const myPts=roleScopedPatients('pc');
-    const medicCount=usingRealPlatoons() ? platoonMembers(_myPlatoonId,['medic','paramedic']).length
+    const medicCount=usingRealPlatoons() ? platoonMembers(_myCompanyId,['medic','paramedic']).length
       : DEMO_USERS.filter(u=>u.role==='medic' && u.platoonId==='PLT-A').length;
     objects=[
       roleRow('חובשים בקריסה',`${medicCount} חובשים זמינים / פעילים במחלקה`),
@@ -6674,7 +6710,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
     ].join('');
   }else if(role==='rcc'){
     const myPlatoonIds=commandPlatoons().filter(pl=>pl.companyId==='COMP-1').map(pl=>pl.platoonId);
-    objects=myPlatoonIds.map(tacticalPlatoonRollup).join('');
+    objects=myPlatoonRow()+myPlatoonIds.map(tacticalPlatoonRollup).join('');
   }else{
     objects=allSites.filter(s=>s.id!=='ALL').map(s=>roleRow(
       `${s.name} · ${incidentTypeLabel(s.id)}`,
@@ -6737,7 +6773,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
     ${role==='pc'?myPlatoonRow():''}
     ${role==='pc'?renderPcResponsibilityBoard():''}
     ${['pc','cc'].includes(role)?roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds(role))):''}
-    ${role==='cc'&&canManagePlatoonRoster()?roleSection('מחלקות — שיוך חוג״ד, מ״מ וחובשים', '<div id="platoon-roster-panel" style="font-size:13px;color:var(--muted)">טוען…</div>'):''}
+    ${role==='cc'&&canManagePlatoonRoster()?roleSection('פלוגות ומחלקות — שיבוץ', '<div id="platoon-roster-panel" style="font-size:13px;color:var(--muted)">טוען…</div>'):''}
     ${role==='physician'?renderDoctorLegacyNote():''}
     ${role==='medic'||role==='pc'?'':role==='cc'
       ? `<details style="margin:12px 0 0"><summary style="cursor:pointer;font-weight:900;color:var(--muted);padding:10px 0">פירוט נוסף / אחריות ותורים</summary>${genericSections}</details>`
@@ -6746,41 +6782,60 @@ function renderRoleDashboard(role=activeRoleDashboard){
   if(role==='cc' && canManagePlatoonRoster()) loadPlatoonRoster();
   updateDemoStatus();
 }
-// ── Platoons and roster (database/053, replaces 045's PC-only roster) ──
-// One company, several platoons. Company-level command (cc/chamal/admin/physician) creates
-// platoons, places each pc / rpc / medic / paramedic in one, and sets which platoon works the
-// active site. A platoon's pc and rpc then see that platoon's sites; a pc assigns only its own
-// platoon's medics. Every change is written to platoon_audit on the server.
+// ── Units and roster (database/053, replaces 045's PC-only roster) ──
+// Company-level command (cc/chamal/admin/physician) creates rescue companies, the ambulance team
+// and platoons; places each person (a מ״מ in a platoon, a חוג״ד / מ״פ חילוץ / medic / paramedic /
+// physician in a company); and sets which unit works the active site. Every change is written to
+// unit_audit on the server.
 function canManagePlatoonRoster(){ return !!currentUser && COMPANY_COMMAND_ROLES.has(currentUser.role); }
-const PLATOON_MEMBER_ROLE_LABELS={pc:'חוג״ד', rpc:'מ״מ', medic:'חובש', paramedic:'פראמדיק'};
+const UNIT_MEMBER_ROLE_LABELS={pc:'חוג״ד', rpc:'מ״מ', rcc:'מ״פ חילוץ', medic:'חובש', paramedic:'פראמדיק', physician:'רופא'};
+const COMPANY_KIND_LABELS={rescue:'פלוגת חילוץ', ambulance:'צוות אמבולנס'};
 async function loadPlatoonRoster(){
   const el=document.getElementById('platoon-roster-panel'); if(!el) return;
   const client=getSupabaseClient(); if(!client) return;
   await pullRealPlatoons(client);
   const target=document.getElementById('platoon-roster-panel'); if(!target) return;
-  if(!usingRealPlatoons()){ target.textContent='ניהול מחלקות יהיה זמין אחרי עדכון השרת (database/053).'; return; }
+  if(!usingRealPlatoons()){ target.textContent='ניהול פלוגות ומחלקות יהיה זמין אחרי עדכון השרת (database/053).'; return; }
+  const companies=_realCompanies.filter(c=>c.is_active);
   const platoons=_realPlatoons.filter(p=>p.is_active);
-  const options=sel=>`<option value="">— ללא מחלקה —</option>`+platoons.map(p=>`<option value="${escAttr(p.id)}"${p.id===sel?' selected':''}>${escAttr(p.name)}</option>`).join('');
-  const siteRow=activeIncident?`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0">
-      <span style="color:var(--text);font-weight:900">מחלקה במוקד ${escAttr(incidentDisplayName(activeIncident))}</span>
-      <select data-incident-platoon="${escAttr(activeIncident.id)}" onchange="setIncidentPlatoon(this.value)" style="max-width:55%">${options(_activeIncidentPlatoonId)}</select>
-    </div>`:'';
-  const counts=platoons.map(p=>{
-    const m=platoonMembers(p.id);
-    return `${escAttr(p.name)}: ${m.filter(x=>x.role==='pc').length} חוג״ד · ${m.filter(x=>x.role==='rpc').length} מ״מ · ${m.filter(x=>['medic','paramedic'].includes(x.role)).length} חובשים`;
-  }).join('<br>');
-  const memberRows=_realPlatoonMembers.map(m=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--border)">
-      <span style="color:var(--text);font-weight:700">${escAttr(m.display_name||'ללא שם')} (${PLATOON_MEMBER_ROLE_LABELS[m.role]||m.role})</span>
-      <select data-roster-member="${escAttr(m.id)}" onchange="setProfilePlatoon('${escAttr(m.id)}', this.value)" style="max-width:55%">${options(m.platoon_id)}</select>
-    </div>`).join('');
+  const opt=(value,label,sel)=>`<option value="${escAttr(value)}"${sel?' selected':''}>${escAttr(label)}</option>`;
+  const companyOptions=(sel,kinds)=>opt('','— ללא פלוגה —',!sel)+companies.filter(c=>!kinds||kinds.includes(c.kind)).map(c=>opt(c.id,c.name,c.id===sel)).join('');
+  const platoonOptions=sel=>opt('','— ללא מחלקה —',!sel)+platoons.map(p=>opt(p.id,`${realCompanyName(p.company_id)} · ${p.name}`,p.id===sel)).join('');
+  const siteValue=_activeIncidentPlatoonId?`p:${_activeIncidentPlatoonId}`:_activeIncidentCompanyId?`c:${_activeIncidentCompanyId}`:'';
+  const siteOptions=opt('','— ללא שיוך —',!siteValue)
+    +companies.map(c=>opt(`c:${c.id}`,`${c.name} (כל הפלוגה)`,siteValue===`c:${c.id}`)).join('')
+    +platoons.map(p=>opt(`p:${p.id}`,`${realCompanyName(p.company_id)} · ${p.name}`,siteValue===`p:${p.id}`)).join('');
+  const row=(label,control)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--border)"><span style="color:var(--text);font-weight:700">${label}</span>${control}</div>`;
+  const siteRow=activeIncident?row(`מי עובד במוקד ${escAttr(incidentDisplayName(activeIncident))}`,
+    `<select data-incident-unit="${escAttr(activeIncident.id)}" onchange="setIncidentUnit(this.value)" style="max-width:55%">${siteOptions}</select>`):'';
+  const names=list=>list.map(m=>escAttr(m.display_name||'ללא שם')).join(', ')||'—';
+  const structure=companies.map(c=>{
+    const ppl=platoonMembers(c.id);
+    const pls=platoons.filter(p=>p.company_id===c.id).map(p=>`${escAttr(p.name)} (מ״מ: ${names(platoonMembers(p.id,['rpc']))})`).join(' · ');
+    return `<div style="padding:4px 0"><b style="color:var(--text)">${escAttr(c.name)}</b> · ${COMPANY_KIND_LABELS[c.kind]||c.kind}<br>`
+      +(c.kind==='rescue'?`מ״פ חילוץ: ${names(ppl.filter(m=>m.role==='rcc'))} · `:'')
+      +`חוג״ד: ${names(ppl.filter(m=>m.role==='pc'))} · ${ppl.filter(m=>['medic','paramedic','physician'].includes(m.role)).length} אנשי רפואה`
+      +(pls?`<br>מחלקות: ${pls}`:'')+`</div>`;
+  }).join('');
+  const memberRows=_realPlatoonMembers.map(m=>row(`${escAttr(m.display_name||'ללא שם')} (${UNIT_MEMBER_ROLE_LABELS[m.role]||m.role})`,
+    m.role==='rpc'
+      ? `<select data-roster-member="${escAttr(m.id)}" onchange="setProfileUnit('${escAttr(m.id)}','rpc',this.value)" style="max-width:55%">${platoonOptions(m.platoon_id)}</select>`
+      : `<select data-roster-member="${escAttr(m.id)}" onchange="setProfileUnit('${escAttr(m.id)}','${escAttr(m.role)}',this.value)" style="max-width:55%">${companyOptions(m.company_id, m.role==='rcc'?['rescue']:null)}</select>`
+  )).join('');
   target.innerHTML=`
-    <div style="display:flex;gap:8px;margin-bottom:8px">
-      <input id="new-platoon-name" placeholder="שם מחלקה חדשה" style="flex:1">
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <input id="new-company-name" placeholder="שם פלוגה / צוות" style="flex:1;min-width:120px">
+      <select id="new-company-kind">${opt('rescue',COMPANY_KIND_LABELS.rescue,true)}${opt('ambulance',COMPANY_KIND_LABELS.ambulance,false)}</select>
+      <button class="demo-mini-btn" onclick="createCompanyFromPanel()">הוסף פלוגה</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <select id="new-platoon-company">${companies.filter(c=>c.kind==='rescue').map(c=>opt(c.id,c.name,false)).join('')}</select>
+      <input id="new-platoon-name" placeholder="שם מחלקה" style="flex:1;min-width:100px">
       <button class="demo-mini-btn" onclick="createPlatoonFromPanel()">הוסף מחלקה</button>
     </div>
-    ${platoons.length?`<div style="margin-bottom:8px">${counts}</div>`:'<div style="margin-bottom:8px">אין מחלקות עדיין. הוסף/י מחלקה ואז שבץ/י אנשים.</div>'}
+    ${companies.length?`<div style="margin-bottom:8px">${structure}</div>`:'<div style="margin-bottom:8px">אין פלוגות עדיין. הוסף/י פלוגות חילוץ, צוות אמבולנס ומחלקות, ואז שבץ/י אנשים.</div>'}
     ${siteRow}
-    ${memberRows||'<div>אין חשבונות חוג״ד / מ״מ / חובש / פראמדיק פעילים.</div>'}`;
+    ${memberRows||'<div>אין חשבונות לשיבוץ.</div>'}`;
 }
 async function platoonRpc(name, args, okMsg){
   const client=getSupabaseClient(); if(!client) return false;
@@ -6792,17 +6847,33 @@ async function platoonRpc(name, args, okMsg){
   renderRoleDashboard();
   return true;
 }
+async function createCompanyFromPanel(){
+  const name=document.getElementById('new-company-name')?.value.trim();
+  const kind=document.getElementById('new-company-kind')?.value||'rescue';
+  if(!name){ toast('הזן/י שם פלוגה'); return; }
+  await platoonRpc('create_company', {p_name:name, p_kind:kind}, `"${name}" נוספה`);
+}
 async function createPlatoonFromPanel(){
+  const companyId=document.getElementById('new-platoon-company')?.value;
   const name=document.getElementById('new-platoon-name')?.value.trim();
+  if(!companyId){ toast('הוסף/י קודם פלוגת חילוץ'); return; }
   if(!name){ toast('הזן/י שם מחלקה'); return; }
-  await platoonRpc('create_platoon', {p_name:name}, `מחלקה "${name}" נוספה`);
+  await platoonRpc('create_platoon', {p_company_id:companyId, p_name:name}, `מחלקה "${name}" נוספה`);
 }
-async function setProfilePlatoon(profileId, platoonId){
-  await platoonRpc('set_profile_platoon', {p_profile_id:profileId, p_platoon_id:platoonId||null}, platoonId?'השיבוץ למחלקה נשמר':'הוסר מהמחלקה');
+// A מ״מ is placed in a platoon; everyone else in a company.
+async function setProfileUnit(profileId, role, unitId){
+  const args=role==='rpc' ? {p_profile_id:profileId, p_company_id:null, p_platoon_id:unitId||null}
+    : {p_profile_id:profileId, p_company_id:unitId||null, p_platoon_id:null};
+  await platoonRpc('set_profile_unit', args, unitId?'השיבוץ נשמר':'הוסר מהשיבוץ');
 }
-async function setIncidentPlatoon(platoonId){
+// value: '' (no unit), 'c:<company id>' or 'p:<platoon id>'.
+async function setIncidentUnit(value){
   if(!activeIncident) return;
-  if(await platoonRpc('set_incident_platoon', {p_incident_id:activeIncident.id, p_platoon_id:platoonId||null}, platoonId?'המוקד שויך למחלקה':'המוקד הוצא מהמחלקה')) _activeIncidentPlatoonId=platoonId||null;
+  const platoonId=value.startsWith('p:') ? value.slice(2) : null;
+  const companyId=value.startsWith('c:') ? value.slice(2) : platoonId ? (_realPlatoons.find(p=>p.id===platoonId)?.company_id||null) : null;
+  if(await platoonRpc('set_incident_unit', {p_incident_id:activeIncident.id, p_company_id:companyId, p_platoon_id:platoonId}, value?'המוקד שויך':'השיוך הוסר')){
+    _activeIncidentCompanyId=companyId; _activeIncidentPlatoonId=platoonId;
+  }
 }
 function reassignPatient(patientId, {toMedicId=null, toPlatoonId=null, assignedByRole='pc', reason='הקצאה מחדש'}={}){
   const p=patients.find(x=>x.id===patientId); if(!p) return;
@@ -7795,7 +7866,12 @@ function setSweepTourniquetLimb(limb, tourniquetId=pendingTourniquetLimbId){
   }
   p.events=p.events||[];
   p.events.unshift({type:'TOURNIQUET_LIMB_RECORDED',time:nowT(),detail:`${tq.id} · חסם: ${meta.label}`,warn:false});
-  saveLocalEvent({type:'TOURNIQUET_LIMB_RECORDED',detail:`${p.id} · ${tq.id} · ${meta.label}`,warn:false,payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb:meta.key}});
+  // WP-2b (V2.99.42, database/056-057): the server row was created with tq.serverLimb (normally
+  // 'unknown'); this moves it to the recorded limb, so other devices stop showing "לא ידוע".
+  const previousLimb=tq.serverLimb||'unknown';
+  saveLocalEvent({type:'TOURNIQUET_LIMB_RECORDED',detail:`${p.id} · ${tq.id} · ${meta.label}`,warn:false,patient_id:p.id,
+    payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb:meta.key,previous_limb:previousLimb,application_time:new Date(tq.appliedAt||Date.now()).toISOString()}});
+  tq.serverLimb=meta.key;
   pendingTourniquetLimbPatientId=null;
   pendingTourniquetLimbId=null;
   hideTourniquetLimbModal();
@@ -7840,8 +7916,22 @@ function markSweepTourniquetEffectiveness(tourniquetId, effectiveness){
   p.events=p.events||[];
   p.events.unshift({type,time:nowT(),detail,warn:effectiveness==='bleeding_continues'});
   saveLocalEvent({type,detail:`${p.id} · ${detail}`,warn:effectiveness==='bleeding_continues',payload_json:{patient_id:p.id,tourniquet_id:tq.id,effectiveness}});
+  queueTourniquetReassessment(p, tq, effectiveness);
   saveDemoState();
   renderMstartSweep();
+}
+// WP-2b (V2.99.42): checking a tourniquet's effectiveness is a reassessment. Sent as
+// TOURNIQUET_REASSESSMENT, which project_tourniquet_events() (database/001) already projects into
+// tourniquet_status and last_reassessed_at for the server row of that limb. The client sends
+// clinical_context 'unknown' at application, for which the server schedules reassessment every 30
+// minutes (D1: the server rule is authoritative); the same 30 is sent here so a check does not
+// stretch the server's cadence to its 60-minute default.
+function queueTourniquetReassessment(p, tq, effectiveness){
+  if(!tq?.serverLimb) return;
+  saveLocalEvent({type:'TOURNIQUET_REASSESSMENT',detail:`${p.visualId||p.id} · ${tq.id} · ${effectiveness==='bleeding_continues'?'דימום ממשיך':'דימום נשלט'}`,
+    warn:effectiveness==='bleeding_continues',patient_id:p.id,
+    payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb:tq.serverLimb,tourniquet_status:effectiveness==='bleeding_continues'?'bleeding_continues':'effective',
+      effectiveness,clinical_context:'unknown',next_reassessment_interval_minutes:30}});
 }
 function addSweepTourniquetSameLimb(sourceId){
   const p=activeSweepPatient(); if(!p) return;
@@ -8293,7 +8383,52 @@ function renderAlerts(){
   list.forEach(a=>{ h+=renderAlertCard(a,'medic'); });
   document.getElementById('alerts-banner').innerHTML=h;
 }
-setInterval(()=>{ renderAlerts(); renderDashboard(); },30000);
+// D1 (repo owner, 2026-10-20): the phone raises tourniquet time alerts itself, from its own clock,
+// whether or not it can reach the server. Before this, crossing 45/60/120 minutes only changed a
+// color in the lists, which a medic with the phone in a pocket never sees. Now each level alerts
+// once per tourniquet: vibration (where the phone supports it) and a banner that stays until it is
+// tapped. Runs with the 30-second alert refresh and right after load; nothing here touches the
+// network. Remote tourniquets (another device's, from the server) alert too, from their server
+// application time. Patients handed over or deceased do not alert.
+const TQ_ALERT_RANK={notice:1, warn:2, critical:3};
+function checkTourniquetTimeAlerts(nowMs=Date.now()){
+  let top=null, changed=false;
+  (patients||[]).forEach(p=>{
+    if(['handed_over','deceased'].includes(p.patientStatus)) return;
+    activeTourniquets(p).forEach(tq=>{
+      const timer=C5Rules.tourniquetTimer({tourniquet:tq}, nowMs);
+      if(!timer) return;
+      const level=C5Rules.tourniquetAlertToRaise(timer.cls, tq.timeAlertedLevel||null);
+      if(!level) return;
+      tq.timeAlertedLevel=level;
+      changed=true;
+      p.events=p.events||[];
+      p.events.unshift({type:'TOURNIQUET_TIME_ALERT',time:nowT(),detail:`${tq.id} · ${tq.limbLabel||tourniquetLimbMeta(tq.limb).label} · +${timer.minutes} דק׳`,warn:level!=='notice'});
+      if(!top || TQ_ALERT_RANK[level]>TQ_ALERT_RANK[top.level]) top={level, p, tq, minutes:timer.minutes};
+    });
+  });
+  if(changed) saveDemoState();
+  if(top) showTourniquetTimeAlert(top);
+  return top ? top.level : null;
+}
+function showTourniquetTimeAlert({level, p, tq, minutes}){
+  haptic(level==='critical' ? [400,150,400,150,400] : level==='warn' ? [250,100,250] : 150);
+  let el=document.getElementById('tq-time-alert');
+  if(!el){
+    el=document.createElement('div');
+    el.id='tq-time-alert';
+    el.setAttribute('role','alert');
+    document.body.appendChild(el);
+  }
+  const color=level==='critical'?'var(--red)':level==='warn'?'var(--orange)':'var(--yellow)';
+  const title=level==='critical'?'חסם עורקים: עברו 120 דקות':level==='warn'?'חסם עורקים: עברה שעה':'חסם עורקים: 45 דקות';
+  el.style.cssText=`position:fixed;top:12px;left:12px;right:12px;z-index:600;background:${color};color:#111;padding:14px 16px;border-radius:14px;font-weight:900;box-shadow:0 10px 30px rgba(0,0,0,0.45);cursor:pointer`;
+  el.dataset.level=level;
+  el.dataset.patientId=p.id;
+  el.innerHTML=`<div style="font-size:16px">${title}</div><div style="font-size:13px;margin-top:4px">${p.visualId||p.id} · ${tq.limbLabel||tourniquetLimbMeta(tq.limb).label} · +${minutes} דק׳ · הקש לפתיחה</div>`;
+  el.onclick=()=>{ el.remove(); openPatient(p.id); };
+}
+setInterval(()=>{ renderAlerts(); renderDashboard(); checkTourniquetTimeAlerts(); },30000);
 
 // LEGACY_FULL_ASSESSMENT_DO_NOT_DELETE_WITHOUT_TESTS
 // ── Fix 7: block new patient if no site open ──────────────
@@ -10483,6 +10618,22 @@ function queueModalTreatmentEvents(patient, text, medicName){
       queueTreatmentEvent(patient.id, key, key==='other_tx' ? (otherText||'אחר') : (INT_LABELS[key]||key), {source:'vitals_modal'});
     }
   });
+  // WP-2b (V2.99.42): a tourniquet ticked here used to be text only: no tourniquet entry, so no
+  // timer on any device and nothing on the server. It now starts a tourniquet (limb to be
+  // recorded, time = now, since this screen asks for neither) unless one is already active, in
+  // which case the tick reads as "still on" and must not restart its timer.
+  if(modalTreatments.has('tourniquet') && !activeTourniquets(patient).length){
+    const list=ensureTourniquetArray(patient);
+    const meta=tourniquetLimbMeta('unknown');
+    const tq={id:`TQ-${String(list.length+1).padStart(3,'0')}`, appliedAt:Date.now(), timeCode:nowT(), limb:meta.key, limbLabel:meta.label, side:meta.side, bodyPart:meta.bodyPart,
+      appliedBy:medicName, source:'vitals_modal', status:'active', effectiveness:'unknown', reasonForAdditional:null, note:''};
+    list.push(tq);
+    syncLegacyTourniquetAlias(patient);
+    patient.assessmentDebt=patient.assessmentDebt||[];
+    if(!patient.assessmentDebt.includes('tourniquet_limb_missing')) patient.assessmentDebt.push('tourniquet_limb_missing');
+    patient.events.unshift({type:'TOURNIQUET_APPLIED',time:nowT(),detail:`${tq.id} · ${tq.limbLabel} · נרשם מתוך עדכון מדדים`,warn:true});
+    queueTourniquetAppliedEvent(patient, tq, {source:'vitals_modal'});
+  }
   modalTreatments.forEach(key=>{
     const spec=INTERVENTION_SUPPLY[key];
     if(!spec) return;
@@ -12403,6 +12554,7 @@ async function activateIncident(inc){
 }
 function deactivateIncidentContext(){
   activeIncident=null;
+  _activeIncidentCompanyId=null;
   _activeIncidentPlatoonId=null;
   _myRealAssignment=null;
   _activeIncidentRow=null;
@@ -13112,7 +13264,7 @@ async function pullProjectedPatientState(incidentId){
 // Active tourniquets from the server (tourniquets table, RLS-scoped by app.can_access_incident).
 // Applied only to patients this device received from another device: a patient created here
 // keeps its own, richer tourniquet records (effectiveness, later limb correction, notes).
-const SERVER_TOURNIQUET_COLUMNS='id,patient_id,limb,applied_at,is_active';
+const SERVER_TOURNIQUET_COLUMNS='id,patient_id,limb,applied_at,is_active,tourniquet_status';
 function applyServerTourniquets(rows, incidentId){
   const site=INCIDENT_ID_TO_SITE[incidentId];
   const pending=patientsWithPendingLocalEdits();
@@ -13122,13 +13274,17 @@ function applyServerTourniquets(rows, incidentId){
     if(site && p.siteId && p.siteId!==site) continue;
     const next=rows.filter(r=>r.patient_id===p.id && r.is_active!==false).map(r=>{
       const meta=tourniquetLimbMeta(r.limb);
+      // tourniquet_status comes from TOURNIQUET_REASSESSMENT (effectiveness check, V2.99.42).
+      const effectiveness=r.tourniquet_status==='bleeding_continues'?'bleeding_continues':r.tourniquet_status==='effective'?'effective':'unknown';
       return {id:`SRV-${r.id}`, appliedAt:Date.parse(r.applied_at)||null, limb:meta.key, limbLabel:meta.label, side:meta.side, bodyPart:meta.bodyPart,
-        appliedBy:'(מכשיר אחר)', source:'server', status:'active', effectiveness:'unknown', reasonForAdditional:null, note:''};
+        appliedBy:'(מכשיר אחר)', source:'server', status:effectiveness==='bleeding_continues'?'ineffective':'active', effectiveness, reasonForAdditional:null, note:''};
     }).filter(t=>t.appliedAt);
-    const key=list=>JSON.stringify((list||[]).filter(t=>t.source==='server').map(t=>[t.id,t.limb,t.appliedAt]));
+    const key=list=>JSON.stringify((list||[]).filter(t=>t.source==='server').map(t=>[t.id,t.limb,t.appliedAt,t.effectiveness]));
     if(key(p.tourniquets)===key(next) && (p.tourniquets||[]).every(t=>t.source==='server')) continue;
     // Clear the legacy p.tourniquet alias first: ensureTourniquetArray() rebuilds an empty
     // list from it, which would bring back a tourniquet the server has released.
+    // Keep each tourniquet's last time alert, so a refreshed server row does not alert again.
+    next.forEach(t=>{ const prev=(p.tourniquets||[]).find(x=>x.id===t.id); if(prev?.timeAlertedLevel) t.timeAlertedLevel=prev.timeAlertedLevel; });
     p.tourniquet=null;
     p.tourniquets=next;
     syncLegacyTourniquetAlias(p);

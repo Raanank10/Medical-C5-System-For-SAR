@@ -56,8 +56,8 @@ for (const rel of files) {
   assert(html.includes("toast(r.error.code==='42501' ? 'נדרש שיבוץ לאירוע · פנה/י למ״פ רפואה או לחוג״ד שלך'"), `${rel}: a refused self-join must say an assignment is needed`);
   assert(html.includes("const roles=COMPANY_COMMAND_ROLES.has(currentUser.role) ? ['medic','paramedic','pc'] : ['medic','paramedic'];"), `${rel}: only company-level command may assign a PC`);
   assert(html.includes("function canManagePlatoonRoster(){ return !!currentUser && COMPANY_COMMAND_ROLES.has(currentUser.role); }"), `${rel}: roster panel for company-level command only`);
-  // Real platoons (database/053, V2.99.39) replaced 045's set_platoon_commander() roster link.
-  assert(html.includes("await platoonRpc('set_profile_platoon', {p_profile_id:profileId, p_platoon_id:platoonId||null},"), `${rel}: roster changes go through set_profile_platoon()`);
+  // Companies and platoons (database/053, V2.99.42) replaced 045's set_platoon_commander() roster link.
+  assert(html.includes("await platoonRpc('set_profile_unit', args,"), `${rel}: roster changes go through set_profile_unit()`);
 
   console.log(`${rel}: Demo V2.9933 evacuation tracking + location board smoke passed`);
 }

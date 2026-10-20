@@ -38,7 +38,7 @@ node scripts/browser_collapse_brief_test.js       # Movement screen: building co
 node scripts/browser_medic_assignment_test.js     # cross-device PC -> medic assignment: PC, medic and rescue tabs sharing one stubbed backend
 node scripts/browser_evacuation_tracking_test.js  # cross-device evacuation destination/MDA classification, location board, UH report: PC, CC and medic tabs
 node scripts/browser_command_scope_test.js        # command hierarchy: CC (company) sees every site, PC (platoon) only its own
-node scripts/browser_platoon_security_test.js     # database/045+053 client side: real platoons, no self-join, CC roster + PC assignment, PC/RPC see only their platoon
+node scripts/browser_platoon_security_test.js     # database/045+053 client side: real companies/platoons, no self-join, unit roster, PC/RCC see their company, RPC its platoon
 node scripts/browser_admin_users_test.js          # admin user management + invite-link handling, stubbed Supabase client
 node scripts/browser_sync_rejection_test.js       # a server-rejected patient is loud on the phone (tile badge, card banner, red sync pill, resend)
 node scripts/browser_remote_patient_and_resupply_test.js  # remote patients show no placeholder vitals; medic resupply requests are queued for push
@@ -48,6 +48,8 @@ node scripts/browser_intake_clinical_sync_test.js # treatments, medications, hig
 node scripts/browser_reinforcement_sync_test.js   # reinforcement / death-certification requests across medic, PC, physician devices; status by server id, D3 visibility (WP-5)
 node scripts/browser_alert_ack_sync_test.js       # "בטיפול" acknowledgment shared across medic and PC devices; re-escalation brings the alert back everywhere (WP-4)
 node scripts/browser_remote_treatments_test.js    # treatments, medications and airway from another device listed on the patient card, not mixed into this device's own history (WP-3 step 6)
+node scripts/browser_tourniquet_followups_test.js # later limb, effectiveness check, vitals-screen tourniquet sent; remote effectiveness shown (WP-2b)
+node scripts/browser_tourniquet_offline_alert_test.js # D1: network off, fake clock; 60/120-minute tourniquet alerts vibrate + banner, once per level
 
 # Analytics package
 cd analytics/c5_sentinel_sar_analytics_v1_1
@@ -63,7 +65,7 @@ CI (`.github/workflows/validate.yml`) runs exactly two things on every PR and pu
 
 `scripts/check_repo.py` enforces (stdlib only, no deps):
 - a fixed list of required paths exist (`REQUIRED_PATHS` in the script — update it when adding/renaming core docs, schema files, or archive folders)
-- `index.html` has a doctype and closing `</html>`, and its three visible version labels ("Demo V2.9941", "ROLE // V2.9941", "Role-Based Medical Command System V2.9941") match `APP_VERSION`
+- `index.html` has a doctype and closing `</html>`, and its three visible version labels ("Demo V2.9942", "ROLE // V2.9942", "Role-Based Medical Command System V2.9942") match `APP_VERSION`
 - every relative markdown link across the repo resolves to a real file (no broken/external-repo links)
 - the domain-rules module inlined in `index.html` hasn't drifted from `src/domain/rules.js`
 - `database/*.sql` structural sanity: balanced parens/`$$` dollar-quoted blocks, and every `references table(...)` target resolves to a real `create table` — see docs/DEVELOPMENT.md's "Validating SQL Drafts" for what this does and doesn't catch (it's not a real SQL parser; a Postgres instance is still the only full validation)
@@ -77,8 +79,8 @@ CI (`.github/workflows/validate.yml`) runs exactly two things on every PR and pu
 `index.html` is the whole prototype, and the file GitHub Pages serves as the live demo. It used to have a byte-identical copy, `demo/rescue-app.html`; that copy was removed (decision D5 in `docs/GAP_CLOSURE_PLAN.md`), so there is only one file to edit. It is ~14,200 lines of self-contained HTML/CSS/JS, with no bundler and no framework. Its one external script is the pinned supabase-js build from jsDelivr (real auth and sync; bump the pinned version deliberately, never float `@2`). The `src/domain/rules.js` logic is inlined directly into the HTML (the standalone `src/domain/rules.js` module is a separately extracted, testable copy of that logic, see below).
 
 Inside the HTML, look for:
-- `const APP_VERSION = '2.99.41';` — bump this and the three visible label strings ("Demo V2.9941", "ROLE // V2.9941", "Role-Based Medical Command System V2.9941") together when shipping a version; `scripts/check_repo.py` fails CI if they disagree.
-- `const ROLE_LABELS` / `const ROLE_DEFS` — defines the role-based views. Ten roles exist in the live `user_role` enum: `medic`, `paramedic` and `physician` (added in `database/019`/`020`), `pc` (חוג"ד — platoon commander), `cc` (מ״פ רפואה — company/command medical), `logistics_officer` (mapped to the client-side `logistics` key via `SERVER_ROLE_TO_CLIENT_ROLE`), `chamal` (command system), `rpc`/`rcc` (rescue-chain platoon/company commander — site-authority actions per `docs/ROLE_COMMAND_MODEL_v2.8.md`, added in `database/006`/`007`), and `admin`. New users are invited by an admin from the in-app "ניהול משתמשים" screen (`supabase/functions/admin-users/index.ts`, `database/042`), or with the fallback CLI `scripts/invite_user.js`; never the Supabase dashboard button, which can't set a role. `database/042` and the `admin-users` function are not on the live project yet (owner decision pending, `docs/GAP_CLOSURE_PLAN.md`), so for now the CLI is the only path that works live. Both keep a `VALID_ROLES` list that must match this enum.
+- `const APP_VERSION = '2.99.42';` — bump this and the three visible label strings ("Demo V2.9942", "ROLE // V2.9942", "Role-Based Medical Command System V2.9942") together when shipping a version; `scripts/check_repo.py` fails CI if they disagree.
+- `const ROLE_LABELS` / `const ROLE_DEFS` — defines the role-based views. Ten roles exist in the live `user_role` enum: `medic`, `paramedic` and `physician` (added in `database/019`/`020`), `pc` (חוג"ד — platoon commander), `cc` (מ״פ רפואה — company/command medical), `logistics_officer` (mapped to the client-side `logistics` key via `SERVER_ROLE_TO_CLIENT_ROLE`), `chamal` (command system), `rpc`/`rcc` (rescue-chain platoon/company commander — site-authority actions per `docs/ROLE_COMMAND_MODEL_v2.8.md`, added in `database/006`/`007`), and `admin`. New users are invited by an admin from the in-app "ניהול משתמשים" screen (`supabase/functions/admin-users/index.ts`, `database/042`), or with the fallback CLI `scripts/invite_user.js`; never the Supabase dashboard button, which can't set a role. Both keep a `VALID_ROLES` list that must match this enum.
 - `render*` functions (e.g. `renderDashboard`, `renderCommander`, `renderMstartSweep`, `renderAar`, `renderCcHeroDashboard`, `renderLogisticsOfficer`) — each is a self-contained view renderer for one role/screen. Grep for `^function render` to find the current screen inventory before adding a new one.
 - A legacy step-based New Patient flow (`screen-step1`..`screen-step8`, guarded by a `LEGACY_FULL_ASSESSMENT_DO_NOT_DELETE_WITHOUT_TESTS` comment) coexists with the newer Quick/Extended patient flows — don't delete it without checking what still depends on it (smoke scripts assert on its presence).
 
@@ -88,7 +90,7 @@ This is the one piece of logic that has been pulled out of the HTML prototype in
 
 It owns:
 - vitals reassessment timing (`vitalsTimer`, interval varies by triage color — red 10m / yellow 20m / green 30m — 1-minute warning buffer before each)
-- tourniquet timing (`tourniquetTimer`, 45-minute heads-up notice / 60-minute warning / 120-minute critical)
+- tourniquet timing (`tourniquetTimer`, 45-minute heads-up notice / 60-minute warning / 120-minute critical) and when the phone raises each level (`tourniquetAlertToRaise`: once per level per tourniquet, from the device clock, offline too; D1)
 - device-silence detection (`isDeviceSilent`, 10-minute threshold, one shared constant across the medic load board, command-view device panel, and Dead Man's Switch watchdog row)
 - MSTART triage computation (`computeMstartTriage`, `suggestMstartTriage`) — the auto-triage suggestion logic from vitals/SABCDE
 - pediatric detection and high-risk medication dose guardrails (`isPediatricPatient`, `isHighRiskDose` — age cutoff 8, dose limits currently hardcoded for morphine/fentanyl)
