@@ -37,7 +37,7 @@ node scripts/browser_collapse_brief_test.js       # Movement screen: building co
 node scripts/browser_medic_assignment_test.js     # cross-device PC -> medic assignment: PC, medic and rescue tabs sharing one stubbed backend
 node scripts/browser_evacuation_tracking_test.js  # cross-device evacuation destination/MDA classification, location board, UH report: PC, CC and medic tabs
 node scripts/browser_command_scope_test.js        # command hierarchy: CC (company) sees every site, PC (platoon) only its own
-node scripts/browser_platoon_security_test.js     # database/045+053 client side: real platoons, no self-join, CC roster + PC assignment, PC/RPC see only their platoon
+node scripts/browser_platoon_security_test.js     # database/045+053 client side: real companies/platoons, no self-join, unit roster, PC/RCC see their company, RPC its platoon
 node scripts/browser_admin_users_test.js          # admin user management + invite-link handling, stubbed Supabase client
 node scripts/browser_sync_rejection_test.js       # a server-rejected patient is loud on the phone (tile badge, card banner, red sync pill, resend)
 node scripts/browser_remote_patient_and_resupply_test.js  # remote patients show no placeholder vitals; medic resupply requests are queued for push

@@ -1,75 +1,105 @@
--- Platoons as real units, one company (V2.99.39). Decided with the repo owner 2026-10-20:
--- 1. A platoon (מחלקה) is one shared site team: its חוג״ד (pc), its מ״מ (rpc) and its medics /
---    paramedics. There is one company, so there is no companies table: company-level roles
---    (cc, chamal, admin, physician, and rcc on the rescue side) span every platoon.
--- 2. An incident (site) belongs to at most one platoon (incidents.platoon_id).
--- 3. A מ״מ (rpc) sees only its own platoon's incidents (plus ones it opened or was assigned to),
---    like a חוג״ד. מ״פ חילוץ (rcc) keeps every incident.
--- 4. The rescue chain (rpc, rcc) can no longer read clinical events (vitals, medication,
---    treatment, injuries, the MIST handover summary) at the database level. Before this file the
---    rule "no vitals / treatment / mechanism" in docs/ROLE_COMMAND_MODEL_v2.8.md was enforced on
---    the screen only.
+-- Companies and platoons as real units (V2.99.42). Revised before it was ever applied: the first
+-- version (V2.99.39) assumed one company. Structure confirmed with the repo owner 2026-10-20:
 --
--- Measured live before this file (2026-10-20, read-only, rpc impersonation): the rpc account,
--- with no incident membership, read all 5 incidents, all 5 patients, all 29 events including
--- VITALS_RECORDED / MEDICATION_ADMINISTERED / INTERVENTION_RECORDED, and the
--- vw_patient_latest_vitals / vw_patient_treatment_history views (security_invoker, so they
--- follow events RLS and are covered by the events policy below).
+--   מ״פ רפואה (cc, one)            - sees every site
+--   ├─ rescue company A..C (3)     - each: 1 מ״פ חילוץ (rcc), 1 חוג״ד (pc) with its medics,
+--   │   └─ platoon A1..A3 (3 each) -   and 3 platoons, each led by 1 מ״מ (rpc)
+--   └─ ambulance team               - 1 pc + 1 physician or paramedic + 3 medics; goes where it is
+--                                      assigned (modelled as a company of kind 'ambulance')
 --
--- Replaces database/045's roster link (profiles.platoon_commander_id, set_platoon_commander()).
--- The column stays (no data dropped; it held 0 rows when this was written) but nothing reads it
--- any more. set_platoon_commander() stays as a compatibility wrapper for clients older than
--- V2.99.39: it places the medic in the PC's platoon.
+-- Who sees which sites (app.can_access_incident):
+-- - cc, chamal, admin, physician, paramedic: every site (owner: physician and paramedic see all).
+-- - rcc and pc: their own company's sites. rpc: its own platoon's sites.
+-- - Everyone also sees sites they opened, drafted or were assigned to (incident_memberships).
+-- - medics: only sites they were assigned to or drafted (unchanged since database/045).
+-- A site belongs to at most one company and one platoon of that company. A site opened by a
+-- unit member belongs to the opener's unit. Company-level command can move any site; an rcc can
+-- move a site between its own company's platoons.
 --
--- Not covered here (documented in docs/RLS_AUDIT_v1.md): the projected patients columns
--- pulse_present / breathing_present / injury_zones stay readable to rpc/rcc on patients rows
--- they can access (row-level security cannot hide single columns per role).
+-- The rescue chain (rpc, rcc) can no longer read clinical events (vitals, medication, treatment,
+-- injuries, the MIST handover summary). Before this file that rule in
+-- docs/ROLE_COMMAND_MODEL_v2.8.md was enforced on the screen only. Measured live 2026-10-20
+-- (read-only, rpc impersonation): with no incident membership the rpc read all 5 incidents and
+-- every event, including VITALS_RECORDED / MEDICATION_ADMINISTERED / INTERVENTION_RECORDED.
+--
+-- Replaces database/045's roster link (profiles.platoon_commander_id, set_platoon_commander()):
+-- the column stays (no data dropped; 0 rows used it) but nothing reads it any more, and
+-- set_platoon_commander() stays as a compatibility wrapper (puts the medic in the pc's company).
+--
+-- Not covered (docs/RLS_AUDIT_v1.md): the projected patients columns pulse_present /
+-- breathing_present / injury_zones stay readable to rpc/rcc on patients they can reach (RLS
+-- cannot hide single columns per role).
 
 -- ---------------------------------------------------------------------------------------------
 -- Tables
 -- ---------------------------------------------------------------------------------------------
+create table if not exists companies (
+  id uuid primary key default gen_random_uuid(),
+  name text not null check (btrim(name) <> ''),
+  kind text not null default 'rescue' check (kind in ('rescue','ambulance')),
+  is_active boolean not null default true,
+  created_by uuid references profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create unique index if not exists uq_companies_name on companies (lower(btrim(name)));
+
 create table if not exists platoons (
   id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references companies(id),
   name text not null check (btrim(name) <> ''),
   is_active boolean not null default true,
   created_by uuid references profiles(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-create unique index if not exists uq_platoons_name on platoons (lower(btrim(name)));
+create unique index if not exists uq_platoons_company_name on platoons (company_id, lower(btrim(name)));
 
+alter table profiles add column if not exists company_id uuid references companies(id) on delete set null;
 alter table profiles add column if not exists platoon_id uuid references platoons(id) on delete set null;
+create index if not exists idx_profiles_company on profiles(company_id) where company_id is not null;
 create index if not exists idx_profiles_platoon on profiles(platoon_id) where platoon_id is not null;
+comment on column profiles.company_id is
+  'Company of a pc / rcc / medic / paramedic / physician (database/053). Set only by cc/chamal/admin/physician via set_profile_unit().';
 comment on column profiles.platoon_id is
-  'The platoon (shared site team) this pc / rpc / medic / paramedic belongs to. Set only by cc/chamal/admin/physician via set_profile_platoon() (database/053).';
+  'Platoon of an rpc (database/053); its company is the platoon''s. Set only by cc/chamal/admin/physician via set_profile_unit().';
 comment on column profiles.platoon_commander_id is
-  'Deprecated by database/053 (profiles.platoon_id). Kept for history; not read by any policy.';
+  'Deprecated by database/053 (profiles.company_id). Kept for history; not read by any policy.';
 
+alter table incidents add column if not exists company_id uuid references companies(id) on delete set null;
 alter table incidents add column if not exists platoon_id uuid references platoons(id) on delete set null;
+create index if not exists idx_incidents_company on incidents(company_id) where company_id is not null;
 create index if not exists idx_incidents_platoon on incidents(platoon_id) where platoon_id is not null;
+comment on column incidents.company_id is
+  'The company working this site (database/053). Always the platoon''s company when platoon_id is set.';
 comment on column incidents.platoon_id is
-  'The platoon working this site. Set at open from the opener''s platoon, or by company-level command via set_incident_platoon() (database/053).';
+  'The rescue platoon working this site (database/053).';
 
--- Append-only record of every platoon change, for after-action review.
-create table if not exists platoon_audit (
+-- Append-only record of every unit change, for after-action review.
+create table if not exists unit_audit (
   id bigint generated always as identity primary key,
   actor_id uuid,
   actor_role user_role,
-  action text not null check (action in ('platoon_created','platoon_updated','profile_platoon_changed','incident_platoon_changed')),
-  platoon_id uuid,
+  action text not null check (action in ('company_created','company_updated','platoon_created','platoon_updated',
+                                         'profile_unit_changed','incident_unit_changed')),
+  target_company_id uuid,
+  target_platoon_id uuid,
   target_profile_id uuid,
   target_incident_id uuid,
+  old_company_id uuid,
+  new_company_id uuid,
   old_platoon_id uuid,
   new_platoon_id uuid,
   detail jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-create index if not exists idx_platoon_audit_created on platoon_audit(created_at desc);
+create index if not exists idx_unit_audit_created on unit_audit(created_at desc);
 
 -- ---------------------------------------------------------------------------------------------
 -- Helpers
 -- ---------------------------------------------------------------------------------------------
-create or replace function app.is_company_command()
+-- Manages units (companies, platoons, who is where).
+create or replace function app.is_unit_manager()
 returns boolean
 language sql
 stable
@@ -89,118 +119,174 @@ as $function$
   select p.platoon_id from profiles p where p.id = auth.uid() and p.is_active
 $function$;
 
-create or replace function app.write_platoon_audit(p_action text, p_platoon_id uuid, p_profile_id uuid,
-                                                   p_incident_id uuid, p_old uuid, p_new uuid, p_detail jsonb)
+-- An rpc's company is its platoon's.
+create or replace function app.my_company_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path to 'public'
+as $function$
+  select coalesce(p.company_id, pl.company_id)
+  from profiles p
+  left join platoons pl on pl.id = p.platoon_id
+  where p.id = auth.uid() and p.is_active
+$function$;
+
+create or replace function app.write_unit_audit(p_action text, p_company uuid, p_platoon uuid, p_profile uuid,
+                                                p_incident uuid, p_old_company uuid, p_new_company uuid,
+                                                p_old_platoon uuid, p_new_platoon uuid, p_detail jsonb)
 returns void
 language sql
 security definer
 set search_path to 'public'
 as $function$
-  insert into platoon_audit (actor_id, actor_role, action, platoon_id, target_profile_id, target_incident_id,
-                             old_platoon_id, new_platoon_id, detail)
-  values (auth.uid(), app.current_user_role(), p_action, p_platoon_id, p_profile_id, p_incident_id,
-          p_old, p_new, coalesce(p_detail, '{}'::jsonb))
+  insert into unit_audit (actor_id, actor_role, action, target_company_id, target_platoon_id, target_profile_id,
+                          target_incident_id, old_company_id, new_company_id, old_platoon_id, new_platoon_id, detail)
+  values (auth.uid(), app.current_user_role(), p_action, p_company, p_platoon, p_profile, p_incident,
+          p_old_company, p_new_company, p_old_platoon, p_new_platoon, coalesce(p_detail, '{}'::jsonb))
 $function$;
 
 -- ---------------------------------------------------------------------------------------------
 -- Guards (also catch direct table writes that bypass the RPCs)
 -- ---------------------------------------------------------------------------------------------
-create or replace function app.reject_platoon_audit_mutation()
+create or replace function app.reject_unit_audit_mutation()
 returns trigger
 language plpgsql
 security definer
 set search_path to 'public'
 as $function$
 begin
-  raise exception 'platoon_audit is append-only' using errcode = '42501';
+  raise exception 'unit_audit is append-only' using errcode = '42501';
 end;
 $function$;
 
-drop trigger if exists trg_platoon_audit_append_only on platoon_audit;
-create trigger trg_platoon_audit_append_only
-before update or delete on platoon_audit
-for each row execute function app.reject_platoon_audit_mutation();
+drop trigger if exists trg_unit_audit_append_only on unit_audit;
+create trigger trg_unit_audit_append_only
+before update or delete on unit_audit
+for each row execute function app.reject_unit_audit_mutation();
 
--- profiles.platoon_id: only company-level command (or the service role / SQL editor, where
--- auth.uid() is null) changes it, and only pc/rpc/medic/paramedic can be in a platoon. A role
--- change out of those roles takes the person out of the platoon. Every change is audited.
-create or replace function app.guard_profile_platoon()
+-- profiles: an rpc has a platoon; a pc / rcc / medic / paramedic / physician has a company; nobody
+-- else has a unit. Only unit managers (or the service role / SQL editor, auth.uid() null) change
+-- it. A role change keeps whatever still fits the new role and clears the rest. Audited.
+create or replace function app.guard_profile_unit()
 returns trigger
 language plpgsql
 security definer
 set search_path to 'public'
+as $function$
 declare
-  v_old uuid := case when tg_op = 'UPDATE' then old.platoon_id end;
+  v_old_company uuid := case when tg_op = 'UPDATE' then old.company_id end;
+  v_old_platoon uuid := case when tg_op = 'UPDATE' then old.platoon_id end;
+  v_role_changed boolean := tg_op = 'UPDATE' and new.role is distinct from old.role;
 begin
-  if tg_op = 'UPDATE' and new.role is distinct from old.role
-     and new.role not in ('pc','rpc','medic','paramedic') then
-    new.platoon_id := null;
-  end if;
-  if new.platoon_id is distinct from v_old then
-    if auth.uid() is not null and not app.is_company_command()
-       and not (tg_op = 'UPDATE' and new.role is distinct from old.role and new.platoon_id is null) then
-      raise exception 'only company-level command may change a platoon roster' using errcode = '42501';
+  if v_role_changed then
+    if new.role = 'rpc' then
+      new.company_id := null;
+    else
+      new.platoon_id := null;
+      if new.role not in ('pc','rcc','medic','paramedic','physician') then
+        new.company_id := null;
+      end if;
     end if;
-    if new.platoon_id is not null and new.role not in ('pc','rpc','medic','paramedic') then
-      raise exception 'only a pc, rpc, medic or paramedic can be in a platoon' using errcode = '22023';
-    end if;
-    perform app.write_platoon_audit('profile_platoon_changed', coalesce(new.platoon_id, v_old), new.id, null,
-      v_old, new.platoon_id,
-      jsonb_build_object('role', new.role));
   end if;
+  if new.company_id is not distinct from v_old_company and new.platoon_id is not distinct from v_old_platoon then
+    return new;
+  end if;
+  if auth.uid() is not null and not app.is_unit_manager()
+     and not (v_role_changed
+              and (new.company_id is null or new.company_id is not distinct from v_old_company)
+              and (new.platoon_id is null or new.platoon_id is not distinct from v_old_platoon)) then
+    raise exception 'only company-level command may change units' using errcode = '42501';
+  end if;
+  if new.platoon_id is not null and new.role <> 'rpc' then
+    raise exception 'only a מ״מ (rpc) is placed in a platoon' using errcode = '22023';
+  end if;
+  if new.company_id is not null and new.role not in ('pc','rcc','medic','paramedic','physician') then
+    raise exception 'only a pc, rcc, medic, paramedic or physician is placed in a company' using errcode = '22023';
+  end if;
+  if new.role = 'rcc' and new.company_id is not null
+     and not exists (select 1 from companies where id = new.company_id and kind = 'rescue') then
+    raise exception 'a מ״פ חילוץ (rcc) belongs to a rescue company' using errcode = '22023';
+  end if;
+  perform app.write_unit_audit('profile_unit_changed', coalesce(new.company_id, v_old_company),
+    coalesce(new.platoon_id, v_old_platoon), new.id, null,
+    v_old_company, new.company_id, v_old_platoon, new.platoon_id, jsonb_build_object('role', new.role));
   return new;
 end;
 $function$;
 
-drop trigger if exists trg_guard_profile_platoon on profiles;
-create trigger trg_guard_profile_platoon
-before insert or update of platoon_id, role on profiles
-for each row execute function app.guard_profile_platoon();
+drop trigger if exists trg_guard_profile_unit on profiles;
+create trigger trg_guard_profile_unit
+before insert or update of company_id, platoon_id, role on profiles
+for each row execute function app.guard_profile_unit();
 
--- incidents.platoon_id: set at insert only to the opener's own platoon (or by company-level /
--- rescue-company command); changed later only by company-level command or rcc, or by
--- confirm_draft() filling an empty value (transaction-local flag, same pattern as database/040).
-create or replace function app.guard_incident_platoon()
+-- incidents: company_id always follows platoon_id. Set at insert only to the opener's own unit
+-- (or by unit managers / rcc); changed later by unit managers, by an rcc inside its own company,
+-- or by confirm_draft() filling an empty value (transaction-local flag, same pattern as 040).
+create or replace function app.guard_incident_unit()
 returns trigger
 language plpgsql
 security definer
 set search_path to 'public'
 as $function$
 declare
-  v_old uuid := case when tg_op = 'UPDATE' then old.platoon_id end;
+  v_old_company uuid := case when tg_op = 'UPDATE' then old.company_id end;
+  v_old_platoon uuid := case when tg_op = 'UPDATE' then old.platoon_id end;
+  v_mine uuid;
+  v_platoon_company uuid;
 begin
-  if new.platoon_id is not distinct from v_old then
+  if new.platoon_id is not null then
+    select company_id into v_platoon_company from platoons where id = new.platoon_id;
+    -- A company that contradicts the platoon is refused, not silently replaced (found by the
+    -- local test: a pc's direct "move to company B" on a platoon site was a quiet no-op).
+    if new.company_id is not null and new.company_id is distinct from v_platoon_company
+       and (tg_op = 'INSERT' or new.company_id is distinct from old.company_id) then
+      raise exception 'platoon % is not in company %', new.platoon_id, new.company_id using errcode = '22023';
+    end if;
+    new.company_id := v_platoon_company;
+  end if;
+  if new.company_id is not distinct from v_old_company and new.platoon_id is not distinct from v_old_platoon then
     return new;
   end if;
   if auth.uid() is not null
-     and not app.is_company_command()
-     and coalesce(app.current_user_role()::text, '') <> 'rcc'
-     and coalesce(current_setting('app.incident_platoon_via_rpc', true), '') <> 'on'
-     and not (tg_op = 'INSERT' and new.platoon_id = app.my_platoon_id()) then
-    raise exception 'only company-level command may change which platoon works a site' using errcode = '42501';
+     and not app.is_unit_manager()
+     and coalesce(current_setting('app.incident_unit_via_rpc', true), '') <> 'on' then
+    v_mine := app.my_company_id();
+    if not (
+      (tg_op = 'INSERT'
+        and (new.company_id is null or new.company_id = v_mine)
+        and (new.platoon_id is null or new.platoon_id = app.my_platoon_id()))
+      or (app.current_user_role() = 'rcc' and v_mine is not null
+          and new.company_id = v_mine and (v_old_company is null or v_old_company = v_mine))
+    ) then
+      raise exception 'only company-level command may change which unit works a site' using errcode = '42501';
+    end if;
+  end if;
+  if new.company_id is not null and not exists (select 1 from companies where id = new.company_id and is_active) then
+    raise exception 'company % does not exist or is inactive', new.company_id using errcode = '22023';
   end if;
   if new.platoon_id is not null and not exists (select 1 from platoons where id = new.platoon_id and is_active) then
     raise exception 'platoon % does not exist or is inactive', new.platoon_id using errcode = '22023';
   end if;
-  perform app.write_platoon_audit('incident_platoon_changed', coalesce(new.platoon_id, v_old), null, new.id,
-    v_old, new.platoon_id, jsonb_build_object('visual_id', new.visual_id));
+  perform app.write_unit_audit('incident_unit_changed', coalesce(new.company_id, v_old_company),
+    coalesce(new.platoon_id, v_old_platoon), null, new.id,
+    v_old_company, new.company_id, v_old_platoon, new.platoon_id, jsonb_build_object('visual_id', new.visual_id));
   return new;
 end;
 $function$;
 
-drop trigger if exists trg_guard_incident_platoon on incidents;
-create trigger trg_guard_incident_platoon
-before insert or update of platoon_id on incidents
-for each row execute function app.guard_incident_platoon();
+drop trigger if exists trg_guard_incident_unit on incidents;
+create trigger trg_guard_incident_unit
+before insert or update of company_id, platoon_id on incidents
+for each row execute function app.guard_incident_unit();
 
 -- ---------------------------------------------------------------------------------------------
 -- Access helpers
 -- ---------------------------------------------------------------------------------------------
--- database/045 plus: pc and rpc reach every incident of their own platoon; rpc is no longer
--- company-wide. A pc still sees a platoon-less draft drafted by a medic of its platoon (drafts
--- from before 053, or by a medic placed in the platoon after drafting). Found in the live
--- rolled-back test: without "platoon_id is null" a draft that company command had moved to
--- another platoon stayed visible to the drafter's pc.
+-- Replaces database/045's version. rpc is no longer blanket; rcc is scoped to its company; pc to
+-- its company (045's "a pc sees its platoon medics' drafts" is covered: a medic's draft now
+-- carries the medic's company); paramedic joins the roles that see every site.
 create or replace function app.can_access_incident(p_incident_id uuid)
 returns boolean
 language sql
@@ -211,7 +297,7 @@ as $function$
   select coalesce(
     app.current_user_role() is not null
     and (
-      app.current_user_role() in ('cc','chamal','admin','rcc','physician')
+      app.current_user_role() in ('cc','chamal','admin','physician','paramedic')
       or exists (
         select 1
         from incident_memberships im
@@ -219,33 +305,22 @@ as $function$
           and im.profile_id = auth.uid()
       )
       or (
-        app.current_user_role() in ('pc','rpc')
-        and app.my_platoon_id() is not null
-        and exists (
-          select 1 from incidents i
-          where i.id = p_incident_id and i.platoon_id = app.my_platoon_id()
-        )
+        app.current_user_role() in ('pc','rcc')
+        and app.my_company_id() is not null
+        and exists (select 1 from incidents i where i.id = p_incident_id and i.company_id = app.my_company_id())
       )
       or (
-        app.current_user_role() = 'pc'
+        app.current_user_role() = 'rpc'
         and app.my_platoon_id() is not null
-        and exists (
-          select 1
-          from incidents i
-          join profiles d on d.id = i.draft_created_by
-          where i.id = p_incident_id
-            and i.status = 'draft'
-            and i.platoon_id is null -- once a site has a platoon, only that platoon's pc sees it
-            and d.platoon_id = app.my_platoon_id()
-        )
+        and exists (select 1 from incidents i where i.id = p_incident_id and i.platoon_id = app.my_platoon_id())
       )
     ),
     false
   )
 $function$;
 
--- A pc's membership writes: only in incidents of its own platoon or that it belongs to, only for
--- its own platoon's medics/paramedics, never itself.
+-- A pc's membership writes: only its own company's medics/paramedics, only into its company's
+-- sites or sites it belongs to, never itself.
 create or replace function app.pc_may_manage_membership(p_incident_id uuid, p_profile_id uuid, p_role_at_incident user_role)
 returns boolean
 language sql
@@ -255,27 +330,27 @@ set search_path to 'public'
 as $function$
   select coalesce(
     app.current_user_role() = 'pc'
-    and app.my_platoon_id() is not null
+    and app.my_company_id() is not null
     and p_profile_id <> auth.uid()
     and p_role_at_incident in ('medic','paramedic')
     and (
       app.is_incident_member(p_incident_id)
-      or exists (select 1 from incidents i where i.id = p_incident_id and i.platoon_id = app.my_platoon_id())
+      or exists (select 1 from incidents i where i.id = p_incident_id and i.company_id = app.my_company_id())
     )
     and exists (
       select 1 from profiles p
       where p.id = p_profile_id
         and p.role in ('medic','paramedic')
-        and p.platoon_id = app.my_platoon_id()
+        and p.company_id = app.my_company_id()
     ),
     false
   )
 $function$;
 
 -- ---------------------------------------------------------------------------------------------
--- Platoon management RPCs (company-level command)
+-- Unit management RPCs (company-level command)
 -- ---------------------------------------------------------------------------------------------
-create or replace function public.create_platoon(p_name text)
+create or replace function public.create_company(p_name text, p_kind text default 'rescue')
 returns jsonb
 language plpgsql
 security definer
@@ -284,16 +359,72 @@ as $function$
 declare
   v_id uuid;
 begin
-  if not app.is_company_command() then
+  if not app.is_unit_manager() then
+    raise exception 'only company-level command may create a company' using errcode = '42501';
+  end if;
+  if coalesce(btrim(p_name), '') = '' then
+    raise exception 'company name is required' using errcode = '22023';
+  end if;
+  insert into companies (name, kind, created_by) values (btrim(p_name), coalesce(p_kind, 'rescue'), auth.uid())
+  returning id into v_id;
+  perform app.write_unit_audit('company_created', v_id, null, null, null, null, null, null, null,
+    jsonb_build_object('name', btrim(p_name), 'kind', coalesce(p_kind, 'rescue')));
+  return jsonb_build_object('id', v_id, 'name', btrim(p_name));
+end;
+$function$;
+
+create or replace function public.update_company(p_company_id uuid, p_name text default null, p_is_active boolean default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_old companies;
+begin
+  if not app.is_unit_manager() then
+    raise exception 'only company-level command may change a company' using errcode = '42501';
+  end if;
+  select * into v_old from companies where id = p_company_id for update;
+  if not found then
+    raise exception 'company % not found', p_company_id using errcode = 'P0002';
+  end if;
+  if p_name is not null and btrim(p_name) = '' then
+    raise exception 'company name is required' using errcode = '22023';
+  end if;
+  update companies
+  set name = coalesce(btrim(p_name), name), is_active = coalesce(p_is_active, is_active), updated_at = now()
+  where id = p_company_id;
+  perform app.write_unit_audit('company_updated', p_company_id, null, null, null, null, null, null, null,
+    jsonb_build_object('old_name', v_old.name, 'new_name', coalesce(btrim(p_name), v_old.name),
+                       'old_is_active', v_old.is_active, 'new_is_active', coalesce(p_is_active, v_old.is_active)));
+  return jsonb_build_object('id', p_company_id);
+end;
+$function$;
+
+create or replace function public.create_platoon(p_company_id uuid, p_name text)
+returns jsonb
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_id uuid;
+begin
+  if not app.is_unit_manager() then
     raise exception 'only company-level command may create a platoon' using errcode = '42501';
+  end if;
+  if not exists (select 1 from companies where id = p_company_id and is_active and kind = 'rescue') then
+    raise exception 'platoons belong to an active rescue company' using errcode = '22023';
   end if;
   if coalesce(btrim(p_name), '') = '' then
     raise exception 'platoon name is required' using errcode = '22023';
   end if;
-  insert into platoons (name, created_by) values (btrim(p_name), auth.uid()) returning id into v_id;
-  perform app.write_platoon_audit('platoon_created', v_id, null, null, null, null,
+  insert into platoons (company_id, name, created_by) values (p_company_id, btrim(p_name), auth.uid())
+  returning id into v_id;
+  perform app.write_unit_audit('platoon_created', p_company_id, v_id, null, null, null, null, null, null,
     jsonb_build_object('name', btrim(p_name)));
-  return jsonb_build_object('id', v_id, 'name', btrim(p_name));
+  return jsonb_build_object('id', v_id, 'company_id', p_company_id, 'name', btrim(p_name));
 end;
 $function$;
 
@@ -306,7 +437,7 @@ as $function$
 declare
   v_old platoons;
 begin
-  if not app.is_company_command() then
+  if not app.is_unit_manager() then
     raise exception 'only company-level command may change a platoon' using errcode = '42501';
   end if;
   select * into v_old from platoons where id = p_platoon_id for update;
@@ -317,59 +448,75 @@ begin
     raise exception 'platoon name is required' using errcode = '22023';
   end if;
   update platoons
-  set name = coalesce(btrim(p_name), name),
-      is_active = coalesce(p_is_active, is_active),
-      updated_at = now()
+  set name = coalesce(btrim(p_name), name), is_active = coalesce(p_is_active, is_active), updated_at = now()
   where id = p_platoon_id;
-  perform app.write_platoon_audit('platoon_updated', p_platoon_id, null, null, null, null,
+  perform app.write_unit_audit('platoon_updated', v_old.company_id, p_platoon_id, null, null, null, null, null, null,
     jsonb_build_object('old_name', v_old.name, 'new_name', coalesce(btrim(p_name), v_old.name),
                        'old_is_active', v_old.is_active, 'new_is_active', coalesce(p_is_active, v_old.is_active)));
   return jsonb_build_object('id', p_platoon_id);
 end;
 $function$;
 
-create or replace function public.set_profile_platoon(p_profile_id uuid, p_platoon_id uuid)
+-- Places a person: an rpc in a platoon (p_platoon_id), everyone else in a company (p_company_id).
+-- Passing nulls takes the person out of their unit.
+create or replace function public.set_profile_unit(p_profile_id uuid, p_company_id uuid, p_platoon_id uuid)
 returns jsonb
 language plpgsql
 security definer
 set search_path to 'public'
 as $function$
+declare
+  v_role user_role;
 begin
-  if not app.is_company_command() then
-    raise exception 'only company-level command may change a platoon roster' using errcode = '42501';
+  if not app.is_unit_manager() then
+    raise exception 'only company-level command may change units' using errcode = '42501';
   end if;
-  if not exists (select 1 from profiles where id = p_profile_id and role in ('pc','rpc','medic','paramedic')) then
-    raise exception 'only a pc, rpc, medic or paramedic can be in a platoon' using errcode = '22023';
+  select role into v_role from profiles where id = p_profile_id;
+  if not found then
+    raise exception 'profile % not found', p_profile_id using errcode = 'P0002';
   end if;
-  if p_platoon_id is not null and not exists (select 1 from platoons where id = p_platoon_id and is_active) then
-    raise exception 'platoon % does not exist or is inactive', p_platoon_id using errcode = '22023';
+  if v_role = 'rpc' then
+    if p_company_id is not null then
+      raise exception 'a מ״מ (rpc) is placed in a platoon, not directly in a company' using errcode = '22023';
+    end if;
+  elsif p_platoon_id is not null then
+    raise exception 'only a מ״מ (rpc) is placed in a platoon' using errcode = '22023';
   end if;
-  update profiles set platoon_id = p_platoon_id, updated_at = now(), version = version + 1
-  where id = p_profile_id and platoon_id is distinct from p_platoon_id;
-  return jsonb_build_object('profile_id', p_profile_id, 'platoon_id', p_platoon_id);
+  update profiles
+  set company_id = p_company_id, platoon_id = p_platoon_id, updated_at = now(), version = version + 1
+  where id = p_profile_id
+    and (company_id is distinct from p_company_id or platoon_id is distinct from p_platoon_id);
+  return jsonb_build_object('profile_id', p_profile_id, 'company_id', p_company_id, 'platoon_id', p_platoon_id);
 end;
 $function$;
 
-create or replace function public.set_incident_platoon(p_incident_id uuid, p_platoon_id uuid)
+-- Which unit works a site. Unit managers: any; rcc: within its own company (the guard enforces it).
+create or replace function public.set_incident_unit(p_incident_id uuid, p_company_id uuid, p_platoon_id uuid)
 returns jsonb
 language plpgsql
 security definer
 set search_path to 'public'
 as $function$
 begin
-  if not app.is_company_command() and coalesce(app.current_user_role()::text, '') <> 'rcc' then
-    raise exception 'only company-level command may change which platoon works a site' using errcode = '42501';
+  if not app.is_unit_manager() and coalesce(app.current_user_role()::text, '') <> 'rcc' then
+    raise exception 'only company-level command may change which unit works a site' using errcode = '42501';
   end if;
   if not exists (select 1 from incidents where id = p_incident_id) then
     raise exception 'incident % not found', p_incident_id using errcode = 'P0002';
   end if;
-  update incidents set platoon_id = p_platoon_id, updated_at = now(), version = version + 1
-  where id = p_incident_id and platoon_id is distinct from p_platoon_id;
-  return jsonb_build_object('incident_id', p_incident_id, 'platoon_id', p_platoon_id);
+  if p_platoon_id is not null and p_company_id is not null
+     and not exists (select 1 from platoons where id = p_platoon_id and company_id = p_company_id) then
+    raise exception 'platoon % is not in company %', p_platoon_id, p_company_id using errcode = '22023';
+  end if;
+  update incidents set company_id = p_company_id, platoon_id = p_platoon_id, updated_at = now(), version = version + 1
+  where id = p_incident_id
+    and (company_id is distinct from p_company_id or platoon_id is distinct from p_platoon_id);
+  return jsonb_build_object('incident_id', p_incident_id, 'company_id', p_company_id, 'platoon_id', p_platoon_id);
 end;
 $function$;
 
--- Compatibility for clients older than V2.99.39 (database/045 roster panel).
+-- Compatibility for clients older than V2.99.39 (database/045 roster panel): puts the medic in
+-- that pc's company.
 create or replace function public.set_platoon_commander(p_profile_id uuid, p_pc_id uuid)
 returns jsonb
 language plpgsql
@@ -377,26 +524,26 @@ security definer
 set search_path to 'public'
 as $function$
 declare
-  v_platoon uuid;
+  v_company uuid;
 begin
-  if not app.is_company_command() then
+  if not app.is_unit_manager() then
     raise exception 'only company-level command may change a platoon roster' using errcode = '42501';
   end if;
   if not exists (select 1 from profiles where id = p_profile_id and role in ('medic','paramedic')) then
     raise exception 'only a medic or paramedic can be placed in a platoon' using errcode = '22023';
   end if;
   if p_pc_id is not null then
-    select platoon_id into v_platoon from profiles where id = p_pc_id and role = 'pc';
-    if v_platoon is null then
-      raise exception 'that pc is not in a platoon yet' using errcode = '22023';
+    select company_id into v_company from profiles where id = p_pc_id and role = 'pc';
+    if v_company is null then
+      raise exception 'that pc is not in a company yet' using errcode = '22023';
     end if;
   end if;
-  return public.set_profile_platoon(p_profile_id, v_platoon);
+  return public.set_profile_unit(p_profile_id, v_company, null);
 end;
 $function$;
 
 -- ---------------------------------------------------------------------------------------------
--- Incident lifecycle: same bodies as live (database/038, 045), plus the platoon.
+-- Incident lifecycle: same bodies as live (database/038, 045), plus the unit.
 -- ---------------------------------------------------------------------------------------------
 create or replace function public.open_incident(p_incident_id uuid, p_location_name text, p_address text DEFAULT NULL::text, p_incident_type text DEFAULT NULL::text, p_t_zero timestamp with time zone DEFAULT NULL::timestamp with time zone, p_device_id text DEFAULT NULL::text, p_local_event_id text DEFAULT NULL::text)
 returns jsonb
@@ -411,6 +558,7 @@ declare
   v_t_zero timestamptz := coalesce(p_t_zero, now());
   v_existing incidents;
   v_visual_id text;
+  v_company uuid;
   v_platoon uuid;
 begin
   if v_role is null then
@@ -444,18 +592,21 @@ begin
 
   v_visual_id := 'INC-' || to_char(now() at time zone 'utc', 'YYMMDD') || '-' ||
                  upper(substr(replace(p_incident_id::text, '-', ''), 1, 6));
-  -- database/053: a site opened by a platoon member belongs to that platoon.
-  if v_role in ('pc','rpc','medic','paramedic') then
+  -- database/053: a site opened by a unit member belongs to that member's unit.
+  if v_role = 'rpc' then
     v_platoon := app.my_platoon_id();
+    v_company := app.my_company_id();
+  elsif v_role in ('pc','rcc','medic','paramedic') then
+    v_company := app.my_company_id();
   end if;
 
   insert into incidents (id, visual_id, t_zero, t_injury_default, location_name, address,
-                         incident_type, status, draft_created_by, opened_by, opened_at, platoon_id)
+                         incident_type, status, draft_created_by, opened_by, opened_at, company_id, platoon_id)
   values (p_incident_id, v_visual_id, v_t_zero, v_t_zero, btrim(p_location_name),
           nullif(btrim(p_address), ''), nullif(btrim(p_incident_type), ''), v_status,
           case when v_status = 'draft' then v_uid end,
           case when v_status = 'active' then v_uid end,
-          now(), v_platoon);
+          now(), v_company, v_platoon);
 
   insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by)
   values (p_incident_id, v_uid, v_role, v_uid)
@@ -466,13 +617,13 @@ begin
     case when v_status = 'draft' then 'INCIDENT_DRAFT_CREATED'::event_type else 'INCIDENT_OPENED'::event_type end,
     jsonb_build_object('visual_id', v_visual_id, 'location_name', btrim(p_location_name),
                        'incident_type', p_incident_type, 't_zero', v_t_zero, 'status', v_status,
-                       'platoon_id', v_platoon),
+                       'company_id', v_company, 'platoon_id', v_platoon),
     p_device_id, p_local_event_id);
 
   perform refresh_incident_command_state(p_incident_id);
 
   return jsonb_build_object('id', p_incident_id, 'visual_id', v_visual_id,
-                            'status', v_status, 'created', true, 'platoon_id', v_platoon);
+                            'status', v_status, 'created', true, 'company_id', v_company, 'platoon_id', v_platoon);
 end;
 $function$;
 
@@ -496,9 +647,8 @@ begin
   if v_status not in ('draft','staging','active') then
     raise exception 'incident % is %, not open for joining', p_incident_id, v_status using errcode = '42501';
   end if;
-  -- database/045, 053: no self-join into someone else's site. A pc/rpc/medic/paramedic joins
-  -- only what it can already access (its platoon's site, assigned, or opened/drafted).
-  if v_role in ('pc','rpc','medic','paramedic') and not app.can_access_incident(p_incident_id) then
+  -- database/045, 053: no self-join into a site outside one's unit.
+  if v_role in ('pc','rpc','rcc','medic','paramedic') and not app.can_access_incident(p_incident_id) then
     raise exception 'assignment required to join incident %', p_incident_id using errcode = '42501';
   end if;
   insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by)
@@ -531,14 +681,14 @@ begin
   left join profiles op on op.id = i.opened_by
   left join profiles dc on dc.id = i.draft_created_by
   where i.status in ('draft','staging','active')
-    -- database/045, 053: pc/rpc/medic/paramedic list only incidents they can access.
-    and (app.current_user_role() not in ('pc','rpc','medic','paramedic') or app.can_access_incident(i.id))
+    -- database/045, 053: unit roles list only the sites they can reach.
+    and (app.current_user_role() not in ('pc','rpc','rcc','medic','paramedic') or app.can_access_incident(i.id))
   order by (i.status = 'draft') desc, i.opened_at desc;
 end;
 $function$;
 
--- Same body as database/045, plus: a pc confirming a platoon-less draft makes it its platoon's
--- site.
+-- Same body as database/045, plus: a pc confirming a draft with no company makes it its
+-- company's site.
 create or replace function public.confirm_draft(p_incident_id uuid, p_device_id text default null, p_local_event_id text default null)
 returns jsonb
 language plpgsql
@@ -566,19 +716,19 @@ begin
     raise exception 'incident % is %, not a draft', p_incident_id, v_inc.status using errcode = '42501';
   end if;
 
-  perform set_config('app.incident_platoon_via_rpc', 'on', true);
+  perform set_config('app.incident_unit_via_rpc', 'on', true);
   update incidents
   set status = 'active',
       confirmed_by = auth.uid(),
       confirmed_at = now(),
       draft_resolved_at = now(),
       opened_by = coalesce(opened_by, auth.uid()),
-      platoon_id = coalesce(platoon_id, case when v_role = 'pc' then app.my_platoon_id() end),
+      company_id = coalesce(company_id, case when v_role = 'pc' then app.my_company_id() end),
       metadata = metadata || jsonb_build_object('draft_resolution', 'confirmed'),
       updated_at = now(),
       version = version + 1
   where id = p_incident_id;
-  perform set_config('app.incident_platoon_via_rpc', '', true);
+  perform set_config('app.incident_unit_via_rpc', '', true);
 
   insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by)
   values (p_incident_id, auth.uid(), v_role, auth.uid())
@@ -595,31 +745,44 @@ $function$;
 -- ---------------------------------------------------------------------------------------------
 -- Policies
 -- ---------------------------------------------------------------------------------------------
+alter table companies enable row level security;
 alter table platoons enable row level security;
-alter table platoon_audit enable row level security;
+alter table unit_audit enable row level security;
 
--- Names only; every active account may read them (the phone shows its own platoon's name).
--- Writes go through the RPCs above only.
+-- Names only; every active account may read them (phones show their own unit's name). Writes go
+-- through the RPCs above only.
+drop policy if exists companies_read on companies;
+create policy companies_read on companies for select to authenticated
+using ((select app.current_user_role()) is not null);
+
 drop policy if exists platoons_read on platoons;
 create policy platoons_read on platoons for select to authenticated
 using ((select app.current_user_role()) is not null);
 
-drop policy if exists platoon_audit_read on platoon_audit;
-create policy platoon_audit_read on platoon_audit for select to authenticated
-using ((select app.is_company_command()));
+drop policy if exists unit_audit_read on unit_audit;
+create policy unit_audit_read on unit_audit for select to authenticated
+using ((select app.is_unit_manager()));
 
-revoke all on platoons, platoon_audit from public, anon, authenticated;
-grant select on platoons, platoon_audit to authenticated;
+revoke all on companies, platoons, unit_audit from public, anon, authenticated;
+grant select on companies, platoons, unit_audit to authenticated;
 
--- A pc reads its own row and its own platoon's members; company-level roles read everyone.
+-- A pc reads its own row and its own company's people (medics, paramedics, its rcc, and the
+-- company's platoons' rpc); company-level roles read everyone.
 drop policy if exists profiles_read_authenticated on profiles;
 create policy profiles_read_authenticated on profiles for select to authenticated using (
   id = (select auth.uid())
   or app.current_user_role() = any (array['cc','chamal','admin','physician']::user_role[])
-  or (app.current_user_role() = 'pc' and platoon_id is not null and platoon_id = app.my_platoon_id())
+  or (
+    app.current_user_role() = 'pc'
+    and app.my_company_id() is not null
+    and (
+      company_id = app.my_company_id()
+      or exists (select 1 from platoons pl where pl.id = profiles.platoon_id and pl.company_id = app.my_company_id())
+    )
+  )
 );
 
--- A pc reads memberships of every incident it can reach (now including its platoon's sites).
+-- A pc reads memberships of every site it can reach (now including its company's sites).
 drop policy if exists incident_memberships_read_scoped on incident_memberships;
 create policy incident_memberships_read_scoped on incident_memberships for select to authenticated using (
   profile_id = (select auth.uid())
@@ -657,20 +820,26 @@ create policy events_read_authenticated on events for select to authenticated us
 -- ---------------------------------------------------------------------------------------------
 -- Grants (database/046 convention)
 -- ---------------------------------------------------------------------------------------------
-revoke all on function app.is_company_command() from public, anon;
-grant execute on function app.is_company_command() to authenticated;
+revoke all on function app.is_unit_manager() from public, anon;
+grant execute on function app.is_unit_manager() to authenticated;
 revoke all on function app.my_platoon_id() from public, anon;
 grant execute on function app.my_platoon_id() to authenticated;
-revoke all on function app.write_platoon_audit(text, uuid, uuid, uuid, uuid, uuid, jsonb) from public, anon, authenticated;
-revoke all on function app.reject_platoon_audit_mutation() from public, anon, authenticated;
-revoke all on function app.guard_profile_platoon() from public, anon, authenticated;
-revoke all on function app.guard_incident_platoon() from public, anon, authenticated;
+revoke all on function app.my_company_id() from public, anon;
+grant execute on function app.my_company_id() to authenticated;
+revoke all on function app.write_unit_audit(text, uuid, uuid, uuid, uuid, uuid, uuid, uuid, uuid, jsonb) from public, anon, authenticated;
+revoke all on function app.reject_unit_audit_mutation() from public, anon, authenticated;
+revoke all on function app.guard_profile_unit() from public, anon, authenticated;
+revoke all on function app.guard_incident_unit() from public, anon, authenticated;
 
-revoke execute on function public.create_platoon(text) from public, anon;
-grant execute on function public.create_platoon(text) to authenticated;
+revoke execute on function public.create_company(text, text) from public, anon;
+grant execute on function public.create_company(text, text) to authenticated;
+revoke execute on function public.update_company(uuid, text, boolean) from public, anon;
+grant execute on function public.update_company(uuid, text, boolean) to authenticated;
+revoke execute on function public.create_platoon(uuid, text) from public, anon;
+grant execute on function public.create_platoon(uuid, text) to authenticated;
 revoke execute on function public.update_platoon(uuid, text, boolean) from public, anon;
 grant execute on function public.update_platoon(uuid, text, boolean) to authenticated;
-revoke execute on function public.set_profile_platoon(uuid, uuid) from public, anon;
-grant execute on function public.set_profile_platoon(uuid, uuid) to authenticated;
-revoke execute on function public.set_incident_platoon(uuid, uuid) from public, anon;
-grant execute on function public.set_incident_platoon(uuid, uuid) to authenticated;
+revoke execute on function public.set_profile_unit(uuid, uuid, uuid) from public, anon;
+grant execute on function public.set_profile_unit(uuid, uuid, uuid) to authenticated;
+revoke execute on function public.set_incident_unit(uuid, uuid, uuid) from public, anon;
+grant execute on function public.set_incident_unit(uuid, uuid, uuid) to authenticated;

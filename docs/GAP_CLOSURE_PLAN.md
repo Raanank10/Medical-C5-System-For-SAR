@@ -296,7 +296,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-4 Alert acknowledgment | P1 | Done (V2.99.40): 054 live, verified 2026-10-20 | this PR | per patient, as the client's alerts are: `patients.alert_acknowledged_*` plus `watchdog_alerts.acknowledged_*`; re-escalation (red/black triage, critical vitals) clears it everywhere via `WATCHDOG_ALERT` reason `reescalated`; patient card shows who and when |
 | WP-5 Reinforcement / death-cert requests | P1 | Done (V2.99.38): 051 + 052 live, sync-log v8 deployed, verified 2026-10-20 | this PR | `medical_resource_requests` + RLS per D3; status updates by server id from any device; physician death confirmation resolves the request. Still local: `PC_REVIEW_REQUESTED_FOR_DETERIORATION` (a PC review request is not a resource request; kept under `known_gaps` WP-5) |
 | WP-6 PC resupply decisions | P2 | Not started | | |
-| WP-7 CC real platoons | P2 | Mostly done (V2.99.39, `database/053`, not applied live yet) | | real `platoons` table (one company) instead of 045's medic-to-PC link; CC tiles/rows/counts from real platoons; roster panel; rpc platoon scope and rescue clinical block added at the owner's request. Remaining: `PATIENT_REASSIGNED_*` (moving a patient to another platoon means another site; not modelled) |
+| WP-7 CC real platoons | P2 | Mostly done (V2.99.42, `database/053`, not applied live yet) | #82 + this PR | real `companies` and `platoons` (3 rescue companies x 3 platoons, plus the ambulance team) instead of 045's medic-to-PC link; first one-company version (#82) rewritten before it was applied; CC tiles/rows/counts from real platoons; roster panel; rpc platoon scope and rescue clinical block added at the owner's request. Remaining: `PATIENT_REASSIGNED_*` (moving a patient to another platoon means another site; not modelled) |
 | WP-8 Rescue panel state | P2 | Not started | | verify first |
 | WP-9 Inventory on server | P2 | Not started | | needs D2 |
 | WP-10 Offline cold start | P2 | Not started | | |
@@ -321,7 +321,7 @@ The plan was written against V2.99.33 (`a4f6c81`). PR #73 (V2.99.34) merged afte
 - **`main` failed `scripts/check_repo.py` for a while** after #77 (event contract) and #78 (pre-evacuation) merged without seeing each other: `SITE_PRE_EVACUATION_REPORTED` was in `SYNC_ELIGIBLE_EVENT_TYPES` and `sync-log` but not in the contract. Fixed on `main` by #80/#81 (seen 2026-10-20). Worth a branch-protection rule that requires the `validate` check to pass before merge.
 - **`database/042` (admin user management) is not on the live project.** The in-app "ניהול משתמשים" screen's role change / deactivate RPCs and `admin_user_audit` do not exist live; the `admin-users` Edge Function is not deployed either (live functions: `sync-log` v8, `handover-consume` v2), so the whole screen fails on the live project and onboarding still needs `scripts/invite_user.js`. Owner decision needed before applying it.
 - **The 34 `scripts/smoke_*.js` scripts all fail on `main`**: each pins an old `APP_VERSION` (e.g. "must be V2.9916"). Add to WP-13: refresh or retire them before wiring them into CI.
-- **WP-7** mostly done in V2.99.39 together with real platoons (`database/053`); see the status table.
+- **WP-7** mostly done together with real companies and platoons (`database/053`, V2.99.42); see the status table.
 
 ## Baseline results
 
