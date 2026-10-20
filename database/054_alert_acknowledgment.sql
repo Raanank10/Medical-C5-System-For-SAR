@@ -1,4 +1,4 @@
--- Alert acknowledgment is shared across devices (WP-4, docs/GAP_CLOSURE_PLAN.md, V2.99.39).
+-- Alert acknowledgment is shared across devices (WP-4, docs/GAP_CLOSURE_PLAN.md, V2.99.40).
 --
 -- Before this file, pressing "בטיפול" (in treatment) on a patient's alert only changed the phone
 -- that pressed it: the client wrote a local timeline entry and bumped a counter that never cleared.
@@ -8,6 +8,10 @@
 -- this" from "a medic is on it" (docs/PRODUCTION_READINESS.md).
 --
 -- Decision D4 (repo owner, 2026-10-20): both the event and server state.
+--
+-- Numbering: written and applied live as 053 (live migration history: 053_alert_acknowledgment) on
+-- 2026-10-20, then renumbered to 054 when merging main, whose 053_platoons.sql took 053 first (same
+-- situation as 049/050 in database/050). The live column comment still names database/053.
 --
 -- What this adds:
 -- - patients.alert_acknowledged_at / _by / _by_name / _by_role: the patient's current
@@ -36,7 +40,7 @@ alter table patients add column if not exists alert_acknowledged_by_name text;
 alter table patients add column if not exists alert_acknowledged_by_role user_role;
 
 comment on column patients.alert_acknowledged_at is
-  'local_timestamp of the newest WATCHDOG_ACKNOWLEDGED ("בטיפול") for this patient; cleared by a later WATCHDOG_ALERT re-escalation (database/053).';
+  'local_timestamp of the newest WATCHDOG_ACKNOWLEDGED ("בטיפול") for this patient; cleared by a later WATCHDOG_ALERT re-escalation (database/054).';
 
 create or replace function public.project_alert_acknowledgment()
 returns trigger

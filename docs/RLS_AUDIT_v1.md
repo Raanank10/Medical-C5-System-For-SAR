@@ -245,9 +245,44 @@ New table `medical_resource_requests` (WP-5 of `docs/GAP_CLOSURE_PLAN.md`), writ
 
 Applied 2026-10-20 (`052` without its two `drop ... if exists` lines, no-ops on a first apply) and verified the same day by role impersonation in one block forced to roll back, against real profiles: a medic's death-certification request and a PC's paramedic request each created one row (a re-sent creation did not duplicate; a junk reason code and a non-uuid patient id were dropped; an unknown resource type created nothing); the requesting medic read 1 row, another medic 0, the PC 2, a physician (not a member) 2, a paramedic and a logistics officer 0; a physician's acknowledgment from another device applied by server id; the medic's attempt to resolve their own request and to cancel the PC's were ignored, the medic's urgency change on their own request applied; an older PC update did not undo the physician's newer one; a direct insert as the PC failed with 42501; the physician's `PATIENT_DEATH_CONFIRMED` resolved the death-certification request; all 10 events stayed in the log. `get_advisors` (security) showed no new finding.
 
-## Follow-up: shared alert acknowledgment (`database/053`)
+## Follow-up: platoons and rescue-chain scope (`database/053`)
 
-No new table or policy. Four new `patients` columns (`alert_acknowledged_at`, `_by`, `_by_name`, `_by_role`), readable through the existing `patients` read policy and written only by the `SECURITY DEFINER` trigger function `project_alert_acknowledgment()` (execute revoked from `public`, `anon`, `authenticated`). It also sets `watchdog_alerts.acknowledged_at` / `acknowledged_by`. Applied 2026-10-20 (without its `drop trigger if exists` line, a no-op on a first apply) and verified the same day by role impersonation in one block forced to roll back: a member medic's acknowledgment set the patient columns and the patient's open watchdog row; a CC read it; an older re-escalation and a `WATCHDOG_ALERT` without `reason` left it; a newer re-escalation cleared it while the watchdog row kept its acknowledgment; a newer CC acknowledgment replaced it; a medic who is not an incident member could not insert the event at all (42501, `events_insert_by_role`).
+Asked by the repo owner on 2026-10-20 ("add platoons but one company, check all"); decisions: a platoon is one shared site team (pc, rpc, medics/paramedics), rpc sees only its own platoon's sites, and the rescue chain is blocked from clinical data in the database.
+
+**Measured live before the change** (read-only, rpc account impersonated with `set local role authenticated` + JWT claims): with no incident membership the rpc read all 5 incidents, all 5 patients, all 29 events (including 3 `VITALS_RECORDED` / `MEDICATION_ADMINISTERED` / `INTERVENTION_RECORDED`), 1 row of `vw_patient_latest_vitals` and 2 of `vw_patient_treatment_history`. `PATIENT_HANDED_OVER` payloads carry a MIST summary with HR/RR/AVPU and treatments (`index.html`, handover), so the block has to cover more than the obvious vitals types.
+
+**Policy shape.** An allowlist, not a denylist, on `events_read_authenticated` for rpc/rcc: a new event type stays hidden from rescue until someone decides otherwise. Own events stay readable. The two clinical views are `security_invoker`, so they follow the events policy with no change of their own. The `sync-log` GET runs with the caller's JWT, so the pull is covered too.
+
+**Verified on the live database before merge**, in three transactions that each ended with a raised error (nothing persisted; checked afterwards that no table, column or function definition remained). Fixtures: two platoons, pc + rpc + one medic in A, one medic in B, `TEST-INC-A` in A, an active incident in B.
+
+| Check | Result |
+| --- | --- |
+| rpc (platoon A, no membership): incidents visible | 1 (was 5) |
+| rpc: clinical events / clinical view rows | 0 / 0+0 (was 3 / 1+2) |
+| rpc: non-clinical events of its site | 11 |
+| rpc: join the other platoon's site; set a site's platoon | both refused |
+| rpc opens a site | site gets platoon A |
+| rcc: incidents / clinical events | 5 / 0 |
+| pc (A): clinical events | 3 (unchanged) |
+| pc: profiles readable | 3 (its platoon), other platoon's medic 0 |
+| pc: may assign own medic / other platoon's medic | true / false |
+| pc: change roster, move a site to another platoon, create platoon, write `platoon_audit`, rename | all refused |
+| medic (A) drafts a site; pc (A) lists and confirms it | draft gets platoon A; listed; confirmed |
+| paramedic with no platoon drafts; pc (A) | not visible |
+| cc: create / rename platoon, place a medic, move a site; duplicate name; place a logistics officer | succeed; duplicate refused; logistics refused |
+| `set_platoon_commander()` (045 wrapper) | places the medic in that pc's platoon |
+| role change to a non-platoon role | platoon cleared, audited |
+| `platoon_audit` update | refused (append-only) |
+
+**Gap found by the test and fixed in the file:** a draft that company command moved to platoon B stayed visible to platoon A's pc, because 045's drafter rule did not look at the site's platoon. The drafter rule now applies only while `incidents.platoon_id` is null; re-verified (visible before the move, hidden after).
+
+**Not covered** (documented, not fixed): `patients.pulse_present`, `breathing_present` and `injury_zones` stay readable to rpc/rcc on patients they can reach. Hiding single columns per role needs a view or RPC for the rescue read path, not RLS. `watchdog_alerts` rows stay readable to rpc/rcc (alert type and timing, no values).
+
+**Not applied live yet.** After applying: run `get_advisors` (security), and repeat the rpc row of the table with the real rpc account.
+
+## Follow-up: shared alert acknowledgment (`database/054`)
+
+No new table or policy. Four new `patients` columns (`alert_acknowledged_at`, `_by`, `_by_name`, `_by_role`), readable through the existing `patients` read policy and written only by the `SECURITY DEFINER` trigger function `project_alert_acknowledgment()` (execute revoked from `public`, `anon`, `authenticated`). It also sets `watchdog_alerts.acknowledged_at` / `acknowledged_by`. Applied 2026-10-20 as `053_alert_acknowledgment` (renumbered to `054` when merging `main`, whose `053_platoons.sql` took `053`; without its `drop trigger if exists` line, a no-op on a first apply) and verified the same day by role impersonation in one block forced to roll back: a member medic's acknowledgment set the patient columns and the patient's open watchdog row; a CC read it; an older re-escalation and a `WATCHDOG_ALERT` without `reason` left it; a newer re-escalation cleared it while the watchdog row kept its acknowledgment; a newer CC acknowledgment replaced it; a medic who is not an incident member could not insert the event at all (42501, `events_insert_by_role`).
 
 ## Explicitly not re-litigated here
 

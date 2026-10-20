@@ -1,10 +1,10 @@
-// Real-browser test of shared alert acknowledgment (V2.99.39, docs/GAP_CLOSURE_PLAN.md WP-4,
-// database/053). A medic and a PC (two browser contexts, so two separate devices) share one fake
+// Real-browser test of shared alert acknowledgment (V2.99.40, docs/GAP_CLOSURE_PLAN.md WP-4,
+// database/054). A medic and a PC (two browser contexts, so two separate devices) share one fake
 // backend in this Node process, the same harness as scripts/browser_reinforcement_sync_test.js. The
 // fake mirrors project_alert_acknowledgment(): WATCHDOG_ACKNOWLEDGED sets
 // patients.alert_acknowledged_* (newest wins); WATCHDOG_ALERT with reason 'reescalated' clears it
 // when the acknowledgment is not newer.
-// It proves client behavior only; database/053 itself must be exercised against real Postgres.
+// It proves client behavior only; database/054 itself must be exercised against real Postgres.
 //
 // Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
 // Run: npm install && node scripts/browser_alert_ack_sync_test.js
@@ -46,7 +46,7 @@ function newServer() {
   };
 }
 
-// Port of project_alert_acknowledgment() (database/053).
+// Port of project_alert_acknowledgment() (database/054).
 function project(server, evt, actorId) {
   if (!evt.patient_id) return;
   const u = userById(actorId);
