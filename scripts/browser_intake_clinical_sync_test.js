@@ -16,7 +16,7 @@ const path = require('path');
 const { chromium } = require('playwright');
 
 const root = path.resolve(__dirname, '..');
-const files = [path.join(root, 'index.html'), path.join(root, 'demo', 'rescue-app.html')];
+const files = [path.join(root, 'index.html')];
 const PIN = '135790';
 
 function assert(condition, message) {

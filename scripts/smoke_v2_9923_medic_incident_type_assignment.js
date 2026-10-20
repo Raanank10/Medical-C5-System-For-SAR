@@ -1,8 +1,9 @@
 const fs = require('fs');
 const path = require('path');
+const { assertVersionLabels } = require('./lib/smoke_version');
 
 const root = path.resolve(__dirname, '..');
-const files = ['index.html', path.join('demo', 'rescue-app.html')];
+const files = ['index.html'];
 
 function assert(condition, message) {
   if (!condition) {
@@ -13,10 +14,7 @@ function assert(condition, message) {
 for (const rel of files) {
   const html = fs.readFileSync(path.join(root, rel), 'utf8');
 
-  assert(html.includes("const APP_VERSION = '2.99.23';"), `${rel}: APP_VERSION must be V2.9923`);
-  assert(html.includes('Demo V2.9923'), `${rel}: launcher label must be Demo V2.9923`);
-  assert(html.includes('ROLE // V2.9923'), `${rel}: role header must be Demo V2.9923`);
-  assert(html.includes('Role-Based Medical Command System V2.9923'), `${rel}: role system strip must be Demo V2.9923`);
+  assertVersionLabels(html, rel);
 
   // Medic Movement screen: the hardcoded "structural collapse" alert banner is gone, replaced by
   // the same four incident types the rescue-chain (rpc/rcc) authority panel offers.
@@ -46,7 +44,13 @@ for (const rel of files) {
   // Signed-in safety: the live medic is only a member of incident A, so a local assignment must
   // never move a signed-in device's sync target, and the new events must stay local-only.
   assert(html.includes("return (!currentUser && a?.siteId) || 'SITE_A';"), `${rel}: currentSiteId() must ignore local assignments while signed in`);
-  assert(html.includes("if(currentUser && siteId!=='SITE_A'){ toast("), `${rel}: confirmMedicAssignment must refuse non-SITE_A while signed in`);
+  // Since V2.99.29 a signed-in assignment goes to the server (assignRealMedic) and returns before
+  // the local medicIncidentAssignments write, so it still never moves this device's sync target.
+  const confirmStart = html.indexOf('async function confirmMedicAssignment(){');
+  assert(confirmStart >= 0, `${rel}: confirmMedicAssignment missing`);
+  const confirmFn = html.slice(confirmStart, html.indexOf('\n}\n', confirmStart));
+  const signedInBranch = confirmFn.slice(confirmFn.indexOf('if(currentUser){'), confirmFn.indexOf('medicIncidentAssignments[medicId]='));
+  assert(signedInBranch.includes('if(!canAssignMedicsOnServer())') && signedInBranch.includes('await assignRealMedic(') && signedInBranch.includes('return;\n  }'), `${rel}: signed-in confirmMedicAssignment must assign on the server and return before the local assignment`);
   const eligible = html.match(/const SYNC_ELIGIBLE_EVENT_TYPES = new Set\(\[([\s\S]*?)\]\);/);
   assert(eligible, `${rel}: SYNC_ELIGIBLE_EVENT_TYPES must exist`);
   for (const t of ['MEDIC_ASSIGNED_TO_INCIDENT', 'INCIDENT_TYPE_MISMATCH_REPORTED', 'SITE_PREFILL_CORRECTED', 'INCIDENT_TYPE_SET']) {

@@ -8,7 +8,7 @@ const fs = require('fs');
 const { chromium } = require('playwright');
 
 const root = path.resolve(__dirname, '..');
-const files = [path.join(root, 'index.html'), path.join(root, 'demo', 'rescue-app.html')];
+const files = [path.join(root, 'index.html')];
 const PIN = '246810';
 function assert(c, m) { if (!c) throw new Error(m); }
 

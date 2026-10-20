@@ -1,8 +1,9 @@
 const fs = require('fs');
 const path = require('path');
+const { assertVersionLabels } = require('./lib/smoke_version');
 
 const root = path.resolve(__dirname, '..');
-const files = ['index.html', path.join('demo', 'rescue-app.html')];
+const files = ['index.html'];
 
 function assert(condition, message) {
   if (!condition) {
@@ -23,10 +24,7 @@ for (const rel of files) {
   const openPatientFn = section(html, 'function openPatient(id){', 'function markPatientAtCollectionPoint');
   const opiFn = section(html, 'function renderOperationalPressureIndex(opi){', 'function renderPcNowTaskBoard');
 
-  assert(html.includes("const APP_VERSION = '2.99.16';"), `${rel}: APP_VERSION must be V2.9916`);
-  assert(html.includes('Demo V2.9916'), `${rel}: launcher label must be Demo V2.9916`);
-  assert(html.includes('ROLE // V2.9916'), `${rel}: role header must be Demo V2.9916`);
-  assert(html.includes('Role-Based Medical Command System V2.9916'), `${rel}: role system strip must be Demo V2.9916`);
+  assertVersionLabels(html, rel);
 
   assert(html.includes('function renderGaugeArc('), `${rel}: reusable gauge component missing`);
 

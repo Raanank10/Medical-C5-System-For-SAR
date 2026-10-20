@@ -1,8 +1,9 @@
 const fs = require('fs');
 const path = require('path');
+const { assertVersionLabels } = require('./lib/smoke_version');
 
 const root = path.resolve(__dirname, '..');
-const files = ['index.html', path.join('demo', 'rescue-app.html')];
+const files = ['index.html'];
 
 function assert(condition, message) {
   if (!condition) {
@@ -25,10 +26,7 @@ for (const rel of files) {
   const trackFn = section(html, 'function trackHighStakesSync(entry){', 'function checkHighStakesSyncStatus(');
   const checkFn = section(html, 'function checkHighStakesSyncStatus(localEventId, label){', 'async function retryHighStakesSync(');
 
-  assert(html.includes("const APP_VERSION = '2.99.16';"), `${rel}: APP_VERSION must be V2.9916`);
-  assert(html.includes('Demo V2.9916'), `${rel}: launcher label must be Demo V2.9916`);
-  assert(html.includes('ROLE // V2.9916'), `${rel}: role header must be Demo V2.9916`);
-  assert(html.includes('Role-Based Medical Command System V2.9916'), `${rel}: role system strip must be Demo V2.9916`);
+  assertVersionLabels(html, rel);
 
   // Patient detail screen was the one screen missing a live sync indicator - now has one,
   // reusing the same .sync-pill component/fresh-stale-offline styling as every other screen.
@@ -41,7 +39,7 @@ for (const rel of files) {
   assert(html.includes("const HIGH_STAKES_SYNC_EVENT_TYPES = new Set(['TOURNIQUET_APPLIED','PATIENT_TRIAGED_EXPECTANT','PATIENT_HANDED_OVER']);"), `${rel}: high-stakes event set must be exactly tourniquet/black-triage/handover`);
   assert(saveLocalEventFn.includes('trackHighStakesSync(entry);'), `${rel}: saveLocalEvent must invoke the confirmation tracker for every saved event`);
   assert(trackFn.includes('if(!currentUser) return;'), `${rel}: trackHighStakesSync must skip entirely in local-demo (no-login) mode`);
-  assert(trackFn.includes("if(!HIGH_STAKES_SYNC_EVENT_TYPES.has(entry.type)) return;"), `${rel}: trackHighStakesSync must only fire for the three high-stakes event types`);
+  assert(trackFn.includes("if(!HIGH_STAKES_SYNC_EVENT_TYPES.has(entry.type) || entry.localOnly) return;"), `${rel}: trackHighStakesSync must only fire for the three high-stakes event types, and never for local-only entries`);
   assert(trackFn.includes("el.className='sync-confirm-toast pending';"), `${rel}: initial toast state must be pending`);
 
   // Fast path (already synced by the time of the check) reuses toast()'s auto-dismiss pattern;

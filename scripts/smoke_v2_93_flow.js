@@ -1,11 +1,9 @@
 ﻿const fs = require('fs');
 const path = require('path');
+const { assertVersionLabels } = require('./lib/smoke_version');
 
 const root = path.resolve(__dirname, '..');
-const files = [
-  path.join(root, 'index.html'),
-  path.join(root, 'demo', 'rescue-app.html')
-];
+const files = [path.join(root, 'index.html')];
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -36,13 +34,12 @@ for (const file of files) {
   assert(html.includes('function receiveLogisticsSupply('), `${rel}: logistics receive helper missing`);
   assert(html.includes("pcTruckStock[itemType]=(pcTruckStock[itemType]??PC_TRUCK_BASELINE[itemType]??0)+received;"), `${rel}: logistics receive helper must replenish the PC truck`);
   assert(html.includes("movement_type:'logistics_manual_received'"), `${rel}: logistics receive helper must append a receipt ledger movement`);
-  assert(html.includes("const APP_VERSION = '2.99.16';"), `${rel}: APP_VERSION must be V2.9916`);
-  assert(html.includes('Demo V2.9916'), `${rel}: launcher version label must be V2.9916`);
-  assert(html.includes('ROLE // V2.9916'), `${rel}: role header version label must be V2.9916`);
-  assert(html.includes('Role-Based Medical Command System V2.9916'), `${rel}: role system strip must be V2.9916`);
+  assertVersionLabels(html, rel);
   assert(!html.includes('Role-Based Medical Command System v2.91'), `${rel}: stale role strip version remains`);
   assert(!html.includes('ונפתח ״ציוד נצרך״'), `${rel}: launcher still promises a supply popup during sweep`);
-  assert(!/<script\s+src=/i.test(html), `${rel}: external script introduced`);
+  // The one allowed external script is the pinned supabase-js build used for real auth and sync.
+  const externalScripts = html.match(/<script\s+src="[^"]*"/gi) || [];
+  assert(externalScripts.length === 1 && /^<script\s+src="https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@\d+\.\d+\.\d+\//.test(externalScripts[0]), `${rel}: only the pinned supabase-js script may load externally`);
 
   console.log(`${rel}: V2.93 PC commander-impact static smoke passed`);
 }

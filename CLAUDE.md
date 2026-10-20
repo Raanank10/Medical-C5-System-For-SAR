@@ -25,11 +25,12 @@ node tests/domain-rules.test.js
 # Manual smoke tests against the built HTML (string-assertion checks, run individually as needed)
 node scripts/smoke_v2_991_medic_cc.js
 node scripts/smoke_v2_992_decision_support.js
-# ...other scripts/smoke_*.js files follow the same pattern, one per feature milestone
+# ...other scripts/smoke_*.js files follow the same pattern, one per feature milestone. They no longer
+# pin a version: scripts/lib/smoke_version.js only checks the visible labels match APP_VERSION.
+for f in scripts/smoke_*.js; do node "$f" || echo "FAILED: $f"; done
 
 # Real-browser smoke test (Playwright, headless Chromium) — loads index.html and
-# demo/rescue-app.html and checks they actually render, not just that the HTML text
-# contains expected strings. Manual-only, not wired into CI, requires `npm install` once.
+# checks it actually renders, not just that the HTML text contains expected strings. Manual-only, not wired into CI, requires `npm install` once.
 npm install
 npm run test:browser-smoke            # or: node scripts/browser_smoke_test.js
 node scripts/browser_incident_lifecycle_test.js   # logged-in incident picker/draft flow + close guard, stubbed Supabase client
@@ -58,26 +59,26 @@ python -m pytest                  # pytest suite for db.py/kpis.py/charts.py/rep
 python -c "from db import DB; from kpis import KPIEngine; from report import ReportGenerator; db=DB('rescue_demo_v1_1.db'); kpi=KPIEngine(db); ReportGenerator(kpi).save('aar_report_v1_1.html')"
 ```
 
-CI (`.github/workflows/validate.yml`) runs exactly two things on every PR and push to `main`: `python scripts/check_repo.py` and `node tests/domain-rules.test.js`. The smoke scripts under `scripts/smoke_*.js`, `scripts/browser_smoke_test.js` (Playwright), and the analytics package's `pytest` suite are not wired into CI — they're run manually (string-assertion smoke scripts and the Playwright smoke test against `index.html` / `demo/rescue-app.html`; pytest requires the analytics venv/dependencies CI doesn't install).
+CI (`.github/workflows/validate.yml`) runs exactly two things on every PR and push to `main`: `python scripts/check_repo.py` and `node tests/domain-rules.test.js`. The smoke scripts under `scripts/smoke_*.js`, `scripts/browser_smoke_test.js` (Playwright), and the analytics package's `pytest` suite are not wired into CI — they're run manually (string-assertion smoke scripts and the Playwright smoke test against `index.html`; pytest requires the analytics venv/dependencies CI doesn't install).
 
 `scripts/check_repo.py` enforces (stdlib only, no deps):
 - a fixed list of required paths exist (`REQUIRED_PATHS` in the script — update it when adding/renaming core docs, schema files, or archive folders)
-- `index.html` and `demo/rescue-app.html` have a doctype and closing `</html>`
+- `index.html` has a doctype and closing `</html>`, and its three visible version labels ("Demo V2.9941", "ROLE // V2.9941", "Role-Based Medical Command System V2.9941") match `APP_VERSION`
 - every relative markdown link across the repo resolves to a real file (no broken/external-repo links)
-- the domain-rules module inlined in `index.html`/`demo/rescue-app.html` hasn't drifted from `src/domain/rules.js`
+- the domain-rules module inlined in `index.html` hasn't drifted from `src/domain/rules.js`
 - `database/*.sql` structural sanity: balanced parens/`$$` dollar-quoted blocks, and every `references table(...)` target resolves to a real `create table` — see docs/DEVELOPMENT.md's "Validating SQL Drafts" for what this does and doesn't catch (it's not a real SQL parser; a Postgres instance is still the only full validation)
 - every `*.py` file parses without a syntax error
 - every event type `index.html` writes is classified in `src/domain/event-contract.json` (`synced` must equal `SYNC_ELIGIBLE_EVENT_TYPES` and be allowed by `sync-log`; otherwise `local_only`, `not_events` or `known_gaps` with its work package) - see docs/DEVELOPMENT.md "Event Contract"
 
 ## Architecture
 
-### The prototype is one HTML file, duplicated
+### The prototype is one HTML file
 
-`index.html` and `demo/rescue-app.html` are **byte-identical** (verify with `diff` before assuming otherwise). Both are ~8,600 lines of self-contained HTML/CSS/JS — no bundler, no framework, no `<script src>` to other JS files except `src/domain/rules.js`-equivalent logic that is inlined directly into the HTML (the standalone `src/domain/rules.js` module is a separately extracted, testable copy of a subset of that logic — see below). When you change prototype behavior, **you almost always need to edit both `index.html` and `demo/rescue-app.html` identically** unless a doc explicitly says they should diverge (currently they should not).
+`index.html` is the whole prototype, and the file GitHub Pages serves as the live demo. It used to have a byte-identical copy, `demo/rescue-app.html`; that copy was removed (decision D5 in `docs/GAP_CLOSURE_PLAN.md`), so there is only one file to edit. It is ~14,200 lines of self-contained HTML/CSS/JS, with no bundler and no framework. Its one external script is the pinned supabase-js build from jsDelivr (real auth and sync; bump the pinned version deliberately, never float `@2`). The `src/domain/rules.js` logic is inlined directly into the HTML (the standalone `src/domain/rules.js` module is a separately extracted, testable copy of that logic, see below).
 
 Inside the HTML, look for:
-- `const APP_VERSION = '2.99.41';` — bump this and the visible "Demo X.Y" / "ROLE // X.Y" label strings together when shipping a version; smoke scripts assert on these exact strings.
-- `const ROLE_LABELS` / `const ROLE_DEFS` — defines the role-based views. Ten roles exist in the live `user_role` enum: `medic`, `paramedic` and `physician` (added in `database/019`/`020`), `pc` (חוג"ד — platoon commander), `cc` (מ״פ רפואה — company/command medical), `logistics_officer` (mapped to the client-side `logistics` key via `SERVER_ROLE_TO_CLIENT_ROLE`), `chamal` (command system), `rpc`/`rcc` (rescue-chain platoon/company commander — site-authority actions per `docs/ROLE_COMMAND_MODEL_v2.8.md`, added in `database/006`/`007`), and `admin`. New users are invited by an admin from the in-app "ניהול משתמשים" screen (`supabase/functions/admin-users/index.ts`, `database/042`), or with the fallback CLI `scripts/invite_user.js`; never the Supabase dashboard button, which can't set a role. Both keep a `VALID_ROLES` list that must match this enum.
+- `const APP_VERSION = '2.99.41';` — bump this and the three visible label strings ("Demo V2.9941", "ROLE // V2.9941", "Role-Based Medical Command System V2.9941") together when shipping a version; `scripts/check_repo.py` fails CI if they disagree.
+- `const ROLE_LABELS` / `const ROLE_DEFS` — defines the role-based views. Ten roles exist in the live `user_role` enum: `medic`, `paramedic` and `physician` (added in `database/019`/`020`), `pc` (חוג"ד — platoon commander), `cc` (מ״פ רפואה — company/command medical), `logistics_officer` (mapped to the client-side `logistics` key via `SERVER_ROLE_TO_CLIENT_ROLE`), `chamal` (command system), `rpc`/`rcc` (rescue-chain platoon/company commander — site-authority actions per `docs/ROLE_COMMAND_MODEL_v2.8.md`, added in `database/006`/`007`), and `admin`. New users are invited by an admin from the in-app "ניהול משתמשים" screen (`supabase/functions/admin-users/index.ts`, `database/042`), or with the fallback CLI `scripts/invite_user.js`; never the Supabase dashboard button, which can't set a role. `database/042` and the `admin-users` function are not on the live project yet (owner decision pending, `docs/GAP_CLOSURE_PLAN.md`), so for now the CLI is the only path that works live. Both keep a `VALID_ROLES` list that must match this enum.
 - `render*` functions (e.g. `renderDashboard`, `renderCommander`, `renderMstartSweep`, `renderAar`, `renderCcHeroDashboard`, `renderLogisticsOfficer`) — each is a self-contained view renderer for one role/screen. Grep for `^function render` to find the current screen inventory before adding a new one.
 - A legacy step-based New Patient flow (`screen-step1`..`screen-step8`, guarded by a `LEGACY_FULL_ASSESSMENT_DO_NOT_DELETE_WITHOUT_TESTS` comment) coexists with the newer Quick/Extended patient flows — don't delete it without checking what still depends on it (smoke scripts assert on its presence).
 
@@ -107,7 +108,7 @@ Invalid/dependency-blocked sync events go to `sync_ingestion_errors` / `sync_eve
 
 `/sync/log` (`docs/API_SURFACE_v1.2.md`) is implemented as a Supabase Edge Function, `supabase/functions/sync-log/index.ts` — not a literal HTTP path, deployed as `https://btvvjmuwdzirjyauyijx.supabase.co/functions/v1/sync-log` (POST = push, GET = pull). The Command Dashboard read side has one real slice, `get_incident_command_state()`, a `SECURITY DEFINER` RPC (`database/014_command_dashboard_state_rpc.sql`) rather than a literal `GET /command/...` endpoint. Command Actions and most of the AAR API (`docs/API_SURFACE_v1.2.md` sections 5-7) are still unbuilt. See `docs/ARCHITECTURE.md`'s "Backend Deployment Status" for the full account, including real gaps found only by deploying and testing against live accounts (RLS bypassed by views until fixed, missing `SECURITY DEFINER` on trigger functions, no `profiles` row auto-created on signup, an invite-link flow that silently logged people in without ever setting a password).
 
-`database/001_postgresql_schema_v1.2.sql` is the base schema (`create table if not exists`, no migration framework yet — Phase 4 plans to convert to real Supabase CLI migrations, see `docs/PHASE_4_PLAN.md` 4C). `002_seed_demo_data_v1.2.sql` is matching synthetic seed data, `003_mci_ui_alignment.sql` a small delta on top, and `004` through `017` are the incremental fixes applied directly against the live project during deployment/RLS-audit work (RLS gaps, `rpc`/`rcc` roles and their site-authority RLS, auto-create-profile-on-signup, new rescue-chain event types, the command-dashboard RPC, incident-scoping the sync-error read policy, locking out inactive profiles, etc. — each file's name says what it fixes). Older `_v1.1` files and `archive/v0.6`, `archive/v0.7` are kept for history — don't edit them; add a new numbered file instead.
+`database/001_postgresql_schema_v1.2.sql` is the base schema (`create table if not exists`, no migration framework yet — Phase 4 plans to convert to real Supabase CLI migrations, see `docs/PHASE_4_PLAN.md` 4C). `002_seed_demo_data_v1.2.sql` is matching synthetic seed data, `003_mci_ui_alignment.sql` a small delta on top, and `004` through `055` are the incremental fixes and features applied directly against the live project (not every file is applied live, and live migration names do not always match the repo numbers - see `docs/GAP_CLOSURE_PLAN.md`), starting with deployment/RLS-audit work (RLS gaps, `rpc`/`rcc` roles and their site-authority RLS, auto-create-profile-on-signup, new rescue-chain event types, the command-dashboard RPC, incident-scoping the sync-error read policy, locking out inactive profiles, etc. — each file's name says what it fixes). Older `_v1.1` files and `archive/v0.6`, `archive/v0.7` are kept for history — don't edit them; add a new numbered file instead.
 
 ### Analytics package (`analytics/c5_sentinel_sar_analytics_v1_1/`)
 

@@ -1,11 +1,9 @@
 ﻿const fs = require('fs');
 const path = require('path');
+const { assertVersionLabels } = require('./lib/smoke_version');
 
 const root = path.resolve(__dirname, '..');
-const files = [
-  path.join(root, 'index.html'),
-  path.join(root, 'demo', 'rescue-app.html')
-];
+const files = [path.join(root, 'index.html')];
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -24,8 +22,7 @@ for (const file of files) {
   const blackEnd = html.indexOf('function overrideSweepColor', blackStart);
   const blackBody = html.slice(blackStart, blackEnd);
 
-  assert(html.includes("const APP_VERSION = '2.99.16';"), `${rel}: APP_VERSION must be V2.9916`);
-  assert(html.includes('Demo V2.9916'), `${rel}: launcher label must be V2.9916`);
+  assertVersionLabels(html, rel);
   assert(html.includes('function ensureTourniquetArray('), `${rel}: legacy-compatible TQ normalizer missing`);
   assert(html.includes("status:p.tourniquet.status||'active'"), `${rel}: legacy TQ alias migration missing`);
   assert(html.includes("effectiveness:p.tourniquet.effectiveness||'unknown'"), `${rel}: legacy TQ effectiveness default missing`);

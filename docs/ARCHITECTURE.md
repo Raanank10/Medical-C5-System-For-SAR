@@ -32,7 +32,7 @@ flowchart LR
 | Field app | Capture patients, vitals, treatments, handovers, and local alerts | `index.html` |
 | Command dashboard | Show incident state, stale data, high-risk alerts, and site progress | `index.html`, `assets/mockups/` |
 | Domain rules | Triage, vitals timers, tourniquet timers, and alert classification | `src/domain/rules.js` |
-| Sync API | Accept and return ordered event batches | `docs/API_SURFACE_v1.2.md` |
+| Sync API | Accept and return ordered event batches | `supabase/functions/sync-log/index.ts` (deployed), contract in `docs/API_SURFACE_v1.2.md` |
 | Event store | Preserve clinical and operational history | `database/001_postgresql_schema_v1.2.sql` |
 | Projectors | Convert raw events into command-ready state | SQL views and future workers |
 | Analytics | Compute KPIs and generate AAR material | `analytics/c5_sentinel_sar_analytics_v1_1/` |
@@ -58,7 +58,7 @@ Black/expectant triage is represented by `PATIENT_TRIAGED_EXPECTANT`. It is a fa
 
 ## Domain Rules
 
-The first extracted domain module is `src/domain/rules.js`. It is deliberately browser-compatible and CommonJS-compatible so the standalone prototype can load it directly while Node can test it without a build step. Because there is no build step, the browser doesn't load this file directly - `index.html` and `demo/rescue-app.html` each carry an inlined copy of the same `buildDomainRules()` factory body. `scripts/check_repo.py` enforces that the inlined copies stay byte-identical (modulo whitespace/formatting) to `src/domain/rules.js`, so a change made in only one place fails CI instead of silently diverging - this is how the SABCDE airway-check drift and the untested `suggestedSweepColor` sweep classifier both happened in the first place.
+The first extracted domain module is `src/domain/rules.js`. It is deliberately browser-compatible and CommonJS-compatible so the standalone prototype can load it directly while Node can test it without a build step. Because there is no build step, the browser doesn't load this file directly - `index.html` carries an inlined copy of the same `buildDomainRules()` factory body. `scripts/check_repo.py` enforces that the inlined copy stays byte-identical (modulo whitespace/formatting) to `src/domain/rules.js`, so a change made in only one place fails CI instead of silently diverging - this is how the SABCDE airway-check drift and the untested `suggestedSweepColor` sweep classifier both happened in the first place.
 
 Covered today:
 
@@ -70,7 +70,7 @@ Covered today:
 - deterioration detection
 - routine vs. critical alert classification
 
-When changing anything in this file, edit `src/domain/rules.js` first, then copy the exact same `buildDomainRules() { ... }` body into both `index.html` and `demo/rescue-app.html` - `python scripts/check_repo.py` will catch it if the copies drift.
+When changing anything in this file, edit `src/domain/rules.js` first, then copy the exact same `buildDomainRules() { ... }` body into `index.html` - `python scripts/check_repo.py` will catch it if the copies drift.
 
 For product-level UI guardrails, see `docs/TACTICAL_UI_GUIDELINES.md`. For the production hardening path, see `docs/PRODUCTION_READINESS.md`.
 

@@ -21,7 +21,6 @@ REQUIRED_PATHS = [
     "CONTRIBUTING.md",
     "SECURITY.md",
     "index.html",
-    "demo/rescue-app.html",
     "docs/DEVELOPMENT.md",
     "docs/ARCHITECTURE.md",
     "docs/TACTICAL_UI_GUIDELINES.md",
@@ -58,7 +57,7 @@ def check_required_paths(errors: list[str]) -> None:
 
 
 def check_html_files(errors: list[str]) -> None:
-    for rel in ["index.html", "demo/rescue-app.html"]:
+    for rel in ["index.html"]:
         path = ROOT / rel
         if not path.exists():
             continue
@@ -67,6 +66,32 @@ def check_html_files(errors: list[str]) -> None:
             fail(f"{rel} is missing a doctype", errors)
         if "</html>" not in text:
             fail(f"{rel} is missing a closing html tag", errors)
+
+
+def check_version_labels(errors: list[str]) -> None:
+    """The three visible version labels must match APP_VERSION.
+
+    CLAUDE.md asks for them to be bumped together, but nothing checked it, and
+    the labels stayed at V2.9934 for seven releases while APP_VERSION moved on.
+    Label style: APP_VERSION '2.99.41' -> 'V2.9941'. scripts/lib/smoke_version.js
+    runs the same check for the smoke scripts.
+    """
+    path = ROOT / "index.html"
+    if not path.exists():
+        return
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    match = re.search(r"const APP_VERSION = '(\d+)\.(\d+)\.(\d+)';", text)
+    if not match:
+        fail("index.html: APP_VERSION declaration not found", errors)
+        return
+    label = f"V{match.group(1)}.{match.group(2)}{match.group(3)}"
+    for expected in (f"Demo {label}", f"ROLE // {label}", f"Role-Based Medical Command System {label}"):
+        if expected not in text:
+            fail(
+                f"index.html: visible label '{expected}' missing - bump it with APP_VERSION "
+                f"'{match.group(1)}.{match.group(2)}.{match.group(3)}'",
+                errors,
+            )
 
 
 def is_external_link(target: str) -> bool:
@@ -117,8 +142,8 @@ DOMAIN_RULES_FACTORY_MARKER = "function buildDomainRules() {"
 def extract_domain_rules_factory_body(text: str, rel: str, errors: list[str]) -> str | None:
     """Pull the body of buildDomainRules() out of a file's text.
 
-    Both src/domain/rules.js and the copy inlined into index.html /
-    demo/rescue-app.html define the exact same factory function; this is how
+    Both src/domain/rules.js and the copy inlined into index.html define the
+    exact same factory function; this is how
     the app avoids a build step while still having one tested module. If the
     inlined copy and the standalone file ever diverge (as happened once
     already, silently, with the SABCDE airway branch) the app's real
@@ -160,7 +185,7 @@ def check_domain_rules_sync(errors: list[str]) -> None:
         return
     canonical_norm = normalize_js_body(canonical_body)
 
-    for rel in ["index.html", "demo/rescue-app.html"]:
+    for rel in ["index.html"]:
         path = ROOT / rel
         if not path.exists():
             continue
@@ -340,6 +365,7 @@ def main() -> int:
     errors: list[str] = []
     check_required_paths(errors)
     check_html_files(errors)
+    check_version_labels(errors)
     check_markdown_links(errors)
     check_domain_rules_sync(errors)
     check_event_contract(errors)

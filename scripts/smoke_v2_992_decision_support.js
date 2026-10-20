@@ -1,8 +1,9 @@
 ﻿const fs = require('fs');
 const path = require('path');
+const { assertVersionLabels } = require('./lib/smoke_version');
 
 const root = path.resolve(__dirname, '..');
-const files = ['index.html', path.join('demo', 'rescue-app.html')];
+const files = ['index.html'];
 
 function assert(condition, message) {
   if (!condition) {
@@ -23,12 +24,8 @@ for (const rel of files) {
   const engine = section(html, 'const DecisionSupportEngine=(()=>', 'function renderRecommendationCard');
   const pcBoard = section(html, 'function renderPcNowTaskBoard', 'function renderPcMedicLoadBoard');
   const ccHero = section(html, 'function renderCcHeroDashboard', 'function renderCcCommandBoard');
-  const demoScenario = section(html, 'function loadDemoScenario', 'function activateSignedDemoScenario');
 
-  assert(html.includes("const APP_VERSION = '2.99.16';"), `${rel}: APP_VERSION must be Demo V2.9916`);
-  assert(html.includes('Demo V2.9916'), `${rel}: launcher label must be Demo V2.9916`);
-  assert(html.includes('ROLE // V2.9916'), `${rel}: role header must be Demo V2.9916`);
-  assert(html.includes('Role-Based Medical Command System V2.9916'), `${rel}: role system strip must be Demo V2.9916`);
+  assertVersionLabels(html, rel);
   assert(!html.includes('Demo V3.0') && !html.includes("const APP_VERSION = '3.0.0';"), `${rel}: V3.0 must not be present`);
 
   assert(html.includes('const RECOMMENDATION_ACK_KEY'), `${rel}: recommendation ACK storage key missing`);
@@ -74,11 +71,9 @@ for (const rel of files) {
   assert(ccHero.includes('Top 3 Recommendations — מ״פ רפואה'), `${rel}: CC Top 3 recommendation panel missing`);
   assert(ccHero.includes('מ״פ רפואה — החלטות עכשיו'), `${rel}: CC hero title missing`);
 
-  assert(demoScenario.includes('tourniquet:{limb') && demoScenario.includes('minutesAgo(42)'), `${rel}: demo scenario must trigger tourniquet overdue`);
-  assert(demoScenario.includes('deterioration:['), `${rel}: demo scenario must trigger patient deterioration`);
-  assert(demoScenario.includes("resourceType:'paramedic'") && demoScenario.includes('minutesAgo(8)'), `${rel}: demo scenario must trigger doctor/paramedic gap`);
-  assert(demoScenario.includes("reasonCodes:['red_patient','tourniquet','evac_delay']"), `${rel}: demo scenario must trigger evacuation delay`);
-  assert(demoScenario.includes('pcTruckStock={...PC_TRUCK_BASELINE') && demoScenario.includes('tourniquets:4'), `${rel}: demo scenario must trigger supply burn`);
+  // The fixture scenario that used to trigger every engine rule was removed with the hardcoded
+  // patients (V2.99.24), so invented casualties never show next to real ones.
+  assert(!html.includes('function loadDemoScenario'), `${rel}: the fixture demo scenario must stay removed`);
 
   assert(html.includes('function startNewPatient('), `${rel}: legacy startNewPatient missing`);
   assert(html.includes('function guardedNewPatient('), `${rel}: legacy guardedNewPatient missing`);

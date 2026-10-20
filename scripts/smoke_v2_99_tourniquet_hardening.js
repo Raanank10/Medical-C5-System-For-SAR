@@ -1,11 +1,9 @@
 ﻿const fs = require('fs');
 const path = require('path');
+const { assertVersionLabels } = require('./lib/smoke_version');
 
 const root = path.resolve(__dirname, '..');
-const files = [
-  path.join(root, 'index.html'),
-  path.join(root, 'demo', 'rescue-app.html')
-];
+const files = [path.join(root, 'index.html')];
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -34,7 +32,7 @@ for (const file of files) {
     html.indexOf('function setBreathingAfterAirway')
   );
 
-  assert(html.includes("const APP_VERSION = '2.99.16';"), `${rel}: APP_VERSION must be V2.9916`);
+  assertVersionLabels(html, rel);
   assert(!html.includes('Demo V3.0') && !html.includes("const APP_VERSION = '3.0.0';"), `${rel}: V3.0 label/version must not be present`);
   assert(sweep.includes('M — דימום מסכן חיים') || sweep.includes('דימום מסכן חיים'), `${rel}: corrected hemorrhage block title missing`);
   assert(sweep.includes("right_arm:'יד ימין'") && sweep.includes("left_arm:'יד שמאל'") && sweep.includes("right_leg:'רגל ימין'") && sweep.includes("left_leg:'רגל שמאל'"), `${rel}: sweep TQ block must use current limb vocabulary`);
