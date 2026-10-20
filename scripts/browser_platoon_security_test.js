@@ -1,10 +1,12 @@
-// Real-browser test of the platoon security scope's client side (database/045, V2.99.33): CC, PC
-// and medic phones share one fake backend in this Node process (same harness as
-// scripts/browser_medic_assignment_test.js). The fake enforces the database/045 rules the client
-// depends on: no self-join for pc/medic/paramedic without access; list_open_incidents scoped;
-// profiles readable by a PC only for itself and its own platoon; memberships written by a PC only
-// for its own platoon's medics in incidents it belongs to; set_platoon_commander() for
-// company-level command only. The SQL itself was exercised against a real Postgres separately.
+// Real-browser test of the platoon security scope's client side (database/045, V2.99.33; platoons
+// as real units since database/051, V2.99.37): CC, PC, RPC and medic phones share one fake backend
+// in this Node process (same harness as scripts/browser_medic_assignment_test.js). The fake
+// enforces the database/051 rules the client depends on: a pc / rpc reaches its own platoon's
+// sites and the ones it belongs to; no self-join elsewhere; list_open_incidents scoped; profiles
+// readable by a PC only for itself and its own platoon; memberships written by a PC only for its
+// own platoon's medics; create_platoon / set_profile_platoon / set_incident_platoon for
+// company-level command only. The SQL itself was exercised against the live database inside
+// rolled-back transactions (docs/RLS_AUDIT_v1.md, database/051 follow-up).
 //
 // Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
 // Run: npm install && node scripts/browser_platoon_security_test.js
@@ -22,6 +24,9 @@ const PC1 = '22222222-2222-4222-8222-222222222222';
 const PC2 = '44444444-4444-4444-8444-444444444444';
 const M1 = '11111111-1111-4111-8111-111111111111';
 const M2 = '55555555-5555-4555-8555-555555555555';
+const RPC1 = '66666666-6666-4666-8666-666666666666';
+const PLA = 'aaaaaaaa-0000-4000-8000-00000000000a';
+const PLB = 'bbbbbbbb-0000-4000-8000-00000000000b';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -33,23 +38,25 @@ const USERS = {
   'pc2@test': { id: PC2, role: 'pc', display_name: 'חוג"ד ב' },
   'm1@test': { id: M1, role: 'medic', display_name: 'חובש א' },
   'm2@test': { id: M2, role: 'medic', display_name: 'חובש ב' },
+  'rpc1@test': { id: RPC1, role: 'rpc', display_name: 'מ"מ א' },
 };
 const COMPANY = ['cc', 'chamal', 'admin', 'physician'];
-const BLANKET = ['cc', 'chamal', 'admin', 'rpc', 'rcc', 'physician'];
+const BLANKET = ['cc', 'chamal', 'admin', 'rcc', 'physician'];
 const userById = (id) => Object.values(USERS).find((u) => u.id === id);
 
 function newServer() {
   const now = new Date().toISOString();
   return {
     incidents: [
-      { id: INC1, visual_id: 'INC-PLT-A', status: 'active', location_name: 'מוקד מחלקה א', address: null, incident_type: null, metadata: {} },
-      { id: INC2, visual_id: 'INC-PLT-B', status: 'active', location_name: 'מוקד מחלקה ב', address: null, incident_type: null, metadata: {} },
+      { id: INC1, visual_id: 'INC-PLT-A', status: 'active', location_name: 'מוקד מחלקה א', address: null, incident_type: null, metadata: {}, platoon_id: PLA },
+      { id: INC2, visual_id: 'INC-PLT-B', status: 'active', location_name: 'מוקד מחלקה ב', address: null, incident_type: null, metadata: {}, platoon_id: PLB },
     ],
     members: [
       { incident_id: INC1, profile_id: PC1, role_at_incident: 'pc', assigned_by: PC1, created_at: now },
       { incident_id: INC2, profile_id: PC2, role_at_incident: 'pc', assigned_by: PC2, created_at: now },
     ],
-    roster: { [M1]: PC1, [M2]: null }, // M2 starts without a platoon
+    platoons: [{ id: PLA, name: 'מחלקה א', is_active: true }, { id: PLB, name: 'מחלקה ב', is_active: true }],
+    roster: { [PC1]: PLA, [M1]: PLA, [RPC1]: PLA, [PC2]: PLB, [M2]: null }, // M2 starts without a platoon
   };
 }
 function handle(server, req) {
@@ -60,7 +67,9 @@ function handle(server, req) {
     && Object.entries(req.in || {}).every(([c, v]) => v.includes(row[c]))
     && (req.notNull || []).every((c) => row[c] != null);
   const member = (incId, uid = u.id) => server.members.some((m) => m.incident_id === incId && m.profile_id === uid);
-  const canSee = (inc) => BLANKET.includes(u.role) || member(inc.id);
+  const myPlatoon = server.roster[u.id] || null;
+  const canSee = (inc) => BLANKET.includes(u.role) || member(inc.id)
+    || (['pc', 'rpc'].includes(u.role) && !!myPlatoon && inc.platoon_id === myPlatoon);
   const denied = (msg) => ({ data: null, error: { code: '42501', message: msg } });
   if (req.kind === 'rpc') {
     const p = req.params || {};
@@ -68,24 +77,36 @@ function handle(server, req) {
       return { data: clone(server.incidents.filter((i) => i.status === 'active' && canSee(i)).map((i) => ({ ...i, patient_count: 0, is_member: member(i.id) }))), error: null };
     }
     if (req.name === 'join_incident') {
-      if (['pc', 'medic', 'paramedic'].includes(u.role) && !canSee(server.incidents.find((i) => i.id === p.p_incident_id) || {})) return denied('assignment required');
+      if (['pc', 'rpc', 'medic', 'paramedic'].includes(u.role) && !canSee(server.incidents.find((i) => i.id === p.p_incident_id) || {})) return denied('assignment required');
       if (!member(p.p_incident_id)) server.members.push({ incident_id: p.p_incident_id, profile_id: u.id, role_at_incident: u.role, assigned_by: u.id, created_at: new Date().toISOString() });
       return { data: { id: p.p_incident_id }, error: null };
     }
-    if (req.name === 'set_platoon_commander') {
+    if (req.name === 'create_platoon') {
       if (!COMPANY.includes(u.role)) return denied('only company-level command');
-      server.roster[p.p_profile_id] = p.p_pc_id;
+      const row = { id: 'cccccccc-0000-4000-8000-' + String(server.platoons.length).padStart(12, '0'), name: p.p_name, is_active: true };
+      server.platoons.push(row);
+      return { data: { id: row.id, name: row.name }, error: null };
+    }
+    if (req.name === 'set_profile_platoon') {
+      if (!COMPANY.includes(u.role)) return denied('only company-level command');
+      server.roster[p.p_profile_id] = p.p_platoon_id;
       return { data: { profile_id: p.p_profile_id }, error: null };
+    }
+    if (req.name === 'set_incident_platoon') {
+      if (!COMPANY.includes(u.role) && u.role !== 'rcc') return denied('only company-level command');
+      server.incidents.find((i) => i.id === p.p_incident_id).platoon_id = p.p_platoon_id;
+      return { data: { incident_id: p.p_incident_id }, error: null };
     }
     if (req.name === 'get_incident_command_state') { const inc = server.incidents.find((i) => i.id === p.p_incident_id); return { data: inc ? { incident_id: inc.id, status: inc.status, state_json: {} } : null, error: null }; }
     return { data: null, error: null };
   }
   if (req.table === 'profiles') {
-    let rows = Object.values(USERS).map((x) => ({ id: x.id, role: x.role, display_name: x.display_name, is_active: true, platoon_commander_id: server.roster[x.id] || null }));
-    if (!COMPANY.includes(u.role)) rows = rows.filter((r) => r.id === u.id || (u.role === 'pc' && r.platoon_commander_id === u.id));
+    let rows = Object.values(USERS).map((x) => ({ id: x.id, role: x.role, display_name: x.display_name, is_active: true, platoon_id: server.roster[x.id] || null }));
+    if (!COMPANY.includes(u.role)) rows = rows.filter((r) => r.id === u.id || (u.role === 'pc' && !!myPlatoon && r.platoon_id === myPlatoon));
     rows = rows.filter(match);
     return { data: req.single ? (rows[0] || null) : rows, error: null };
   }
+  if (req.table === 'platoons') return { data: clone(server.platoons), error: null };
   if (req.table === 'incidents') {
     const visible = server.incidents.filter((i) => canSee(i) && match(i));
     if (req.op === 'update') { visible.forEach((i) => Object.assign(i, clone(req.payload))); return { data: visible.map((i) => ({ id: i.id })), error: null }; }
@@ -97,7 +118,8 @@ function handle(server, req) {
       const r = clone(req.payload);
       const target = userById(r.profile_id);
       const pcOk = u.role === 'pc' && r.profile_id !== u.id && ['medic', 'paramedic'].includes(target?.role)
-        && member(r.incident_id) && server.roster[r.profile_id] === u.id;
+        && (member(r.incident_id) || server.incidents.find((i) => i.id === r.incident_id)?.platoon_id === myPlatoon)
+        && !!myPlatoon && server.roster[r.profile_id] === myPlatoon;
       if (!COMPANY.includes(u.role) && !pcOk) return denied('new row violates row-level security policy');
       const ex = server.members.find((m) => m.incident_id === r.incident_id && m.profile_id === r.profile_id);
       if (ex) Object.assign(ex, r); else server.members.push({ created_at: new Date().toISOString(), ...r });
@@ -192,22 +214,42 @@ async function checkFile(browser, file) {
   assert(pc2.toasts.some((t) => t.includes('נדרש שיבוץ')), `${rel}: a refused join must say an assignment is needed (got ${JSON.stringify(pc2.toasts)})`);
   assert(!SERVER.members.some((m) => m.incident_id === INC1 && m.profile_id === PC2), `${rel}: no membership may be created by a refused join`);
 
-  // CC: roster panel places M2 in PC1's platoon; CC can assign PC2 into PC1's site.
+  // RPC1 (platoon A, no membership): reaches its platoon's site only (database/051).
+  const rpc1 = await openPhone(context, file);
+  await login(rpc1.page, 'rpc1@test');
+  const rpcListed = await rpc1.page.evaluate(async () => { await refreshOpenIncidents(); return (_openIncidents || []).map((i) => i.id); });
+  assert(rpcListed.includes(INC1) && !rpcListed.includes(INC2), `${rel}: RPC must see exactly its platoon's site (got ${JSON.stringify(rpcListed)})`);
+  await rpc1.page.evaluate((id) => enterIncidentFromPicker(id), INC1);
+  await rpc1.page.waitForTimeout(300);
+  await rpc1.page.evaluate(() => pullIncidentAssignmentState());
+  assert(await rpc1.page.evaluate(() => _myPlatoonId === null ? 'none' : platoonName(_myPlatoonId)) === 'מחלקה א', `${rel}: RPC must know its platoon`);
+
+  // CC: roster panel creates a platoon, places M2 in platoon A, shows the site's platoon; CC can
+  // assign PC2 into PC1's site; the CC dashboard lists the real platoons, not the demo ones.
   const cc = await openPhone(context, file);
   await login(cc.page, 'cc@test');
   await cc.page.evaluate((id) => enterIncidentFromPicker(id), INC1);
   await cc.page.waitForTimeout(300);
   await cc.page.evaluate(() => startRoleDashboard('cc'));
-  await cc.page.waitForSelector('[data-roster-medic]', { timeout: 5000 });
-  await cc.page.selectOption(`[data-roster-medic="${M2}"]`, PC1);
+  await cc.page.waitForSelector('[data-roster-member]', { timeout: 5000 });
+  assert(await cc.page.inputValue(`[data-incident-platoon="${INC1}"]`) === PLA, `${rel}: the roster panel must show the site's platoon`);
+  await cc.page.fill('#new-platoon-name', 'מחלקה ג');
+  await cc.page.evaluate(() => createPlatoonFromPanel());
   await cc.page.waitForTimeout(300);
-  assert(SERVER.roster[M2] === PC1, `${rel}: CC roster change must reach the server`);
+  assert(SERVER.platoons.some((p) => p.name === 'מחלקה ג'), `${rel}: CC must be able to create a platoon`);
+  await cc.page.waitForSelector(`[data-roster-member="${M2}"]`, { timeout: 5000 });
+  await cc.page.selectOption(`[data-roster-member="${M2}"]`, PLA);
+  await cc.page.waitForTimeout(300);
+  assert(SERVER.roster[M2] === PLA, `${rel}: CC roster change must reach the server`);
+  const ccPlatoons = await cc.page.evaluate(() => commandPlatoons().map((p) => p.name));
+  assert(ccPlatoons.includes('מחלקה א') && ccPlatoons.includes('מחלקה ב') && ccPlatoons.includes('מחלקה ג') && !ccPlatoons.includes('מחלקה רפואית א'),
+    `${rel}: CC must see the real platoons, not the demo list (got ${JSON.stringify(ccPlatoons)})`);
   const ccOptions = await cc.page.evaluate(async () => { await loadRealMedicProfiles(); return _realMedicProfiles.map((p) => p.role); });
   assert(ccOptions.includes('pc'), `${rel}: CC must be offered PC accounts to assign`);
   await cc.page.evaluate((id) => assignRealMedic(id, '', ''), PC2);
   assert(SERVER.members.some((m) => m.incident_id === INC1 && m.profile_id === PC2 && m.assigned_by === CC), `${rel}: CC must be able to assign a PC to a site`);
 
-  // PC1: sees only its own platoon to assign; cannot change the roster.
+  // PC1: sees only its own platoon to assign; cannot change the roster; sees its platoon's name.
   const pc1 = await openPhone(context, file);
   await login(pc1.page, 'pc1@test');
   await pc1.page.evaluate((id) => enterIncidentFromPicker(id), INC1);
@@ -219,8 +261,11 @@ async function checkFile(browser, file) {
   assert(!(await pc1.page.evaluate(() => canManagePlatoonRoster())), `${rel}: a PC must not be offered the roster panel`);
   await pc1.page.evaluate(() => startRoleDashboard('pc'));
   assert(await pc1.page.locator('#platoon-roster-panel').count() === 0, `${rel}: no roster panel on the PC dashboard`);
+  const pcBody = await pc1.page.locator('#role-dashboard-body').innerText();
+  const myRow = pcBody.split('\n').findIndex((l) => l.includes('המחלקה שלי'));
+  assert(myRow >= 0 && pcBody.split('\n').slice(myRow, myRow + 3).join(' ').includes('מחלקה א'), `${rel}: the PC dashboard must name its platoon`);
 
-  const errors = [...pc2.errors, ...cc.errors, ...pc1.errors];
+  const errors = [...pc2.errors, ...rpc1.errors, ...cc.errors, ...pc1.errors];
   assert(errors.length === 0, `${rel}: page errors: ${errors.join(' | ')}`);
   await context.close();
   console.log(`${rel}: platoon security scope browser test passed`);

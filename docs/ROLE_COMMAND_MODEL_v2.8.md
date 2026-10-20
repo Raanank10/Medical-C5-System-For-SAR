@@ -10,6 +10,8 @@ Rescue command and medical command are different chains of authority that both o
 
 Tactical picture for their own platoon only: tag, triage color, zone, trapped/mobile status, evac status, patient identity (full name once reported/confirmed, otherwise the physical description used to locate an unidentified patient), and which medic is responsible (callsign only, never full name). No vitals, treatment, or mechanism of injury — this role never needs clinical detail to do its job, but it does need to know which physical person in the field is which patient, which is why identity (unlike vitals/treatment/mechanism) is in scope. See "Evacuation order visibility" below.
 
+**Enforced by the database since `database/051` (V2.99.37).** An RPC reaches only its own platoon's sites (plus any it opened or was assigned to), and RPC and RCC read only tactical event types: vitals, medication, treatment, injury and the MIST handover summary are hidden from both. Before `051` both rules existed only on the screen. See "Platoons (one company)" below.
+
 RPC does **not** submit medical reinforcement or resupply requests — that stays with חוג״ד/מ״פ רפואה.
 
 RPC **can**:
@@ -96,7 +98,7 @@ Known limits:
 - **Handover** ("הועבר למד״א — עכשיו") opens a short sheet: destination hospital (free text with suggestions) and MDA's classification (קל / נפגע חרדה / בינוני / קשה / אנוש / נקבע מותו). Both are optional, because they are often unknown at handover. The confirm button is the same one-tap handover.
 - **Later update** of destination / MDA classification: pc, cc, chamal, physician, admin (`PATIENT_EVACUATION_UPDATED`), from the patient card or the board's "עדכן" button. A medic or paramedic records them only at handover. The update never changes triage or status. If MDA's classification differs from field triage, the board shows "⚠ שונה ממיון שדה" for information only.
 - **Casualty board by location** ("לוח נפגעים לפי מיקום"): on the PC and CC role dashboards and the command screen panel, with the same scope as the command screen (below). For each site it shows casualties on scene grouped by zone, evacuated casualties grouped by destination with MDA's classification, the initial-evacuation counter and external-report totals per source. An unknown zone or destination is shown as such, never hidden. Zones now sync between phones (`PATIENT_LOCATION_UPDATED`).
-- **Command scope follows the hierarchy** (decided with the repo owner): מ״פ רפואה (company) is senior to חוג״ד (platoon). On the command screen the CC, חמ״ל and other command roles see every site, including the "all sites" tab. The PC sees only its own platoon's site (demo: PLT-A = SITE_A, PLT-B = SITE_B), cannot switch to another platoon's site, and sees only that site's reinforcement requests and its own platoon's recommendations, as its role dashboard already did. Before V2.99.33 this was inverted: the PC saw every site and the CC was pinned to one. Signed in, only the active incident is loaded as a site, so the PC's scope is that incident. Since `database/045` this is also a server-side security scope: a PC reaches only incidents it opened or was assigned to (plus its own platoon's medic drafts, which it confirms), cannot self-join another platoon's site, and assigns only its own platoon's medics. The CC (and chamal/physician/admin) keeps every incident, assigns PCs to sites, and manages the platoon roster from the "מחלקות — שיוך חובשים לחוג״ד" panel on its dashboard. Medics and paramedics also enter only incidents they were assigned to or drafted.
+- **Command scope follows the hierarchy** (decided with the repo owner): מ״פ רפואה (company) is senior to חוג״ד (platoon). On the command screen the CC, חמ״ל and other command roles see every site, including the "all sites" tab. The PC sees only its own platoon's site (demo: PLT-A = SITE_A, PLT-B = SITE_B), cannot switch to another platoon's site, and sees only that site's reinforcement requests and its own platoon's recommendations, as its role dashboard already did. Before V2.99.33 this was inverted: the PC saw every site and the CC was pinned to one. Signed in, only the active incident is loaded as a site, so the PC's scope is that incident. Since `database/045` this is also a server-side security scope: a PC reaches only incidents it opened or was assigned to (plus its own platoon's medic drafts, which it confirms), cannot self-join another platoon's site, and assigns only its own platoon's medics. The CC (and chamal/physician/admin) keeps every incident, assigns PCs to sites, and manages the platoon roster from the "מחלקות — שיוך חובשים לחוג״ד" panel on its dashboard. Medics and paramedics also enter only incidents they were assigned to or drafted. Since `database/051` (V2.99.37) a platoon is a real unit with its own site list: see "Platoons (one company)" below.
 - **External reports** add איחוד הצלה (United Hatzalah) as a source, with ידידים (Yedidim) kept separate, and איחוד הצלה is also on the initial-evacuation source chips. Reports from pc/cc/chamal/physician/admin sync to `external_reports` and appear on every command device. Other roles keep them on their own device, as before.
 
 ## Casualties evacuated before the medical force arrived (V2.99.36)
@@ -109,6 +111,17 @@ Requested by the repo owner: casualties who left the site before any medical sta
 - Each device shows who entered the report and who last changed it.
 - chamal, rpc, rcc and logistics see the report where their screens already show site counters but cannot write it.
 - The "expected number" of casualties (requirement 3) was deferred by the repo owner.
+
+## Platoons (one company) (V2.99.37)
+
+Decided with the repo owner on 2026-10-20.
+
+- **One company.** מ״פ רפואה, חמ״ל, the physician, admin and מ״פ חילוץ span every platoon. There is no companies table.
+- **A platoon is one shared site team:** its חוג״ד (pc), its מ״מ (rpc) and its medics/paramedics. The medical and rescue chains point at the same platoon, so "my platoon's site" means the same site for both.
+- **A site belongs to at most one platoon.** A site opened by a platoon member belongs to that member's platoon. A pc confirming a draft with no platoon makes it its platoon's site. Company-level command (and מ״פ חילוץ) can move a site to another platoon.
+- **Who sees what:** a pc and an rpc see their own platoon's sites plus any they opened or were assigned to. מ״פ חילוץ sees every site. A medic still enters only sites it was assigned to or drafted.
+- **Who manages platoons:** only company-level command (מ״פ רפואה, חמ״ל, physician, admin), from the "מחלקות — שיוך חוג״ד, מ״מ וחובשים" panel on the CC dashboard: create a platoon, place each pc / rpc / medic / paramedic in one, set the current site's platoon. Every change is kept in an audit log.
+- **Signed in, the CC dashboard's platoon tiles are the real platoons.** Because only the active site is loaded, its patients all count under that site's platoon. A site with no platoon shows under "ללא מחלקה", never hidden. Local demo mode keeps the fictional PLT-A / PLT-B.
 
 ## PC can go hands-on
 

@@ -239,6 +239,41 @@ The rest of `047` (`high_risk_override_insert`, `death_confirmations_insert`, an
 
 The rest of `047` and all of `048` were applied by the owner and verified live on 2026-10-19, again by role impersonation in one block forced to roll back (no data left behind): admin created a patient and set triage red; admin inserted into `death_confirmations` and `high_risk_override_confirmations` (both ALLOWED); a physician then set the same patient yellow one minute later, inside the 5-minute window, and the projected triage stayed red (admin rank 6 beats physician 5) with one `conflict_log` row recording the override. `project_patient_state()` and `app.role_authority_rank()` remain non-executable by `authenticated`. `get_advisors` (security) unchanged: the same pre-existing items listed above.
 
+## Follow-up: platoons and rescue-chain scope (`database/051`)
+
+Asked by the repo owner on 2026-10-20 ("add platoons but one company, check all"); decisions: a platoon is one shared site team (pc, rpc, medics/paramedics), rpc sees only its own platoon's sites, and the rescue chain is blocked from clinical data in the database.
+
+**Measured live before the change** (read-only, rpc account impersonated with `set local role authenticated` + JWT claims): with no incident membership the rpc read all 5 incidents, all 5 patients, all 29 events (including 3 `VITALS_RECORDED` / `MEDICATION_ADMINISTERED` / `INTERVENTION_RECORDED`), 1 row of `vw_patient_latest_vitals` and 2 of `vw_patient_treatment_history`. `PATIENT_HANDED_OVER` payloads carry a MIST summary with HR/RR/AVPU and treatments (`index.html`, handover), so the block has to cover more than the obvious vitals types.
+
+**Policy shape.** An allowlist, not a denylist, on `events_read_authenticated` for rpc/rcc: a new event type stays hidden from rescue until someone decides otherwise. Own events stay readable. The two clinical views are `security_invoker`, so they follow the events policy with no change of their own. The `sync-log` GET runs with the caller's JWT, so the pull is covered too.
+
+**Verified on the live database before merge**, in three transactions that each ended with a raised error (nothing persisted; checked afterwards that no table, column or function definition remained). Fixtures: two platoons, pc + rpc + one medic in A, one medic in B, `TEST-INC-A` in A, an active incident in B.
+
+| Check | Result |
+| --- | --- |
+| rpc (platoon A, no membership): incidents visible | 1 (was 5) |
+| rpc: clinical events / clinical view rows | 0 / 0+0 (was 3 / 1+2) |
+| rpc: non-clinical events of its site | 11 |
+| rpc: join the other platoon's site; set a site's platoon | both refused |
+| rpc opens a site | site gets platoon A |
+| rcc: incidents / clinical events | 5 / 0 |
+| pc (A): clinical events | 3 (unchanged) |
+| pc: profiles readable | 3 (its platoon), other platoon's medic 0 |
+| pc: may assign own medic / other platoon's medic | true / false |
+| pc: change roster, move a site to another platoon, create platoon, write `platoon_audit`, rename | all refused |
+| medic (A) drafts a site; pc (A) lists and confirms it | draft gets platoon A; listed; confirmed |
+| paramedic with no platoon drafts; pc (A) | not visible |
+| cc: create / rename platoon, place a medic, move a site; duplicate name; place a logistics officer | succeed; duplicate refused; logistics refused |
+| `set_platoon_commander()` (045 wrapper) | places the medic in that pc's platoon |
+| role change to a non-platoon role | platoon cleared, audited |
+| `platoon_audit` update | refused (append-only) |
+
+**Gap found by the test and fixed in the file:** a draft that company command moved to platoon B stayed visible to platoon A's pc, because 045's drafter rule did not look at the site's platoon. The drafter rule now applies only while `incidents.platoon_id` is null; re-verified (visible before the move, hidden after).
+
+**Not covered** (documented, not fixed): `patients.pulse_present`, `breathing_present` and `injury_zones` stay readable to rpc/rcc on patients they can reach. Hiding single columns per role needs a view or RPC for the rescue read path, not RLS. `watchdog_alerts` rows stay readable to rpc/rcc (alert type and timing, no values).
+
+**Not applied live yet.** After applying: run `get_advisors` (security), and repeat the rpc row of the table with the real rpc account.
+
 ## Explicitly not re-litigated here
 
 - T6 (leaked-password protection) and T5 (service-role key handling) — out of scope, not RLS/authorization, already tracked in `docs/THREAT_MODEL.md`.

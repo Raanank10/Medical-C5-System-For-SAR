@@ -68,7 +68,8 @@
     "PATIENT_DEATH_CONFIRMED",
     "PATIENT_EVACUATION_UPDATED",
     "RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE",
-    "RESUPPLY_REQUEST_ESCALATED_CC"
+    "RESUPPLY_REQUEST_ESCALATED_CC",
+    "SITE_PRE_EVACUATION_REPORTED"
   ],
   "local_only": {
     "Patient-card timeline entry shown on this device only; the clinical fact itself is sent by a synced event or is display text": [

@@ -2859,7 +2859,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.36';
+const APP_VERSION = '2.99.37';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3056,6 +3056,59 @@ const DEMO_PLATOONS = [
 // the active incident exists as SITE_A, so the PC's scope is that incident.
 const PLATOON_SITE = Object.freeze({'PLT-A':'SITE_A', 'PLT-B':'SITE_B'});
 let pcPlatoonId='PLT-A';
+// ── Real platoons (database/051, V2.99.37) ──
+// Signed in, the command views use the server's platoons instead of DEMO_PLATOONS. There is one
+// company, so every platoon belongs to it. Only the active incident is loaded as a site, so every
+// loaded patient belongs to that incident's platoon; a site with no platoon yet is shown under
+// "ללא מחלקה", never hidden. Before 051 is applied the platoons read fails and the demo list stays.
+const NO_PLATOON_ID='__no_platoon__';
+let _realPlatoons=null;      // [{id,name,is_active}] signed in once 051 is applied; null otherwise
+let _realPlatoonMembers=[];  // company-level command: everyone in a platoon; pc: its own platoon (RLS)
+let _myPlatoonId=null;
+let _activeIncidentPlatoonId=null;
+function usingRealPlatoons(){ return !!currentUser && Array.isArray(_realPlatoons); }
+function patientPlatoonId(p){
+  if(!usingRealPlatoons()) return p.assignedPlatoonId||'PLT-A';
+  return _activeIncidentPlatoonId||NO_PLATOON_ID;
+}
+function commandPlatoons(){
+  if(!usingRealPlatoons()) return DEMO_PLATOONS;
+  const list=_realPlatoons.filter(p=>p.is_active || p.id===_activeIncidentPlatoonId)
+    .map(p=>({platoonId:p.id, name:p.name, companyId:'COMP-1', real:true}));
+  if(patients.some(p=>patientPlatoonId(p)===NO_PLATOON_ID)) list.push({platoonId:NO_PLATOON_ID, name:'ללא מחלקה', companyId:'COMP-1', real:true});
+  return list;
+}
+function platoonMembers(platoonId, roles){
+  return _realPlatoonMembers.filter(m=>m.platoon_id===platoonId && (!roles || roles.includes(m.role)));
+}
+function platoonCommanderLabel(pl){
+  if(!pl.real) return displayUser(pl.pcId);
+  const pcs=platoonMembers(pl.platoonId,['pc']);
+  return pcs.length ? pcs.map(m=>m.display_name||'חוג״ד').join(', ') : 'לא שובץ';
+}
+function myPlatoonRow(){
+  if(!usingRealPlatoons()) return '';
+  return roleRow('המחלקה שלי', _myPlatoonId ? platoonName(_myPlatoonId) : 'לא שובצת למחלקה · מ״פ רפואה משבץ/ת מחלקות');
+}
+// Separate queries, so a server without database/051 leaves everything else working.
+async function pullRealPlatoons(client){
+  if(!currentUser) return;
+  try{
+    const pl=await client.from('platoons').select('id,name,is_active').order('name');
+    if(pl.error || !Array.isArray(pl.data)){ _realPlatoons=null; return; }
+    _realPlatoons=pl.data;
+    const me=await client.from('profiles').select('platoon_id').eq('id',currentUser.id).single();
+    _myPlatoonId=me.error ? null : (me.data?.platoon_id||null);
+    if(activeIncident){
+      const inc=await client.from('incidents').select('platoon_id').eq('id',activeIncident.id).single();
+      _activeIncidentPlatoonId=inc.error ? null : (inc.data?.platoon_id||null);
+    }else _activeIncidentPlatoonId=null;
+    if(COMPANY_COMMAND_ROLES.has(currentUser.role) || currentUser.role==='pc'){
+      const m=await client.from('profiles').select('id,display_name,role,platoon_id').in('role',['pc','rpc','medic','paramedic']).eq('is_active',true).order('display_name');
+      _realPlatoonMembers=(!m.error && Array.isArray(m.data)) ? m.data : [];
+    }else _realPlatoonMembers=[];
+  }catch(e){}
+}
 const INTERVENTION_SUPPLY = {
   tourniquet:{item:'tourniquets', qty:1},
   bandage:{item:'pressureDressings', qty:1},
@@ -3611,6 +3664,7 @@ async function signOut(){
   const client=getSupabaseClient();
   if(client){ try{ await client.auth.signOut(); }catch(e){} }
   currentUser=null;
+  _realPlatoons=null; _realPlatoonMembers=[]; _myPlatoonId=null;
   deactivateIncidentContext();
   renderAuthStatus();
   goTo('login');
@@ -4630,6 +4684,7 @@ async function runIncidentAssignmentPull(){
   try{
     for(const [incId, w] of Object.entries(_pendingIncidentTypeWrites)) await writeIncidentTypeToServer(incId, w.type, w.role);
     await pullActiveIncidentRow(client);
+    await pullRealPlatoons(client);
     const prevKey=assignmentKey(_myRealAssignment);
     await pullMyAssignment(client);
     const a=_myRealAssignment;
@@ -4732,7 +4787,7 @@ function siteNameById(id){
   return (allSites.find(s=>s.id===id)?.name) || (siteData.name || 'מוקד לא מזוהה');
 }
 function platoonName(id){
-  return (DEMO_PLATOONS.find(p=>p.platoonId===id)?.name) || 'מחלקה לא מזוהה';
+  return (commandPlatoons().find(p=>p.platoonId===id)?.name) || (usingRealPlatoons() && _realPlatoons.find(p=>p.id===id)?.name) || (DEMO_PLATOONS.find(p=>p.platoonId===id)?.name) || 'מחלקה לא מזוהה';
 }
 function minutesSinceIso(value){
   const t=Date.parse(value);
@@ -4771,7 +4826,7 @@ function tacticalPatientRow(p){
   );
 }
 function tacticalPlatoonRollup(platoonId){
-  const pts=patients.filter(p=>(p.assignedPlatoonId||'PLT-A')===platoonId);
+  const pts=patients.filter(p=>patientPlatoonId(p)===platoonId);
   const c={red:0,yellow:0,green:0,black:0,trapped:0};
   pts.forEach(p=>{ if(c[p.triage]!==undefined) c[p.triage]++; if(p.trapStatus==='trapped') c.trapped++; });
   const evacuated=pts.filter(p=>['handed_over','evacuated'].includes(p.patientStatus)).length;
@@ -5190,8 +5245,8 @@ function roleScopedPatients(role){
   if(role==='pc') return sortedPatients(patients.filter(p=>(p.assignedPlatoonId||'PLT-A')===pcPlatoonId));
   if(role==='rpc') return sortedPatients(patients.filter(p=>(p.assignedPlatoonId||'PLT-A')==='PLT-A'));
   if(role==='rcc'){
-    const myPlatoonIds=DEMO_PLATOONS.filter(pl=>pl.companyId==='COMP-1').map(pl=>pl.platoonId);
-    return sortedPatients(patients.filter(p=>myPlatoonIds.includes(p.assignedPlatoonId||'PLT-A')));
+    const myPlatoonIds=commandPlatoons().filter(pl=>pl.companyId==='COMP-1').map(pl=>pl.platoonId);
+    return sortedPatients(patients.filter(p=>myPlatoonIds.includes(patientPlatoonId(p))));
   }
   if(role==='physician') return sortedPatients(patients.filter(p=>['red','black'].includes(p.triage)));
   return sortedPatients(patients);
@@ -5395,7 +5450,7 @@ function focusMatchesPatient(p={}){
   const medicId=p.assignedMedicId||userIdFromMedic(p.medic||p.lastTouchedBy);
   if(f.medicIds?.length && f.medicIds.includes(medicId)) return true;
   if(f.siteIds?.length && f.siteIds.includes(p.siteId||'SITE_A')) return true;
-  if(f.platoonIds?.length && f.platoonIds.includes(p.assignedPlatoonId||'PLT-A')) return true;
+  if(f.platoonIds?.length && f.platoonIds.includes(patientPlatoonId(p))) return true;
   return false;
 }
 function focusMatchesRequest(r={}){
@@ -6265,7 +6320,7 @@ function renderCompanyResourceCenter(openReqs, doctorReqs, deathReqs, blockedEva
 function renderCcResupplyCommandBoard(){
   const escalated=reinforcementRequests.filter(r=>r.type==='resupply' && ['escalated_to_cc','unavailable_at_truck','fulfilled_by_company'].includes(r.status));
   const activeCritical=patients.filter(p=>['red','yellow'].includes(p.triage)).length;
-  const truckRows=DEMO_PLATOONS.map(pl=>{
+  const truckRows=commandPlatoons().map(pl=>{
     const criticalItems=Object.entries(pcTruckStock).filter(([key,value])=>value<=(PC_TRUCK_LOW_THRESHOLDS[key]??1));
     const text=criticalItems.length?criticalItems.map(([key,value])=>`${supplyLabel(key,true)} ${value}`).join(' · '):'מלאי רכב תקין';
     return roleRow(`${pl.name} · רכב חוג״ד`,`${text} · ${activeCritical} אדום/צהוב פעילים בחברה`);
@@ -6318,21 +6373,25 @@ function renderCcPlatoonPanel(pl){
       <div class="panel-sub">${pl.noVitals} ללא מדדים מלאים · ${pl.openReqs} בקשות פתוחות</div>
       <div class="panel-actions">
         <button class="p-btn" onclick='setDashboardFocus(${JSON.stringify(focus).replace(/'/g,'&#39;')})'>מקד</button>
-        <button class="p-btn primary" onclick="demoReassignBetweenPlatoons()">העבר חובש</button>
+        ${pl.real?'':`<button class="p-btn primary" onclick="demoReassignBetweenPlatoons()">העבר חובש</button>`}
       </div>
     </div>
   </div>`;
 }
 function renderCcHeroDashboard(ctx={}){
   const dse=DecisionSupportEngine.forCc();
-  const platoons=DEMO_PLATOONS.map(pl=>{
-    const pts=patients.filter(p=>(p.assignedPlatoonId||'PLT-A')===pl.platoonId);
+  const platoons=commandPlatoons().map(pl=>{
+    const pts=patients.filter(p=>patientPlatoonId(p)===pl.platoonId);
     const red=pts.filter(p=>p.triage==='red').length;
     const trapped=pts.filter(p=>['trapped','access_blocked'].includes(normalizeTrapStatus(p))).length;
     const tqs=pts.reduce((sum,p)=>sum+activeTourniquets(p).length,0);
     const noVitals=pts.filter(p=>assessmentDebtList(p).includes('full_vitals')).length;
-    const openReqs=(reinforcementRequests||[]).filter(r=>isRequestOpen(r) && (r.siteId||'SITE_A')===pl.defaultSiteId).length;
-    const activeMedics=DEMO_USERS.filter(u=>u.role==='medic' && u.active && u.platoonId===pl.platoonId).length;
+    // Signed in, every loaded request belongs to the active incident, so to its platoon.
+    const openReqs=pl.real
+      ? (pl.platoonId===(_activeIncidentPlatoonId||NO_PLATOON_ID) ? (reinforcementRequests||[]).filter(isRequestOpen).length : 0)
+      : (reinforcementRequests||[]).filter(r=>isRequestOpen(r) && (r.siteId||'SITE_A')===pl.defaultSiteId).length;
+    const activeMedics=pl.real ? platoonMembers(pl.platoonId,['medic','paramedic']).length
+      : DEMO_USERS.filter(u=>u.role==='medic' && u.active && u.platoonId===pl.platoonId).length;
     const score=pts.length + red*2 + trapped + tqs + noVitals;
     const status=score>=8?'עמוסה':score<=2?'פנויה':'יציבה';
     return {...pl,pts,red,trapped,tqs,noVitals,openReqs,activeMedics,score,status};
@@ -6410,9 +6469,9 @@ function renderCcCommandBoard(){
   const ineffectiveTqs=tqPatients.flatMap(p=>activeTourniquets(p)).filter(t=>t.status==='ineffective' || t.effectiveness==='bleeding_continues');
   const tqAwaitingEvac=tqPatients.filter(p=>!['evacuating','evacuated','handed_over'].includes(p.patientStatus));
   const blockedEvac=patients.filter(p=>['red','yellow'].includes(p.triage) && !['evacuating','evacuated','handed_over'].includes(p.patientStatus)).length;
-  const overloaded=DEMO_PLATOONS.filter(pl=>patients.filter(p=>(p.assignedPlatoonId||'PLT-A')===pl.platoonId).length>=3).length;
-  const platoonRows=DEMO_PLATOONS.map(pl=>{
-    const pts=patients.filter(p=>(p.assignedPlatoonId||'PLT-A')===pl.platoonId);
+  const overloaded=commandPlatoons().filter(pl=>patients.filter(p=>patientPlatoonId(p)===pl.platoonId).length>=3).length;
+  const platoonRows=commandPlatoons().map(pl=>{
+    const pts=patients.filter(p=>patientPlatoonId(p)===pl.platoonId);
     const red=pts.filter(p=>p.triage==='red').length;
     const yellow=pts.filter(p=>p.triage==='yellow').length;
     const green=pts.filter(p=>p.triage==='green').length;
@@ -6431,7 +6490,7 @@ function renderCcCommandBoard(){
   const shortageItems=logisticsCompanies().flatMap(c=>c.lowItems.map(item=>({company:c,...item}))).filter(item=>focusMatchesLogisticsTask({itemTypes:[item.item],siteIds:[item.company.siteId],urgency:item.qty<=0?'CRITICAL':'MEDIUM'}));
   const shortageRows=shortageItems.map(item=>roleRow(`${item.company.name} · ${SUPPLY_LABELS[item.item]||item.item}`,`${item.qty} נותרו · משפיע על טיפול פעיל אם יש אדום/צהוב במוקד`)).join('');
   const snapshot=[
-    roleMetric(DEMO_PLATOONS.length,'מחלקות פעילות'),
+    roleMetric(commandPlatoons().length,'מחלקות פעילות'),
     roleMetric(allSites.filter(s=>s.id!=='ALL').length,'מוקדים פעילים'),
     roleMetric(patients.filter(p=>['red','yellow'].includes(p.triage)).length,'אדום / צהוב'),
     roleMetric(openReqs.length,'בקשות חוג"ד פתוחות'),
@@ -6460,10 +6519,10 @@ function renderCcCommandBoard(){
     `<span class="identity-chip">לא דחוף · נפרד מתור טיפול רפואי דחוף</span>`
   )).join('');
   const suggestions=[];
-  const overloadedPl=DEMO_PLATOONS.filter(pl=>patients.filter(p=>(p.assignedPlatoonId||'PLT-A')===pl.platoonId).length>=3);
+  const overloadedPl=commandPlatoons().filter(pl=>patients.filter(p=>patientPlatoonId(p)===pl.platoonId).length>=3);
   if(overloadedPl.length) suggestions.push(roleRow(
     `${overloadedPl[0].name} עמוסה`,
-    `${patients.filter(p=>(p.assignedPlatoonId||'PLT-A')===overloadedPl[0].platoonId).length} פצועים · שקול העברת חובש ממחלקה פחות עמוסה`
+    `${patients.filter(p=>patientPlatoonId(p)===overloadedPl[0].platoonId).length} פצועים · שקול העברת חובש ממחלקה פחות עמוסה`
   ));
   const longOpenReq=reinforcementRequests.find(r=>isRequestOpen(r) && r.resourceType==='paramedic' && minutesSinceIso(r.createdAt)>=6);
   if(longOpenReq) suggestions.push(roleRow(
@@ -6488,7 +6547,7 @@ function renderCcCommandBoard(){
     ${renderCcEvacuationFunnel()}
     ${renderCcActiveSitesSnapshot()}
     ${renderCcResupplyCommandBoard()}
-    ${renderCollapsibleSection('cc-platoon-load','עומס מחלקות — אדום/צהוב לפי מחלקה', platoonRows, DEMO_PLATOONS.length)}
+    ${renderCollapsibleSection('cc-platoon-load','עומס מחלקות — אדום/צהוב לפי מחלקה', platoonRows, commandPlatoons().length)}
     ${renderCollapsibleSection('cc-evac-priority','תעדוף פינוי פלוגתי', companyEvacuationPriorityRows(focusFilteredList(patients, focusMatchesPatient)), focusFilteredList(patients, focusMatchesPatient).length, {criticalCount:patients.filter(p=>p.triage==='red'&&!['evacuating','evacuated','handed_over','deceased'].includes(p.patientStatus)).length, emptyMessage:'אין פצועים במיקוד הנוכחי'})}
     ${renderCollapsibleSection('cc-resource-requests','בקשות משאב רפואי פתוחות', reqQueue || renderOperationalEmptyState('אין בקשות במיקוד הנוכחי'), focusedOpenReqs.length, {criticalCount:focusedOpenReqs.filter(isCriticalRequestForFocus).length, emptyMessage:'אין בקשות במיקוד הנוכחי'})}
     ${renderCollapsibleSection('cc-death-queue','תור רופא — קביעת מוות / אישור מוות', deathQueue || renderOperationalEmptyState('אין בקשות במיקוד הנוכחי'), focusedDeathReqs.length, {criticalCount:focusedDeathReqs.length, emptyMessage:'אין בקשות במיקוד הנוכחי'})}
@@ -6550,16 +6609,17 @@ function renderRoleDashboard(role=activeRoleDashboard){
     roleMetric(pts.length, role==='medic'?'הפצועים שלי':role==='pc'?'פצועי המחלקה':role==='rpc'?'פצועי המחלקה (טקטי)':role==='rcc'?'פצועי הפלוגה (טקטי)':'פצועים גלויים'),
     roleMetric(alerts.length, 'התראות לפעולה'),
     roleMetric(requests.filter(isRequestOpen).length, 'בקשות פתוחות'),
-    roleMetric(['cc','rcc'].includes(role)?DEMO_PLATOONS.length:allSites.filter(s=>s.id!=='ALL').length, ['cc','rcc'].includes(role)?'מחלקות':'מוקדים')
+    roleMetric(['cc','rcc'].includes(role)?commandPlatoons().length:allSites.filter(s=>s.id!=='ALL').length, ['cc','rcc'].includes(role)?'מחלקות':'מוקדים')
   ].join('');
   const responsibilities=cfg.responsibilities.map(x=>roleRow(x,'אחריות תפקיד')).join('');
   const alertHtml=alerts.slice(0,8).map(a=>renderAlertCard(a,'commander')).join('');
   let objects='';
   if(role==='pc'){
     const myPts=roleScopedPatients('pc');
-    const medics=DEMO_USERS.filter(u=>u.role==='medic' && u.platoonId==='PLT-A');
+    const medicCount=usingRealPlatoons() ? platoonMembers(_myPlatoonId,['medic','paramedic']).length
+      : DEMO_USERS.filter(u=>u.role==='medic' && u.platoonId==='PLT-A').length;
     objects=[
-      roleRow('חובשים בקריסה',`${medics.length} חובשים זמינים / פעילים במחלקה`),
+      roleRow('חובשים בקריסה',`${medicCount} חובשים זמינים / פעילים במחלקה`),
       roleRow('הפצועים שלי',`${myPts.length} פצועים תחת אחריות חוג"ד · ${myPts.filter(p=>['red','yellow'].includes(p.triage)).length} אדום/צהוב`),
       roleRow('תמונת מצב מוקד',`${siteData.name||'אין מוקד'} · צפי לכודים ${siteData.expectedCasualties?.trapped||0} · נעדרים ${siteData.expectedCasualties?.missing||0}`),
       ...sitesSummaryRows()
@@ -6589,9 +6649,9 @@ function renderRoleDashboard(role=activeRoleDashboard){
   }else if(role==='cc'){
     objects=[
       ...sitesSummaryRows(),
-      ...DEMO_PLATOONS.map(pl=>{
-        const plPts=patients.filter(p=>(p.assignedPlatoonId||'PLT-A')===pl.platoonId);
-        return roleRow(pl.name,`${plPts.length} פצועים · ${plPts.filter(p=>p.triage==='red').length} אדומים · חוג"ד: ${displayUser(pl.pcId)}`);
+      ...commandPlatoons().map(pl=>{
+        const plPts=patients.filter(p=>patientPlatoonId(p)===pl.platoonId);
+        return roleRow(pl.name,`${plPts.length} פצועים · ${plPts.filter(p=>p.triage==='red').length} אדומים · חוג"ד: ${platoonCommanderLabel(pl)}`);
       })
     ].join('');
   }else if(role==='logistics'){
@@ -6603,11 +6663,12 @@ function renderRoleDashboard(role=activeRoleDashboard){
     const c={red:0,yellow:0,green:0,black:0,trapped:0};
     pts.forEach(p=>{ if(c[p.triage]!==undefined) c[p.triage]++; if(p.trapStatus==='trapped') c.trapped++; });
     objects=[
+      myPlatoonRow(),
       roleRow('ספירת מיון — מחלקה שלי',`אדום ${c.red} · צהוב ${c.yellow} · ירוק ${c.green} · שחור ${c.black} · לכודים ${c.trapped}`),
       ...pts.slice(0,10).map(tacticalPatientRow)
     ].join('');
   }else if(role==='rcc'){
-    const myPlatoonIds=DEMO_PLATOONS.filter(pl=>pl.companyId==='COMP-1').map(pl=>pl.platoonId);
+    const myPlatoonIds=commandPlatoons().filter(pl=>pl.companyId==='COMP-1').map(pl=>pl.platoonId);
     objects=myPlatoonIds.map(tacticalPlatoonRollup).join('');
   }else{
     objects=allSites.filter(s=>s.id!=='ALL').map(s=>roleRow(
@@ -6668,9 +6729,10 @@ function renderRoleDashboard(role=activeRoleDashboard){
     ${dashboardFocusBanner()}
     ${role==='cc'?renderCcCommandBoard()+renderExtractedCounterBoard():`<div class="role-top-grid">${metrics}</div>`}
     ${role==='medic'?renderMedicActionPanel():''}
+    ${role==='pc'?myPlatoonRow():''}
     ${role==='pc'?renderPcResponsibilityBoard():''}
     ${['pc','cc'].includes(role)?roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds(role))):''}
-    ${role==='cc'&&canManagePlatoonRoster()?roleSection('מחלקות — שיוך חובשים לחוג״ד', '<div id="platoon-roster-panel" style="font-size:13px;color:var(--muted)">טוען…</div>'):''}
+    ${role==='cc'&&canManagePlatoonRoster()?roleSection('מחלקות — שיוך חוג״ד, מ״מ וחובשים', '<div id="platoon-roster-panel" style="font-size:13px;color:var(--muted)">טוען…</div>'):''}
     ${role==='physician'?renderDoctorLegacyNote():''}
     ${role==='medic'||role==='pc'?'':role==='cc'
       ? `<details style="margin:12px 0 0"><summary style="cursor:pointer;font-weight:900;color:var(--muted);padding:10px 0">פירוט נוסף / אחריות ותורים</summary>${genericSections}</details>`
@@ -6679,38 +6741,63 @@ function renderRoleDashboard(role=activeRoleDashboard){
   if(role==='cc' && canManagePlatoonRoster()) loadPlatoonRoster();
   updateDemoStatus();
 }
-// ── Platoon roster (database/045) ──
-// Which PC each medic/paramedic belongs to. It decides whose drafts a PC sees and confirms, and
-// which medics a PC may assign. Only company-level command changes it (set_platoon_commander()).
+// ── Platoons and roster (database/051, replaces 045's PC-only roster) ──
+// One company, several platoons. Company-level command (cc/chamal/admin/physician) creates
+// platoons, places each pc / rpc / medic / paramedic in one, and sets which platoon works the
+// active site. A platoon's pc and rpc then see that platoon's sites; a pc assigns only its own
+// platoon's medics. Every change is written to platoon_audit on the server.
 function canManagePlatoonRoster(){ return !!currentUser && COMPANY_COMMAND_ROLES.has(currentUser.role); }
-let _platoonRoster=null;
+const PLATOON_MEMBER_ROLE_LABELS={pc:'חוג״ד', rpc:'מ״מ', medic:'חובש', paramedic:'פראמדיק'};
 async function loadPlatoonRoster(){
   const el=document.getElementById('platoon-roster-panel'); if(!el) return;
   const client=getSupabaseClient(); if(!client) return;
-  let res;
-  try{ res=await client.from('profiles').select('id,display_name,role,platoon_commander_id').in('role',['medic','paramedic','pc']).eq('is_active',true).order('display_name'); }
-  catch(e){ res={error:e}; }
+  await pullRealPlatoons(client);
   const target=document.getElementById('platoon-roster-panel'); if(!target) return;
-  if(res.error){ target.textContent='רשימת המחלקות תהיה זמינה אחרי עדכון השרת (database/045).'; return; }
-  _platoonRoster=Array.isArray(res.data) ? res.data : [];
-  const pcs=_platoonRoster.filter(p=>p.role==='pc');
-  const medics=_platoonRoster.filter(p=>p.role!=='pc');
-  if(!medics.length){ target.textContent='אין חשבונות חובש / פראמדיק פעילים.'; return; }
-  target.innerHTML=medics.map(m=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--border)">
-      <span style="color:var(--text);font-weight:700">${escAttr(m.display_name||'ללא שם')}${m.role==='paramedic'?' (פראמדיק)':''}</span>
-      <select data-roster-medic="${escAttr(m.id)}" onchange="setPlatoonCommander('${escAttr(m.id)}', this.value)" style="max-width:55%">
-        <option value="">— ללא מחלקה —</option>
-        ${pcs.map(pc=>`<option value="${escAttr(pc.id)}"${pc.id===m.platoon_commander_id?' selected':''}>${escAttr(pc.display_name||'חוג״ד')}</option>`).join('')}
-      </select>
+  if(!usingRealPlatoons()){ target.textContent='ניהול מחלקות יהיה זמין אחרי עדכון השרת (database/051).'; return; }
+  const platoons=_realPlatoons.filter(p=>p.is_active);
+  const options=sel=>`<option value="">— ללא מחלקה —</option>`+platoons.map(p=>`<option value="${escAttr(p.id)}"${p.id===sel?' selected':''}>${escAttr(p.name)}</option>`).join('');
+  const siteRow=activeIncident?`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0">
+      <span style="color:var(--text);font-weight:900">מחלקה במוקד ${escAttr(incidentDisplayName(activeIncident))}</span>
+      <select data-incident-platoon="${escAttr(activeIncident.id)}" onchange="setIncidentPlatoon(this.value)" style="max-width:55%">${options(_activeIncidentPlatoonId)}</select>
+    </div>`:'';
+  const counts=platoons.map(p=>{
+    const m=platoonMembers(p.id);
+    return `${escAttr(p.name)}: ${m.filter(x=>x.role==='pc').length} חוג״ד · ${m.filter(x=>x.role==='rpc').length} מ״מ · ${m.filter(x=>['medic','paramedic'].includes(x.role)).length} חובשים`;
+  }).join('<br>');
+  const memberRows=_realPlatoonMembers.map(m=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--border)">
+      <span style="color:var(--text);font-weight:700">${escAttr(m.display_name||'ללא שם')} (${PLATOON_MEMBER_ROLE_LABELS[m.role]||m.role})</span>
+      <select data-roster-member="${escAttr(m.id)}" onchange="setProfilePlatoon('${escAttr(m.id)}', this.value)" style="max-width:55%">${options(m.platoon_id)}</select>
     </div>`).join('');
+  target.innerHTML=`
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <input id="new-platoon-name" placeholder="שם מחלקה חדשה" style="flex:1">
+      <button class="demo-mini-btn" onclick="createPlatoonFromPanel()">הוסף מחלקה</button>
+    </div>
+    ${platoons.length?`<div style="margin-bottom:8px">${counts}</div>`:'<div style="margin-bottom:8px">אין מחלקות עדיין. הוסף/י מחלקה ואז שבץ/י אנשים.</div>'}
+    ${siteRow}
+    ${memberRows||'<div>אין חשבונות חוג״ד / מ״מ / חובש / פראמדיק פעילים.</div>'}`;
 }
-async function setPlatoonCommander(profileId, pcId){
-  const client=getSupabaseClient(); if(!client) return;
+async function platoonRpc(name, args, okMsg){
+  const client=getSupabaseClient(); if(!client) return false;
   let r;
-  try{ r=await client.rpc('set_platoon_commander', {p_profile_id:profileId, p_pc_id:pcId||null}); }catch(e){ r={error:e}; }
-  if(r.error){ toast('שיוך למחלקה נכשל · '+(r.error.message||'')); }
-  else toast(pcId ? 'החובש שויך למחלקה' : 'החובש הוסר מהמחלקה');
-  loadPlatoonRoster();
+  try{ r=await client.rpc(name, args); }catch(e){ r={error:e}; }
+  if(r.error){ toast('השינוי לא נשמר בשרת · '+(r.error.message||'')); loadPlatoonRoster(); return false; }
+  toast(okMsg);
+  await loadPlatoonRoster();
+  renderRoleDashboard();
+  return true;
+}
+async function createPlatoonFromPanel(){
+  const name=document.getElementById('new-platoon-name')?.value.trim();
+  if(!name){ toast('הזן/י שם מחלקה'); return; }
+  await platoonRpc('create_platoon', {p_name:name}, `מחלקה "${name}" נוספה`);
+}
+async function setProfilePlatoon(profileId, platoonId){
+  await platoonRpc('set_profile_platoon', {p_profile_id:profileId, p_platoon_id:platoonId||null}, platoonId?'השיבוץ למחלקה נשמר':'הוסר מהמחלקה');
+}
+async function setIncidentPlatoon(platoonId){
+  if(!activeIncident) return;
+  if(await platoonRpc('set_incident_platoon', {p_incident_id:activeIncident.id, p_platoon_id:platoonId||null}, platoonId?'המוקד שויך למחלקה':'המוקד הוצא מהמחלקה')) _activeIncidentPlatoonId=platoonId||null;
 }
 function reassignPatient(patientId, {toMedicId=null, toPlatoonId=null, assignedByRole='pc', reason='הקצאה מחדש'}={}){
   const p=patients.find(x=>x.id===patientId); if(!p) return;
@@ -12221,6 +12308,7 @@ async function activateIncident(inc){
 }
 function deactivateIncidentContext(){
   activeIncident=null;
+  _activeIncidentPlatoonId=null;
   _myRealAssignment=null;
   _activeIncidentRow=null;
   renderAssignmentSwitchBanner();
