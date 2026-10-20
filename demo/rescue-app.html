@@ -2835,7 +2835,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.35';
+const APP_VERSION = '2.99.36';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -7643,6 +7643,7 @@ function recordSweepTreatment(type, meta={}){
   p.unsyncedEvents=(p.unsyncedEvents||0)+1;
   p.lastModifiedAt=new Date().toISOString();
   saveLocalEvent({type:'LIFE_SAVING_TREATMENT_RECORDED',detail:`${p.id} · ${label}`,warn:type==='tourniquet',payload_json:event});
+  queueTreatmentEvent(p.id, type, label, {source:'mstart_sweep'});
   saveDemoState();
   renderMstartSweep();
   if(document.getElementById('screen-commander')?.classList.contains('active')) renderCommander();
@@ -8424,6 +8425,7 @@ function saveImmediateCasualtyAndContinue(){
     syncLegacyTourniquetAlias(p);
     queueTourniquetAppliedEvent(p, p.tourniquets[0], {source:'mstart_immediate'});
   }
+  actions.forEach((key, i)=>queueTreatmentEvent(id, key, actionLabels[i], {source:'mstart_immediate'}));
   saveLocalEvent({type:'IMMEDIATE_FIELD_ASSESSMENT',detail:`${visualId} נפתח בסריקת MSTART`,warn:['red','black'].includes(triage),patient_id:id,payload_json:{triage,site:siteData.name,zone:zoneLabel(),immediate:im,life_saving_actions:actions,tourniquet_limb:isTq?tqLimbLabel:null}});
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   state=freshState(); state.flowMode='quick';
@@ -8478,7 +8480,8 @@ function createImmediateInterventionPatient(kind='tourniquet'){
   // QUICK_PATIENT_CREATED actually creates the server-side patients row; queue it before the
   // treatment event below, which references the same patient_id.
   saveLocalEvent({type:'QUICK_PATIENT_CREATED',detail:`${visualId} נפתח מפעולה מצילת חיים`,warn:false,patient_id:id,payload_json:{visual_id:visualId,triage:'red'}});
-  saveLocalEvent({type:isTq?'TOURNIQUET_APPLIED':'IMMEDIATE_INTERVENTION_RECORDED',detail:label,warn:true,patient_id:id,payload_json:{source:'medic_immediate_action',auto_triage:'red'}});
+  if(isTq) saveLocalEvent({type:'TOURNIQUET_APPLIED',detail:label,warn:true,patient_id:id,payload_json:{source:'medic_immediate_action',auto_triage:'red'}});
+  else queueTreatmentEvent(id, kind, label, {source:'medic_immediate_action', auto_triage:'red'});
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   renderDashboard(); renderAlerts();
   toast(`${label} · ${visualId} נפתח והופיע לחוג"ד`);
@@ -9870,27 +9873,43 @@ function buildIntStr(){
   return parts.join(', ');
 }
 
-function queueMedicationEventsBeforeSave(){
-  ['morphine','atq'].forEach(key=>{
-    if(!state.interventions.has(key)) return;
+function medicationEntriesFromState(){
+  return ['morphine','atq'].filter(key=>state.interventions.has(key)).map(key=>{
     const med=medicationDose(key);
-    if(!med) return;
+    if(!med) return null;
+    const override=state.pediatricOverrides[key];
+    return {key, med, override, payload:{
+      medication:med.label,
+      dosage:med.dosage,
+      route:med.route,
+      estimated_weight_kg:state.patientAgeGroup==='pediatric'?estimatedPediatricWeight():null,
+      is_pediatric_override:!!override,
+      ...(override?{high_risk_override:{required:true, confirmed_twice:true, reason:override.reason}}:{})
+    }};
+  }).filter(Boolean);
+}
+// Local log entry while the patient does not exist yet; queueIntakeClinicalEventsAtSave() sends
+// the patient-scoped copy after the create event.
+function queueMedicationEventsBeforeSave(){
+  medicationEntriesFromState().forEach(({med, override, payload})=>{
     const already=(state.localEvents||[]).some(e=>e.type==='MEDICATION_ADMINISTERED' && e.payload_json?.medication===med.label && e.payload_json?.dosage===med.dosage);
     if(already) return;
-    const override=state.pediatricOverrides[key];
-    saveLocalEvent({
-      type:'MEDICATION_ADMINISTERED',
-      detail:`${med.label} ${med.dosage}`,
-      warn:!!override,
-      payload_json:{
-        medication:med.label,
-        dosage:med.dosage,
-        route:med.route,
-        estimated_weight_kg:state.patientAgeGroup==='pediatric'?estimatedPediatricWeight():null,
-        is_pediatric_override:!!override,
-        ...(override?{high_risk_override:{required:true, confirmed_twice:true, reason:override.reason}}:{})
-      }
-    });
+    saveLocalEvent({type:'MEDICATION_ADMINISTERED', detail:`${med.label} ${med.dosage}`, warn:!!override, payload_json:payload});
+  });
+}
+// WP-3 (V2.99.36): medications, pediatric high-risk confirmations and treatments entered during
+// intake, sent with the new patient's id and after its create event so the server can place them.
+function queueIntakeClinicalEventsAtSave(patientId){
+  medicationEntriesFromState().forEach(({med, override, payload})=>{
+    if(override){
+      saveLocalEvent({type:'HIGH_RISK_OVERRIDE_CONFIRMED', detail:`אישור חריגת מינון פדיאטרי — ${med.label} ${med.dosage}`, warn:true, patient_id:patientId,
+        payload_json:{medication:med.label, dosage:med.dosage, route:med.route, estimated_weight_kg:estimatedPediatricWeight(), confirmed_twice:true, reason:override.reason}});
+    }
+    saveLocalEvent({type:'MEDICATION_ADMINISTERED', detail:`${med.label} ${med.dosage}`, warn:!!override, patient_id:patientId, payload_json:payload});
+  });
+  [...state.interventions].forEach(key=>{
+    const label=key==='other_tx' ? ((document.getElementById('other-tx-text')?.value||'').trim()||'אחר') : (INT_LABELS[key]||key);
+    queueTreatmentEvent(patientId, key, label, {source:'patient_flow'});
   });
 }
 
@@ -10067,7 +10086,9 @@ function savePatient(){
   // default (false), which the 45s pull would then copy back over the medic's own flag.
   const quickCapture=state.needsFullAssessment && state.triage!=='black';
   saveLocalEvent({type:quickCapture?'QUICK_PATIENT_CREATED':'PATIENT_CREATED',detail:`${newId} נפתח — ${quickCapture?'מסלול מהיר, יש לקחת מדדים':'הערכה מלאה'}`,warn:false,patient_id:patientUuid,
-    payload_json:{visual_id:newId,triage:state.triage,needs_full_assessment:quickCapture,capture_mode:state.flowMode}});
+    payload_json:{visual_id:newId,triage:state.triage,needs_full_assessment:quickCapture,capture_mode:state.flowMode,
+      // Injury zones are projected into patients.injury_zones from the create event (WP-3).
+      injury_zones:[...(state.injuryZones||[])], injury_mechanism:effectiveInjury}});
   // Vitals taken in the full flow: the server sets last_vitals_at (and clears
   // needs_full_assessment) from this event, so other devices do not show the patient as
   // vitals overdue. Never sent for a quick capture, which must stay flagged for assessment.
@@ -10080,6 +10101,7 @@ function savePatient(){
     syncLegacyTourniquetAlias(savedPatient);
     tqEntries.forEach(tq=>queueTourniquetAppliedEvent(savedPatient, tq, {source:'patient_flow'}));
   }
+  queueIntakeClinicalEventsAtSave(patientUuid);
   if(savedPatient.triage==='black' || savedPatient.patientStatus==='deceased'){
     createDeathCertificationRequest(savedPatient);
   }
@@ -10201,6 +10223,18 @@ function queueModalTreatmentEvents(patient, text, medicName){
     detail:text,
     warn:false,
     payload_json:{patient_id:patient.id, treatments:[...modalTreatments], note:text}
+  });
+  // WP-3 (V2.99.36): each treatment and medication also reaches the server under the name it
+  // knows. The modal records no dose, so a medication is sent with dosage null.
+  const otherText=(document.getElementById('modal-treatment-other')?.value||'').trim();
+  modalTreatments.forEach(key=>{
+    if(key==='morphine' || key==='atq'){
+      const med=medicationDose(key);
+      saveLocalEvent({type:'MEDICATION_ADMINISTERED', detail:`${med.label} — נרשם מתוך עדכון מדדים`, warn:false, patient_id:patient.id,
+        payload_json:{medication:med.label, dosage:null, route:med.route, source:'vitals_modal'}});
+    } else {
+      queueTreatmentEvent(patient.id, key, key==='other_tx' ? (otherText||'אחר') : (INT_LABELS[key]||key), {source:'vitals_modal'});
+    }
   });
   modalTreatments.forEach(key=>{
     const spec=INTERVENTION_SUPPLY[key];
@@ -11836,7 +11870,21 @@ function checkStep7() {
   document.getElementById('btn-step7').disabled = false;
 }
 
-const FLOW_EVENTS_SENT_AT_SAVE = new Set(['TOURNIQUET_APPLIED','VITALS_RECORDED','QUICK_PATIENT_CREATED']);
+// Medications and their pediatric high-risk confirmations joined in V2.99.36 (WP-3): written
+// during intake without a patient, they could never be placed on the server.
+const FLOW_EVENTS_SENT_AT_SAVE = new Set(['TOURNIQUET_APPLIED','VITALS_RECORDED','QUICK_PATIENT_CREATED','MEDICATION_ADMINISTERED','HIGH_RISK_OVERRIDE_CONFIRMED']);
+// A treatment reaches the server as INTERVENTION_RECORDED (AIRWAY_MANAGED for an opened airway)
+// with payload_json.treatment_type, which vw_patient_treatment_history reads (WP-3, V2.99.36).
+// Before this, treatments were logged under client-only names (INTERVENTION_LOGGED,
+// IMMEDIATE_INTERVENTION_RECORDED, LIFE_SAVING_TREATMENT_RECORDED) and never left the phone.
+// Tourniquets and medications have their own events and are skipped here.
+const TREATMENT_SYNC_SKIP = new Set(['tourniquet','morphine','atq']);
+function queueTreatmentEvent(patientId, treatmentType, label, extra={}){
+  if(!patientId || !treatmentType || TREATMENT_SYNC_SKIP.has(treatmentType)) return;
+  const airway=treatmentType==='airway' || treatmentType==='airway_mgmt';
+  saveLocalEvent({type:airway?'AIRWAY_MANAGED':'INTERVENTION_RECORDED', detail:label, warn:false, patient_id:patientId,
+    payload_json:{treatment_type:treatmentType, treatment_label:label, ...extra}});
+}
 function saveLocalEvent(event){
   if(!state.localEvents) state.localEvents=[];
   const entry={
@@ -13463,7 +13511,8 @@ function confirmPediatricOverride(){
     detail:`אישור חריגת מינון פדיאטרי — ${pending.label} ${pending.dosage}`,
     warn:true,
     payload_json:{
-      patient_id:state.patientDraftId,
+      // The draft id is not a server patient id; savePatient() sends the patient-scoped copy.
+      draft_patient_id:state.patientDraftId,
       medication:pending.label,
       dosage:pending.dosage,
       route:pending.route,

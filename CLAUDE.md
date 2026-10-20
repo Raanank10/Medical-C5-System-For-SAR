@@ -42,6 +42,7 @@ node scripts/browser_admin_users_test.js          # admin user management + invi
 node scripts/browser_sync_rejection_test.js       # a server-rejected patient is loud on the phone (tile badge, card banner, red sync pill, resend)
 node scripts/browser_remote_patient_and_resupply_test.js  # remote patients show no placeholder vitals; medic resupply requests are queued for push
 node scripts/browser_tourniquet_sync_test.js      # tourniquets pushed per patient/limb from every entry path, read back on other devices
+node scripts/browser_intake_clinical_sync_test.js # treatments, medications, high-risk overrides and injury zones sent patient-scoped after the create event (WP-3)
 
 # Analytics package
 cd analytics/c5_sentinel_sar_analytics_v1_1
@@ -71,7 +72,7 @@ CI (`.github/workflows/validate.yml`) runs exactly two things on every PR and pu
 `index.html` and `demo/rescue-app.html` are **byte-identical** (verify with `diff` before assuming otherwise). Both are ~8,600 lines of self-contained HTML/CSS/JS — no bundler, no framework, no `<script src>` to other JS files except `src/domain/rules.js`-equivalent logic that is inlined directly into the HTML (the standalone `src/domain/rules.js` module is a separately extracted, testable copy of a subset of that logic — see below). When you change prototype behavior, **you almost always need to edit both `index.html` and `demo/rescue-app.html` identically** unless a doc explicitly says they should diverge (currently they should not).
 
 Inside the HTML, look for:
-- `const APP_VERSION = '2.99.35';` — bump this and the visible "Demo X.Y" / "ROLE // X.Y" label strings together when shipping a version; smoke scripts assert on these exact strings.
+- `const APP_VERSION = '2.99.36';` — bump this and the visible "Demo X.Y" / "ROLE // X.Y" label strings together when shipping a version; smoke scripts assert on these exact strings.
 - `const ROLE_LABELS` / `const ROLE_DEFS` — defines the role-based views. Ten roles exist in the live `user_role` enum: `medic`, `paramedic` and `physician` (added in `database/019`/`020`), `pc` (חוג"ד — platoon commander), `cc` (מ״פ רפואה — company/command medical), `logistics_officer` (mapped to the client-side `logistics` key via `SERVER_ROLE_TO_CLIENT_ROLE`), `chamal` (command system), `rpc`/`rcc` (rescue-chain platoon/company commander — site-authority actions per `docs/ROLE_COMMAND_MODEL_v2.8.md`, added in `database/006`/`007`), and `admin`. New users are invited by an admin from the in-app "ניהול משתמשים" screen (`supabase/functions/admin-users/index.ts`, `database/042`), or with the fallback CLI `scripts/invite_user.js`; never the Supabase dashboard button, which can't set a role. Both keep a `VALID_ROLES` list that must match this enum.
 - `render*` functions (e.g. `renderDashboard`, `renderCommander`, `renderMstartSweep`, `renderAar`, `renderCcHeroDashboard`, `renderLogisticsOfficer`) — each is a self-contained view renderer for one role/screen. Grep for `^function render` to find the current screen inventory before adding a new one.
 - A legacy step-based New Patient flow (`screen-step1`..`screen-step8`, guarded by a `LEGACY_FULL_ASSESSMENT_DO_NOT_DELETE_WITHOUT_TESTS` comment) coexists with the newer Quick/Extended patient flows — don't delete it without checking what still depends on it (smoke scripts assert on its presence).
