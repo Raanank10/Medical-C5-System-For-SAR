@@ -266,7 +266,7 @@ Add a CI job running `npm ci`, then every `scripts/browser_*.js` with the pre-in
 2. Fix the drift found by the audit:
    - `CLAUDE.md`: "~8,600 lines" (now 13,501).
    - `FIELD_EXPERIMENT_GAPS.md`: says the scenario injector is missing (`scripts/inject_scenario.js` exists) and that there is no unit scoping (fixed by `045`); its tourniquet sentence should match WP-2's evidence.
-   - `ARCHITECTURE.md`: says no platoon model exists (`045` added one); says `042` was verified only on local Postgres (commit `9a04de7` applied `042`-`045` live); the runtime table lists the Sync API as a doc only.
+   - `ARCHITECTURE.md`: the runtime table lists the Sync API as a doc only. (Its platoon-model sentence is fixed by V2.99.39. Its statement that `042` admin user management is not live is **correct**: checked live 2026-10-20, there is no `admin_user_audit` table and no `admin_set_user_role()`; the live migration named `042` is the evacuation enum, repo file `043`, because `043`-`046` were renumbered after being applied as `042`-`045`.)
    - `PRODUCTION_READINESS.md`: "001 through 016" (now 046).
    - `ROADMAP.md` Phase 5: "8-role live enum" (now 10).
 
@@ -296,7 +296,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-4 Alert acknowledgment | P1 | Not started | | D4 decided (both). Migration numbers in the steps are stale: next free is `053` |
 | WP-5 Reinforcement / death-cert requests | P1 | Done (V2.99.38): 051 + 052 live, sync-log v8 deployed, verified 2026-10-20 | this PR | `medical_resource_requests` + RLS per D3; status updates by server id from any device; physician death confirmation resolves the request. Still local: `PC_REVIEW_REQUESTED_FOR_DETERIORATION` (a PC review request is not a resource request; kept under `known_gaps` WP-5) |
 | WP-6 PC resupply decisions | P2 | Not started | | |
-| WP-7 CC real platoons | P2 | Not started | | |
+| WP-7 CC real platoons | P2 | Mostly done (V2.99.39, `database/053`, not applied live yet) | | real `platoons` table (one company) instead of 045's medic-to-PC link; CC tiles/rows/counts from real platoons; roster panel; rpc platoon scope and rescue clinical block added at the owner's request. Remaining: `PATIENT_REASSIGNED_*` (moving a patient to another platoon means another site; not modelled) |
 | WP-8 Rescue panel state | P2 | Not started | | verify first |
 | WP-9 Inventory on server | P2 | Not started | | needs D2 |
 | WP-10 Offline cold start | P2 | Not started | | |
@@ -315,6 +315,13 @@ The plan was written against V2.99.33 (`a4f6c81`). PR #73 (V2.99.34) merged afte
 - **Order** after WP-0 and WP-1: WP-3 (client only, fixes high-risk dose records), WP-5, WP-4, WP-2b, then P2 and P3 as listed.
 - **2026-10-20:** WP-3 step 6 decided by the owner: other devices show remote treatments (read `vw_patient_treatment_history`). Not done yet; small follow-up after WP-4.
 - **WP-14** drift still present: `index.html` is now 13,595 lines; `FIELD_EXPERIMENT_GAPS.md` still says the injector and unit scoping are missing.
+
+## Revisions after V2.99.36 (2026-10-20)
+
+- **`main` failed `scripts/check_repo.py` for a while** after #77 (event contract) and #78 (pre-evacuation) merged without seeing each other: `SITE_PRE_EVACUATION_REPORTED` was in `SYNC_ELIGIBLE_EVENT_TYPES` and `sync-log` but not in the contract. Fixed on `main` by #80/#81 (seen 2026-10-20). Worth a branch-protection rule that requires the `validate` check to pass before merge.
+- **`database/042` (admin user management) is not on the live project.** The in-app "ניהול משתמשים" screen's role change / deactivate RPCs and `admin_user_audit` do not exist live; the `admin-users` Edge Function is not deployed either (live functions: `sync-log` v8, `handover-consume` v2), so the whole screen fails on the live project and onboarding still needs `scripts/invite_user.js`. Owner decision needed before applying it.
+- **The 34 `scripts/smoke_*.js` scripts all fail on `main`**: each pins an old `APP_VERSION` (e.g. "must be V2.9916"). Add to WP-13: refresh or retire them before wiring them into CI.
+- **WP-7** mostly done in V2.99.39 together with real platoons (`database/053`); see the status table.
 
 ## Baseline results
 
