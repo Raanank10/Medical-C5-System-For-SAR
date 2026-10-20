@@ -119,6 +119,17 @@
     return { cls, minutes, limb: tourniquet.limb || "לא צוין" };
   }
 
+  // D1 (repo owner, 2026-10-20): the phone raises tourniquet time alerts itself, from its own clock,
+  // with or without a server connection. Given the timer level now (tourniquetTimer().cls) and the
+  // level this tourniquet was last alerted at, returns the level to alert now, or null. Each level
+  // alerts once; a level skipped while the app was closed is not replayed, only the current one.
+  const TOURNIQUET_ALERT_RANK = { "": 0, notice: 1, warn: 2, critical: 3 };
+  function tourniquetAlertToRaise(timerCls, lastAlertedCls) {
+    const now = TOURNIQUET_ALERT_RANK[timerCls || ""] || 0;
+    const last = TOURNIQUET_ALERT_RANK[lastAlertedCls || ""] || 0;
+    return now > last ? timerCls : null;
+  }
+
   function isDeviceSilent(lastSeenMs, nowMs = Date.now()) {
     return !lastSeenMs || nowMs - lastSeenMs > DEVICE_SILENCE_MS;
   }
@@ -387,6 +398,7 @@
     supplyCriticalThreshold,
     supplyRiskTier,
     timeCodeToTodayMs,
+    tourniquetAlertToRaise,
     tourniquetTimer,
     vitalsAgeMs,
     vitalsIntervalMsFor,

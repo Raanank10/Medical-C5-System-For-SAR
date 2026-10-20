@@ -48,6 +48,7 @@ node scripts/browser_reinforcement_sync_test.js   # reinforcement / death-certif
 node scripts/browser_alert_ack_sync_test.js       # "בטיפול" acknowledgment shared across medic and PC devices; re-escalation brings the alert back everywhere (WP-4)
 node scripts/browser_remote_treatments_test.js    # treatments, medications and airway from another device listed on the patient card, not mixed into this device's own history (WP-3 step 6)
 node scripts/browser_tourniquet_followups_test.js # later limb, effectiveness check, vitals-screen tourniquet sent; remote effectiveness shown (WP-2b)
+node scripts/browser_tourniquet_offline_alert_test.js # D1: network off, fake clock; 60/120-minute tourniquet alerts vibrate + banner, once per level
 
 # Analytics package
 cd analytics/c5_sentinel_sar_analytics_v1_1
@@ -88,7 +89,7 @@ This is the one piece of logic that has been pulled out of the HTML prototype in
 
 It owns:
 - vitals reassessment timing (`vitalsTimer`, interval varies by triage color — red 10m / yellow 20m / green 30m — 1-minute warning buffer before each)
-- tourniquet timing (`tourniquetTimer`, 45-minute heads-up notice / 60-minute warning / 120-minute critical)
+- tourniquet timing (`tourniquetTimer`, 45-minute heads-up notice / 60-minute warning / 120-minute critical) and when the phone raises each level (`tourniquetAlertToRaise`: once per level per tourniquet, from the device clock, offline too; D1)
 - device-silence detection (`isDeviceSilent`, 10-minute threshold, one shared constant across the medic load board, command-view device panel, and Dead Man's Switch watchdog row)
 - MSTART triage computation (`computeMstartTriage`, `suggestMstartTriage`) — the auto-triage suggestion logic from vitals/SABCDE
 - pediatric detection and high-risk medication dose guardrails (`isPediatricPatient`, `isHighRiskDose` — age cutoff 8, dose limits currently hardcoded for morphine/fentanyl)
