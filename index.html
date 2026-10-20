@@ -2859,7 +2859,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.40';
+const APP_VERSION = '2.99.41';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -9080,6 +9080,7 @@ function openPatient(id){
     <div style="margin-bottom:4px"><div class="section-label" style="padding:0 0 8px">היסטוריית טיפולים (${p.txHistory.length})</div>
     ${p.txHistory.map(tx=>`<div class="tx-history-item"><div class="tx-history-time">${tx.time}</div><div class="tx-history-text">${tx.text}</div><div class="tx-history-medic">חובש: ${tx.medic}</div></div>`).join('')}
     </div>`:''}
+    ${remoteTreatmentsSection(p)}
     <div class="section-label" style="padding:0 0 8px">Timeline</div>
     ${p.events.map((e,i)=>`
       <div class="timeline-entry">
@@ -13136,7 +13137,7 @@ function applyServerTourniquets(rows, incidentId){
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
 function pullProjectedPatientStateAll(){
-  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); pullAlertAcknowledgments(id); });
+  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); pullAlertAcknowledgments(id); pullRemoteTreatments(id); });
 }
 // ── Pre-evacuation report pull (V2.99.36, database/050) ──
 // incident_pre_evacuations is the server's verdict on who owns the report (first medical
@@ -13192,6 +13193,64 @@ function applyRemotePreEvacuation(row, rejected){
     updateInitialEvacDisplays();
     refreshActiveScreenData();
   }
+}
+// ── Treatments from other devices (V2.99.41, WP-3 step 6, database/055) ──
+// Since WP-3 every treatment, medication and opened airway reaches the server patient-scoped. This
+// reads them back from vw_patient_treatment_history (security_invoker: events RLS decides who
+// sees what) and shows the ones recorded on other devices in their own section of the patient
+// card. Kept out of p.txHistory on purpose: that list is this device's own record and feeds
+// supply counts and the assessment-debt check. Tourniquets are not listed here; they already come
+// from the tourniquets table (applyServerTourniquets). Separate query: until 055 is applied the
+// view has no device_id, the query fails, and nothing else is affected.
+const REMOTE_TX_COLUMNS='event_id,patient_id,type,local_timestamp,treatment_type,medication,payload_json,device_id';
+const REMOTE_TX_TYPES=['INTERVENTION_RECORDED','MEDICATION_ADMINISTERED','AIRWAY_MANAGED'];
+async function pullRemoteTreatments(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let result;
+  try{ result=await client.from('vw_patient_treatment_history').select(REMOTE_TX_COLUMNS).eq('incident_id', incidentId).in('type', REMOTE_TX_TYPES).order('local_timestamp',{ascending:false}).limit(1000); }
+  catch(e){ return; }
+  if(result.error || !Array.isArray(result.data)) return;
+  applyRemoteTreatments(result.data);
+}
+function remoteTreatmentEntry(r){
+  const pl=(r.payload_json && typeof r.payload_json==='object') ? r.payload_json : {};
+  let text;
+  if(r.type==='MEDICATION_ADMINISTERED'){
+    text=[sanitizeRemoteText(pl.medication||r.medication, 80)||'תרופה', sanitizeRemoteText(pl.dosage, 40), sanitizeRemoteText(pl.route, 20)].filter(Boolean).join(' ');
+    if(pl.dosage==null) text+=' (ללא מינון)';
+    if(pl.is_pediatric_override===true) text+=' · אישור ילדים בסיכון גבוה';
+  }else if(r.type==='AIRWAY_MANAGED'){
+    text=sanitizeRemoteText(pl.treatment_label, 120)||'פתיחת נתיב אוויר';
+  }else{
+    text=sanitizeRemoteText(pl.treatment_label, 120)||sanitizeRemoteText(r.treatment_type, 40)||'טיפול';
+  }
+  const at=new Date(r.local_timestamp);
+  return {id:String(r.event_id||''), at:r.local_timestamp, time:isNaN(at)?'':at.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}), text, type:r.type};
+}
+function applyRemoteTreatments(rows){
+  const me=getDeviceId();
+  const byPatient={};
+  rows.forEach(r=>{
+    if(!r || !r.patient_id || r.device_id===me || !REMOTE_TX_TYPES.includes(r.type)) return;
+    (byPatient[r.patient_id]||(byPatient[r.patient_id]=[])).push(remoteTreatmentEntry(r));
+  });
+  let changed=false;
+  patients.forEach(p=>{
+    const next=byPatient[p.id]||[];
+    if(JSON.stringify((p.remoteTreatments||[]).map(t=>t.id))===JSON.stringify(next.map(t=>t.id))) return;
+    p.remoteTreatments=next;
+    changed=true;
+  });
+  if(changed){ saveDemoState(); refreshActiveScreenData(); }
+}
+function remoteTreatmentsSection(p){
+  const list=p?.remoteTreatments||[];
+  if(!list.length) return '';
+  return `<div style="margin-bottom:4px"><div class="section-label" style="padding:0 0 8px">טיפולים ממכשירים אחרים (${list.length})</div>
+    ${list.map(tx=>`<div class="tx-history-item"><div class="tx-history-time">${tx.time}</div><div class="tx-history-text">${tx.text}</div><div class="tx-history-medic">נרשם במכשיר אחר</div></div>`).join('')}
+    </div>`;
 }
 // ── Alert acknowledgment pull (V2.99.40, WP-4, database/054) ──
 // patients.alert_acknowledged_* is the newest "בטיפול" for each patient, from any device, cleared by
