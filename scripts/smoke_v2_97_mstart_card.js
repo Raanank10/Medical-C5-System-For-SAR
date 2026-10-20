@@ -1,11 +1,9 @@
 ﻿const fs = require('fs');
 const path = require('path');
+const { assertVersionLabels } = require('./lib/smoke_version');
 
 const root = path.resolve(__dirname, '..');
-const files = [
-  path.join(root, 'index.html'),
-  path.join(root, 'demo', 'rescue-app.html')
-];
+const files = [path.join(root, 'index.html')];
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -21,8 +19,7 @@ for (const file of files) {
   const treatmentEnd = html.indexOf('function setSweepTourniquetLimb', treatmentStart);
   const treatmentBody = html.slice(treatmentStart, treatmentEnd);
 
-  assert(html.includes("const APP_VERSION = '2.99.16';"), `${rel}: APP_VERSION must be V2.9916`);
-  assert(html.includes('Demo V2.9916'), `${rel}: launcher label must be V2.9916`);
+  assertVersionLabels(html, rel);
   assert(renderBody.includes('M — דימום מסכן חיים'), `${rel}: missing immediate hemorrhage section`);
   assert(renderBody.indexOf('M — דימום מסכן חיים') < renderBody.indexOf('הולך?'), `${rel}: hemorrhage section must precede walking`);
   const breathingLabel = '<div class="field-label">נשימה</div>';

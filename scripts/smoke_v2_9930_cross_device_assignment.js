@@ -1,8 +1,9 @@
 const fs = require('fs');
 const path = require('path');
+const { assertVersionLabels } = require('./lib/smoke_version');
 
 const root = path.resolve(__dirname, '..');
-const files = ['index.html', path.join('demo', 'rescue-app.html')];
+const files = ['index.html'];
 
 function assert(condition, message) {
   if (!condition) {
@@ -13,10 +14,7 @@ function assert(condition, message) {
 for (const rel of files) {
   const html = fs.readFileSync(path.join(root, rel), 'utf8');
 
-  assert(html.includes("const APP_VERSION = '2.99.30';"), `${rel}: APP_VERSION must be V2.9930`);
-  assert(html.includes('Demo V2.9930'), `${rel}: launcher label must be Demo V2.9930`);
-  assert(html.includes('ROLE // V2.9930'), `${rel}: role header must be Demo V2.9930`);
-  assert(html.includes('Role-Based Medical Command System V2.9930'), `${rel}: role system strip must be Demo V2.9930`);
+  assertVersionLabels(html, rel);
 
   // Cross-device PC -> medic assignment on real incidents, using existing tables/RLS only.
   assert(/async function assignRealMedic\(profileId, address, note\)\{[\s\S]{0,1200}?updateIncidentWithMetadata\([\s\S]{0,600}?from\('incident_memberships'\)\.upsert\(\{incident_id:incidentId, profile_id:profileId, role_at_incident:[^}]*assigned_by:currentUser\.id/.test(html), `${rel}: assignment must write address/note first, then the medic membership with assigned_by`);

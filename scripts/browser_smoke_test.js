@@ -1,4 +1,4 @@
-// Real browser smoke test: loads index.html and demo/rescue-app.html in headless Chromium via
+// Real browser smoke test: loads index.html in headless Chromium via
 // Playwright and checks the app actually renders and initializes, not just that the HTML text
 // contains expected strings (see scripts/smoke_*.js for that kind of check). Manual-only, not
 // wired into CI - see the package.json/CLAUDE.md note on why this is the one place in the repo
@@ -12,7 +12,6 @@ const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '..');
 const files = [
   path.join(root, 'index.html'),
-  path.join(root, 'demo', 'rescue-app.html'),
 ];
 
 function assert(condition, message) {

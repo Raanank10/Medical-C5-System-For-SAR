@@ -16,7 +16,7 @@ const path = require('path');
 const { chromium } = require('playwright');
 
 const root = path.resolve(__dirname, '..');
-const files = [path.join(root, 'index.html'), path.join(root, 'demo', 'rescue-app.html')];
+const files = [path.join(root, 'index.html')];
 const PIN = '135790';
 const INC1 = '11111111-aaaa-4aaa-8aaa-111111111111';
 const PC = '22222222-2222-4222-8222-222222222222';

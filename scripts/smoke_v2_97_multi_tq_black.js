@@ -2,10 +2,7 @@
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
-const files = [
-  path.join(root, 'index.html'),
-  path.join(root, 'demo', 'rescue-app.html')
-];
+const files = [path.join(root, 'index.html')];
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);

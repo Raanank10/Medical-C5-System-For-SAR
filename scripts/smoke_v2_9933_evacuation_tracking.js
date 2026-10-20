@@ -1,8 +1,9 @@
 const fs = require('fs');
 const path = require('path');
+const { assertVersionLabels } = require('./lib/smoke_version');
 
 const root = path.resolve(__dirname, '..');
-const files = ['index.html', path.join('demo', 'rescue-app.html')];
+const files = ['index.html'];
 
 function assert(condition, message) {
   if (!condition) {
@@ -13,10 +14,7 @@ function assert(condition, message) {
 for (const rel of files) {
   const html = fs.readFileSync(path.join(root, rel), 'utf8');
 
-  assert(html.includes("const APP_VERSION = '2.99.33';"), `${rel}: APP_VERSION must be V2.9933`);
-  assert(html.includes('Demo V2.9933'), `${rel}: launcher label must be Demo V2.9933`);
-  assert(html.includes('ROLE // V2.9933'), `${rel}: role header must be Demo V2.9933`);
-  assert(html.includes('Role-Based Medical Command System V2.9933'), `${rel}: role system strip must be Demo V2.9933`);
+  assertVersionLabels(html, rel);
 
   // Handover: optional destination + MDA classification, never the old 'pending' placeholder.
   assert(html.includes(`onclick="openEvacuationSheet('\${p.id}','handover')">הועבר למד״א — עכשיו</button>`), `${rel}: handover button must open the evacuation sheet`);
@@ -32,7 +30,8 @@ for (const rel of files) {
   // External reports: United Hatzalah and Yedidim are separate sources, and reports sync.
   assert(html.includes("UH:{label:'איחוד הצלה', server:'united_hatzalah'}") && html.includes("YEDIDIM:{label:'ידידים', server:'yedidim'}"), `${rel}: UH and Yedidim must be separate sources`);
   assert(html.includes(`onclick="selectReportSource(this,'UH')"><span class="icon">🧡</span>איחוד הצלה</button>`), `${rel}: the UH button must read איחוד הצלה`);
-  assert((html.match(/selectInitialReportSource\(this,'uh'\)">איחוד הצלה/g) || []).length === 2, `${rel}: initial-evacuation chips must offer איחוד הצלה on both screens`);
+  // The initial-evacuation chips became the pre-evacuation report (V2.99.35), which lists United Hatzalah as an evacuator.
+  assert(html.includes("const PRE_EVAC_EVACUATOR_LABELS = {mda:'מד״א', united_hatzalah:'איחוד הצלה', yedidim:'ידידים',"), `${rel}: the pre-evacuation report must offer איחוד הצלה and ידידים as separate evacuators`);
   assert(/saveLocalEvent\(\{type:'EXTERNAL_REPORT_CREATED'[\s\S]{0,900}?linked_patient_id/.test(html), `${rel}: reports must sync, with the patient link kept out of events.patient_id`);
 
   // Board by location on the PC and CC dashboards and the command screen.
@@ -57,7 +56,8 @@ for (const rel of files) {
   assert(html.includes("toast(r.error.code==='42501' ? 'נדרש שיבוץ לאירוע · פנה/י למ״פ רפואה או לחוג״ד שלך'"), `${rel}: a refused self-join must say an assignment is needed`);
   assert(html.includes("const roles=COMPANY_COMMAND_ROLES.has(currentUser.role) ? ['medic','paramedic','pc'] : ['medic','paramedic'];"), `${rel}: only company-level command may assign a PC`);
   assert(html.includes("function canManagePlatoonRoster(){ return !!currentUser && COMPANY_COMMAND_ROLES.has(currentUser.role); }"), `${rel}: roster panel for company-level command only`);
-  assert(html.includes("client.rpc('set_platoon_commander', {p_profile_id:profileId, p_pc_id:pcId||null})"), `${rel}: roster changes go through set_platoon_commander()`);
+  // Companies and platoons (database/053, V2.99.42) replaced 045's set_platoon_commander() roster link.
+  assert(html.includes("await platoonRpc('set_profile_unit', args,"), `${rel}: roster changes go through set_profile_unit()`);
 
   console.log(`${rel}: Demo V2.9933 evacuation tracking + location board smoke passed`);
 }

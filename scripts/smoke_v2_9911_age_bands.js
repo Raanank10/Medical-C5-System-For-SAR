@@ -1,8 +1,9 @@
 const fs = require('fs');
 const path = require('path');
+const { assertVersionLabels } = require('./lib/smoke_version');
 
 const root = path.resolve(__dirname, '..');
-const files = ['index.html', path.join('demo', 'rescue-app.html')];
+const files = ['index.html'];
 
 function assert(condition, message) {
   if (!condition) {
@@ -23,10 +24,7 @@ for (const rel of files) {
   const openPatientFn = section(html, 'function openPatient(id){', 'function markPatientAtCollectionPoint');
   const dashboardFn = section(html, 'function renderDashboard(){', 'function needsVitals');
 
-  assert(html.includes("const APP_VERSION = '2.99.16';"), `${rel}: APP_VERSION must be V2.9916`);
-  assert(html.includes('Demo V2.9916'), `${rel}: launcher label must be Demo V2.9916`);
-  assert(html.includes('ROLE // V2.9916'), `${rel}: role header must be Demo V2.9916`);
-  assert(html.includes('Role-Based Medical Command System V2.9916'), `${rel}: role system strip must be Demo V2.9916`);
+  assertVersionLabels(html, rel);
 
   // Four age bands, additive on top of the existing binary patientAgeGroup
   assert(html.includes("const AGE_BAND_LABELS = {infant:"), `${rel}: AGE_BAND_LABELS missing`);
@@ -43,7 +41,8 @@ for (const rel of files) {
   assert(html.includes("if(state.patientAgeGroup!=='pediatric') return;") , `${rel}: applyPediatricSafeDefaults must still gate on patientAgeGroup, unmodified`);
 
   // Patient-object construction sites must all carry patientAgeBand through
-  assert(html.includes("patientAgeBand:extra.patientAgeBand||(extra.patientAgeGroup==='pediatric'?'child':'adult')"), `${rel}: demoPatient must default legacy pediatric demo data to the 'child' band`);
+  // demoPatient() went with the hardcoded patients (V2.99.24); ageBandOf() now holds the legacy default.
+  assert(html.includes("function ageBandOf(p={}){ return p.patientAgeBand || (p.patientAgeGroup==='pediatric'?'child':'adult'); }"), `${rel}: ageBandOf must default legacy pediatric data to the 'child' band`);
   assert(html.includes('patientAgeBand:state.patientAgeBand||\'adult\','), `${rel}: patient creation must carry patientAgeBand through`);
 
   // Dashboard: badge + elderly caution line on the medic patient list

@@ -24,10 +24,10 @@ The current implementation is intentionally lightweight: a standalone HTML proto
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Field/command prototype | Active Demo 2.995 (`APP_VERSION 2.99.5`) | `index.html` and `demo/rescue-app.html` (byte-identical) |
+| Field/command prototype | Active Demo V2.9942 (`APP_VERSION 2.99.42`) | `index.html` (single file; also the live demo) |
 | Product specification | Active V2.8 role/command model | `docs/ROLE_COMMAND_MODEL_v2.8.md`, `docs/ALERT_OWNERSHIP_v1.3.md`, `docs/C5_SENTINEL_SAR_MVP_SPEC_v1.2.md` |
 | API contract | v1.2, sync endpoints implemented | `docs/API_SURFACE_v1.2.md` — `/sync/log` push/pull is a real deployed Edge Function; Command Actions and most of the AAR API are still unbuilt |
-| Data model | Deployed to a live Supabase project, RLS enabled and audited | `database/001_postgresql_schema_v1.2.sql` + incremental fixes `004`-`017`; see `docs/RLS_AUDIT_v1.md` |
+| Data model | Deployed to a live Supabase project, RLS enabled and audited | `database/001_postgresql_schema_v1.2.sql` + incremental files `004`-`055`; see `docs/RLS_AUDIT_v1.md` |
 | Demo data | Draft seed data | `database/002_seed_demo_data_v1.2.sql` |
 | Analytics/AAR | Working local package, with a pytest suite and a real-incident export path | `analytics/c5_sentinel_sar_analytics_v1_1/` |
 | Production backend | Deployed | Real Supabase Auth, RLS-enforced Postgres, `/sync/log` Edge Function; see `docs/ARCHITECTURE.md`'s "Backend Deployment Status" |
@@ -86,8 +86,6 @@ See `CLAUDE.md` for the full command reference, including what CI actually runs.
 ```text
 .
 |-- index.html                         # standalone prototype entry point
-|-- demo/
-|   `-- rescue-app.html                # byte-identical demo artifact
 |-- docs/
 |   |-- ARCHITECTURE.md                # system design, module boundaries, backend deployment status
 |   |-- DEVELOPMENT.md                 # local setup and contribution workflow
@@ -113,9 +111,11 @@ See `CLAUDE.md` for the full command reference, including what CI actually runs.
 |   |-- 001_postgresql_schema_v1.2.sql # base schema, deployed to a live Supabase project
 |   |-- 002_seed_demo_data_v1.2.sql
 |   |-- 003_mci_ui_alignment.sql
-|   `-- 004_...sql - 017_...sql        # incremental fixes applied against the live project
-|-- supabase/
-|   `-- functions/sync-log/index.ts   # deployed Edge Function implementing /sync/log
+|   `-- 004_...sql - 055_...sql        # incremental fixes and features applied against the live project
+|-- supabase/functions/
+|   |-- sync-log/index.ts             # deployed Edge Function implementing /sync/log
+|   |-- handover-consume/index.ts     # deployed: QR handover token redemption
+|   `-- admin-users/index.ts          # deployed: admin user invites from the in-app screen
 |-- src/
 |   `-- domain/rules.js               # testable triage, vitals, alert, and timing rules
 |-- tests/

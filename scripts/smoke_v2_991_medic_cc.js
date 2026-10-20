@@ -1,11 +1,9 @@
 ﻿const fs = require('fs');
 const path = require('path');
+const { assertVersionLabels } = require('./lib/smoke_version');
 
 const root = path.resolve(__dirname, '..');
-const files = [
-  path.join(root, 'index.html'),
-  path.join(root, 'demo', 'rescue-app.html')
-];
+const files = [path.join(root, 'index.html')];
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -21,9 +19,7 @@ for (const file of files) {
   const ccEnd = html.indexOf('function renderCcCommandBoard', ccStart);
   const ccHero = html.slice(ccStart, ccEnd);
 
-  assert(html.includes("const APP_VERSION = '2.99.16';"), `${rel}: APP_VERSION must be V2.9916`);
-  assert(html.includes('Demo V2.9916'), `${rel}: launcher label must be V2.9916`);
-  assert(html.includes('ROLE // V2.9916'), `${rel}: role label must be V2.9916`);
+  assertVersionLabels(html, rel);
   assert(!html.includes('Demo V3.0') && !html.includes("const APP_VERSION = '3.0.0';"), `${rel}: V3.0 must not be present`);
 
   assert(sweep.includes('${triageBand(p.triage,p)}'), `${rel}: top triage band removed`);

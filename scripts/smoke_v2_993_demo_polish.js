@@ -1,8 +1,9 @@
 ﻿const fs = require('fs');
 const path = require('path');
+const { assertVersionLabels } = require('./lib/smoke_version');
 
 const root = path.resolve(__dirname, '..');
-const files = ['index.html', path.join('demo', 'rescue-app.html')];
+const files = ['index.html'];
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -22,13 +23,9 @@ for (const rel of files) {
   const roleDashboard = sliceBetween(html, 'function renderRoleDashboard', 'function reassignPatient', rel);
   const ccHero = sliceBetween(html, 'function renderCcHeroDashboard', 'function renderCcCommandBoard', rel);
   const logistics = sliceBetween(html, 'function renderLogisticsTaskBoard', 'function patientMatchesBoardFilter', rel);
-  const commanderBrief = sliceBetween(html, 'function playMedicCommanderSequence', 'function playDeathCertificationSequence', rel);
   const tqWithLimb = sliceBetween(html, 'function recordSweepTourniquetWithLimb', 'function renderSweepTourniquetCard', rel);
 
-  assert(html.includes("const APP_VERSION = '2.99.16';"), `${rel}: APP_VERSION must be 2.99.16`);
-  assert(html.includes('Demo V2.9916'), `${rel}: launcher label must be Demo V2.9916`);
-  assert(html.includes('ROLE // V2.9916'), `${rel}: role header must be V2.9916`);
-  assert(html.includes('Role-Based Medical Command System V2.9916'), `${rel}: role strip must be V2.9916`);
+  assertVersionLabels(html, rel);
   assert(!html.includes('2.992V') && !html.includes("const APP_VERSION = '2.99.2';"), `${rel}: stale V2.992 label remains`);
   assert(!html.includes('localStorage.clear('), `${rel}: must not use localStorage.clear()`);
   assert(html.includes('const DEMO_KEYS_TO_PURGE = Object.freeze'), `${rel}: scoped demo reset key list missing`);
@@ -58,7 +55,8 @@ for (const rel of files) {
   assert(html.includes("if(activeRoleDashboard!=='medic' || activeScreenId()!=='sweep') return;"), `${rel}: same-zone FAB must be sweep/medic scoped`);
   assert(!tqWithLimb.includes('reconcileSupplySource'), `${rel}: recordSweepTourniquetWithLimb must not double-count tourniquet supply`);
 
-  assert(roleDashboard.includes("${role==='cc'?renderCcCommandBoard():`<div class=\"role-top-grid\">"), `${rel}: CC hero must render before generic metrics`);
+  // V2.99.35 appended the pre-evacuation board after the CC board; the CC board still leads.
+  assert(roleDashboard.includes("${role==='cc'?renderCcCommandBoard()+renderExtractedCounterBoard():`<div class=\"role-top-grid\">"), `${rel}: CC hero must render before generic metrics`);
   assert(roleDashboard.includes('${dashboardFocusBanner()}'), `${rel}: dashboard focus banner missing from role dashboard`);
   assert(html.includes('let dashboardCollapsedSections = {}'), `${rel}: collapse state missing`);
   assert(html.includes('function normalizeDashboardFocus'), `${rel}: normalized dashboard focus helper missing`);
@@ -83,15 +81,15 @@ for (const rel of files) {
   assert(logistics.includes('focusFilteredList(tasks, focusMatchesLogisticsTask)'), `${rel}: logistics task filtering must use structured matcher`);
   assert(html.includes('id="logistics-task-board"'), `${rel}: logistics task board mount missing`);
   assert(html.includes('function setDashboardFocus') && html.includes('function focusedRecommendations'), `${rel}: lightweight focus filtering helpers missing`);
-  assert(html.includes('function loadOmniRoleScenario'), `${rel}: Omni-Role scenario loader missing`);
-  assert(html.includes('טען תרחיש Omni-Role'), `${rel}: Omni-Role launcher label missing`);
-  assert(html.includes('TOURNIQUET_MARKED_INEFFECTIVE') && html.includes('REQ-OMNI-EVAC-001') && html.includes('REQ-OMNI-SUP-001'), `${rel}: Omni scenario must trigger TQ failure, evacuation, and supply pressure`);
+  // The Omni-Role fixture scenario was removed with the hardcoded patients (V2.99.24); devices that
+  // saved it are cleaned on load.
+  assert(!html.includes('function loadOmniRoleScenario') && !html.includes('טען תרחיש Omni-Role'), `${rel}: the Omni-Role fixture scenario must stay removed`);
+  assert(html.includes("!String(r.id||'').startsWith('REQ-OMNI-')"), `${rel}: saved Omni-Role fixture requests must be dropped on load`);
 
   assert(html.includes('הצג תדריך מ״פ / חוג״ד ב־60 שניות'), `${rel}: commander 60-second launcher button missing`);
-  assert(commanderBrief.includes("renderRoleDashboard('pc')"), `${rel}: commander brief must show PC board`);
-  assert(commanderBrief.includes("renderRoleDashboard('cc')"), `${rel}: commander brief must show CC hero`);
-  assert(commanderBrief.includes("goTo('logistics')"), `${rel}: commander brief must show logistics`);
-  assert(commanderBrief.includes("goTo('aar')"), `${rel}: commander brief must end in AAR`);
+  // The scripted medic-commander sequence was removed with the hardcoded patients (V2.99.24): it
+  // created a fake red patient and sync-eligible VITALS_RECORDED events that could reach the live DB.
+  assert(!html.includes('function playMedicCommanderSequence'), `${rel}: the scripted commander sequence must stay removed`);
 
   assert(html.includes('function startNewPatient('), `${rel}: legacy startNewPatient missing`);
   assert(html.includes('function guardedNewPatient('), `${rel}: legacy guardedNewPatient missing`);

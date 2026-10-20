@@ -2,10 +2,7 @@
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
-const files = [
-  path.join(root, 'index.html'),
-  path.join(root, 'demo', 'rescue-app.html')
-];
+const files = [path.join(root, 'index.html')];
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -98,10 +95,12 @@ function checkFile(file) {
     assert(wrapperBody.includes(s), `${rel}: wrapper missing ${s}`);
   });
 
-  const autofillStart = html.indexOf('function suggestedSweepColor');
+  // The sweep color moved into the inlined domain rules; the autofill itself into applyWalkingAutofill.
+  assert(html.includes('if (m.walking === "yes") return "green";'), `${rel}: walking casualty must suggest green`);
+  const autofillStart = html.indexOf('function applyWalkingAutofill');
   assert(autofillStart >= 0, `${rel}: missing walking autofill`);
-  const autofillBody = html.slice(autofillStart, autofillStart + 1900);
-  ['breathing', 'radial_strong', "avpu:'A'", 'not_trapped', "return 'green'"].forEach(s => {
+  const autofillBody = html.slice(autofillStart, html.indexOf('function clearWalkingBecause', autofillStart));
+  ["breathing:'yes'", "perfusion:'radial_strong'", "avpu:'A'", "trapped:'not_trapped'"].forEach(s => {
     assert(autofillBody.includes(s), `${rel}: walking autofill missing ${s}`);
   });
 
@@ -122,7 +121,9 @@ function checkFile(file) {
   assert(html.includes('MSTART_SWEEP_COMPLETED'), `${rel}: missing sweep completion event`);
   assert(html.includes('SUPPLY_CONSUMED'), `${rel}: missing supply consumed event`);
   assert(html.includes('doctor_death_cert'), `${rel}: missing death-cert resource type`);
-  assert(countMatches(html, /<script\s+src=/gi) === 0, `${rel}: external script tag introduced`);
+  // The one allowed external script is the pinned supabase-js build used for real auth and sync.
+  const externalScripts = html.match(/<script\s+src="[^"]*"/gi) || [];
+  assert(externalScripts.length === 1 && /^<script\s+src="https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@\d+\.\d+\.\d+\//.test(externalScripts[0]), `${rel}: only the pinned supabase-js script may load externally`);
 
   return `${rel}: static smoke passed (${scripts.length} inline scripts parsed)`;
 }

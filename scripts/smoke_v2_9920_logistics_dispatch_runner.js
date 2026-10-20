@@ -1,8 +1,9 @@
 const fs = require('fs');
 const path = require('path');
+const { assertVersionLabels } = require('./lib/smoke_version');
 
 const root = path.resolve(__dirname, '..');
-const files = ['index.html', path.join('demo', 'rescue-app.html')];
+const files = ['index.html'];
 
 function assert(condition, message) {
   if (!condition) {
@@ -13,10 +14,7 @@ function assert(condition, message) {
 for (const rel of files) {
   const html = fs.readFileSync(path.join(root, rel), 'utf8');
 
-  assert(html.includes("const APP_VERSION = '2.99.20';"), `${rel}: APP_VERSION must be V2.9920`);
-  assert(html.includes('Demo V2.9920'), `${rel}: launcher label must be Demo V2.9920`);
-  assert(html.includes('ROLE // V2.9920'), `${rel}: role header must be Demo V2.9920`);
-  assert(html.includes('Role-Based Medical Command System V2.9920'), `${rel}: role system strip must be Demo V2.9920`);
+  assertVersionLabels(html, rel);
 
   // PR3 of the resupply queue/dispatch scope: logistics dispatch/runner-assign write actions
   // on the real supply_requests queue (database/033 + database/034). These write the

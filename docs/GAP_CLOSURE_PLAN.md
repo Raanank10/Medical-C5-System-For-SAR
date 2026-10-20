@@ -14,8 +14,8 @@ Update the status table at the bottom of this file in the same PR that finishes 
 
 ## Rules for every WP
 
-- Edit `index.html` and `demo/rescue-app.html` identically (until WP-14 changes that). Confirm with `diff index.html demo/rescue-app.html` before committing.
-- Bump `APP_VERSION` and the visible version labels together, one version per merged PR.
+- `index.html` is the only prototype file (WP-14 removed the `demo/rescue-app.html` copy, D5).
+- Bump `APP_VERSION` and the visible version labels together, one version per merged PR. `check_repo.py` fails if they disagree.
 - New SQL goes in a new numbered file, starting at `database/047_...`. Never edit an applied migration. Every new trigger function: `SECURITY DEFINER`, `set search_path`, and `revoke execute ... from public, anon, authenticated` (see `046`). Run `get_advisors` after applying.
 - Any new event type must be added in four places at once: the `event_type` enum (migration), `ROLE_ALLOWED_EVENT_TYPES` in `supabase/functions/sync-log/index.ts`, `SYNC_ELIGIBLE_EVENT_TYPES` in the HTML, and the contract list from WP-1.
 - Deploy order when a WP has server parts: migration, then `sync-log` Edge Function, then client. The client must keep working if the migration is not applied yet (separate queries, tolerate missing columns), as `044` did.
@@ -38,7 +38,7 @@ Some WPs cannot finish without one of these. Ask before starting the WP that nee
 | D2 | Two inventory ledger tables, `inventory_ledger` (v1.1) and `inventory_ledger_v12`. Neither is written by the client today. | WP-9 | (a) keep `inventory_ledger_v12`, archive v1.1; (b) the reverse; (c) defer inventory sync |
 | D3 | **Decided 2026-10-20 by the owner: command + physicians.** pc/cc/chamal/physician/admin of the incident see every request; whoever made a request sees their own. Physicians are in that set, so every physician sees death-certification requests (`database/052` RLS). Original question: who sees reinforcement and death-certification requests from other devices? | WP-5 | - |
 | D4 | **Decided 2026-10-20 by the owner: both.** `WATCHDOG_ACKNOWLEDGED` is sent and a server projection marks `watchdog_alerts.acknowledged_at` / `acknowledged_by`, so every device sees the alert as handled. Original question: event only, or also mark the server row? | WP-4 | - |
-| D5 | `demo/rescue-app.html`: keep as a byte-identical copy, generate it, or replace with a redirect to `index.html`? | WP-14 | Check what the GitHub Pages demo link and smoke scripts rely on before choosing |
+| D5 | **Decided 2026-10-20 by the owner: remove the copy.** The two files were identical and having both caused confusion. `index.html` stays (GitHub Pages serves it as the live demo); `demo/rescue-app.html` was deleted and every check and test now reads `index.html` only. Original question: keep as a byte-identical copy, generate it, or replace with a redirect? | WP-14 | - |
 | D6 | Supabase Pro plan, required for leaked-password protection. | Track T5 | Cost decision |
 | D7 | Can the `admin` role record patients? `sync-log` allows admin every event type, but the `patients_insert` RLS policy allowed only medic/pc/paramedic/rpc/rcc, so an admin's patients were rejected (see Baseline results). | WP-0 part 2, WP-1 | **Decided 2026-10-19: admin may do everything**, matching `AUTH_MATRIX` in `index.html`. `database/047_admin_full_access.sql` adds admin to `patients_insert`, `high_risk_override_insert`, `death_confirmations_insert` and the physician-death guard in `project_patient_state()`. Follow-up decision the same day: admin also **wins** the concurrent-edit tie-break (`database/048`, rank above physician). Event log and audit tables stay append-only for every role, admin included (CLAUDE.md: never remove audit history). The rejected-patient warning on the phone (V2.99.35) is a separate part of the same fix. |
 
@@ -262,6 +262,8 @@ Add a CI job running `npm ci`, then every `scripts/browser_*.js` with the pre-in
 
 ### WP-14: Duplicate HTML and documentation drift (P3)
 
+**Done 2026-10-20** (see the status table). The list below is the original audit, kept for the record.
+
 1. Per D5, stop maintaining two copies of `index.html` by hand.
 2. Fix the drift found by the audit:
    - `CLAUDE.md`: "~8,600 lines" (now 13,501).
@@ -296,14 +298,14 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-4 Alert acknowledgment | P1 | Done (V2.99.40): 054 live, verified 2026-10-20 | this PR | per patient, as the client's alerts are: `patients.alert_acknowledged_*` plus `watchdog_alerts.acknowledged_*`; re-escalation (red/black triage, critical vitals) clears it everywhere via `WATCHDOG_ALERT` reason `reescalated`; patient card shows who and when |
 | WP-5 Reinforcement / death-cert requests | P1 | Done (V2.99.38): 051 + 052 live, sync-log v8 deployed, verified 2026-10-20 | this PR | `medical_resource_requests` + RLS per D3; status updates by server id from any device; physician death confirmation resolves the request. Still local: `PC_REVIEW_REQUESTED_FOR_DETERIORATION` (a PC review request is not a resource request; kept under `known_gaps` WP-5) |
 | WP-6 PC resupply decisions | P2 | Not started | | |
-| WP-7 CC real platoons | P2 | Mostly done (V2.99.42, `database/053`, not applied live yet) | #82 + this PR | real `companies` and `platoons` (3 rescue companies x 3 platoons, plus the ambulance team) instead of 045's medic-to-PC link; first one-company version (#82) rewritten before it was applied; CC tiles/rows/counts from real platoons; roster panel; rpc platoon scope and rescue clinical block added at the owner's request. Remaining: `PATIENT_REASSIGNED_*` (moving a patient to another platoon means another site; not modelled) |
+| WP-7 CC real platoons | P2 | Mostly done (V2.99.42, `database/053`): applied live by the owner 2026-10-20, every 053 function, trigger and policy confirmed present; no companies or platoons created yet | #82, #86 | real `companies` and `platoons` (3 rescue companies x 3 platoons, plus the ambulance team) instead of 045's medic-to-PC link; first one-company version (#82) rewritten before it was applied; CC tiles/rows/counts from real platoons; roster panel; rpc platoon scope and rescue clinical block added at the owner's request. Remaining: `PATIENT_REASSIGNED_*` (moving a patient to another platoon means another site; not modelled) |
 | WP-8 Rescue panel state | P2 | Not started | | verify first |
 | WP-9 Inventory on server | P2 | Not started | | needs D2 |
 | WP-10 Offline cold start | P2 | Not started | | |
 | WP-11 Small loose ends | P3 | Not started | | |
 | WP-12 Durable watchdog | P3 | Not started | | needs D1 |
-| WP-13 Tests in CI | P3 | Not started | | |
-| WP-14 Duplicate HTML, doc drift | P3 | Not started | | needs D5 |
+| WP-13 Tests in CI | P3 | Not started | | the 34 smoke scripts pass again (WP-14), so they can be wired in |
+| WP-14 Duplicate HTML, doc drift | P3 | Done (2026-10-20) | | D5: `demo/rescue-app.html` removed. Visible labels were stuck at V2.9934 since V2.99.34; fixed to match `APP_VERSION` and `check_repo.py` now checks them against `APP_VERSION`. Smoke scripts refreshed: no version pins (`scripts/lib/smoke_version.js`), stale assertions updated to the commits that changed the behaviour; all 34 pass. Docs: CLAUDE.md, README, DEVELOPMENT, ARCHITECTURE, PHASE_4_PLAN, ROADMAP, THREAT_MODEL, PRODUCTION_READINESS, FIELD_EXPERIMENT_GAPS |
 
 ## Revisions after #73 (2026-10-19)
 
@@ -319,8 +321,8 @@ The plan was written against V2.99.33 (`a4f6c81`). PR #73 (V2.99.34) merged afte
 ## Revisions after V2.99.36 (2026-10-20)
 
 - **`main` failed `scripts/check_repo.py` for a while** after #77 (event contract) and #78 (pre-evacuation) merged without seeing each other: `SITE_PRE_EVACUATION_REPORTED` was in `SYNC_ELIGIBLE_EVENT_TYPES` and `sync-log` but not in the contract. Fixed on `main` by #80/#81 (seen 2026-10-20). Worth a branch-protection rule that requires the `validate` check to pass before merge.
-- **`database/042` (admin user management) is not on the live project.** The in-app "ניהול משתמשים" screen's role change / deactivate RPCs and `admin_user_audit` do not exist live; the `admin-users` Edge Function is not deployed either (live functions: `sync-log` v8, `handover-consume` v2), so the whole screen fails on the live project and onboarding still needs `scripts/invite_user.js`. Owner decision needed before applying it.
-- **The 34 `scripts/smoke_*.js` scripts all fail on `main`**: each pins an old `APP_VERSION` (e.g. "must be V2.9916"). Add to WP-13: refresh or retire them before wiring them into CI.
+- **`database/042` (admin user management) is not on the live project.** The in-app "ניהול משתמשים" screen's role change / deactivate RPCs and `admin_user_audit` do not exist live; the `admin-users` Edge Function is not deployed either (live functions: `sync-log` v8, `handover-consume` v2), so the whole screen fails on the live project and onboarding still needs `scripts/invite_user.js`. Owner decision needed before applying it. **Applied live by the owner 2026-10-20**, and `admin-users` deployed (v1): `admin_user_audit`, `admin_list_users()`, `admin_set_user_role()`, `admin_set_user_active()` and the profiles audit trigger confirmed present.
+- **The 34 `scripts/smoke_*.js` scripts all fail on `main`**: each pins an old `APP_VERSION` (e.g. "must be V2.9916"). Add to WP-13: refresh or retire them before wiring them into CI. (Refreshed in WP-14; all 34 pass.)
 - **WP-7** mostly done together with real companies and platoons (`database/053`, V2.99.42); see the status table.
 
 ## Baseline results
