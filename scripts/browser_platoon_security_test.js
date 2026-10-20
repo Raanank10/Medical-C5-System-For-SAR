@@ -1,12 +1,12 @@
 // Real-browser test of the platoon security scope's client side (database/045, V2.99.33; platoons
-// as real units since database/051, V2.99.37): CC, PC, RPC and medic phones share one fake backend
+// as real units since database/053, V2.99.39): CC, PC, RPC and medic phones share one fake backend
 // in this Node process (same harness as scripts/browser_medic_assignment_test.js). The fake
-// enforces the database/051 rules the client depends on: a pc / rpc reaches its own platoon's
+// enforces the database/053 rules the client depends on: a pc / rpc reaches its own platoon's
 // sites and the ones it belongs to; no self-join elsewhere; list_open_incidents scoped; profiles
 // readable by a PC only for itself and its own platoon; memberships written by a PC only for its
 // own platoon's medics; create_platoon / set_profile_platoon / set_incident_platoon for
 // company-level command only. The SQL itself was exercised against the live database inside
-// rolled-back transactions (docs/RLS_AUDIT_v1.md, database/051 follow-up).
+// rolled-back transactions (docs/RLS_AUDIT_v1.md, database/053 follow-up).
 //
 // Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
 // Run: npm install && node scripts/browser_platoon_security_test.js
@@ -214,7 +214,7 @@ async function checkFile(browser, file) {
   assert(pc2.toasts.some((t) => t.includes('נדרש שיבוץ')), `${rel}: a refused join must say an assignment is needed (got ${JSON.stringify(pc2.toasts)})`);
   assert(!SERVER.members.some((m) => m.incident_id === INC1 && m.profile_id === PC2), `${rel}: no membership may be created by a refused join`);
 
-  // RPC1 (platoon A, no membership): reaches its platoon's site only (database/051).
+  // RPC1 (platoon A, no membership): reaches its platoon's site only (database/053).
   const rpc1 = await openPhone(context, file);
   await login(rpc1.page, 'rpc1@test');
   const rpcListed = await rpc1.page.evaluate(async () => { await refreshOpenIncidents(); return (_openIncidents || []).map((i) => i.id); });

@@ -2859,7 +2859,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.37';
+const APP_VERSION = '2.99.39';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -2931,7 +2931,10 @@ const SYNC_ELIGIBLE_EVENT_TYPES = new Set([
   'RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE','RESUPPLY_REQUEST_ESCALATED_CC',
   // Casualties evacuated before the medical force arrived (database/049-050): the server keeps
   // the first medical reporter's version, then accepts changes only from pc/cc/admin.
-  'SITE_PRE_EVACUATION_REPORTED'
+  'SITE_PRE_EVACUATION_REPORTED',
+  // Medical reinforcement and death-certification requests (database/051-052, WP-5): projected
+  // into medical_resource_requests, which pc/cc/chamal/physician/admin and the requester read.
+  'MEDICAL_REINFORCEMENT_REQUESTED','DOCTOR_DEATH_CERTIFICATION_REQUESTED','MEDICAL_REINFORCEMENT_STATUS_UPDATED'
 ]);
 const SUPPLY_BASELINE = Object.freeze({tourniquets:3, pressureDressings:4, hemostaticGauze:2, airwayEquipment:2, ivKits:1, blankets:2, batteryPacks:1});
 const PC_TRUCK_BASELINE = Object.freeze({tourniquets:20, pressureDressings:30, hemostaticGauze:15, airwayEquipment:10, ivKits:8, blankets:25, batteryPacks:6});
@@ -3056,13 +3059,13 @@ const DEMO_PLATOONS = [
 // the active incident exists as SITE_A, so the PC's scope is that incident.
 const PLATOON_SITE = Object.freeze({'PLT-A':'SITE_A', 'PLT-B':'SITE_B'});
 let pcPlatoonId='PLT-A';
-// ── Real platoons (database/051, V2.99.37) ──
+// ── Real platoons (database/053, V2.99.39) ──
 // Signed in, the command views use the server's platoons instead of DEMO_PLATOONS. There is one
 // company, so every platoon belongs to it. Only the active incident is loaded as a site, so every
 // loaded patient belongs to that incident's platoon; a site with no platoon yet is shown under
-// "ללא מחלקה", never hidden. Before 051 is applied the platoons read fails and the demo list stays.
+// "ללא מחלקה", never hidden. Before 053 is applied the platoons read fails and the demo list stays.
 const NO_PLATOON_ID='__no_platoon__';
-let _realPlatoons=null;      // [{id,name,is_active}] signed in once 051 is applied; null otherwise
+let _realPlatoons=null;      // [{id,name,is_active}] signed in once 053 is applied; null otherwise
 let _realPlatoonMembers=[];  // company-level command: everyone in a platoon; pc: its own platoon (RLS)
 let _myPlatoonId=null;
 let _activeIncidentPlatoonId=null;
@@ -3090,7 +3093,7 @@ function myPlatoonRow(){
   if(!usingRealPlatoons()) return '';
   return roleRow('המחלקה שלי', _myPlatoonId ? platoonName(_myPlatoonId) : 'לא שובצת למחלקה · מ״פ רפואה משבץ/ת מחלקות');
 }
-// Separate queries, so a server without database/051 leaves everything else working.
+// Separate queries, so a server without database/053 leaves everything else working.
 async function pullRealPlatoons(client){
   if(!currentUser) return;
   try{
@@ -6339,6 +6342,7 @@ function assignReinforcementRequest(requestId){
   rr.status='assigned';
   rr.statusHistory=rr.statusHistory||[];
   rr.statusHistory.push({status:'assigned',at:new Date().toISOString(),by:'CC'});
+  queueReinforcementStatusEvent(rr, {status:'assigned'});
   saveDemoState();
   renderCommander();
   toast(`משאב שויך · ${requestId}`);
@@ -6349,6 +6353,7 @@ function fulfillReinforcementRequest(requestId){
   rr.status='fulfilled';
   rr.statusHistory=rr.statusHistory||[];
   rr.statusHistory.push({status:'fulfilled',at:new Date().toISOString(),by:'CC'});
+  queueReinforcementStatusEvent(rr, {status:'fulfilled'});
   saveDemoState();
   renderCommander();
   toast(`בקשה אושרה · ${requestId}`);
@@ -6741,7 +6746,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
   if(role==='cc' && canManagePlatoonRoster()) loadPlatoonRoster();
   updateDemoStatus();
 }
-// ── Platoons and roster (database/051, replaces 045's PC-only roster) ──
+// ── Platoons and roster (database/053, replaces 045's PC-only roster) ──
 // One company, several platoons. Company-level command (cc/chamal/admin/physician) creates
 // platoons, places each pc / rpc / medic / paramedic in one, and sets which platoon works the
 // active site. A platoon's pc and rpc then see that platoon's sites; a pc assigns only its own
@@ -6753,7 +6758,7 @@ async function loadPlatoonRoster(){
   const client=getSupabaseClient(); if(!client) return;
   await pullRealPlatoons(client);
   const target=document.getElementById('platoon-roster-panel'); if(!target) return;
-  if(!usingRealPlatoons()){ target.textContent='ניהול מחלקות יהיה זמין אחרי עדכון השרת (database/051).'; return; }
+  if(!usingRealPlatoons()){ target.textContent='ניהול מחלקות יהיה זמין אחרי עדכון השרת (database/053).'; return; }
   const platoons=_realPlatoons.filter(p=>p.is_active);
   const options=sel=>`<option value="">— ללא מחלקה —</option>`+platoons.map(p=>`<option value="${escAttr(p.id)}"${p.id===sel?' selected':''}>${escAttr(p.name)}</option>`).join('');
   const siteRow=activeIncident?`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0">
@@ -7663,6 +7668,7 @@ function cancelSuspectedNotSalvageable(){
     r.status='cancelled';
     r.statusHistory=r.statusHistory||[];
     r.statusHistory.push({status:'cancelled',at:new Date().toISOString(),by:getDeviceId(),reason:'medic_cancelled_suspected_not_salvageable'});
+    queueReinforcementStatusEvent(r, {status:'cancelled', reason:'medic_cancelled_suspected_not_salvageable'});
   });
   p.triage='red';
   p.mstart.color='red';
@@ -7763,6 +7769,7 @@ function recordSweepTreatment(type, meta={}){
   p.unsyncedEvents=(p.unsyncedEvents||0)+1;
   p.lastModifiedAt=new Date().toISOString();
   saveLocalEvent({type:'LIFE_SAVING_TREATMENT_RECORDED',detail:`${p.id} · ${label}`,warn:type==='tourniquet',payload_json:event});
+  queueTreatmentEvent(p.id, type, label, {source:'mstart_sweep'});
   saveDemoState();
   renderMstartSweep();
   if(document.getElementById('screen-commander')?.classList.contains('active')) renderCommander();
@@ -8544,6 +8551,7 @@ function saveImmediateCasualtyAndContinue(){
     syncLegacyTourniquetAlias(p);
     queueTourniquetAppliedEvent(p, p.tourniquets[0], {source:'mstart_immediate'});
   }
+  actions.forEach((key, i)=>queueTreatmentEvent(id, key, actionLabels[i], {source:'mstart_immediate'}));
   saveLocalEvent({type:'IMMEDIATE_FIELD_ASSESSMENT',detail:`${visualId} נפתח בסריקת MSTART`,warn:['red','black'].includes(triage),patient_id:id,payload_json:{triage,site:siteData.name,zone:zoneLabel(),immediate:im,life_saving_actions:actions,tourniquet_limb:isTq?tqLimbLabel:null}});
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   state=freshState(); state.flowMode='quick';
@@ -8598,7 +8606,8 @@ function createImmediateInterventionPatient(kind='tourniquet'){
   // QUICK_PATIENT_CREATED actually creates the server-side patients row; queue it before the
   // treatment event below, which references the same patient_id.
   saveLocalEvent({type:'QUICK_PATIENT_CREATED',detail:`${visualId} נפתח מפעולה מצילת חיים`,warn:false,patient_id:id,payload_json:{visual_id:visualId,triage:'red'}});
-  saveLocalEvent({type:isTq?'TOURNIQUET_APPLIED':'IMMEDIATE_INTERVENTION_RECORDED',detail:label,warn:true,patient_id:id,payload_json:{source:'medic_immediate_action',auto_triage:'red'}});
+  if(isTq) saveLocalEvent({type:'TOURNIQUET_APPLIED',detail:label,warn:true,patient_id:id,payload_json:{source:'medic_immediate_action',auto_triage:'red'}});
+  else queueTreatmentEvent(id, kind, label, {source:'medic_immediate_action', auto_triage:'red'});
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   renderDashboard(); renderAlerts();
   toast(`${label} · ${visualId} נפתח והופיע לחוג"ד`);
@@ -10110,27 +10119,43 @@ function buildIntStr(){
   return parts.join(', ');
 }
 
-function queueMedicationEventsBeforeSave(){
-  ['morphine','atq'].forEach(key=>{
-    if(!state.interventions.has(key)) return;
+function medicationEntriesFromState(){
+  return ['morphine','atq'].filter(key=>state.interventions.has(key)).map(key=>{
     const med=medicationDose(key);
-    if(!med) return;
+    if(!med) return null;
+    const override=state.pediatricOverrides[key];
+    return {key, med, override, payload:{
+      medication:med.label,
+      dosage:med.dosage,
+      route:med.route,
+      estimated_weight_kg:state.patientAgeGroup==='pediatric'?estimatedPediatricWeight():null,
+      is_pediatric_override:!!override,
+      ...(override?{high_risk_override:{required:true, confirmed_twice:true, reason:override.reason}}:{})
+    }};
+  }).filter(Boolean);
+}
+// Local log entry while the patient does not exist yet; queueIntakeClinicalEventsAtSave() sends
+// the patient-scoped copy after the create event.
+function queueMedicationEventsBeforeSave(){
+  medicationEntriesFromState().forEach(({med, override, payload})=>{
     const already=(state.localEvents||[]).some(e=>e.type==='MEDICATION_ADMINISTERED' && e.payload_json?.medication===med.label && e.payload_json?.dosage===med.dosage);
     if(already) return;
-    const override=state.pediatricOverrides[key];
-    saveLocalEvent({
-      type:'MEDICATION_ADMINISTERED',
-      detail:`${med.label} ${med.dosage}`,
-      warn:!!override,
-      payload_json:{
-        medication:med.label,
-        dosage:med.dosage,
-        route:med.route,
-        estimated_weight_kg:state.patientAgeGroup==='pediatric'?estimatedPediatricWeight():null,
-        is_pediatric_override:!!override,
-        ...(override?{high_risk_override:{required:true, confirmed_twice:true, reason:override.reason}}:{})
-      }
-    });
+    saveLocalEvent({type:'MEDICATION_ADMINISTERED', detail:`${med.label} ${med.dosage}`, warn:!!override, payload_json:payload});
+  });
+}
+// WP-3 (V2.99.37): medications, pediatric high-risk confirmations and treatments entered during
+// intake, sent with the new patient's id and after its create event so the server can place them.
+function queueIntakeClinicalEventsAtSave(patientId){
+  medicationEntriesFromState().forEach(({med, override, payload})=>{
+    if(override){
+      saveLocalEvent({type:'HIGH_RISK_OVERRIDE_CONFIRMED', detail:`אישור חריגת מינון פדיאטרי — ${med.label} ${med.dosage}`, warn:true, patient_id:patientId,
+        payload_json:{medication:med.label, dosage:med.dosage, route:med.route, estimated_weight_kg:estimatedPediatricWeight(), confirmed_twice:true, reason:override.reason}});
+    }
+    saveLocalEvent({type:'MEDICATION_ADMINISTERED', detail:`${med.label} ${med.dosage}`, warn:!!override, patient_id:patientId, payload_json:payload});
+  });
+  [...state.interventions].forEach(key=>{
+    const label=key==='other_tx' ? ((document.getElementById('other-tx-text')?.value||'').trim()||'אחר') : (INT_LABELS[key]||key);
+    queueTreatmentEvent(patientId, key, label, {source:'patient_flow'});
   });
 }
 
@@ -10307,7 +10332,9 @@ function savePatient(){
   // default (false), which the 45s pull would then copy back over the medic's own flag.
   const quickCapture=state.needsFullAssessment && state.triage!=='black';
   saveLocalEvent({type:quickCapture?'QUICK_PATIENT_CREATED':'PATIENT_CREATED',detail:`${newId} נפתח — ${quickCapture?'מסלול מהיר, יש לקחת מדדים':'הערכה מלאה'}`,warn:false,patient_id:patientUuid,
-    payload_json:{visual_id:newId,triage:state.triage,needs_full_assessment:quickCapture,capture_mode:state.flowMode}});
+    payload_json:{visual_id:newId,triage:state.triage,needs_full_assessment:quickCapture,capture_mode:state.flowMode,
+      // Injury zones are projected into patients.injury_zones from the create event (WP-3).
+      injury_zones:[...(state.injuryZones||[])], injury_mechanism:effectiveInjury}});
   // Vitals taken in the full flow: the server sets last_vitals_at (and clears
   // needs_full_assessment) from this event, so other devices do not show the patient as
   // vitals overdue. Never sent for a quick capture, which must stay flagged for assessment.
@@ -10320,6 +10347,7 @@ function savePatient(){
     syncLegacyTourniquetAlias(savedPatient);
     tqEntries.forEach(tq=>queueTourniquetAppliedEvent(savedPatient, tq, {source:'patient_flow'}));
   }
+  queueIntakeClinicalEventsAtSave(patientUuid);
   if(savedPatient.triage==='black' || savedPatient.patientStatus==='deceased'){
     createDeathCertificationRequest(savedPatient);
   }
@@ -10441,6 +10469,18 @@ function queueModalTreatmentEvents(patient, text, medicName){
     detail:text,
     warn:false,
     payload_json:{patient_id:patient.id, treatments:[...modalTreatments], note:text}
+  });
+  // WP-3 (V2.99.37): each treatment and medication also reaches the server under the name it
+  // knows. The modal records no dose, so a medication is sent with dosage null.
+  const otherText=(document.getElementById('modal-treatment-other')?.value||'').trim();
+  modalTreatments.forEach(key=>{
+    if(key==='morphine' || key==='atq'){
+      const med=medicationDose(key);
+      saveLocalEvent({type:'MEDICATION_ADMINISTERED', detail:`${med.label} — נרשם מתוך עדכון מדדים`, warn:false, patient_id:patient.id,
+        payload_json:{medication:med.label, dosage:null, route:med.route, source:'vitals_modal'}});
+    } else {
+      queueTreatmentEvent(patient.id, key, key==='other_tx' ? (otherText||'אחר') : (INT_LABELS[key]||key), {source:'vitals_modal'});
+    }
   });
   modalTreatments.forEach(key=>{
     const spec=INTERVENTION_SUPPLY[key];
@@ -11321,8 +11361,11 @@ function selectReinforcementUrgency(btn, urgency){
 function createMedicalResourceRequest({resourceType, reasonCodes=[], urgency='high', targetLocation='', freeText='', siteId=null, linkedPatientIds=[], requestedByRole='pc', requestedByName=null, status='pending', eventType='MEDICAL_REINFORCEMENT_REQUESTED', auto=false}){
   const effectiveSite=siteId || (cmdActiveSite==='ALL'?'SITE_A':cmdActiveSite);
   const req={
-    id:`REQ-${String(reinforcementRequests.length+1).padStart(3,'0')}`,
+    // Unique per device: the server keys a request by (device, this id), and a count-based id
+    // repeats after the demo list is cleared (WP-5).
+    id:`REQ-${Date.now().toString(36).slice(-4).toUpperCase()}${uid().slice(0,3).toUpperCase()}`,
     type:resourceType==='doctor_death_cert'?'death_certification_request':'medical_reinforcement',
+    originDeviceId:getDeviceId(),
     requestedByRole,
     requestedById:requestedByName||getDeviceId(),
     requestedByName:requestedByName||displayUser(requestedByRole==='medic'?'USR-COHEN':requestedByRole==='cc'?'USR-MIZRAHI':'USR-BARAK'),
@@ -11355,6 +11398,7 @@ function createDeathCertificationRequest(patient){
       r.urgency='high';
       r.statusHistory=r.statusHistory||[];
       r.statusHistory.push({status:'urgency_escalated', at:new Date().toISOString(), by:'system', reason:'second_black_patient_same_site'});
+      queueReinforcementStatusEvent(r, {urgency:'high', reason:'second_black_patient_same_site'});
     });
   }
   return createMedicalResourceRequest({
@@ -11398,9 +11442,17 @@ function updateReinforcementStatus(id, status){
   req.status=status;
   req.statusHistory=req.statusHistory||[];
   req.statusHistory.push({status, at:new Date().toISOString(), by:getDeviceId()});
-  saveLocalEvent({type:'MEDICAL_REINFORCEMENT_STATUS_UPDATED',detail:`${id} → ${status}`,payload_json:{request_id:id,status},warn:false});
+  queueReinforcementStatusEvent(req, {status});
   saveDemoState();
   renderCommander();
+}
+// One status/urgency change of a reinforcement or death-certification request (WP-5). The server
+// finds the request by its server id when this device has pulled it (any device may update it),
+// otherwise by this device's own local id. Resupply requests have their own events.
+function queueReinforcementStatusEvent(req, {status=null, urgency=null, reason=null}={}){
+  if(!req || req.type==='resupply') return;
+  saveLocalEvent({type:'MEDICAL_REINFORCEMENT_STATUS_UPDATED',detail:`${req.id} → ${status||urgency}`,
+    payload_json:{request_id:req.id, server_request_id:req.serverId||null, status, urgency, reason}, warn:false});
 }
 function renderReinforcementPanel(){
   const body=document.getElementById('cmd-reinforcement-requests'); if(!body) return;
@@ -12076,7 +12128,21 @@ function checkStep7() {
   document.getElementById('btn-step7').disabled = false;
 }
 
-const FLOW_EVENTS_SENT_AT_SAVE = new Set(['TOURNIQUET_APPLIED','VITALS_RECORDED','QUICK_PATIENT_CREATED']);
+// Medications and their pediatric high-risk confirmations joined in V2.99.37 (WP-3): written
+// during intake without a patient, they could never be placed on the server.
+const FLOW_EVENTS_SENT_AT_SAVE = new Set(['TOURNIQUET_APPLIED','VITALS_RECORDED','QUICK_PATIENT_CREATED','MEDICATION_ADMINISTERED','HIGH_RISK_OVERRIDE_CONFIRMED']);
+// A treatment reaches the server as INTERVENTION_RECORDED (AIRWAY_MANAGED for an opened airway)
+// with payload_json.treatment_type, which vw_patient_treatment_history reads (WP-3, V2.99.37).
+// Before this, treatments were logged under client-only names (INTERVENTION_LOGGED,
+// IMMEDIATE_INTERVENTION_RECORDED, LIFE_SAVING_TREATMENT_RECORDED) and never left the phone.
+// Tourniquets and medications have their own events and are skipped here.
+const TREATMENT_SYNC_SKIP = new Set(['tourniquet','morphine','atq']);
+function queueTreatmentEvent(patientId, treatmentType, label, extra={}){
+  if(!patientId || !treatmentType || TREATMENT_SYNC_SKIP.has(treatmentType)) return;
+  const airway=treatmentType==='airway' || treatmentType==='airway_mgmt';
+  saveLocalEvent({type:airway?'AIRWAY_MANAGED':'INTERVENTION_RECORDED', detail:label, warn:false, patient_id:patientId,
+    payload_json:{treatment_type:treatmentType, treatment_label:label, ...extra}});
+}
 function saveLocalEvent(event){
   if(!state.localEvents) state.localEvents=[];
   const entry={
@@ -12748,6 +12814,9 @@ async function syncPush(){
   // A pre-evacuation report's fate (kept, or lost to another medic's first report) is decided
   // server-side on insert; read it back now rather than on the next 45-second poll.
   if(outbox.some(e=>e.type==='SITE_PRE_EVACUATION_REPORTED' && doneIds.has(e.local_event_id))) pullPreEvacuation(SITE_TO_INCIDENT_ID.SITE_A);
+  // Same for a reinforcement / death-certification request: pick up the server id right away, so
+  // a status change made next on this device can be matched from any device (WP-5).
+  if(outbox.some(e=>['MEDICAL_REINFORCEMENT_REQUESTED','DOCTOR_DEATH_CERTIFICATION_REQUESTED','MEDICAL_REINFORCEMENT_STATUS_UPDATED'].includes(e.type) && doneIds.has(e.local_event_id))) Object.values(SITE_TO_INCIDENT_ID).forEach(id=>pullMedicalResourceRequests(id));
 }
 setInterval(()=>{ if(currentUser) syncPush(); }, 45000);
 
@@ -13039,7 +13108,7 @@ function applyServerTourniquets(rows, incidentId){
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
 function pullProjectedPatientStateAll(){
-  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id); pullPreEvacuation(id); });
+  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); });
 }
 // ── Pre-evacuation report pull (V2.99.36, database/050) ──
 // incident_pre_evacuations is the server's verdict on who owns the report (first medical
@@ -13095,6 +13164,82 @@ function applyRemotePreEvacuation(row, rejected){
     updateInitialEvacDisplays();
     refreshActiveScreenData();
   }
+}
+// ── Medical reinforcement / death-certification requests pull (V2.99.38, WP-5, database/052) ──
+// medical_resource_requests is readable (RLS, decision D3) by pc/cc/chamal/physician/admin of the
+// incident, and by whoever made a request. Server rows are merged into reinforcementRequests, so
+// every existing panel (commander, CC resource center, physician death-certification list, alerts)
+// shows requests from other devices unchanged. A request or status change still waiting in this
+// device's outbox wins until it is pushed. Separate query: until 052 is applied the table does not
+// exist, and that must not break the other pulls (same reason as pullPreEvacuation).
+const MEDICAL_REQUEST_COLUMNS='id,incident_id,request_kind,resource_type,quantity,urgency,reason_codes,linked_patient_ids,site_id,target_location,free_text,auto_generated,status,status_history,requested_by,requested_by_name,requested_by_role,requested_at,status_updated_by_name,status_updated_by_role,status_updated_at,origin_device_id,origin_client_request_id';
+async function pullMedicalResourceRequests(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let result;
+  try{ result=await client.from('medical_resource_requests').select(MEDICAL_REQUEST_COLUMNS).eq('incident_id', incidentId).order('requested_at',{ascending:false}).limit(200); }
+  catch(e){ return; }
+  if(result.error || !Array.isArray(result.data)) return;
+  // The user may have switched incident while the query was in flight.
+  const siteId=siteIdForIncident(incidentId);
+  if(!siteId) return;
+  applyRemoteMedicalRequests(result.data, siteId);
+}
+function siteIdForIncident(incidentId){
+  return Object.keys(SITE_TO_INCIDENT_ID).find(k=>SITE_TO_INCIDENT_ID[k]===incidentId)||null;
+}
+function hasPendingMedicalRequestPush(req){
+  return getOutbox().some(e=>!e.synced && !e.syncRejected
+    && ['MEDICAL_REINFORCEMENT_REQUESTED','DOCTOR_DEATH_CERTIFICATION_REQUESTED','MEDICAL_REINFORCEMENT_STATUS_UPDATED'].includes(e.type)
+    && (e.payload_json?.id===req.id || e.payload_json?.request_id===req.id || (req.serverId && e.payload_json?.server_request_id===req.serverId)));
+}
+const MEDICAL_REQUEST_ID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function applyRemoteMedicalRequests(rows, siteId){
+  const me=getDeviceId();
+  let changed=false;
+  rows.forEach(row=>{
+    if(!row || !MEDICAL_REQUEST_ID_RE.test(String(row.id||''))) return;
+    if(!REINFORCEMENT_RESOURCE_LABELS[row.resource_type]) return;
+    let req=reinforcementRequests.find(r=>r.type!=='resupply' && (r.serverId===row.id
+      || (row.origin_device_id===me && r.id===row.origin_client_request_id)));
+    const before=req?JSON.stringify([req.status,req.urgency,req.serverId,(req.statusHistory||[]).length]):null;
+    if(!req){
+      req={
+        id:row.id,
+        type:row.request_kind==='death_certification'?'death_certification_request':'medical_reinforcement',
+        fromServer:true,
+        requestedByRole:mapServerRole(row.requested_by_role||''),
+        requestedById:row.requested_by||null,
+        requestedByName:sanitizeRemoteText(row.requested_by_name)||'—',
+        siteId,
+        eventName:siteData.name||'אירוע ללא שם',
+        company:companyLabelForSite(siteId),
+        targetLocation:sanitizeRemoteText(row.target_location)||'—',
+        resourceType:row.resource_type,
+        quantity:Number.isFinite(row.quantity)?row.quantity:1,
+        reasonCodes:(Array.isArray(row.reason_codes)?row.reason_codes:[]).filter(x=>/^[a-z_]{1,40}$/.test(String(x))),
+        linkedPatientIds:(Array.isArray(row.linked_patient_ids)?row.linked_patient_ids:[]).filter(x=>MEDICAL_REQUEST_ID_RE.test(String(x))),
+        freeText:sanitizeRemoteText(row.free_text, 500),
+        createdAt:row.requested_at,
+        autoGenerated:!!row.auto_generated
+      };
+      reinforcementRequests.unshift(req);
+    }
+    req.serverId=row.id;
+    req.mine=row.requested_by===currentUser?.id;
+    if(!hasPendingMedicalRequestPush(req)){
+      if(REINFORCEMENT_STATUS_LABELS[row.status]||row.status==='fulfilled') req.status=row.status;
+      if(REINFORCEMENT_URGENCY_LABELS[row.urgency]) req.urgency=row.urgency;
+      req.statusHistory=(Array.isArray(row.status_history)?row.status_history:[]).slice(-30).map(h=>({
+        status:String(h?.status||''), at:h?.at||null, by:sanitizeRemoteText(h?.by_name)||mapServerRole(h?.by_role||''), byRole:mapServerRole(h?.by_role||'')
+      }));
+      req.lastUpdatedByName=sanitizeRemoteText(row.status_updated_by_name);
+      req.lastUpdatedAt=row.status_updated_at||null;
+    }
+    if(before!==JSON.stringify([req.status,req.urgency,req.serverId,(req.statusHistory||[]).length])) changed=true;
+  });
+  if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
 // ── Evacuation tracking + external reports pull (V2.99.33, database/044) ──
 // Separate queries from the main patient pull on purpose: until 044 is applied these columns do
@@ -13762,7 +13907,8 @@ function confirmPediatricOverride(){
     detail:`אישור חריגת מינון פדיאטרי — ${pending.label} ${pending.dosage}`,
     warn:true,
     payload_json:{
-      patient_id:state.patientDraftId,
+      // The draft id is not a server patient id; savePatient() sends the patient-scoped copy.
+      draft_patient_id:state.patientDraftId,
       medication:pending.label,
       dosage:pending.dosage,
       route:pending.route,

@@ -1,4 +1,4 @@
--- Platoons as real units, one company (V2.99.37). Decided with the repo owner 2026-10-20:
+-- Platoons as real units, one company (V2.99.39). Decided with the repo owner 2026-10-20:
 -- 1. A platoon (מחלקה) is one shared site team: its חוג״ד (pc), its מ״מ (rpc) and its medics /
 --    paramedics. There is one company, so there is no companies table: company-level roles
 --    (cc, chamal, admin, physician, and rcc on the rescue side) span every platoon.
@@ -19,7 +19,7 @@
 -- Replaces database/045's roster link (profiles.platoon_commander_id, set_platoon_commander()).
 -- The column stays (no data dropped; it held 0 rows when this was written) but nothing reads it
 -- any more. set_platoon_commander() stays as a compatibility wrapper for clients older than
--- V2.99.37: it places the medic in the PC's platoon.
+-- V2.99.39: it places the medic in the PC's platoon.
 --
 -- Not covered here (documented in docs/RLS_AUDIT_v1.md): the projected patients columns
 -- pulse_present / breathing_present / injury_zones stay readable to rpc/rcc on patients rows
@@ -41,14 +41,14 @@ create unique index if not exists uq_platoons_name on platoons (lower(btrim(name
 alter table profiles add column if not exists platoon_id uuid references platoons(id) on delete set null;
 create index if not exists idx_profiles_platoon on profiles(platoon_id) where platoon_id is not null;
 comment on column profiles.platoon_id is
-  'The platoon (shared site team) this pc / rpc / medic / paramedic belongs to. Set only by cc/chamal/admin/physician via set_profile_platoon() (database/051).';
+  'The platoon (shared site team) this pc / rpc / medic / paramedic belongs to. Set only by cc/chamal/admin/physician via set_profile_platoon() (database/053).';
 comment on column profiles.platoon_commander_id is
-  'Deprecated by database/051 (profiles.platoon_id). Kept for history; not read by any policy.';
+  'Deprecated by database/053 (profiles.platoon_id). Kept for history; not read by any policy.';
 
 alter table incidents add column if not exists platoon_id uuid references platoons(id) on delete set null;
 create index if not exists idx_incidents_platoon on incidents(platoon_id) where platoon_id is not null;
 comment on column incidents.platoon_id is
-  'The platoon working this site. Set at open from the opener''s platoon, or by company-level command via set_incident_platoon() (database/051).';
+  'The platoon working this site. Set at open from the opener''s platoon, or by company-level command via set_incident_platoon() (database/053).';
 
 -- Append-only record of every platoon change, for after-action review.
 create table if not exists platoon_audit (
@@ -198,7 +198,7 @@ for each row execute function app.guard_incident_platoon();
 -- ---------------------------------------------------------------------------------------------
 -- database/045 plus: pc and rpc reach every incident of their own platoon; rpc is no longer
 -- company-wide. A pc still sees a platoon-less draft drafted by a medic of its platoon (drafts
--- from before 051, or by a medic placed in the platoon after drafting). Found in the live
+-- from before 053, or by a medic placed in the platoon after drafting). Found in the live
 -- rolled-back test: without "platoon_id is null" a draft that company command had moved to
 -- another platoon stayed visible to the drafter's pc.
 create or replace function app.can_access_incident(p_incident_id uuid)
@@ -369,7 +369,7 @@ begin
 end;
 $function$;
 
--- Compatibility for clients older than V2.99.37 (database/045 roster panel).
+-- Compatibility for clients older than V2.99.39 (database/045 roster panel).
 create or replace function public.set_platoon_commander(p_profile_id uuid, p_pc_id uuid)
 returns jsonb
 language plpgsql
@@ -444,7 +444,7 @@ begin
 
   v_visual_id := 'INC-' || to_char(now() at time zone 'utc', 'YYMMDD') || '-' ||
                  upper(substr(replace(p_incident_id::text, '-', ''), 1, 6));
-  -- database/051: a site opened by a platoon member belongs to that platoon.
+  -- database/053: a site opened by a platoon member belongs to that platoon.
   if v_role in ('pc','rpc','medic','paramedic') then
     v_platoon := app.my_platoon_id();
   end if;
@@ -496,7 +496,7 @@ begin
   if v_status not in ('draft','staging','active') then
     raise exception 'incident % is %, not open for joining', p_incident_id, v_status using errcode = '42501';
   end if;
-  -- database/045, 051: no self-join into someone else's site. A pc/rpc/medic/paramedic joins
+  -- database/045, 053: no self-join into someone else's site. A pc/rpc/medic/paramedic joins
   -- only what it can already access (its platoon's site, assigned, or opened/drafted).
   if v_role in ('pc','rpc','medic','paramedic') and not app.can_access_incident(p_incident_id) then
     raise exception 'assignment required to join incident %', p_incident_id using errcode = '42501';
@@ -531,7 +531,7 @@ begin
   left join profiles op on op.id = i.opened_by
   left join profiles dc on dc.id = i.draft_created_by
   where i.status in ('draft','staging','active')
-    -- database/045, 051: pc/rpc/medic/paramedic list only incidents they can access.
+    -- database/045, 053: pc/rpc/medic/paramedic list only incidents they can access.
     and (app.current_user_role() not in ('pc','rpc','medic','paramedic') or app.can_access_incident(i.id))
   order by (i.status = 'draft') desc, i.opened_at desc;
 end;

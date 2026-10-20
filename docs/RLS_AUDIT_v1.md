@@ -239,7 +239,13 @@ The rest of `047` (`high_risk_override_insert`, `death_confirmations_insert`, an
 
 The rest of `047` and all of `048` were applied by the owner and verified live on 2026-10-19, again by role impersonation in one block forced to roll back (no data left behind): admin created a patient and set triage red; admin inserted into `death_confirmations` and `high_risk_override_confirmations` (both ALLOWED); a physician then set the same patient yellow one minute later, inside the 5-minute window, and the projected triage stayed red (admin rank 6 beats physician 5) with one `conflict_log` row recording the override. `project_patient_state()` and `app.role_authority_rank()` remain non-executable by `authenticated`. `get_advisors` (security) unchanged: the same pre-existing items listed above.
 
-## Follow-up: platoons and rescue-chain scope (`database/051`)
+## Follow-up: medical reinforcement and death-certification requests (`database/051`, `052`)
+
+New table `medical_resource_requests` (WP-5 of `docs/GAP_CLOSURE_PLAN.md`), written only by the `SECURITY DEFINER` trigger function `project_medical_resource_request()` (execute revoked from `public`, `anon`, `authenticated`, as `046`). One policy, `medical_resource_requests_read` (select, `authenticated`): `app.can_access_incident(incident_id)` and either a role in pc/cc/chamal/physician/admin or `requested_by = auth.uid()` (decision D3, owner, 2026-10-20). No insert/update/delete policy. The trigger reads the actor's role from `profiles`, never from `events.actor_role`.
+
+Applied 2026-10-20 (`052` without its two `drop ... if exists` lines, no-ops on a first apply) and verified the same day by role impersonation in one block forced to roll back, against real profiles: a medic's death-certification request and a PC's paramedic request each created one row (a re-sent creation did not duplicate; a junk reason code and a non-uuid patient id were dropped; an unknown resource type created nothing); the requesting medic read 1 row, another medic 0, the PC 2, a physician (not a member) 2, a paramedic and a logistics officer 0; a physician's acknowledgment from another device applied by server id; the medic's attempt to resolve their own request and to cancel the PC's were ignored, the medic's urgency change on their own request applied; an older PC update did not undo the physician's newer one; a direct insert as the PC failed with 42501; the physician's `PATIENT_DEATH_CONFIRMED` resolved the death-certification request; all 10 events stayed in the log. `get_advisors` (security) showed no new finding.
+
+## Follow-up: platoons and rescue-chain scope (`database/053`)
 
 Asked by the repo owner on 2026-10-20 ("add platoons but one company, check all"); decisions: a platoon is one shared site team (pc, rpc, medics/paramedics), rpc sees only its own platoon's sites, and the rescue chain is blocked from clinical data in the database.
 

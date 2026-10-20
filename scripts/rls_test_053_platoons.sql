@@ -1,5 +1,5 @@
--- Rolled-back RLS test for database/051 (docs/RLS_AUDIT_v1.md, 051 follow-up). Run in the SQL editor AFTER the
--- 051 statements in the same transaction, or after applying 051. It ends with an error on purpose so
+-- Rolled-back RLS test for database/053 (docs/RLS_AUDIT_v1.md, 053 follow-up). Run in the SQL editor AFTER the
+-- 053 statements in the same transaction, or after applying 053. It ends with an error on purpose so
 -- nothing persists; the error text is the result. Uses the synthetic test accounts of the live project.
 do $test$
 declare
