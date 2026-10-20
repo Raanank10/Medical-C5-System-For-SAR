@@ -2859,7 +2859,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.41';
+const APP_VERSION = '2.99.42';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -2908,7 +2908,7 @@ const SYNC_ELIGIBLE_EVENT_TYPES = new Set([
   'PATIENT_T_INJURY_UPDATED','PATIENT_HANDED_OVER','PATIENT_TRIAGED_EXPECTANT','VITALS_RECORDED',
   'MINIMAL_TRIAGE_RECORDED','SABCDE_RECORDED','MSTART_SUGGESTED','JUMPSTART_SUGGESTED','MSTART_OVERRIDE',
   'JUMPSTART_OVERRIDE','TOURNIQUET_APPLIED','TOURNIQUET_REASSESSMENT','TOURNIQUET_RELEASED',
-  'TOURNIQUET_CONTEXT_UPDATED','INTERVENTION_RECORDED','MEDICATION_ADMINISTERED','AIRWAY_MANAGED',
+  'TOURNIQUET_CONTEXT_UPDATED','TOURNIQUET_LIMB_RECORDED','INTERVENTION_RECORDED','MEDICATION_ADMINISTERED','AIRWAY_MANAGED',
   'HIGH_RISK_OVERRIDE_CONFIRMED','FIRST_RESPONDER_REPORT','OFFICIAL_INCIDENT_OPENED_BY_RESCUE',
   'INCIDENT_CLOSE_TOGGLED','BUILDING_STATUS_UPDATED','SITE_CLEAR_CONFIRMED','INCIDENT_DRAFT_CREATED',
   'INCIDENT_OPENED','INCIDENT_CONFIRMED','INCIDENT_DRAFT_MERGED','INCIDENT_DRAFT_REJECTED',
@@ -7795,7 +7795,12 @@ function setSweepTourniquetLimb(limb, tourniquetId=pendingTourniquetLimbId){
   }
   p.events=p.events||[];
   p.events.unshift({type:'TOURNIQUET_LIMB_RECORDED',time:nowT(),detail:`${tq.id} · חסם: ${meta.label}`,warn:false});
-  saveLocalEvent({type:'TOURNIQUET_LIMB_RECORDED',detail:`${p.id} · ${tq.id} · ${meta.label}`,warn:false,payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb:meta.key}});
+  // WP-2b (V2.99.42, database/056-057): the server row was created with tq.serverLimb (normally
+  // 'unknown'); this moves it to the recorded limb, so other devices stop showing "לא ידוע".
+  const previousLimb=tq.serverLimb||'unknown';
+  saveLocalEvent({type:'TOURNIQUET_LIMB_RECORDED',detail:`${p.id} · ${tq.id} · ${meta.label}`,warn:false,patient_id:p.id,
+    payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb:meta.key,previous_limb:previousLimb,application_time:new Date(tq.appliedAt||Date.now()).toISOString()}});
+  tq.serverLimb=meta.key;
   pendingTourniquetLimbPatientId=null;
   pendingTourniquetLimbId=null;
   hideTourniquetLimbModal();
@@ -7840,8 +7845,22 @@ function markSweepTourniquetEffectiveness(tourniquetId, effectiveness){
   p.events=p.events||[];
   p.events.unshift({type,time:nowT(),detail,warn:effectiveness==='bleeding_continues'});
   saveLocalEvent({type,detail:`${p.id} · ${detail}`,warn:effectiveness==='bleeding_continues',payload_json:{patient_id:p.id,tourniquet_id:tq.id,effectiveness}});
+  queueTourniquetReassessment(p, tq, effectiveness);
   saveDemoState();
   renderMstartSweep();
+}
+// WP-2b (V2.99.42): checking a tourniquet's effectiveness is a reassessment. Sent as
+// TOURNIQUET_REASSESSMENT, which project_tourniquet_events() (database/001) already projects into
+// tourniquet_status and last_reassessed_at for the server row of that limb. The client sends
+// clinical_context 'unknown' at application, for which the server schedules reassessment every 30
+// minutes (D1: the server rule is authoritative); the same 30 is sent here so a check does not
+// stretch the server's cadence to its 60-minute default.
+function queueTourniquetReassessment(p, tq, effectiveness){
+  if(!tq?.serverLimb) return;
+  saveLocalEvent({type:'TOURNIQUET_REASSESSMENT',detail:`${p.visualId||p.id} · ${tq.id} · ${effectiveness==='bleeding_continues'?'דימום ממשיך':'דימום נשלט'}`,
+    warn:effectiveness==='bleeding_continues',patient_id:p.id,
+    payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb:tq.serverLimb,tourniquet_status:effectiveness==='bleeding_continues'?'bleeding_continues':'effective',
+      effectiveness,clinical_context:'unknown',next_reassessment_interval_minutes:30}});
 }
 function addSweepTourniquetSameLimb(sourceId){
   const p=activeSweepPatient(); if(!p) return;
@@ -10483,6 +10502,22 @@ function queueModalTreatmentEvents(patient, text, medicName){
       queueTreatmentEvent(patient.id, key, key==='other_tx' ? (otherText||'אחר') : (INT_LABELS[key]||key), {source:'vitals_modal'});
     }
   });
+  // WP-2b (V2.99.42): a tourniquet ticked here used to be text only: no tourniquet entry, so no
+  // timer on any device and nothing on the server. It now starts a tourniquet (limb to be
+  // recorded, time = now, since this screen asks for neither) unless one is already active, in
+  // which case the tick reads as "still on" and must not restart its timer.
+  if(modalTreatments.has('tourniquet') && !activeTourniquets(patient).length){
+    const list=ensureTourniquetArray(patient);
+    const meta=tourniquetLimbMeta('unknown');
+    const tq={id:`TQ-${String(list.length+1).padStart(3,'0')}`, appliedAt:Date.now(), timeCode:nowT(), limb:meta.key, limbLabel:meta.label, side:meta.side, bodyPart:meta.bodyPart,
+      appliedBy:medicName, source:'vitals_modal', status:'active', effectiveness:'unknown', reasonForAdditional:null, note:''};
+    list.push(tq);
+    syncLegacyTourniquetAlias(patient);
+    patient.assessmentDebt=patient.assessmentDebt||[];
+    if(!patient.assessmentDebt.includes('tourniquet_limb_missing')) patient.assessmentDebt.push('tourniquet_limb_missing');
+    patient.events.unshift({type:'TOURNIQUET_APPLIED',time:nowT(),detail:`${tq.id} · ${tq.limbLabel} · נרשם מתוך עדכון מדדים`,warn:true});
+    queueTourniquetAppliedEvent(patient, tq, {source:'vitals_modal'});
+  }
   modalTreatments.forEach(key=>{
     const spec=INTERVENTION_SUPPLY[key];
     if(!spec) return;
@@ -13112,7 +13147,7 @@ async function pullProjectedPatientState(incidentId){
 // Active tourniquets from the server (tourniquets table, RLS-scoped by app.can_access_incident).
 // Applied only to patients this device received from another device: a patient created here
 // keeps its own, richer tourniquet records (effectiveness, later limb correction, notes).
-const SERVER_TOURNIQUET_COLUMNS='id,patient_id,limb,applied_at,is_active';
+const SERVER_TOURNIQUET_COLUMNS='id,patient_id,limb,applied_at,is_active,tourniquet_status';
 function applyServerTourniquets(rows, incidentId){
   const site=INCIDENT_ID_TO_SITE[incidentId];
   const pending=patientsWithPendingLocalEdits();
@@ -13122,10 +13157,12 @@ function applyServerTourniquets(rows, incidentId){
     if(site && p.siteId && p.siteId!==site) continue;
     const next=rows.filter(r=>r.patient_id===p.id && r.is_active!==false).map(r=>{
       const meta=tourniquetLimbMeta(r.limb);
+      // tourniquet_status comes from TOURNIQUET_REASSESSMENT (effectiveness check, V2.99.42).
+      const effectiveness=r.tourniquet_status==='bleeding_continues'?'bleeding_continues':r.tourniquet_status==='effective'?'effective':'unknown';
       return {id:`SRV-${r.id}`, appliedAt:Date.parse(r.applied_at)||null, limb:meta.key, limbLabel:meta.label, side:meta.side, bodyPart:meta.bodyPart,
-        appliedBy:'(מכשיר אחר)', source:'server', status:'active', effectiveness:'unknown', reasonForAdditional:null, note:''};
+        appliedBy:'(מכשיר אחר)', source:'server', status:effectiveness==='bleeding_continues'?'ineffective':'active', effectiveness, reasonForAdditional:null, note:''};
     }).filter(t=>t.appliedAt);
-    const key=list=>JSON.stringify((list||[]).filter(t=>t.source==='server').map(t=>[t.id,t.limb,t.appliedAt]));
+    const key=list=>JSON.stringify((list||[]).filter(t=>t.source==='server').map(t=>[t.id,t.limb,t.appliedAt,t.effectiveness]));
     if(key(p.tourniquets)===key(next) && (p.tourniquets||[]).every(t=>t.source==='server')) continue;
     // Clear the legacy p.tourniquet alias first: ensureTourniquetArray() rebuilds an empty
     // list from it, which would bring back a tourniquet the server has released.

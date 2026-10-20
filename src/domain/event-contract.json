@@ -72,7 +72,8 @@
     "SITE_PRE_EVACUATION_REPORTED",
     "MEDICAL_REINFORCEMENT_REQUESTED",
     "DOCTOR_DEATH_CERTIFICATION_REQUESTED",
-    "MEDICAL_REINFORCEMENT_STATUS_UPDATED"
+    "MEDICAL_REINFORCEMENT_STATUS_UPDATED",
+    "TOURNIQUET_LIMB_RECORDED"
   ],
   "local_only": {
     "Patient-card timeline entry shown on this device only; the clinical fact itself is sent by a synced event or is display text": [
@@ -114,6 +115,12 @@
       "LIFE_SAVING_TREATMENT_RECORDED",
       "MAJOR_BLEEDING_NOTED",
       "TREATMENT_NEEDED_RECORDED"
+    ],
+    "Tourniquet note whose clinical content is sent as a separate synced event (the additional tourniquet as TOURNIQUET_APPLIED, an effectiveness check as TOURNIQUET_REASSESSMENT; WP-2b)": [
+      "TOURNIQUET_ADDED_DIFFERENT_LIMB",
+      "TOURNIQUET_ADDED_SAME_LIMB",
+      "TOURNIQUET_MARKED_EFFECTIVE",
+      "TOURNIQUET_MARKED_INEFFECTIVE"
     ]
   },
   "not_events": {
@@ -139,13 +146,6 @@
     ]
   },
   "known_gaps": {
-    "WP-2b": [
-      "TOURNIQUET_ADDED_DIFFERENT_LIMB",
-      "TOURNIQUET_ADDED_SAME_LIMB",
-      "TOURNIQUET_LIMB_RECORDED",
-      "TOURNIQUET_MARKED_EFFECTIVE",
-      "TOURNIQUET_MARKED_INEFFECTIVE"
-    ],
     "WP-5": [
       "PC_REVIEW_REQUESTED_FOR_DETERIORATION"
     ],

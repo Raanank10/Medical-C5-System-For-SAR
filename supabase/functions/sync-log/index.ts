@@ -62,6 +62,8 @@ const CLINICAL_EVENTS = [
   "TOURNIQUET_APPLIED", "TOURNIQUET_REASSESSMENT", "TOURNIQUET_RELEASED",
   "TOURNIQUET_CONTEXT_UPDATED", "INTERVENTION_RECORDED", "MEDICATION_ADMINISTERED",
   "AIRWAY_MANAGED", "HIGH_RISK_OVERRIDE_CONFIRMED",
+  // A tourniquet's limb recorded after it was applied (database/056-057, WP-2b).
+  "TOURNIQUET_LIMB_RECORDED",
 ];
 const FIRST_RESPONDER_EVENTS = ["FIRST_RESPONDER_REPORT"];
 // Event types that create a new patients row on first sight (idempotent — see handlePush).
