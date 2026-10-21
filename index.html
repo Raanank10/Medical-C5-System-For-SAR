@@ -755,7 +755,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9946</div>
+      <div class="demo-kicker">Demo V2.9947</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -852,7 +852,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9946</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9947</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -862,7 +862,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9946</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9947</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2873,7 +2873,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.46';
+const APP_VERSION = '2.99.47';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -2931,7 +2931,7 @@ const SYNC_ELIGIBLE_EVENT_TYPES = new Set([
   'INVENTORY_LEDGER_ENTRY','INVENTORY_INITIALIZED','INVENTORY_TRANSFER_OUT','INVENTORY_TRANSFER_IN',
   'PLATOON_STOCK_INITIALIZED','PLATOON_STOCK_REFILLED','DIRECT_LOGO_TO_MEDIC_REFILL',
   'EXTERNAL_REPORT_CREATED','EXTERNAL_REPORT_LINKED','WATCHDOG_ALERT','WATCHDOG_ACKNOWLEDGED',
-  'WATCHDOG_RESOLVED','DEAD_MAN_SWITCH_ESCALATED','SYNC_CONFLICT','CONFLICT_LOG_ENTRY',
+  'WATCHDOG_RESOLVED','SYNC_CONFLICT','CONFLICT_LOG_ENTRY',
   'TREATMENT_SAFETY_WARNING','COMMAND_CONTEXT_NOTE_ADDED','VOICE_MEMO_ADDED',
   'HIGH_RISK_CLINICAL_VIOLATION','NOTE_ADDED','AAR_CONTEXT_NOTE_ADDED','PATIENT_DEATH_CONFIRMED',
   'PATIENT_EVACUATION_UPDATED',
@@ -2957,7 +2957,11 @@ const SYNC_ELIGIBLE_EVENT_TYPES = new Set([
   // holder's count after it). SUPPLY_CONSUMED repeats a consumption for the patient timeline and is
   // kept as an audit event only, so nothing is counted twice; SUPPLY_USE_CANCELLED and
   // LOCAL_STOCKOUT_WARNING are audit events too.
-  'INVENTORY_LEDGER_MOVEMENT','SUPPLY_CONSUMED','SUPPLY_USE_CANCELLED','LOCAL_STOCKOUT_WARNING'
+  'INVENTORY_LEDGER_MOVEMENT','SUPPLY_CONSUMED','SUPPLY_USE_CANCELLED','LOCAL_STOCKOUT_WARNING',
+  // A medic's MSTART sweep summary (database/063, WP-11): the PC on another phone reads it from the
+  // events it already pulls (sweepSessionsForBoard). DEAD_MAN_SWITCH_ESCALATED was listed here but
+  // nothing ever wrote it; a server-side watchdog (WP-12) owns that escalation, so it was removed.
+  'MSTART_SWEEP_COMPLETED'
 ]);
 const SUPPLY_BASELINE = Object.freeze({tourniquets:3, pressureDressings:4, hemostaticGauze:2, airwayEquipment:2, ivKits:1, blankets:2, batteryPacks:1});
 const PC_TRUCK_BASELINE = Object.freeze({tourniquets:20, pressureDressings:30, hemostaticGauze:15, airwayEquipment:10, ivKits:8, blankets:25, batteryPacks:6});
@@ -3700,7 +3704,7 @@ function isNetworkFailure(err){
 }
 function rememberLastProfile(){
   if(!currentUser || currentUser.offlineProfile) return;
-  queuedSecureSetItem(LAST_PROFILE_KEY, JSON.stringify({id:currentUser.id, email:currentUser.email, role:currentUser.role, at:new Date().toISOString()}));
+  queuedSecureSetItem(LAST_PROFILE_KEY, JSON.stringify({id:currentUser.id, email:currentUser.email, role:currentUser.role, displayName:_myDisplayName||'', at:new Date().toISOString()}));
 }
 async function loadLastProfile(userId){
   try{
@@ -3732,7 +3736,7 @@ async function loadProfileAndEnter(client, userId){
   let profileResult=null;
   let networkDown=false;
   try{
-    profileResult=await client.from('profiles').select('role,is_active').eq('id',userId).single();
+    profileResult=await client.from('profiles').select('role,is_active,display_name').eq('id',userId).single();
   }catch(e){ networkDown=isNetworkFailure(e); }
   if(profileResult?.error && isNetworkFailure(profileResult.error)) networkDown=true;
   const profile=profileResult?.data;
@@ -3740,11 +3744,13 @@ async function loadProfileAndEnter(client, userId){
     const cached=await loadLastProfile(userId);
     if(!cached) return false;
     currentUser={id:userId, email:cached.email||'', role:cached.role, offlineProfile:true};
+    _myDisplayName=cached.displayName||'';
     toast('אין חיבור לשרת · עובד עם הנתונים במכשיר, יסונכרן כשהרשת תחזור');
   }else{
     if(!profileResult || profileResult.error || !profile || !profile.is_active) return false;
     const {data:userData}=await client.auth.getUser();
     currentUser={id:userId, email:userData?.user?.email||'', role:profile.role};
+    _myDisplayName=profile.display_name||'';
     rememberLastProfile();
   }
   renderAuthStatus();
@@ -3767,7 +3773,7 @@ async function signOut(){
   if(client){ try{ await client.auth.signOut(); }catch(e){} }
   try{ localStorage.removeItem(LAST_PROFILE_KEY); }catch(e){}
   currentUser=null;
-  _realCompanies=null; _realPlatoons=[]; _realPlatoonMembers=[]; _myCompanyId=null; _myPlatoonId=null;
+  _realCompanies=null; _realPlatoons=[]; _realPlatoonMembers=[]; _myCompanyId=null; _myPlatoonId=null; _myDisplayName='';
   deactivateIncidentContext();
   renderAuthStatus();
   goTo('login');
@@ -4836,6 +4842,7 @@ async function runIncidentAssignmentPull(){
     for(const [incId, w] of Object.entries(_pendingIncidentTypeWrites)) await writeIncidentTypeToServer(incId, w.type, w.role);
     await pullActiveIncidentRow(client);
     await pullIncidentSiteAuthority(client);
+    await pullRemoteSweeps(client);
     await pullRealPlatoons(client);
     const prevKey=assignmentKey(_myRealAssignment);
     await pullMyAssignment(client);
@@ -6166,7 +6173,7 @@ function renderPcNowTaskBoard(myPts){
     if(debt.includes('full_injury_assessment')) completion.push(renderPcTaskRow({patient:p,detail:'הערכת פגיעה מלאה חסרה',recommendation:'השלם בהמשך המעקב',openedAt:p.createdAt}));
     if(debt.includes('tourniquet_limb_missing')) completion.push(renderPcTaskRow({patient:p,detail:'גפת חסם לא תועדה',recommendation:'השלם מיקום חסם',openedAt:p.tourniquet?.appliedAt||p.createdAt}));
   });
-  (siteData.sweepSessions||[]).forEach(s=>{
+  sweepSessionsForBoard().forEach(s=>{
     const unassigned=myPts.filter(p=>(p.zone||p.locDetail)===s.zone && p.phase==='mstart_sweep' && assessmentDebtList(p).includes('full_vitals'));
     if(!unassigned.length) return;
     operational.push(renderPcTaskRow({
@@ -6332,6 +6339,37 @@ function renderPcAssessmentDebtBoard(){
   ].map(([label,list])=>roleRow(label,`${list.length} פצועים`, list.slice(0,5).map(p=>`<span class="identity-chip">${p.visualId||p.id} · ${p.zone||p.locDetail||zoneLabel()}</span>`).join(''))).join('');
   return renderCollapsibleSection('pc-assessment-debt','חוב הערכה אחרי סריקה', rows || renderOperationalEmptyState('אין פצועים במיקוד הנוכחי'), pts.length, {criticalCount:pts.filter(p=>p.triage==='red'&&assessmentDebtList(p).includes('full_vitals')).length, emptyMessage:'אין פצועים במיקוד הנוכחי'});
 }
+// Completed MSTART sweeps for the PC boards: this phone's own, plus sweeps other phones finished
+// (MSTART_SWEEP_COMPLETED, WP-11). Read with their own query (pullRemoteSweeps): the sync pull
+// keeps only the latest cycle's events, so a sweep would vanish from the board after 45 seconds.
+// Remote text is stripped of markup and numbers are coerced, so a payload from another device
+// cannot inject anything.
+let _remoteSweepEvents={}; // incidentId -> events rows
+async function pullRemoteSweeps(client){
+  if(!activeIncident || !client) return;
+  let r;
+  try{ r=await client.from('events').select('device_id,local_event_id,local_timestamp,payload_json').eq('incident_id',activeIncident.id).eq('type','MSTART_SWEEP_COMPLETED').order('local_timestamp',{ascending:false}).limit(50); }
+  catch(e){ return; }
+  if(r.error || !Array.isArray(r.data)) return;
+  _remoteSweepEvents[activeIncident.id]=r.data.filter(e=>e.device_id!==getDeviceId());
+}
+function sweepSessionsForBoard(){
+  const own=siteData.sweepSessions||[];
+  const incId=activeIncident?.id||null;
+  const num=v=>Math.max(0, Math.round(Number(v)||0));
+  const remote=(incId ? (_remoteSweepEvents[incId]||[]) : []).map(e=>{
+    const p=e.payload_json||{};
+    const c=p.counts||{};
+    return {
+      id:sanitizeRemoteText(p.id||e.local_event_id||'', 40), medicId:sanitizeRemoteText(p.medicId||'', 60),
+      medicName:sanitizeRemoteText(p.medicName||'חובש', 60), zone:sanitizeRemoteText(p.zone||'אזור לא צוין', 80),
+      casualtyCountInSweep:num(p.casualtyCountInSweep), counts:{red:num(c.red),yellow:num(c.yellow),green:num(c.green),black:num(c.black)},
+      trapped:num(p.trapped), immobile:num(p.immobile), tourniquets:num(p.tourniquets), missingFullVitals:num(p.missingFullVitals),
+      completedAt:p.createdAt||e.local_timestamp||e.server_timestamp, remote:true
+    };
+  });
+  return [...own, ...remote.sort((a,b)=>(Date.parse(b.completedAt)||0)-(Date.parse(a.completedAt)||0))];
+}
 function renderSweepBoardForPc(){
   ensureSiteReadiness();
   const supplyGaps=lowStockEntries(state.localStockCache).map(x=>supplyLabel(x.key||x.item||x[0],true)).join(' · ') || 'אין חוסר ציוד אישי מדווח';
@@ -6343,7 +6381,7 @@ function renderSweepBoardForPc(){
     const mins=last?Math.max(0,Math.floor((Date.now()-last)/60000)):'—';
     return roleRow(`סריקה פעילה · ${zone}`,`${currentMedicName()} · ${c.total} פצועים · אדום ${c.red} · צהוב ${c.yellow} · ירוק ${c.green} · שחור ${c.black} · לכודים ${c.trapped} · לא ניידים ${c.immobile} · חסמים ${c.tourniquets} · נתיבי אוויר ${c.airway} · חסר מדדים ${c.missingVitals} · זהות לא ידועה ${c.unknownIdentity} · ציוד: ${supplyGaps} · עדכון אחרון ${mins} דק׳`, `<span class="identity-chip">פעולה הבאה: שייך חובש למעקב / בקש תגבור / טפל בבקשת ציוד</span>`);
   }).join('');
-  const completed=(siteData.sweepSessions||[]).map(s=>roleRow(
+  const completed=sweepSessionsForBoard().map(s=>roleRow(
     `הושלמה · ${s.zone}`,
     `${s.medicName} · ${s.casualtyCountInSweep} פצועים · אדום ${s.counts?.red||0} · צהוב ${s.counts?.yellow||0} · ירוק ${s.counts?.green||0} · שחור ${s.counts?.black||0} · לכודים ${s.trapped} · לא ניידים ${s.immobile||0} · חסמים ${s.tourniquets} · נתיבי אוויר ${s.airwayInterventions||0} · חסר מדדים ${s.missingFullVitals} · זהות לא ידועה ${s.unknownIdentity||0} · ציוד: ${supplyGaps}${s.arrivalToSweepCompletionMinutes!==null&&s.arrivalToSweepCompletionMinutes!==undefined?' · זמן מהגעה '+s.arrivalToSweepCompletionMinutes+' דק׳':''}`,
     `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><button class="demo-mini-btn" onclick="demoReassignWithinPlatoon()">שייך חובש למעקב</button><button class="demo-mini-btn" onclick="openReinforcementRequest()">בקש תגבור רפואי</button><button class="demo-mini-btn" onclick="openReinforcementRequest()">בקש פראמדיק</button><button class="demo-mini-btn" onclick="toast('בקשת פינוי נרשמה לחמ״ל')">בקש פינוי</button><button class="demo-mini-btn" onclick="toast('מעבר לשלב מעקב אושר')">אשר מעבר לשלב מעקב</button><button class="demo-mini-btn" onclick="showRoleDrilldown('patients')">פתח רשימת פצועים באזור</button></div>`
@@ -7878,6 +7916,8 @@ function overrideSweepColor(color){
   if(!C5Rules.canChangePatientStatus(p)){ toast('לא ניתן לשנות — הטיפול בפצוע כבר הסתיים'); return; }
   const reason=document.getElementById('sweep-override-reason')?.value.trim()||'עקיפה ידנית בסריקה';
   p.mstart=p.mstart||{};
+  // What MSTART itself suggests from the answers, before this override replaces it.
+  const algorithmColor=suggestedSweepColor({...p.mstart, overrideReason:''});
   p.mstart.color=color;
   p.mstart.overrideReason=reason;
   p.triage=color;
@@ -7889,6 +7929,13 @@ function overrideSweepColor(color){
     createDeathCertificationRequest(p);
   }
   saveLocalEvent({type:'MSTART_SWEEP_COLOR_OVERRIDDEN',detail:`${p.id} · ${TRIAGE_LABELS[color]}`,warn:p.alert,payload_json:{patient_id:p.id,color,reason}});
+  // The server's audit of a human overriding MSTART (WP-11): MSTART_OVERRIDE is synced and lands in
+  // conflict_log with the algorithm's and the medic's colour and the reason. The colour itself
+  // reaches the server through the triage sync (reconcileTriageSync); the local timeline note
+  // above stays on this phone. The patient was created on the server when the sweep marker was
+  // opened (QUICK_PATIENT_CREATED is queued first), so this never arrives before its patient.
+  saveLocalEvent({type:'MSTART_OVERRIDE',detail:`${p.visualId||p.id} · MSTART ${TRIAGE_LABELS[algorithmColor]||algorithmColor||'—'} → ${TRIAGE_LABELS[color]}`,warn:p.alert,patient_id:p.id,
+    payload_json:{algorithm_value:algorithmColor||null, human_value:color, reason, source:'mstart_sweep', description:'MSTART sweep colour overridden by medic', siteId:p.siteId, zone:p.zone}});
   saveDemoState();
   renderMstartSweep();
 }
@@ -8152,8 +8199,9 @@ function completeMstartSweep(){
   };
   const session={
     id:`SWEEP-${String((siteData.sweepSessions||[]).length+1).padStart(3,'0')}`,
-    medicId:currentMedicId(),
-    medicName:currentMedicName(),
+    // Signed in, the summary reaches the PC's phone (WP-11): name the real medic, not the demo one.
+    medicId:currentUser ? currentUser.id : currentMedicId(),
+    medicName:currentUser ? (_myDisplayName || currentUser.email || 'חובש') : currentMedicName(),
     siteId:currentSiteId(),
     zone:zoneLabel(),
     casualtyCountInSweep:c.total,

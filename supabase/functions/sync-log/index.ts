@@ -64,6 +64,8 @@ const CLINICAL_EVENTS = [
   "AIRWAY_MANAGED", "HIGH_RISK_OVERRIDE_CONFIRMED",
   // A tourniquet's limb recorded after it was applied (database/056-057, WP-2b).
   "TOURNIQUET_LIMB_RECORDED",
+  // A medic's MSTART sweep summary, read by the PC from pulled events (database/063, WP-11).
+  "MSTART_SWEEP_COMPLETED",
 ];
 const FIRST_RESPONDER_EVENTS = ["FIRST_RESPONDER_REPORT"];
 // Event types that create a new patients row on first sight (idempotent — see handlePush).
