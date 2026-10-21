@@ -286,6 +286,10 @@ These need a decision, people or money rather than a code change in this repo. L
 - T6: QR handover as a scannable image, and a live click-through of `handover-consume`.
 - T7: In-app disclosure that device presence tracks location (`PRIVACY_AND_DATA_MINIMIZATION_REVIEW.md`).
 
+### Backlog
+
+- B1 (owner, 2026-10-21): Telegram notifications for critical alerts. Telegram first (free bot API, a server-side function sends the message when an alert is raised); WhatsApp later only if needed (needs Meta's Business API, approved templates, per-message cost). An extra channel only: the phone's own offline alert (D1) stays primary, since Telegram also needs a network. No patient details in the message (only "critical alert, incident X, open the app"), per `OPERATIONS_SAFETY.md` and the privacy review. Open questions for the owner before it starts: which alerts (proposal: 120-minute tourniquet, deterioration to red, death-certification request), and who receives them (role per incident).
+
 ## Status
 
 | WP | Priority | Status | PR | Notes |
@@ -301,7 +305,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-7 CC real platoons | P2 | Mostly done (V2.99.42, `database/053`): applied live by the owner 2026-10-20, every 053 function, trigger and policy confirmed present; no companies or platoons created yet | #82, #86 | real `companies` and `platoons` (3 rescue companies x 3 platoons, plus the ambulance team) instead of 045's medic-to-PC link; first one-company version (#82) rewritten before it was applied; CC tiles/rows/counts from real platoons; roster panel; rpc platoon scope and rescue clinical block added at the owner's request. Remaining: `PATIENT_REASSIGNED_*` (moving a patient to another platoon means another site; not modelled) |
 | WP-8 Rescue panel state | P2 | Done (V2.99.44): 060 live, verified 2026-10-21 | this PR | verified first: incident type already crossed (`incidents.incident_type`), close/reopen too; T0, building status and site clear were stored as events but never read back. Now projected into `incident_site_authority` (only rpc/rcc/admin change it) and read by every phone in the incident. `SITE_EXTRACTED_COUNTER_UPDATED` is no longer written (pre-evacuation report replaced it); `INCIDENT_TYPE_SET` classified local-only. Follow-up: a signed-in medic's incident type and `INCIDENT_TYPE_MISMATCH_REPORTED` still stay on the medic's phone |
 | WP-9 Inventory on server | P2 | Not started | | needs D2 |
-| WP-10 Offline cold start | P2 | Not started | | |
+| WP-10 Offline cold start | P2 | Done (V2.99.45) | this PR | `sw.js` (network-first page with a 4 s fallback, cache-first pinned supabase-js, never Supabase API calls, cache named by `APP_VERSION`), `manifest.webmanifest`, `icon.svg`; `check_repo.py` keeps the pinned URL equal in both files. Found while testing: a signed-in phone fell back to the login screen offline (profile read failed), so the last profile is now kept encrypted and used only when the server cannot be reached; re-checked when the network returns; removed on sign-out. Not verified yet on a real Android/iOS install |
 | WP-11 Small loose ends | P3 | Not started | | |
 | WP-12 Durable watchdog | P3 | Not started | | needs D1 |
 | WP-13 Tests in CI | P3 | Not started | | the 34 smoke scripts pass again (WP-14), so they can be wired in |
