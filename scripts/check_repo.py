@@ -21,6 +21,9 @@ REQUIRED_PATHS = [
     "CONTRIBUTING.md",
     "SECURITY.md",
     "index.html",
+    "sw.js",
+    "manifest.webmanifest",
+    "icon.svg",
     "docs/DEVELOPMENT.md",
     "docs/ARCHITECTURE.md",
     "docs/TACTICAL_UI_GUIDELINES.md",
@@ -294,6 +297,25 @@ EVENT_TYPE_SOURCES = [
 ]
 
 
+def check_offline_shell(errors: list[str]) -> None:
+    """sw.js caches the exact supabase-js build index.html loads (WP-10, offline cold start).
+
+    If the pinned version is bumped in index.html only, the cached library would be the old one and
+    an offline reload would load a different supabase-js than the online page.
+    """
+    html_path = ROOT / "index.html"
+    sw_path = ROOT / "sw.js"
+    if not (html_path.exists() and sw_path.exists()):
+        return
+    pattern = re.compile(r"https://cdn\.jsdelivr\.net/npm/@supabase/supabase-js@[0-9.]+/dist/umd/supabase\.min\.js")
+    html_urls = set(pattern.findall(html_path.read_text(encoding="utf-8", errors="ignore")))
+    sw_urls = set(pattern.findall(sw_path.read_text(encoding="utf-8", errors="ignore")))
+    if len(html_urls) != 1:
+        fail(f"index.html: expected exactly one pinned supabase-js URL, found {sorted(html_urls)}", errors)
+    elif html_urls != sw_urls:
+        fail(f"sw.js: caches {sorted(sw_urls)} but index.html loads {sorted(html_urls)}; keep the pinned supabase-js URL identical in both.", errors)
+
+
 def check_event_contract(errors: list[str]) -> None:
     """Every event type index.html writes is classified in src/domain/event-contract.json.
 
@@ -368,6 +390,7 @@ def main() -> int:
     check_version_labels(errors)
     check_markdown_links(errors)
     check_domain_rules_sync(errors)
+    check_offline_shell(errors)
     check_event_contract(errors)
     check_sql_structure(errors)
     check_python_syntax(errors)

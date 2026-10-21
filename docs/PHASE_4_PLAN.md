@@ -21,7 +21,7 @@ Concrete inventory, not the aspirational picture:
 | `services/projectors` | `project_patient_state()`, a Postgres trigger function (`database/013_consolidate_patient_status_projection.sql`), not a separately deployable service at all. | **DECISION NEEDED** — see 4D. The ROADMAP.md phrasing may not map onto what actually exists. |
 | `database/migrations` | 16 numbered draft SQL files (`database/001_...sql` through `016_...sql`), applied by hand via Supabase MCP tooling during development, no `up`/`down` framework. | Real gap — see 4C. |
 | `analytics/` | Already a real, self-contained Python package (`db.py`/`kpis.py`/`charts.py`/`report.py`, pytest suite, `export_live_incident.py` for live data). | Mostly just needs recognizing as a monorepo workspace member — smallest gap of the eight. |
-| `apps/field-mobile` | Doesn't exist. All field/medic UI is inside `index.html`. | Full build — see 4F, do this last. |
+| `apps/field-mobile` | Doesn't exist. All field/medic UI is inside `index.html`. Since V2.99.45 (WP-10) `index.html` has a minimal `sw.js` + `manifest.webmanifest` for an offline cold start only; it is not the field app's PWA shell and decides nothing for 4F. | Full build — see 4F, do this last. |
 | `apps/command-web` | Doesn't exist. All command/pc/cc/chamal/logistics UI is inside `index.html`, already reading some real server-authoritative data (`get_incident_command_state`, `device_presence`, projected `patients` rows). | Full build — see 4E, do this before 4F. |
 
 Root `package.json` currently exists solely for the Playwright browser-smoke-test dev dependency (`CLAUDE.md`) — it is not a monorepo root yet.

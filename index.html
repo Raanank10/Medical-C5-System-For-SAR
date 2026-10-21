@@ -6,6 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0a0f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <title>RESCUE</title>
 <style>
 :root{
@@ -753,7 +755,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9944</div>
+      <div class="demo-kicker">Demo V2.9945</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -850,7 +852,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9944</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9945</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -860,7 +862,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9944</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9945</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2871,7 +2873,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.44';
+const APP_VERSION = '2.99.45';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3676,15 +3678,69 @@ async function signIn(email, password){
   setLoginBusy(false);
   if(!ok) showLoginError('המשתמש מחובר אך אין פרופיל פעיל במערכת');
 }
+// ── Offline cold start for a signed-in phone (WP-10) ──
+// The role comes from the server profile. Reloading with no signal used to stop here: the profile
+// read failed and the phone fell back to the login screen, with the encrypted local data and the
+// unsent outbox locked behind a login that cannot work offline. The last profile this phone read
+// is now kept (encrypted, behind the PIN like the session itself) and used only when the server
+// cannot be reached at all; a server answer of "no profile" or "inactive" still refuses entry.
+// Back online, the profile is read again (verifyOfflineProfile); an inactive account is signed out.
+// An explicit sign-out removes it, so only a session that was never closed reopens offline.
+const LAST_PROFILE_KEY='c5_last_profile_v1';
+const SUPABASE_AUTH_STORAGE_KEY=`sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`;
+function isNetworkFailure(err){
+  if(typeof navigator!=='undefined' && navigator.onLine===false) return true;
+  return /fetch|network|load failed|timed? ?out/i.test(String(err?.message||err||''));
+}
+function rememberLastProfile(){
+  if(!currentUser || currentUser.offlineProfile) return;
+  queuedSecureSetItem(LAST_PROFILE_KEY, JSON.stringify({id:currentUser.id, email:currentUser.email, role:currentUser.role, at:new Date().toISOString()}));
+}
+async function loadLastProfile(userId){
+  try{
+    const saved=JSON.parse(await secureGetItem(LAST_PROFILE_KEY)||'null');
+    if(saved && saved.id===userId && saved.role) return saved;
+  }catch(e){}
+  return null;
+}
+async function storedSessionUserId(){
+  try{ return JSON.parse(await secureGetItem(SUPABASE_AUTH_STORAGE_KEY)||'null')?.user?.id||null; }catch(e){ return null; }
+}
+async function verifyOfflineProfile(){
+  if(!currentUser?.offlineProfile) return; // also keeps this from creating the client before the PIN unlock
+  const client=getSupabaseClient();
+  if(!client) return;
+  let r;
+  try{ r=await client.from('profiles').select('role,is_active').eq('id',currentUser.id).single(); }catch(e){ return; }
+  if(r.error && isNetworkFailure(r.error)) return; // still unreachable: try again on the next 'online'
+  if(r.error || !r.data || !r.data.is_active){ toast('החשבון אינו פעיל בשרת · נותקת'); await signOut(); return; }
+  const roleChanged=r.data.role!==currentUser.role;
+  currentUser.role=r.data.role;
+  delete currentUser.offlineProfile;
+  rememberLastProfile();
+  renderAuthStatus();
+  if(roleChanged) enterAuthenticatedRole(currentUser.role);
+}
+window.addEventListener('online', ()=>{ verifyOfflineProfile(); });
 async function loadProfileAndEnter(client, userId){
-  let profileResult;
+  let profileResult=null;
+  let networkDown=false;
   try{
     profileResult=await client.from('profiles').select('role,is_active').eq('id',userId).single();
-  }catch(e){ return false; }
-  const profile=profileResult.data;
-  if(profileResult.error || !profile || !profile.is_active) return false;
-  const {data:userData}=await client.auth.getUser();
-  currentUser={id:userId, email:userData?.user?.email||'', role:profile.role};
+  }catch(e){ networkDown=isNetworkFailure(e); }
+  if(profileResult?.error && isNetworkFailure(profileResult.error)) networkDown=true;
+  const profile=profileResult?.data;
+  if(!profile && networkDown){
+    const cached=await loadLastProfile(userId);
+    if(!cached) return false;
+    currentUser={id:userId, email:cached.email||'', role:cached.role, offlineProfile:true};
+    toast('אין חיבור לשרת · עובד עם הנתונים במכשיר, יסונכרן כשהרשת תחזור');
+  }else{
+    if(!profileResult || profileResult.error || !profile || !profile.is_active) return false;
+    const {data:userData}=await client.auth.getUser();
+    currentUser={id:userId, email:userData?.user?.email||'', role:profile.role};
+    rememberLastProfile();
+  }
   renderAuthStatus();
   // Logged-in mode never starts inside an invented incident: resume the one this user was
   // working in on this device if it is still open, otherwise show the incident picker.
@@ -3703,6 +3759,7 @@ function enterAuthenticatedRole(serverRole){
 async function signOut(){
   const client=getSupabaseClient();
   if(client){ try{ await client.auth.signOut(); }catch(e){} }
+  try{ localStorage.removeItem(LAST_PROFILE_KEY); }catch(e){}
   currentUser=null;
   _realCompanies=null; _realPlatoons=[]; _realPlatoonMembers=[]; _myCompanyId=null; _myPlatoonId=null;
   deactivateIncidentContext();
@@ -3738,9 +3795,18 @@ async function restoreSession(){
   }
 
   let sessionResult;
-  try{ sessionResult=await client.auth.getSession(); }catch(e){ return; }
+  try{ sessionResult=await client.auth.getSession(); }catch(e){ sessionResult={error:e}; }
   const session=sessionResult?.data?.session;
-  if(!session) return;
+  if(!session){
+    // Offline with an access token that has expired: supabase-js cannot refresh it and returns no
+    // session, but keeps it stored and refreshes it once the network is back. Enter as the stored
+    // user so the local data opens (WP-10); the server still sees nothing until that refresh.
+    if(isNetworkFailure(sessionResult?.error)){
+      const userId=await storedSessionUserId();
+      if(userId) await loadProfileAndEnter(client, userId);
+    }
+    return;
+  }
 
   // Default-template invite/recovery — supabase-js already auto-established this session from
   // the #access_token hash. Route to set-password instead of straight into the dashboard.
@@ -3757,7 +3823,7 @@ function renderAuthStatus(){
   if(currentUser){
     strip.style.display='flex';
     const label=strip.querySelector('.auth-status-text');
-    if(label) label.textContent=`מחובר: ${currentUser.email} · ${ROLE_LABELS[mapServerRole(currentUser.role)]||currentUser.role}`;
+    if(label) label.textContent=`מחובר: ${currentUser.email} · ${ROLE_LABELS[mapServerRole(currentUser.role)]||currentUser.role}${currentUser.offlineProfile?' · לא מקוון (פרופיל שמור במכשיר)':''}`;
   }else{
     strip.style.display='none';
   }
@@ -14507,6 +14573,18 @@ function computeMstartTriage(v) {
 // since local persistence works the same in both. bootAfterUnlock() runs the rest of what used to
 // be here unconditionally, only once a PIN has actually unlocked the local encryption key.
 showPinGate();
+// Offline cold start (WP-10): sw.js keeps the page and the pinned supabase-js on the phone, so a
+// reload with no signal still opens. https (GitHub Pages) and localhost only; never on file://.
+// The version in the URL makes each release install a fresh worker and drop the old cache.
+function registerOfflineShell(){
+  try{
+    if(!('serviceWorker' in navigator)) return;
+    const local=['localhost','127.0.0.1'].includes(location.hostname);
+    if(location.protocol!=='https:' && !(location.protocol==='http:' && local)) return;
+    navigator.serviceWorker.register(`sw.js?v=${encodeURIComponent(APP_VERSION)}`).catch(()=>{});
+  }catch(e){}
+}
+registerOfflineShell();
 </script>
 </body>
 </html>
