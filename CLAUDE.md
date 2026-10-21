@@ -50,6 +50,7 @@ node scripts/browser_alert_ack_sync_test.js       # "בטיפול" acknowledgmen
 node scripts/browser_remote_treatments_test.js    # treatments, medications and airway from another device listed on the patient card, not mixed into this device's own history (WP-3 step 6)
 node scripts/browser_tourniquet_followups_test.js # later limb, effectiveness check, vitals-screen tourniquet sent; remote effectiveness shown (WP-2b)
 node scripts/browser_tourniquet_offline_alert_test.js # D1: network off, fake clock; 60/120-minute tourniquet alerts vibrate + banner, once per level
+node scripts/test_outbox_eviction.js              # F1: persistOutbox() never evicts an unsynced event, even past the 500 cap (docs/FAILURE_MODE_REVIEW.md)
 
 # Analytics package
 cd analytics/c5_sentinel_sar_analytics_v1_1

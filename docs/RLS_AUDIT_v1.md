@@ -170,7 +170,7 @@ Gap (verified live 2026-10-16): `profiles` has only a SELECT policy, so no signe
 
 New: table `admin_user_audit` (RLS on, one SELECT policy for `app.current_user_role() = 'admin'`, all privileges revoked from `public`/`anon`/`authenticated` except SELECT for `authenticated`, no INSERT/UPDATE/DELETE policy; append-only trigger `app.reject_admin_user_audit_mutation()`); trigger function `app.log_profile_access_change()` (`SECURITY DEFINER`, `EXECUTE` revoked) on `AFTER UPDATE OF role, is_active ON profiles`; RPCs `admin_list_users()`, `admin_set_user_role()`, `admin_set_user_active()` (`SECURITY DEFINER`, `EXECUTE` for `authenticated` only, own admin check). No existing policy changed; no UPDATE policy was added to `profiles`.
 
-**Not yet applied to the live project** (the repo owner chose to review the PR first). Verified on a local PostgreSQL 16 with stand-ins copied from the live definitions (`user_role`, `auth.users`, `auth.uid()`, `profiles` with its live policy and grants, `app.current_user_role()`), impersonating each role as `authenticated` with a JWT subject:
+**Applied live on 2026-10-20** by the repo owner in the SQL editor, after a rolled-back live test passed 10 of 10 checks (admin lists users; role change and (de)activation audited; self role change, self deactivation, audit update and client audit insert refused; cc refused listing, role change and audit read). The `admin-users` Edge Function was deployed the same day (v1, `verify_jwt` on). Before that it had not been applied (the repo owner chose to review the PR first). Verified on a local PostgreSQL 16 with stand-ins copied from the live definitions (`user_role`, `auth.users`, `auth.uid()`, `profiles` with its live policy and grants, `app.current_user_role()`), impersonating each role as `authenticated` with a JWT subject:
 
 | Check | Result |
 |---|---|
@@ -283,7 +283,7 @@ Asked by the repo owner on 2026-10-20 ("add platoons ... check all"). Structure 
 
 **Not covered** (documented, not fixed): `patients.pulse_present`, `breathing_present` and `injury_zones` stay readable to rpc/rcc on patients they can reach. Hiding single columns per role needs a view or RPC for the rescue read path, not RLS. `watchdog_alerts` rows stay readable to rpc/rcc (alert type and timing, no values).
 
-**Not applied live yet.** After applying: run `get_advisors` (security), run `scripts/rls_test_053_platoons.sql` once in the SQL editor, and check one real rpc account.
+**Applied live on 2026-10-20** by the repo owner in the SQL editor, after `042`. `scripts/rls_test_053_platoons.sql` then run once live: every check passed, including the `042` interaction (the live run's tactical-event count for the rpc was 11, against 2 in the local copy, because the live `TEST-INC-A` holds more events), and it left no rows behind (0 companies, 0 `unit_audit` rows afterwards). `get_advisors` (security) afterwards: the new public RPCs appear only in the existing, accepted "signed-in users can execute a SECURITY DEFINER function" warning class (each checks the caller's role itself); none of the `app.*` guard or audit functions are exposed; no new finding otherwise. Still to do: company-level command sets up the units, then one real rpc account is checked on a phone.
 
 ## Follow-up: shared alert acknowledgment (`database/054`)
 
