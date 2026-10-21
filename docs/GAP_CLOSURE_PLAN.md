@@ -274,6 +274,18 @@ Add a CI job running `npm ci`, then every `scripts/browser_*.js` with the pre-in
 
 ---
 
+### WP-15: Unused server tables and writes (P3)
+
+**Why.** Checked live 2026-10-21: of 42 tables, 9 are empty and nothing reads or writes them (no client query, edge function, server function, view or trigger): `aar_reports`, `device_sync_state`, `experiment_observer_notes`, `high_risk_override_confirmations`, `patient_edit_conflicts`, `sync_event_dependencies`, `supply_request_items`, `treatment_catalog` (1 seed row), `treatment_inventory_items`. Each was replaced by another mechanism (phone-side sync cursor, events, `conflict_log`, `sync_ingestion_errors`, `supply_requests.items_json`, client constants) or belongs to an API never built (`aar_reports`, track T3). `realtime_outbox` is written by two triggers on every event (`apply_event_projection_and_outbox`, `draft_incident_approval_outbox`) and read by nothing (no realtime publication, no reader): an extra write per event and one more copy of patient data. Unused tables still cost RLS review and mislead new sessions into assuming they are wired.
+
+**Steps.**
+1. Re-check each table live (row count, references) right before the change; anything that gained a use moves off the list.
+2. Move the unused tables to a new `archive` schema (`alter table ... set schema archive`), not dropped (owner's rule: no data dropped without the owner); no grants on `archive` for `anon`/`authenticated`. Keep `aar_reports` in `public` if track T3 (AAR API) is still planned.
+3. Stop the `realtime_outbox` writes: replace the two trigger functions without the outbox insert (keep `apply_event_projection_and_outbox`'s `conflict_log` part unchanged), then archive the table with its 19 rows.
+4. A new numbered file records the move (`001` is history and stays unedited). Update `RLS_AUDIT_v1.md` (policy count), `ARCHITECTURE.md`, and `analytics/.../export_live_incident.py` if it names a moved table (it lists `device_sync_state`).
+
+**Verify.** Before/after: every browser test, a live rolled-back push of each synced event type (no trigger references a moved table), `get_advisors`.
+
 ## Tracks outside this plan's PRs
 
 These need a decision, people or money rather than a code change in this repo. Listed so nothing is lost:
@@ -310,6 +322,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-12 Durable watchdog | P3 | Not started | | needs D1 |
 | WP-13 Tests in CI | P3 | Not started | | the 34 smoke scripts pass again (WP-14), so they can be wired in |
 | WP-14 Duplicate HTML, doc drift | P3 | Done (2026-10-20) | | D5: `demo/rescue-app.html` removed. Visible labels were stuck at V2.9934 since V2.99.34; fixed to match `APP_VERSION` and `check_repo.py` now checks them against `APP_VERSION`. Smoke scripts refreshed: no version pins (`scripts/lib/smoke_version.js`), stale assertions updated to the commits that changed the behaviour; all 34 pass. Docs: CLAUDE.md, README, DEVELOPMENT, ARCHITECTURE, PHASE_4_PLAN, ROADMAP, THREAT_MODEL, PRODUCTION_READINESS, FIELD_EXPERIMENT_GAPS |
+| WP-15 Unused server tables | P3 | Not started (added 2026-10-21 at the owner's request) | | 9 unused tables to an `archive` schema, stop the never-read `realtime_outbox` writes; nothing dropped |
 
 ## Revisions after #73 (2026-10-19)
 
