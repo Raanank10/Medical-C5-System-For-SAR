@@ -76,7 +76,11 @@
     "TOURNIQUET_LIMB_RECORDED",
     "PC_TRUCK_RESUPPLY_UNAVAILABLE_ESCALATED",
     "RESUPPLY_APPROVED_FROM_PC_TRUCK",
-    "RESUPPLY_ESCALATED_TO_CC"
+    "RESUPPLY_ESCALATED_TO_CC",
+    "INVENTORY_LEDGER_MOVEMENT",
+    "LOCAL_STOCKOUT_WARNING",
+    "SUPPLY_CONSUMED",
+    "SUPPLY_USE_CANCELLED"
   ],
   "local_only": {
     "Patient-card timeline entry shown on this device only; the clinical fact itself is sent by a synced event or is display text": [
@@ -159,12 +163,6 @@
     "WP-7": [
       "PATIENT_REASSIGNED_BETWEEN_PLATOONS",
       "PATIENT_REASSIGNED_WITHIN_PLATOON"
-    ],
-    "WP-9": [
-      "INVENTORY_LEDGER_MOVEMENT",
-      "LOCAL_STOCKOUT_WARNING",
-      "SUPPLY_CONSUMED",
-      "SUPPLY_USE_CANCELLED"
     ],
     "WP-11": [
       "MSTART_SWEEP_COLOR_OVERRIDDEN",

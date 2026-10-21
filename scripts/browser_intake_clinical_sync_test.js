@@ -53,8 +53,10 @@ async function checkFile(browser, file) {
       const before = getOutbox().length;
       savePatient();
       const p = patients[patients.length - 1];
-      // Supply events (an automatic resupply request when stock runs low) are not patient events.
-      const added = getOutbox().slice(before).filter((e) => SYNC_ELIGIBLE_EVENT_TYPES.has(e.type) && !e.localOnly && !/SUPPLY|RESUPPLY/.test(e.type));
+      // Supply and stock events (an automatic resupply request when stock runs low; since WP-9 the
+      // stock movements and stock-out warnings, synced too) are not patient events: no event-level
+      // patient id, the patient link travels in their payload.
+      const added = getOutbox().slice(before).filter((e) => SYNC_ELIGIBLE_EVENT_TYPES.has(e.type) && !e.localOnly && !/SUPPLY|RESUPPLY|INVENTORY_|STOCKOUT/.test(e.type));
       return {
         pid: p.id,
         inFlowMeds,
@@ -100,7 +102,7 @@ async function checkFile(browser, file) {
     const before = getOutbox().length;
     savePatient();
     const p = patients[patients.length - 1];
-    const added = getOutbox().slice(before).filter((e) => SYNC_ELIGIBLE_EVENT_TYPES.has(e.type) && !e.localOnly && !/SUPPLY|RESUPPLY/.test(e.type));
+    const added = getOutbox().slice(before).filter((e) => SYNC_ELIGIBLE_EVENT_TYPES.has(e.type) && !e.localOnly && !/SUPPLY|RESUPPLY|INVENTORY_|STOCKOUT/.test(e.type));
     return { pid: p.id, added: added.map((e) => ({ type: e.type, pid: e.patient_id, payload: e.payload_json })) };
   });
   const pTypes = peds.added.map((e) => e.type);
@@ -117,7 +119,7 @@ async function checkFile(browser, file) {
     modalTreatments = new Set(['bandage', 'morphine', 'cpr']);
     const before = getOutbox().length;
     queueModalTreatmentEvents(p, 'חבישה, מורפיום, החייאה', 'medic-test');
-    const added = getOutbox().slice(before).filter((e) => SYNC_ELIGIBLE_EVENT_TYPES.has(e.type) && !/SUPPLY|RESUPPLY/.test(e.type));
+    const added = getOutbox().slice(before).filter((e) => SYNC_ELIGIBLE_EVENT_TYPES.has(e.type) && !/SUPPLY|RESUPPLY|INVENTORY_|STOCKOUT/.test(e.type));
     return { pid: p.id, added: added.map((e) => ({ type: e.type, pid: e.patient_id, payload: e.payload_json })) };
   });
   const mTx = modal.added.filter((e) => e.type === 'INTERVENTION_RECORDED').map((e) => e.payload.treatment_type).sort();
@@ -131,7 +133,7 @@ async function checkFile(browser, file) {
     siteData.name = siteData.name || 'אתר בדיקה';
     const before = getOutbox().length;
     createImmediateInterventionPatient('airway');
-    const added = getOutbox().slice(before).filter((e) => SYNC_ELIGIBLE_EVENT_TYPES.has(e.type) && !/SUPPLY|RESUPPLY/.test(e.type));
+    const added = getOutbox().slice(before).filter((e) => SYNC_ELIGIBLE_EVENT_TYPES.has(e.type) && !/SUPPLY|RESUPPLY|INVENTORY_|STOCKOUT/.test(e.type));
     return added.map((e) => ({ type: e.type, pid: e.patient_id }));
   });
   assert(immediate.length === 2 && immediate[0].type === 'QUICK_PATIENT_CREATED' && immediate[1].type === 'AIRWAY_MANAGED' && immediate[1].pid === immediate[0].pid,
