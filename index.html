@@ -755,7 +755,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9945</div>
+      <div class="demo-kicker">Demo V2.9946</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -852,7 +852,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9945</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9946</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -862,7 +862,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9945</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9946</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2873,7 +2873,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.45';
+const APP_VERSION = '2.99.46';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -2951,7 +2951,13 @@ const SYNC_ELIGIBLE_EVENT_TYPES = new Set([
   'SITE_PRE_EVACUATION_REPORTED',
   // Medical reinforcement and death-certification requests (database/051-052, WP-5): projected
   // into medical_resource_requests, which pc/cc/chamal/physician/admin and the requester read.
-  'MEDICAL_REINFORCEMENT_REQUESTED','DOCTOR_DEATH_CERTIFICATION_REQUESTED','MEDICAL_REINFORCEMENT_STATUS_UPDATED'
+  'MEDICAL_REINFORCEMENT_REQUESTED','DOCTOR_DEATH_CERTIFICATION_REQUESTED','MEDICAL_REINFORCEMENT_STATUS_UPDATED',
+  // Inventory on the server (WP-9, database/061-062, decision D2). Every stock change is an
+  // INVENTORY_LEDGER_MOVEMENT, projected into inventory_ledger_v12 (one row per movement, with the
+  // holder's count after it). SUPPLY_CONSUMED repeats a consumption for the patient timeline and is
+  // kept as an audit event only, so nothing is counted twice; SUPPLY_USE_CANCELLED and
+  // LOCAL_STOCKOUT_WARNING are audit events too.
+  'INVENTORY_LEDGER_MOVEMENT','SUPPLY_CONSUMED','SUPPLY_USE_CANCELLED','LOCAL_STOCKOUT_WARNING'
 ]);
 const SUPPLY_BASELINE = Object.freeze({tourniquets:3, pressureDressings:4, hemostaticGauze:2, airwayEquipment:2, ivKits:1, blankets:2, batteryPacks:1});
 const PC_TRUCK_BASELINE = Object.freeze({tourniquets:20, pressureDressings:30, hemostaticGauze:15, airwayEquipment:10, ivKits:8, blankets:25, batteryPacks:6});
@@ -5697,7 +5703,11 @@ function acknowledgeRecommendation(id){
 }
 const DecisionSupportEngine=(()=>{
   function defaultContext(){
-    return {patients,reinforcementRequests,pcTruckStock,companyStock,siteData,allSites,localEvents:state.localEvents,nowMs:Date.now()};
+    // Signed in, the burn rate covers the whole incident (WP-9); a screen without its own truck
+    // (logistics, CC) uses the trucks' latest counts from the server when there are any.
+    const signedIn=!!currentUser;
+    const truck=signedIn && currentUser.role!=='pc' ? (serverPcTruckStock() ? {...PC_TRUCK_BASELINE, ...serverPcTruckStock()} : pcTruckStock) : pcTruckStock;
+    return {patients,reinforcementRequests,pcTruckStock:truck,companyStock,siteData,allSites,localEvents:signedIn?incidentConsumptionEvents():state.localEvents,nowMs:Date.now()};
   }
   function ackFor(id){
     const ack=recommendationAckMap()[id];
@@ -11188,7 +11198,8 @@ function renderLogisticsOfficer(){
     {n:localOutboxCount(),l:'אירועי ledger ממתינים',c:localOutboxCount()?'critical':''}
   ].map(x=>`<div class="cmd-priority-card ${x.c}"><div class="cmd-priority-num">${x.n}</div><div class="cmd-priority-label">${x.l}</div></div>`).join('');
   let outbox=getOutbox();
-  const consumptionEvents=outbox.filter(e=>e.type==='SUPPLY_CONSUMED');
+  // Signed in: every medic's use in the incident (server + this phone's unsent ones), WP-9.
+  const consumptionEvents=currentUser ? incidentConsumptionEvents().sort((a,b)=>Date.parse(a.local_timestamp)-Date.parse(b.local_timestamp)) : outbox.filter(e=>e.type==='SUPPLY_CONSUMED');
   const focusedConsumption=focusFilteredList(consumptionEvents, event=>{
     const payload=event.payload_json||{};
     return focusMatchesLogisticsTask({
@@ -11204,7 +11215,8 @@ function renderLogisticsOfficer(){
     const payload=event.payload_json||{};
     const item=payload.item||payload.item_type;
     const qty=Math.abs(Number(payload.quantity_delta)||1);
-    const patientId=payload.patient_id||payload.linkedPatientId||'ללא פצוע';
+    const rawPid=payload.patient_id||payload.linkedPatientId;
+    const patientId=rawPid ? (patients.find(p=>p.id===rawPid)?.visualId||rawPid) : 'ללא פצוע';
     const time=event.local_timestamp?new Date(event.local_timestamp).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):'--:--';
     return `<div class="cmd-matrix-row">
       <div>
@@ -11213,7 +11225,8 @@ function renderLogisticsOfficer(){
       </div>
     </div>`;
   }).join(''):renderOperationalEmptyState('אין משימות לוגיסטיקה במיקוד הנוכחי','אין צריכות ציוד רשומות עדיין');
-  if(consumptionFeed) consumptionFeed.innerHTML=renderCollapsibleSection('logistics-consumption','צריכה אחרונה',consumptionRows,recentConsumption.length,{criticalCount:recentConsumption.filter(e=>e.warn).length,emptyMessage:'אין משימות לוגיסטיקה במיקוד הנוכחי'});
+  if(consumptionFeed) consumptionFeed.innerHTML=renderCollapsibleSection('logistics-consumption','צריכה אחרונה',consumptionRows,recentConsumption.length,{criticalCount:recentConsumption.filter(e=>e.warn).length,emptyMessage:'אין משימות לוגיסטיקה במיקוד הנוכחי'})
+    + (currentUser ? renderCollapsibleSection('logistics-field-stock','מלאי בשטח — כל המכשירים (שרת)',renderFieldStockFromServer(),incidentStockHolders().length,{criticalCount:incidentStockHolders().filter(h=>h.stock<=0).length,emptyMessage:'אין עדיין תנועות מלאי בשרת'}) : '');
   const quickRestock=document.getElementById('logistics-quick-restock');
   if(quickRestock) quickRestock.innerHTML=['tourniquets','pressureDressings','ivKits'].map(item=>`
     <button class="demo-mini-btn" style="min-height:56px;touch-action:manipulation"
@@ -11252,7 +11265,7 @@ function receiveLogisticsSupply(itemType, qty=1){
     type:'INVENTORY_LEDGER_MOVEMENT',
     detail:`רכב חוג״ד קיבל ${supplyLabel(itemType)} x${received}`,
     warn:false,
-    payload_json:{item_type:itemType,movement_type:'logistics_manual_received',quantity_delta:received,destination_node:'pc_truck',pc_truck_stock_after:pcTruckStock[itemType]}
+    payload_json:{item_type:itemType,movement_type:'logistics_manual_received',quantity_delta:received,destination_node:'pc_truck',pc_truck_stock_after:pcTruckStock[itemType],stock_seq:nextLedgerSeq()}
   });
   saveDemoState();
   toast(`ציוד עודכן · ${supplyLabel(itemType)}`);
@@ -11502,6 +11515,20 @@ function submitMedicResupplyRequest(){
   if(document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard(activeRoleDashboard);
   renderCommander();
 }
+// The PC truck hands out what an approved resupply request asked for. Written as a ledger
+// movement per item (WP-9) so the truck's stock reaches logistics and CC, not only this phone.
+function issueFromPcTruck(items, requestRef){
+  (items||[]).forEach(x=>{
+    const item=normalizeSupplyItem(x.item);
+    if(!item || item==='other') return;
+    const before=pcTruckStock[item]??PC_TRUCK_BASELINE[item]??0;
+    const after=Math.max(0, before-(Number(x.quantity)||1));
+    pcTruckStock[item]=after;
+    if(after===before) return;
+    saveLocalEvent({type:'INVENTORY_LEDGER_MOVEMENT',detail:`רכב חוג״ד הנפיק ${supplyLabel(item)} x${before-after}`,warn:after<=0,
+      payload_json:{item_type:item,movement_type:'pc_truck_issued',quantity_delta:after-before,source_node:'pc_truck',pc_truck_stock_after:after,request_ref:requestRef||null,stock_seq:nextLedgerSeq()}});
+  });
+}
 function updateResupplyStatus(id,status){
   const req=reinforcementRequests.find(r=>r.id===id && r.type==='resupply'); if(!req) return;
   const previous=req.status;
@@ -11510,7 +11537,7 @@ function updateResupplyStatus(id,status){
     if(!availability.available){
       status='unavailable_at_truck';
     }else{
-      (req.items||[]).forEach(x=>{ if(x.item!=='other') pcTruckStock[x.item]=Math.max(0,(pcTruckStock[x.item]??PC_TRUCK_BASELINE[x.item]??0)-(Number(x.quantity)||1)); });
+      issueFromPcTruck(req.items||[], req.id);
       req.truckDebited=true;
       saveLocalEvent({type:'RESUPPLY_APPROVED_FROM_PC_TRUCK',detail:`${req.id} · ${resupplyItemsText(req)}`,warn:false,payload_json:withServerSupplyRequestId({request_id:req.id,items:req.items,pcTruckStock}, req.id)});
     }
@@ -13821,8 +13848,88 @@ function applyServerSupplyDecisionsToOwnRequests(rows){
   });
   if(changed) saveDemoState();
 }
+// ── Incident inventory from the server (WP-9, database/061-062) ──
+// inventory_ledger_v12 rows of the incident, newest first: every medic bag and PC truck movement
+// that reached the server, with the holder's count after it. Read directly (RLS: incident
+// members), as a separate query so the supply queue above is unaffected if it fails.
+let _incidentInventory={}; // incidentId -> rows
+const INVENTORY_LEDGER_COLUMNS='item_type,movement_type,quantity_delta,stock_owner,stock_after,actor_id,device_id,local_event_id,patient_id,occurred_at,created_at,stock_seq:payload_json->>stock_seq';
+async function pullIncidentInventory(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let r;
+  try{ r=await client.from('inventory_ledger_v12').select(INVENTORY_LEDGER_COLUMNS).eq('incident_id',incidentId).order('occurred_at',{ascending:false}).limit(2000); }
+  catch(e){ return; }
+  if(r.error || !Array.isArray(r.data)) return;
+  // Newest first: the phone's time, then its own sequence for movements in the same millisecond.
+  _incidentInventory[incidentId]=r.data.filter(x=>SUPPLY_LABELS[x.item_type] && Number.isFinite(Number(x.quantity_delta)))
+    .sort((a,b)=>(Date.parse(b.occurred_at||b.created_at)||0)-(Date.parse(a.occurred_at||a.created_at)||0) || (Number(b.stock_seq)||0)-(Number(a.stock_seq)||0));
+}
+function activeInventoryIncidentId(){ return activeIncident?.id || SITE_TO_INCIDENT_ID[currentSiteId()] || null; }
+// Consumption for the burn rate, incident-wide: every medic bag's use on the server, plus this
+// phone's own uses not sent yet (they are not on the server, so nothing is counted twice).
+// Shaped like SUPPLY_CONSUMED so C5Rules.supplyBurnRatePer10Min reads it unchanged.
+function incidentConsumptionEvents(){
+  const incId=activeInventoryIncidentId();
+  const server=(_incidentInventory[incId]||[]).filter(x=>x.stock_owner==='medic_bag' && Number(x.quantity_delta)<0).map(x=>({
+    type:'SUPPLY_CONSUMED', local_timestamp:x.occurred_at||x.created_at, warn:Number(x.stock_after)<=0, remote:x.device_id!==getDeviceId(),
+    payload_json:{item_type:x.item_type, quantity_delta:Number(x.quantity_delta), patient_id:x.patient_id||null}
+  }));
+  const local=getOutbox().filter(e=>!e.synced && e.type==='INVENTORY_LEDGER_MOVEMENT' && (!e.incident_id || e.incident_id===incId)
+    && !e.payload_json?.destination_node && !e.payload_json?.source_node && Number(e.payload_json?.quantity_delta)<0).map(e=>({
+    type:'SUPPLY_CONSUMED', local_timestamp:e.local_timestamp, warn:!!e.warn, remote:false,
+    payload_json:{item_type:e.payload_json.item_type, quantity_delta:Number(e.payload_json.quantity_delta), patient_id:e.payload_json.patient_context||e.payload_json.patient_id||null}
+  }));
+  return [...server, ...local];
+}
+// Latest known count per holder and item: [{owner, actorId, item, stock, at}]. Rows are newest first
+// (sorted in pullIncidentInventory).
+function incidentStockHolders(){
+  const seen=new Set();
+  const out=[];
+  (_incidentInventory[activeInventoryIncidentId()]||[]).forEach(x=>{
+    if(!Number.isFinite(Number(x.stock_after)) || x.stock_after===null) return;
+    const key=`${x.stock_owner}|${x.actor_id}|${x.item_type}`;
+    if(seen.has(key)) return;
+    seen.add(key);
+    out.push({owner:x.stock_owner, actorId:x.actor_id, item:x.item_type, stock:Number(x.stock_after), at:x.occurred_at||x.created_at});
+  });
+  return out;
+}
+// PC truck stock for screens that have no truck of their own (logistics, CC): the sum of every
+// truck's latest count on the server. The PC's own phone keeps using its own pcTruckStock.
+function serverPcTruckStock(){
+  const trucks=incidentStockHolders().filter(h=>h.owner==='pc_truck');
+  if(!trucks.length) return null;
+  const sum={};
+  trucks.forEach(h=>{ sum[h.item]=(sum[h.item]||0)+h.stock; });
+  return sum;
+}
+function holderLabel(actorId){
+  if(actorId===currentUser?.id) return 'אני';
+  const prof=(_realMedicProfiles||[]).find(x=>x.id===actorId);
+  return prof?.display_name ? sanitizeRemoteText(prof.display_name) : `משתמש ${String(actorId||'').slice(0,4)}`;
+}
+function renderFieldStockFromServer(){
+  const holders=incidentStockHolders();
+  if(!holders.length) return renderOperationalEmptyState('אין עדיין תנועות מלאי בשרת','מלאי חובשים ורכבי חוג״ד יופיע כאן ברגע שתנועה ראשונה תסונכרן');
+  const groups={};
+  holders.forEach(h=>{ const k=`${h.owner}|${h.actorId}`; (groups[k]=groups[k]||{owner:h.owner, actorId:h.actorId, items:[]}).items.push(h); });
+  return Object.values(groups).sort((a,b)=>a.owner.localeCompare(b.owner)).map(g=>{
+    const low=g.items.filter(h=>h.stock<=(g.owner==='pc_truck'?(PC_TRUCK_LOW_THRESHOLDS[h.item]??1):(SUPPLY_LOW_THRESHOLDS[h.item]??1)));
+    const chips=g.items.map(h=>`<span class="${h.stock<=0?'empty':low.includes(h)?'low':''}">${supplyLabel(h.item,true)}: ${h.stock}</span>`).join('');
+    return `<div class="cmd-matrix-row ${g.items.some(h=>h.stock<=0)?'critical':''}">
+      <div>
+        <div class="cmd-matrix-title">${g.owner==='pc_truck'?'רכב חוג״ד':'ערכת חובש'} · ${holderLabel(g.actorId)}</div>
+        <div class="cmd-matrix-sub">עדכון אחרון ${timeAgoLabel(Date.parse(g.items[0].at)||0)} · ${low.length?`${low.length} פריטים נמוכים`:'תקין'}</div>
+        <div class="cmd-logistics">${chips}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
 async function pullSupplyRequestQueueAll(){
-  await Promise.all(Object.values(SITE_TO_INCIDENT_ID).map(id=>pullSupplyRequestQueue(id)));
+  await Promise.all(Object.values(SITE_TO_INCIDENT_ID).map(id=>Promise.all([pullSupplyRequestQueue(id), pullIncidentInventory(id)])));
   if(currentUser) refreshActiveScreenData();
 }
 setInterval(()=>{ if(currentUser) pullSupplyRequestQueueAll(); }, 45000);
@@ -13886,7 +13993,7 @@ function decideRemoteSupplyRequest(requestId, incidentId, decision){
   if(decision==='approve'){
     const availability=pcTruckAvailability(items);
     if(availability.available){
-      items.forEach(x=>{ if(x.item!=='other') pcTruckStock[x.item]=Math.max(0,(pcTruckStock[x.item]??PC_TRUCK_BASELINE[x.item]??0)-(Number(x.quantity)||1)); });
+      issueFromPcTruck(items, requestId);
       saveLocalEvent({type:'RESUPPLY_APPROVED_FROM_PC_TRUCK',detail:`אושר מרכב חוג״ד · ${text}`,warn:false,payload_json:{supply_request_id:requestId,items,pcTruckStock:{...pcTruckStock}}});
       updateLocalSupplyRequestOptimistic(incidentId, requestId, {status:'approved', approved_by_pc:currentUser.id});
       toast('אושר מרכב חוג״ד');
@@ -14302,6 +14409,10 @@ function requestSupplyFromUsedSheet(){
   openMedicResupplySheet(pendingSupplyUse.patientId, pendingSupplyUse.after<=0?'stock_empty':'stock_low', pendingSupplyUse.item);
   document.getElementById('supply-used-modal')?.classList.add('hidden');
 }
+// Increasing per phone, even for several movements in the same millisecond and across reloads
+// (time-based): with it the server rows of one holder have a clear "latest" (WP-9).
+let _lastLedgerSeq=0;
+function nextLedgerSeq(){ _lastLedgerSeq=Math.max(Date.now()*1000, _lastLedgerSeq+1); return _lastLedgerSeq; }
 function consumeFieldSupply(itemType, quantityDelta, patientId=null, movementType='treatment_consumed', meta={}){
   itemType=normalizeSupplyItem(itemType);
   if(!state.localStockCache) state.localStockCache={};
@@ -14343,6 +14454,7 @@ function consumeFieldSupply(itemType, quantityDelta, patientId=null, movementTyp
       patient_id:state.patientDraftId||patientId,
       patient_context:patientId||state.patientDraftId,
       local_stock_after:after,
+      stock_seq:nextLedgerSeq(),
       battery_at_log:null
     }
   });
