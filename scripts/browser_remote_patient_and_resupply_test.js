@@ -5,7 +5,8 @@
 //    are cleared on the next pull.
 // 2. A medic's resupply request (RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE /
 //    RESUPPLY_REQUEST_ESCALATED_CC) must reach the sync outbox as unsynced, so syncPush sends it
-//    and database/033 projects it into supply_requests. PC-side status updates stay local.
+//    and database/033 projects it into supply_requests. Since V2.99.43 (WP-6) the PC's decision
+//    is queued for push too; scripts/browser_resupply_decision_sync_test.js covers it across devices.
 //
 // Runs in local demo mode and calls the page's own functions; no Supabase client is involved,
 // so this proves client behavior only, not the server side.
@@ -77,7 +78,7 @@ async function checkFile(browser, file) {
   assert(migrated.find((x) => x.v === 'P-OLD').pulse === null, `${rel}: a cached remote patient with placeholder vitals must be cleared`);
   assert(migrated.find((x) => x.v === 'P-MEASURED').pulse === 80, `${rel}: vitals actually recorded on this device must be kept`);
 
-  // 2. Resupply request events are queued for push; PC-side status updates are not.
+  // 2. Resupply request events and the PC's decision are queued for push.
   const outbox = await page.evaluate(() => {
     const before = getOutbox().length;
     saveLocalEvent({ type: 'RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE', detail: 'test', payload_json: { id: 'REQ-T1', items: [] } });
@@ -88,7 +89,7 @@ async function checkFile(browser, file) {
   const byType = Object.fromEntries(outbox.map((e) => [e.type, e.synced]));
   assert(byType.RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE === false, `${rel}: a resupply request must be queued unsynced for push`);
   assert(byType.RESUPPLY_REQUEST_ESCALATED_CC === false, `${rel}: an escalated resupply request must be queued unsynced for push`);
-  assert(byType.RESUPPLY_APPROVED_FROM_PC_TRUCK === true, `${rel}: PC-side status updates must stay local (033 matches them by the creating device)`);
+  assert(byType.RESUPPLY_APPROVED_FROM_PC_TRUCK === false, `${rel}: the PC's decision must be queued unsynced for push (WP-6, database/059)`);
 
   assert(pageErrors.length === 0, `${rel}: uncaught page error(s): ${pageErrors.join(' | ')}`);
   await page.close();
