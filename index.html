@@ -753,7 +753,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9943</div>
+      <div class="demo-kicker">Demo V2.9944</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -850,7 +850,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9943</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9944</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -860,7 +860,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9943</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9944</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2871,7 +2871,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.43';
+const APP_VERSION = '2.99.44';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -4655,6 +4655,45 @@ async function pullActiveIncidentRow(client){
   if(r.data.incident_type) activeIncident.incident_type=r.data.incident_type;
   applyServerIncidentType(r.data);
 }
+// ── Rescue site authority from the server (WP-8, database/060) ──
+// T0, building status and site clear set by RPC/RCC on their phone, projected into
+// incident_site_authority (only rpc/rcc/admin change it). Read into SITE_A's local fields so the
+// PC/CC site line, the medic's Movement screen and another rescue phone show the same state.
+// Separate query: if the table is missing, the incident row pull above is unaffected. A change
+// this phone made and has not pushed yet wins until it is sent.
+const SITE_AUTHORITY_COLUMNS='incident_id,official_t0,official_by_role,official_by_name,official_at,building_status,building_status_by_role,building_status_by_name,building_status_at,site_cleared_at,site_cleared_by_role,site_cleared_by_name';
+function siteAuthorityByLabel(role, name){
+  const roleLabel=['rpc','rcc'].includes(role)?rescueReporterLabel(role):(ROLE_LABELS[mapServerRole(role)]||role||'');
+  const clean=sanitizeRemoteText(name||'');
+  return clean?`${clean} (${roleLabel})`:roleLabel;
+}
+async function pullIncidentSiteAuthority(client){
+  if(!activeIncident) return;
+  let r;
+  try{ r=await client.from('incident_site_authority').select(SITE_AUTHORITY_COLUMNS).eq('incident_id',activeIncident.id).maybeSingle(); }catch(e){ return; }
+  if(r.error || !r.data) return;
+  applyServerSiteAuthority(r.data);
+}
+function applyServerSiteAuthority(row){
+  if(!row || !activeIncident || row.incident_id!==activeIncident.id) return;
+  const pending=type=>getOutbox().some(e=>!e.synced && e.type===type && (!e.incident_id || e.incident_id===activeIncident.id));
+  const s=ensureSiteStatusFields('SITE_A');
+  const changes=[];
+  if(row.official_t0 && !pending('OFFICIAL_INCIDENT_OPENED_BY_RESCUE')){
+    s.t0=row.official_t0;
+    changes.push({type:'t0',by:row.official_by_role,byLabel:siteAuthorityByLabel(row.official_by_role,row.official_by_name),detail:'אירוע הוכרז רשמי · T0 נקבע',at:Date.parse(row.official_at||row.official_t0)||0});
+  }
+  if(BUILDING_STATUS_LABELS[row.building_status] && !pending('BUILDING_STATUS_UPDATED')){
+    s.buildingStatus=row.building_status;
+    changes.push({type:'building',by:row.building_status_by_role,byLabel:siteAuthorityByLabel(row.building_status_by_role,row.building_status_by_name),detail:`סטטוס מבנה: ${BUILDING_STATUS_LABELS[row.building_status]}`,at:Date.parse(row.building_status_at||'')||0});
+  }
+  if(row.site_cleared_at && !pending('SITE_CLEAR_CONFIRMED')){
+    s.siteClear={cleared:true,clearedAt:row.site_cleared_at,clearedByRole:row.site_cleared_by_role||null};
+    changes.push({type:'clear',by:row.site_cleared_by_role,byLabel:siteAuthorityByLabel(row.site_cleared_by_role,row.site_cleared_by_name),detail:'האתר הוכרז נקי',at:Date.parse(row.site_cleared_at)||0});
+  }
+  const newest=changes.sort((a,b)=>b.at-a.at)[0];
+  if(newest && (!s.lastRescueStatusChange || newest.at>=(s.lastRescueStatusChange.at||0))) s.lastRescueStatusChange=newest;
+}
 async function pullMyAssignment(client){
   if(!isSignedInMedic()) return;
   let res;
@@ -4724,6 +4763,7 @@ async function runIncidentAssignmentPull(){
   try{
     for(const [incId, w] of Object.entries(_pendingIncidentTypeWrites)) await writeIncidentTypeToServer(incId, w.type, w.role);
     await pullActiveIncidentRow(client);
+    await pullIncidentSiteAuthority(client);
     await pullRealPlatoons(client);
     const prevKey=assignmentKey(_myRealAssignment);
     await pullMyAssignment(client);
@@ -4735,6 +4775,7 @@ async function runIncidentAssignmentPull(){
     }
   }finally{ _assignmentPullBusy=false; }
   renderAssignmentSwitchBanner();
+  if(activeScreenId()==='role-dashboard') renderRoleDashboard(activeRoleDashboard);
   if(activeScreenId()==='enroute'){ applyEnrouteAssignmentPrefill(); renderEnrouteIncidentContext(); }
 }
 async function confirmMedicAssignment(){
