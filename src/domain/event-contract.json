@@ -125,6 +125,9 @@
       "TOURNIQUET_ADDED_SAME_LIMB",
       "TOURNIQUET_MARKED_EFFECTIVE",
       "TOURNIQUET_MARKED_INEFFECTIVE"
+    ],
+    "Incident type, whose server state is incidents.incident_type written directly by rescue (writeIncidentTypeToServer), read by every phone in the incident; the event is the local timeline entry (WP-8)": [
+      "INCIDENT_TYPE_SET"
     ]
   },
   "not_events": {
@@ -157,11 +160,6 @@
       "PATIENT_REASSIGNED_BETWEEN_PLATOONS",
       "PATIENT_REASSIGNED_WITHIN_PLATOON"
     ],
-    "WP-8": [
-      "INCIDENT_TYPE_MISMATCH_REPORTED",
-      "INCIDENT_TYPE_SET",
-      "SITE_EXTRACTED_COUNTER_UPDATED"
-    ],
     "WP-9": [
       "INVENTORY_LEDGER_MOVEMENT",
       "LOCAL_STOCKOUT_WARNING",
@@ -175,6 +173,9 @@
       "PRIORITY_RECOMMENDATION_DECLINED",
       "RECOMMENDATION_ACKNOWLEDGED",
       "SUSPECTED_NOT_SALVAGEABLE_CANCELLED"
+    ],
+    "WP-8 follow-up (medic incident type / mismatch to PC)": [
+      "INCIDENT_TYPE_MISMATCH_REPORTED"
     ]
   }
 }

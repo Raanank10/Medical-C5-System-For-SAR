@@ -297,6 +297,14 @@ No new table or policy. Four new `patients` columns (`alert_acknowledged_at`, `_
 
 No new table or policy. `project_tourniquet_followups()` is a new `SECURITY DEFINER` trigger function (execute revoked from `public`, `anon`, `authenticated`) that updates `tourniquets` rows (limb, `is_active`); `tourniquets_read` is unchanged. 058 widens `tourniquets_tourniquet_status_check` by two values. Incident during apply, 2026-10-20: the first 057 wrote `tourniquet_status = 'handed_over'`, rejected by that check constraint inside the trigger, which would have rolled back any handover of a patient with an active tourniquet; it was replaced within about 5 minutes (live history `057_tourniquet_followups`, `057b_tourniquet_followups_no_raise`) and no events reached the server in that window. Verified afterwards in a rolled-back block as a member medic: later limb moved the row; effectiveness checks stored with a 30-minute next reassessment; a colliding limb move skipped without rejecting the event; handover closed both rows without `released_at`; all 7 events kept. `get_advisors` (security): nothing new.
 
+## Follow-up: PC resupply decisions (`database/059`)
+
+No new table or policy. `project_supply_request_event()` (existing `SECURITY DEFINER` trigger, execute revoked) now changes a `supply_requests` row for the PC decision types only when the actor's `profiles.role` is pc, cc or admin, checks the incident on every update, and no longer raises on a malformed `supply_request_id` or `eta_minutes`. Verified 2026-10-21 in a rolled-back block with real medic, PC and logistics profiles: logistics' and the medic's approvals changed nothing; the PC's approve, escalate and delivered did; all events kept. `get_advisors` (security): nothing new.
+
+## Follow-up: rescue site authority (`database/060`)
+
+New table `incident_site_authority` (one row per incident), RLS enabled, one policy: `incident_site_authority_read` (select, `app.can_access_incident(incident_id)`). No insert/update/delete policy: only `project_incident_site_authority()` (`SECURITY DEFINER` trigger, execute revoked from `public`, `anon`, `authenticated`) writes, and only for rpc/rcc/admin actors (role from `profiles`). Verified 2026-10-21 in a rolled-back block with real rpc, rcc, pc and medic profiles: the PC's three events changed nothing; a malformed T0 fell back to the event time; the first T0 and first clear won; the newest building status won and an unknown value was ignored; all 10 events kept; a member medic reads the row, a non-member medic reads nothing; neither a medic nor a PC can update or insert. `get_advisors` (security): nothing new.
+
 ## Explicitly not re-litigated here
 
 - T6 (leaked-password protection) and T5 (service-role key handling) — out of scope, not RLS/authorization, already tracked in `docs/THREAT_MODEL.md`.
