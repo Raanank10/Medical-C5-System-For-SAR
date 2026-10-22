@@ -788,7 +788,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9952</div>
+      <div class="demo-kicker">Demo V2.9953</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -885,7 +885,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9952</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9953</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -895,7 +895,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9952</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9953</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2906,7 +2906,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.52';
+const APP_VERSION = '2.99.53';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -9323,14 +9323,137 @@ function saveReport(){
   }
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState(); renderExtReports(); goTo('site');
 }
-function externalReportCardHtml(r, siteLabel=''){
-  return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700">${escAttr(r.sourceLabel)}</span><div style="display:flex;gap:6px">${siteLabel?`<span style="font-size:10px;color:var(--muted)">${escAttr(siteLabel)}</span>`:''}<span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escAttr(r.time)}</span></div></div><div style="font-size:13px">${r.patientId?`<span style="color:var(--accent);font-weight:700">${escAttr(r.patientId)} </span>`:''}${r.red?`<span style="color:var(--red);font-weight:700">${r.red} קשה </span>`:''}${r.yellow?`<span style="color:var(--yellow);font-weight:700">${r.yellow} בינוני </span>`:''}${r.green?`<span style="color:var(--green);font-weight:700">${r.green} קל</span>`:''}</div>${r.evacDest?`<div style="font-size:12px;margin-top:4px">🏥 ${escAttr(r.evacDest)}</div>`:''}<div style="font-size:11px;color:var(--muted);margin-top:4px">${escAttr(r.eventName||(r.fromServer?'':siteData.name)||'')}${r.company?' · '+escAttr(r.company):''}${r.fromServer?' · התקבל מסנכרון':''}</div></div>`;
+function externalReportCardHtml(r, siteLabel='', siteId=null){
+  return `<div class="ext-report-card" data-report-key="${escAttr(externalReportLinkKey(r))}" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700">${escAttr(r.sourceLabel)}</span><div style="display:flex;gap:6px">${siteLabel?`<span style="font-size:10px;color:var(--muted)">${escAttr(siteLabel)}</span>`:''}<span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escAttr(r.time)}</span></div></div><div style="font-size:13px">${r.red?`<span style="color:var(--red);font-weight:700">${r.red} קשה </span>`:''}${r.yellow?`<span style="color:var(--yellow);font-weight:700">${r.yellow} בינוני </span>`:''}${r.green?`<span style="color:var(--green);font-weight:700">${r.green} קל</span>`:''}</div>${r.evacDest?`<div style="font-size:12px;margin-top:4px">🏥 ${escAttr(r.evacDest)}</div>`:''}<div style="font-size:11px;color:var(--muted);margin-top:4px">${escAttr(r.eventName||(r.fromServer?'':siteData.name)||'')}${r.company?' · '+escAttr(r.company):''}${r.fromServer?' · התקבל מסנכרון':''}</div>${externalReportLinksHtml(r, siteId)}</div>`;
 }
 function renderExtReports(){
   const el=document.getElementById('ext-reports-list');
   const reports=mergeRemoteExternalReports(siteData.externalReports||[], currentSiteId());
   if(!reports.length){el.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:8px 0">אין דיווחים עדיין</div>';return;}
-  el.innerHTML=reports.map(r=>externalReportCardHtml(r)).join('');
+  el.innerHTML=reports.map(r=>externalReportCardHtml(r, '', currentSiteId())).join('');
+}
+// Linking a report to a patient later (WP-16 PR B, database/069): PC, CC, chamal, physician and
+// admin, from the report card. Sent as EXTERNAL_REPORT_LINKED (patient-scoped; payload names the
+// report by its server id and by the id the creating phone gave it). A link never changes triage
+// or status; MDA's classification for that patient, if chosen, goes as its own
+// PATIENT_EVACUATION_UPDATED. Links shown = the server's (external_patient_links) with this
+// phone's unsent links and unlinks on top (siteData.externalReportLinks, kept until the server
+// shows the same).
+function externalReportLinkKey(r){ return r.externalReference || r.id; }
+function externalReportLinkOverlay(){ return siteData.externalReportLinks || (siteData.externalReportLinks={}); }
+function serverLinkedPatientIds(key){
+  const ids=new Set();
+  Object.values(_remoteExternalReports).forEach(rows=>(rows||[]).forEach(x=>{
+    if(x.externalReference===key || x.id===key) (x.linkedPatientIds||[]).forEach(id=>ids.add(id));
+  }));
+  return ids;
+}
+function linkedPatientIdsForReport(r){
+  const key=externalReportLinkKey(r);
+  const ids=serverLinkedPatientIds(key);
+  if(r.patientId && !r.fromServer) ids.add(r.patientId);
+  Object.entries(externalReportLinkOverlay()[key]||{}).forEach(([pid,o])=>{ if(o.action==='unlink') ids.delete(pid); else ids.add(pid); });
+  return [...ids];
+}
+function externalReportLinksHtml(r, siteId){
+  const linked=linkedPatientIdsForReport(r);
+  const pending=externalReportLinkOverlay()[externalReportLinkKey(r)]||{};
+  const chips=linked.map(pid=>{
+    const p=patients.find(x=>x.id===pid);
+    return `<span class="identity-chip">${escAttr(p?.visualId||'פצוע שאינו במכשיר')}${pending[pid]?' · ממתין לשליחה':''}</span>`;
+  }).join('');
+  const btn=canUpdateEvacuationTracking()?`<button class="btn-secondary" style="margin-top:8px;padding:8px" onclick="openReportLinkSheet('${escAttr(externalReportLinkKey(r))}','${escAttr(siteId||r._siteId||currentSiteId())}')">שייך לפצוע</button>`:'';
+  if(!chips && !btn) return '';
+  return `<div style="margin-top:6px">${chips?`<div style="font-size:11px;color:var(--muted);margin-bottom:4px">משויך לפצועים</div><div class="chip-row">${chips}</div>`:''}${btn}</div>`;
+}
+let reportLinkState={key:null, siteId:null, patientId:null, mda:null};
+function findExternalReportByKey(key, siteId){
+  return siteExternalReports(siteId).find(r=>externalReportLinkKey(r)===key)
+    || allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id)).find(r=>externalReportLinkKey(r)===key) || null;
+}
+function openReportLinkSheet(key, siteId){
+  if(!canUpdateEvacuationTracking()){ toast('שיוך דיווח לפצוע — חוג״ד, מ״פ רפואה, חמ״ל או רופא'); return; }
+  const r=findExternalReportByKey(key, siteId); if(!r){ toast('הדיווח לא נמצא'); return; }
+  reportLinkState={key, siteId, patientId:null, mda:null};
+  let modal=document.getElementById('report-link-modal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='report-link-modal';
+    modal.className='modal-overlay hidden';
+    modal.onclick=function(event){ if(event.target===this) closeReportLinkSheet(); };
+    document.body.appendChild(modal);
+  }
+  renderReportLinkSheet();
+  modal.classList.remove('hidden');
+}
+function renderReportLinkSheet(){
+  const modal=document.getElementById('report-link-modal'); if(!modal) return;
+  const {key, siteId, patientId, mda}=reportLinkState;
+  const r=findExternalReportByKey(key, siteId); if(!r) return;
+  const linked=new Set(linkedPatientIdsForReport(r));
+  const pts=sortedPatientsByEvacPriority(getSitePatients(siteId||'SITE_A'));
+  const rows=pts.map(p=>{
+    const isLinked=linked.has(p.id);
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <button class="chip${patientId===p.id?' selected':''}" data-link-patient="${escAttr(p.id)}" style="flex:1;text-align:right" ${isLinked?'disabled':''} onclick="selectReportLinkPatient('${escAttr(p.id)}')">${escAttr(p.visualId||p.id)} · ${TRIAGE_LABELS[p.triage]||p.triage||'—'}${isLinked?' · משויך':''}</button>
+      ${isLinked?`<button class="btn-secondary" style="width:auto;padding:6px 10px" data-unlink-patient="${escAttr(p.id)}" onclick="unlinkExternalReportPatient('${escAttr(p.id)}')">בטל שיוך</button>`:''}
+    </div>`;
+  }).join('') || '<div style="color:var(--muted);font-size:13px">אין פצועים באתר</div>';
+  modal.innerHTML=`<div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">שיוך דיווח לפצוע · ${escAttr(r.sourceLabel||'')}</div>
+    <div style="font-size:12px;color:var(--muted);margin:6px 0 12px;line-height:1.5">השיוך לא משנה מיון או מצב. סיווג מד״א של הפצוע (אם ידוע) נשמר לצד מיון השדה.</div>
+    <div class="field-label">פצוע</div>
+    <div id="report-link-patients" style="max-height:40vh;overflow:auto">${rows}</div>
+    <div class="field-label" style="margin-top:10px">סיווג מד״א לפצוע (לא חובה)</div>
+    <div class="chip-row" id="report-link-mda">${C5Rules.MDA_CLASSIFICATIONS.map(k=>`<button class="chip${mda===k?' selected':''}" data-mda="${k}" onclick="selectReportLinkMda('${k}')">${MDA_CLASSIFICATION_LABELS[k]}</button>`).join('')}</div>
+    <button class="btn-primary" id="report-link-confirm" style="background:var(--green);margin-top:14px" ${patientId?'':'disabled'} onclick="confirmReportLink()">שייך</button>
+    <button class="btn-secondary" style="margin-top:8px" onclick="closeReportLinkSheet()">סגור</button>
+  </div>`;
+}
+function selectReportLinkPatient(id){ reportLinkState.patientId=reportLinkState.patientId===id?null:id; renderReportLinkSheet(); }
+function selectReportLinkMda(k){ reportLinkState.mda=reportLinkState.mda===k?null:k; renderReportLinkSheet(); }
+function closeReportLinkSheet(){ document.getElementById('report-link-modal')?.classList.add('hidden'); }
+function recordExternalReportLink(r, p, action){
+  const key=externalReportLinkKey(r);
+  const overlay=externalReportLinkOverlay();
+  (overlay[key]||(overlay[key]={}))[p.id]={action, at:new Date().toISOString()};
+  // A report created from this patient's card names it in patientId; an unlink clears that too.
+  if(action==='unlink' && !r.fromServer && r.patientId===p.id) r.patientId=null;
+  const event={type:'EXTERNAL_REPORT_LINKED', time:nowT(), warn:false,
+    detail:`${action==='unlink'?'בוטל שיוך':'שויך'} דיווח ${r.sourceLabel||''}`,
+    payload_json:{external_reference:key, ...(r.serverId?{external_report_id:r.serverId}:{}), ...(action==='unlink'?{action:'unlink'}:{}), siteId:p.siteId}};
+  (p.events||(p.events=[])).push(event);
+  p.lastModifiedAt=new Date().toISOString();
+  p.unsyncedEvents=(p.unsyncedEvents||0)+1;
+  saveLocalEvent({...event, patient_id:p.id});
+}
+function confirmReportLink(){
+  const {key, siteId, patientId, mda}=reportLinkState;
+  const r=findExternalReportByKey(key, siteId); const p=patients.find(x=>x.id===patientId);
+  if(!r || !p) return;
+  recordExternalReportLink(r, p, 'link');
+  if(mda) updatePatientEvacuation(p.id, {mdaClassification:mda, silent:true});
+  lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
+  closeReportLinkSheet(); refreshActiveScreenData(); renderExtReports();
+  toast(`הדיווח שויך ל־${p.visualId||'פצוע'}`);
+}
+function unlinkExternalReportPatient(patientId){
+  const {key, siteId}=reportLinkState;
+  const r=findExternalReportByKey(key, siteId); const p=patients.find(x=>x.id===patientId);
+  if(!r || !p) return;
+  recordExternalReportLink(r, p, 'unlink');
+  saveDemoState(); renderReportLinkSheet(); refreshActiveScreenData(); renderExtReports();
+  toast('השיוך בוטל');
+}
+// After a pull: an unsent link or unlink stays on top until the server shows the same state.
+function pruneExternalReportLinkOverlay(){
+  const overlay=siteData.externalReportLinks; if(!overlay) return;
+  Object.entries(overlay).forEach(([key, byPatient])=>{
+    const server=serverLinkedPatientIds(key);
+    Object.entries(byPatient).forEach(([pid,o])=>{ if((o.action==='unlink')!==server.has(pid)) delete byPatient[pid]; });
+    if(!Object.keys(byPatient).length) delete overlay[key];
+  });
 }
 
 function openLateExternalPatientUpdate(id){
@@ -12156,8 +12279,8 @@ function renderCmdContent(){
     </div>
     <div class="cmd-progress"><div class="cmd-progress-fill" style="width:${pct}%"></div></div>
     <div style="font-size:11px;color:var(--muted);margin-top:4px;text-align:left">${pct}% מחולצו</div></div>`;
-  const rpts=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id).map(r=>({...r,_site:s.name.split('—')[0].trim()}))):siteExternalReports(cmdActiveSite);
-  document.getElementById('cmd-ext-reports').innerHTML=rpts.length?rpts.map(r=>externalReportCardHtml(r, r._site||'')).join(''):'<div style="color:var(--muted);font-size:13px;padding:8px 0">אין דיווחים</div>';
+  const rpts=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id).map(r=>({...r,_site:s.name.split('—')[0].trim(),_siteId:s.id}))):siteExternalReports(cmdActiveSite);
+  document.getElementById('cmd-ext-reports').innerHTML=rpts.length?rpts.map(r=>externalReportCardHtml(r, r._site||'', r._siteId||cmdActiveSite)).join(''):'<div style="color:var(--muted);font-size:13px;padding:8px 0">אין דיווחים</div>';
   const locBoard=document.getElementById('cmd-location-board');
   if(locBoard) locBoard.innerHTML=renderCasualtyLocationBoard(cmdActiveSite==='ALL'?commandVisibleSites().filter(id=>id!=='ALL'):[cmdActiveSite]);
   applyCmdPanelState();
@@ -12236,7 +12359,9 @@ function mergeRemoteExternalReports(local, siteId){
 }
 function siteExternalReports(siteId){
   const site=allSites.find(s=>s.id===siteId);
-  const local=site?.externalReports || (siteId==='SITE_A' ? siteData.externalReports : null) || [];
+  // SITE_A's reports live in siteData.externalReports (saveReport writes there); allSites' SITE_A
+  // copy is only re-pointed at it on load, so reading it showed nothing until a reload.
+  const local=(siteId==='SITE_A' ? siteData.externalReports : site?.externalReports) || [];
   return mergeRemoteExternalReports(local, siteId);
 }
 function renderCmdPatients(){
@@ -13256,6 +13381,7 @@ function renderIncidentReport(){
       <div class="aar-box"><div class="aar-k">חסמי עורקים</div><div class="aar-v">${tq.total??0}</div><div class="demo-strip-sub">פעילים בסגירה ${tq.active_at_close??0} · מקסימום ${tq.max_minutes??'—'} דק׳ · מעל 120 דק׳: ${tq.over_120_minutes??0}</div></div>
       <div class="aar-box"><div class="aar-k">פינוי לפי יעד</div><div>${aarCountChips(rep.evacuations_by_destination)}</div></div>
       <div class="aar-box"><div class="aar-k">מד״א מול מיון שטח</div><div>${(rep.mda_vs_field||[]).length?(rep.mda_vs_field||[]).map(x=>`<span class="aar-chip">${escAttr(TRIAGE_LABELS[x.field_triage]||x.field_triage)} → ${escAttr(x.mda_classification)}: <b>${x.count}</b></span>`).join(''):'<span class="demo-strip-sub">אין</span>'}</div></div>
+      ${rep.external_reports?`<div class="aar-box" id="aar-external-reports"><div class="aar-k">דיווחים חיצוניים</div><div class="aar-v">${rep.external_reports.total??0}</div><div>${aarCountChips(rep.external_reports.by_source, SERVER_EXTERNAL_SOURCE_LABELS)}</div><div class="demo-strip-sub">דווחו: קשה ${rep.external_reports.reported?.red??0} · בינוני ${rep.external_reports.reported?.yellow??0} · קל ${rep.external_reports.reported?.green??0} · מת ${rep.external_reports.reported?.black??0} · פצועים משויכים ${rep.external_reports.linked_patients??0}</div><div>${(rep.external_reports.linked_mda_vs_field||[]).map(x=>`<span class="aar-chip">${escAttr(TRIAGE_LABELS[x.field_triage]||x.field_triage)} → ${escAttr(MDA_CLASSIFICATION_LABELS[x.mda_classification]||'לא דווח')}: <b>${x.count}</b></span>`).join('')}</div></div>`:''}
       <div class="aar-box"><div class="aar-k">פונו לפני הגעת הכוח</div><div class="demo-strip-sub">${rep.pre_evacuation?`סה״כ ${rep.pre_evacuation.total??0} · קשה ${rep.pre_evacuation.severe??0} · בינוני ${rep.pre_evacuation.moderate??0} · קל ${rep.pre_evacuation.light??0}`:'אין דיווח'}</div></div>
       <div class="aar-box"><div class="aar-k">צריכת ציוד</div><div>${aarCountChips(rep.supply_consumed)}</div><div class="demo-strip-sub">בקשות אספקה: ${Object.entries(rep.supply_requests_by_status||{}).map(([k,v])=>`${escAttr(k)} ${v}`).join(' · ')||'אין'}</div></div>
       <div class="aar-box"><div class="aar-k">בקשות רפואיות</div><div>${aarCountChips(rep.medical_requests)}</div></div>
@@ -14172,7 +14298,8 @@ function mapRemoteExternalReport(row){
     sourceLabel:SERVER_EXTERNAL_SOURCE_LABELS[row.source]||'אחר', red:Number(row.reported_red)||0, yellow:Number(row.reported_yellow)||0,
     green:Number(row.reported_green)||0, black:Number(row.reported_black)||0, evacDest:sanitizeRemoteText(row.evacuation_destination), notes:sanitizeRemoteText(row.notes, 500),
     time:at && !isNaN(at) ? at.getHours().toString().padStart(2,'0')+':'+at.getMinutes().toString().padStart(2,'0') : '',
-    status:'new', fromServer:true};
+    status:'new', fromServer:true,
+    linkedPatientIds:(Array.isArray(row.external_patient_links)?row.external_patient_links:[]).map(l=>l?.patient_id).filter(id=>typeof id==='string')};
 }
 async function pullExternalReports(incidentId){
   if(!currentUser) return;
@@ -14181,13 +14308,14 @@ async function pullExternalReports(incidentId){
   let result;
   try{
     result=await client.from('external_reports')
-      .select('id,source,reported_red,reported_yellow,reported_green,reported_black,evacuation_destination,notes,external_reference,created_at')
+      .select('id,source,reported_red,reported_yellow,reported_green,reported_black,evacuation_destination,notes,external_reference,created_at,external_patient_links(patient_id)')
       .eq('incident_id', incidentId).order('created_at',{ascending:true});
   }catch(e){ return; }
   if(result.error || !result.data) return;
   const mapped=result.data.map(mapRemoteExternalReport);
   const before=JSON.stringify(_remoteExternalReports[incidentId]||[]);
   _remoteExternalReports[incidentId]=mapped;
+  pruneExternalReportLinkOverlay();
   if(before!==JSON.stringify(mapped)) refreshActiveScreenData();
 }
 setInterval(()=>{ if(currentUser) pullProjectedPatientStateAll(); }, 45000);

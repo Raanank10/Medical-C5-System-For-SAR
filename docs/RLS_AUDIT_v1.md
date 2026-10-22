@@ -412,3 +412,21 @@ Verified live 2026-10-22 in a rolled-back block (a medic opens an incident with 
 
 - T6 (leaked-password protection) and T5 (service-role key handling) — out of scope, not RLS/authorization, already tracked in `docs/THREAT_MODEL.md`.
 - Full line-by-line cross-check of every role's write scope against `docs/API_SURFACE_v1.2.md`/`docs/ROLE_COMMAND_MODEL_v2.7.md` for every table was done at a summary level while reviewing each policy above (role lists per policy were checked against the role's documented capability); no drift was found. A dedicated doc-vs-schema diff was not built as a separate artifact.
+
+## Follow-up: linking external reports later (`database/069`, WP-16 PR B)
+
+`external_reports` and `external_patient_links` insert/update/delete policies now `false` for clients (`ALTER POLICY`, nothing dropped). Before this, pc / cc / chamal / physician / admin could add, edit or delete reports and links directly, with no event (no audit), without checking that the patient is in the report's incident, and after the close (`can_access_incident`). The client never wrote them directly; both tables are written only by `project_evacuation_tracking()` (`SECURITY DEFINER`) from `EXTERNAL_REPORT_CREATED` and the new `EXTERNAL_REPORT_LINKED` projection, which accepts only `actor_role` pc / cc / chamal / physician / admin and only a report and a patient of the event's own incident. Read policies unchanged (068). `app.build_incident_aar()` is now a wrapper over the renamed `app.build_incident_aar_base()`; execute on both revoked from `public`, `anon`, `authenticated`.
+
+Verified live 2026-10-22 in a rolled-back block (a medic opens two incidents with synthetic patients; the PC writes the events as `authenticated`):
+
+| Check | Result |
+|---|---|
+| PC creates an MDA report; links it to P1 by `external_reference` | 1 link |
+| PC unlinks by `external_report_id` | 0 links |
+| PC links P2 by `external_report_id` | 1 link (`method` `manual_link`) |
+| link event naming a patient of another incident | event accepted (audit), no link |
+| link event with `actor_role` medic | no link |
+| PC direct insert into `external_patient_links`; direct delete of the report | refused; 0 rows |
+| CC closes; stored report `external_reports` | total 1, by source mda 1, reported red 2 / yellow 1, linked patients 1, linked MDA vs field yellow -> moderate 1 |
+
+`get_advisors` (security) after applying: nothing new; `app.build_incident_aar*` are not in an exposed schema.
