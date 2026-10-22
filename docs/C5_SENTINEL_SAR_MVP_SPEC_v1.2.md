@@ -138,15 +138,16 @@ Chamal
 Platoon Commander, if authorized
 ```
 
-A Medic may create a **local draft incident** only when no official incident is available. A draft incident allows field data capture but must later be confirmed by חוג״ד / מ״פ רפואה / Chamal. The confirmation event is auditable. Draft state has a single source of truth: `incidents.status = 'draft'`; there is no separate `is_draft` flag.
+**No draft incidents (decision D10, `docs/GAP_CLOSURE_PLAN.md`, `database/064`, V2.99.48).** A Medic or Paramedic opens an **official** incident directly, in their own company (and platoon, when the roster gives them one). Before opening, the phone lists the open incidents of the medic's company from the last 12 hours and offers to join one instead. Once opened, the company's חוג״ד and מ״פ חילוץ, every מ״מ of the company (only the chosen platoon's מ״מ once the platoon is set), and מ״פ רפואה / Chamal / Admin see a pulsing banner until each of them acknowledges it (per person, stored on the server). A medic's incident has no platoon unless the roster sets one, so the חוג״ד or מ״פ חילוץ chooses it from the banner, which then informs that platoon's מ״מ. The opener may cancel the incident as a false alarm while it has no patients; after that, closing follows the close guard (`040`). Duplicates that still happen are merged into one incident by מ״פ רפואה / Chamal / Admin (D8, WP-11 part 2). The earlier draft path (`incidents.status = 'draft'`, `confirm_draft` / `reject_draft` / `acknowledge_draft`) is no longer used by the client; the server functions remain for history.
 
 ## Authorization Matrix
 
 | Action | Medic | חוג״ד | Log-O | מ״פ רפואה | Chamal |
 |---|---:|---:|---:|---:|---:|
-| Create local draft incident | ✓ | ✓ | ✗ | ✓ | ✓ |
-| Open official incident and set T₀ | ✗ | ✓ | ✗ | ✓ | ✓ |
-| Confirm draft incident | ✗ | ✓ | ✗ | ✓ | ✓ |
+| Open official incident (D10) | ✓ | ✓ | ✗ | ✓ | ✓ |
+| Set T₀ (site authority) | ✗ | ✓ | ✗ | ✓ | ✓ |
+| Informed of an incident a medic opened, acknowledge | ✗ | ✓ | ✗ | ✓ | ✓ |
+| Cancel own incident as a false alarm while it has no patients | ✓ | ✓ | ✗ | ✓ | ✓ |
 | Close / reopen official incident | Limited | ✓ | ✗ | ✓ | ✓ |
 | Register new patient | ✓ | ✓ | ✗ | ✗ | ✗ |
 | Record vitals and interventions | ✓ | ✓ | ✗ | ✗ | ✗ |
@@ -199,26 +200,14 @@ A Medic may override T_injury for an individual patient if injury time is known 
 Any override is logged as PATIENT_T_INJURY_UPDATED.
 ```
 
-### Site Guard and Draft-Incident Patient Creation
+### Site Guard and Patient Creation
 
-The `+ New Patient` button is enabled when either an official incident exists **or** a local draft incident exists.
-
-```text
-Official incident exists → Patient attaches to official incident.
-Draft incident exists only → Patient attaches to draft incident and is marked Pending Incident Approval.
-No official or draft incident exists → + New Patient is disabled; create draft incident first.
-```
-
-Patients, vitals, treatments, tourniquet records, and supply requests may be recorded under a draft incident. They remain operationally visible, local/offline-safe, and syncable.
-
-If only a draft incident exists, every relevant screen must clearly show:
+The `+ New Patient` button is enabled when an incident is active on the device. There are no draft incidents (D10): a medic without an incident opens an official one first, after the phone has offered to join an open incident of the medic's company instead.
 
 ```text
-DRAFT INCIDENT — pending confirmation
-Patients may be recorded, but incident approval is required.
+Active incident on the device → Patient attaches to it.
+No incident → + New Patient is disabled; join or open an incident first.
 ```
-
-חוג״ד / מ״פ רפואה / Chamal screens must show a high-priority blinking/pulsing approval banner until the draft incident is approved, merged, rejected, or explicitly acknowledged.
 
 ---
 
@@ -540,33 +529,21 @@ Override consequences:
 - Incident name
 - Incident clock since `T₀ / T_injury`
 - Sync status: 🟢 Live / 🔴 Offline / 🟡 Syncing
-- Draft incident badge, if relevant
+- False-alarm badge, if the opener cancelled the incident
 
-### Draft Incident Approval Banner — חוג״ד / מ״פ רפואה / Chamal
+### Incident Opened Banner — חוג״ד / מ״פ חילוץ / מ״מ / מ״פ רפואה / Chamal (D10)
 
-When a draft incident exists, חוג״ד / מ״פ רפואה / Chamal screens display a high-priority blinking/pulsing banner:
-
-```text
-⚠ Draft Incident Pending Approval
-Medic Cohen opened Draft Incident INC-DRAFT-001
-Patients already registered: [count]
-Location: [location]
-Created: [elapsed]
-
-[Approve & Set T₀]
-[Merge Into Existing Incident]
-[Reject / Archive]
-```
-
-Behavior:
+When a medic or paramedic opens an incident, the screens of the people who must know show a pulsing banner (`list_incident_open_alerts`, polled every 20 seconds, vibrate once per new incident):
 
 ```text
-First 60 seconds: blinking/pulsing banner
-After acknowledgment: persistent amber banner
-If patients are attached: remains high-priority until resolved
+🚨 New incident opened in the field: INC-... · [location] · [address]
+Opened [time] by [role] [name] · [count] patients
+[platoon not set: the מ״מ was not informed]   (חוג״ד / מ״פ חילוץ: [choose platoon] [set platoon])
+[no company: the medic has no unit (setup error)]   (מ״פ רפואה / Chamal / Admin only)
+[ראיתי] [enter]
 ```
 
-Medic screens show a non-blocking draft badge, but חוג״ד / מ״פ רפואה / Chamal screens require explicit action.
+Who sees it: the company's חוג״ד and מ״פ חילוץ; every מ״מ of the company until the platoon is chosen, then only the מ״מ of the chosen platoon (`064d`, owner 2026-10-22; a מ״מ gets no entry button until then, since it reaches an incident only through its platoon); מ״פ רפואה, Chamal and Admin for every incident. It stays until that person presses "ראיתי" (one acknowledgment per person; others still see it). A false-alarm cancel shows as "✖ incident cancelled (false alarm)" with the reason, until acknowledged. Alerts cover incidents opened in the last 24 hours.
 
 ### Stat Row
 
@@ -1718,7 +1695,7 @@ This keeps inventory auditable, offline-safe, and compatible with after-action l
 
 ## Draft Incident Patient Creation
 
-`+ New Patient` is allowed under a draft incident. Patients created under a draft incident are marked `Pending Incident Approval` and remain syncable. חוג״ד / מ״פ רפואה / Chamal screens show a blinking/pulsing approval banner until the draft incident is approved, merged, rejected, or acknowledged.
+Superseded by D10 (V2.99.48): there are no draft incidents. A medic opens an official incident and command is informed by the incident-opened banner (sec 2.1 and "Incident Opened Banner").
 
 ## Event-Driven Sync
 

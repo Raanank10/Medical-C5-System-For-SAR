@@ -19,8 +19,8 @@ for (const rel of files) {
   // Logged-in mode starts empty and works inside a real incident (database/038 lifecycle RPCs).
   assert(html.includes('id="screen-incident-picker"'), `${rel}: incident picker screen must exist`);
   assert(html.includes('id="incident-context-strip"'), `${rel}: incident context strip must exist`);
-  assert(html.includes('id="draft-approval-banner"'), `${rel}: draft approval banner must exist`);
-  for (const rpc of ['list_open_incidents', 'open_incident', 'join_incident', 'confirm_draft', 'reject_draft', 'acknowledge_draft']) {
+  assert(html.includes('id="incident-open-alert-banner"'), `${rel}: incident-opened alert banner must exist (D10)`);
+  for (const rpc of ['list_open_incidents', 'open_incident', 'join_incident', 'list_incident_open_alerts', 'acknowledge_incident_opened', 'list_unit_open_incidents']) {
     assert(html.includes(`'${rpc}'`), `${rel}: client must call the ${rpc} RPC`);
   }
   assert(html.includes('function blockDemoDataWhileLoggedIn()'), `${rel}: demo loaders must be guarded while logged in`);

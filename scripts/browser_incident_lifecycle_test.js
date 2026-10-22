@@ -1,6 +1,7 @@
 // Real-browser test of the logged-in incident lifecycle UI (V2.99.26, database/038): the app
-// starts with no incident and no patients, a medic opens a draft incident, events are pinned to
-// that incident at creation, command sees the pulsing approval banner and confirms it, and the
+// starts with no incident and no patients, a medic opens an incident (active at once since D10,
+// database/064: no drafts), events are pinned to that incident at creation, the PC sees the
+// pulsing "incident opened" banner until acknowledging it, and the
 // local demo mode still works after sign-out. Also the incident close guard (V2.99.28,
 // database/040): no close while patients are open, medical-command override with a mandatory
 // reason, no override for rescue command, and the same rule in local demo mode.
@@ -52,7 +53,7 @@ const FAKE_SUPABASE = `
       let data;
       const s=session();
       if(table==='profiles'){ const u=s&&userById(s.user.id); data=u?{role:u.role,is_active:true}:null; }
-      else if(table==='incidents'){ const inc=load('incidents',[]).find(i=>i.id===b._filters.id); data=inc?{status:inc.status,metadata:inc.metadata||{}}:null; }
+      else if(table==='incidents'){ const inc=load('incidents',[]).find(i=>i.id===b._filters.id); data=inc?{status:inc.status,metadata:inc.metadata||{},opened_by:inc.opened_by||null,closed_at:inc.closed_at||null}:null; }
       else data=b._single?null:[];
       return Promise.resolve({data,error:null}).then(resolve,reject);
     };
@@ -68,41 +69,43 @@ const FAKE_SUPABASE = `
     const command=['pc','cc','chamal','admin','physician'].includes(me.role);
     if(name==='list_open_incidents'){
       return ok(incidents.filter(i=>['draft','staging','active'].includes(i.status)).map(i=>({...i,patient_count:0,
-        opened_by_name:userById(i.opened_by||i.draft_created_by)?.email||null,
+        opened_by_name:userById(i.opened_by)?.email||null,
         is_member:members.some(m=>m.incident_id===i.id&&m.profile_id===me.id)})));
     }
     if(name==='open_incident'){
       if(me.role==='logistics_officer') return fail('role logistics_officer cannot open an incident');
-      const status=['medic','paramedic'].includes(me.role)?'draft':'active';
+      const status='active'; // database/064 (D10): no drafts
       const inc={id:params.p_incident_id,visual_id:'INC-TEST-'+params.p_incident_id.slice(0,6).toUpperCase(),status,
         location_name:params.p_location_name,address:params.p_address,incident_type:params.p_incident_type,
-        opened_at:new Date().toISOString(),draft_created_by:status==='draft'?me.id:null,opened_by:status==='active'?me.id:null,
-        draft_acknowledged_at:null,metadata:{}};
+        opened_at:new Date().toISOString(),opened_by:me.id,opened_by_role:me.role,metadata:{}};
       incidents.push(inc); save('incidents',incidents);
       members.push({incident_id:inc.id,profile_id:me.id}); save('members',members);
       return ok({id:inc.id,visual_id:inc.visual_id,status,created:true});
+    }
+    if(name==='list_unit_open_incidents') return ok([]);
+    if(name==='list_incident_open_alerts'){
+      if(!['pc','rcc','rpc','cc','chamal','admin'].includes(me.role)) return ok([]);
+      const acks=load('acks',[]);
+      return ok(incidents.filter(i=>i.status==='active'&&['medic','paramedic'].includes(i.opened_by_role)&&!acks.some(a=>a.incident_id===i.id&&a.profile_id===me.id))
+        .map(i=>({id:i.id,visual_id:i.visual_id,location_name:i.location_name,address:i.address,status:i.status,opened_at:i.opened_at,
+          opened_by_name:userById(i.opened_by)?.email||null,opened_by_role:i.opened_by_role,company_id:null,platoon_id:null,patient_count:0,
+          no_unit:true,needs_platoon:false,cancelled:false,cancel_reason:null})));
+    }
+    if(name==='acknowledge_incident_opened'){
+      const acks=load('acks',[]); acks.push({incident_id:params.p_incident_id,profile_id:me.id}); save('acks',acks);
+      return ok({id:params.p_incident_id,acknowledged:true});
     }
     if(name==='join_incident'){
       members.push({incident_id:params.p_incident_id,profile_id:me.id}); save('members',members);
       return ok({id:params.p_incident_id});
     }
     const inc=incidents.find(i=>i.id===params?.p_incident_id);
-    if(['confirm_draft','reject_draft','acknowledge_draft'].includes(name)){
-      if(!command) return fail('only command roles');
-      if(!inc||inc.status!=='draft') return fail('not a draft');
-      if(name==='confirm_draft'){ inc.status='active'; inc.metadata={draft_resolution:'confirmed'}; }
-      if(name==='reject_draft'){ inc.status='closed'; inc.metadata={draft_resolution:'rejected'}; }
-      if(name==='acknowledge_draft'){ inc.draft_acknowledged_at=new Date().toISOString(); }
-      save('incidents',incidents);
-      return ok({id:inc.id});
-    }
     // database/040 contract. Open patients per incident come from __fake_openpatients.
     if(name==='close_incident'||name==='reopen_incident'){
       if(!['pc','cc','chamal','admin','physician','rpc','rcc'].includes(me.role)) return fail('role '+me.role+' cannot close an incident');
       if(!inc) return fail('not found');
       if(name==='reopen_incident'){ if(inc.status!=='closed') return ok({status:inc.status,changed:false}); inc.status='active'; save('incidents',incidents); return ok({status:'active',changed:true}); }
       if(inc.status==='closed') return ok({closed:true,changed:false});
-      if(inc.status==='draft') return fail('draft');
       const open=(load('openpatients',{})[inc.id])||[];
       const canOverride=command;
       const reason=(params.p_override_reason||'').trim()||null;
@@ -171,24 +174,25 @@ async function checkFile(browser, file) {
   await page.goto('file://' + file, { waitUntil: 'domcontentloaded' });
   await unlockOrSetupPin(page);
 
-  // 1. Medic: no incident yet -> picker, empty, draft wording, no demo patients.
+  // 1. Medic: no incident yet -> picker, empty, no draft wording (D10), no demo patients.
   await login(page, 'medic@test');
   await page.waitForSelector('#screen-incident-picker.active', { timeout: 5000 });
   assert((await page.textContent('#incident-picker-list')).includes('אין אירועים פתוחים'), `${rel}: medic should see an empty incident list`);
-  assert((await page.textContent('#incident-open-title')).includes('טיוטת'), `${rel}: medic open panel should say draft`);
+  assert(!(await page.textContent('#incident-open-panel')).includes('טיוט'), `${rel}: medic open panel must not mention drafts any more (D10)`);
   assert(await page.evaluate(() => patients.length === 0), `${rel}: logged-in medic must start with zero patients`);
 
-  // 2. Medic opens a draft -> en-route screen, draft strip, address prefilled.
+  // 2. Medic opens an incident -> en-route screen, active strip, address prefilled, false-alarm cancel offered.
   await page.fill('#incident-open-location', 'Synthetic Site Alpha');
   await page.fill('#incident-open-address', 'Synthetic Street 1');
   await page.click('#incident-open-btn');
   await page.waitForSelector('#screen-enroute.active', { timeout: 5000 });
-  const draftId = await page.evaluate(() => activeIncident.id);
-  assert(/^[0-9a-f-]{36}$/.test(draftId), `${rel}: active incident id should be a client UUID, got ${draftId}`);
-  assert((await page.textContent('#incident-context-strip')).includes('ממתין לאישור'), `${rel}: strip should show the draft status`);
-  assert(await page.evaluate(() => document.getElementById('incident-context-strip').classList.contains('draft')), `${rel}: strip should use the draft style`);
+  const incId = await page.evaluate(() => activeIncident.id);
+  assert(/^[0-9a-f-]{36}$/.test(incId), `${rel}: active incident id should be a client UUID, got ${incId}`);
+  assert((await page.textContent('#incident-context-strip')).includes('פעיל'), `${rel}: a medic's incident is active at once (D10)`);
+  assert(!(await page.evaluate(() => document.getElementById('incident-context-strip').classList.contains('draft'))), `${rel}: strip must not use the draft style`);
+  assert(await page.locator('#incident-strip-false-alarm-btn').isVisible(), `${rel}: the opener of an empty incident should be offered the false-alarm cancel`);
   assert((await page.inputValue('#enroute-address')) === 'Synthetic Street 1', `${rel}: en-route address should be prefilled from the incident`);
-  assert(await page.evaluate((id) => SITE_TO_INCIDENT_ID.SITE_A === id && !('SITE_B' in SITE_TO_INCIDENT_ID), draftId), `${rel}: SITE_A must map to the draft and SITE_B must be gone`);
+  assert(await page.evaluate((id) => SITE_TO_INCIDENT_ID.SITE_A === id && !('SITE_B' in SITE_TO_INCIDENT_ID), incId), `${rel}: SITE_A must map to the incident and SITE_B must be gone`);
   assert(await page.evaluate(() => !allSites.some((s) => s.id === 'SITE_B')), `${rel}: local-demo SITE_B must be hidden while logged in`);
 
   // 3. Events are pinned to the incident at creation; an unstamped legacy entry is rejected locally, never pushed.
@@ -197,10 +201,10 @@ async function checkFile(browser, file) {
     saveLocalEvent({ type: 'QUICK_PATIENT_CREATED', patient_id: newUuid(), payload_json: { visual_id: 'P001' } });
   });
   await page.evaluate(() => syncPush());
-  const stamped = await page.evaluate((id) => getOutbox().filter((e) => e.incident_id === id).length, draftId);
+  const stamped = await page.evaluate((id) => getOutbox().filter((e) => e.incident_id === id).length, incId);
   assert(stamped >= 1, `${rel}: new outbox entries must carry incident_id`);
   const pushedIncidents = [...new Set(pushes.map((p) => p.incident_id))];
-  assert(pushedIncidents.length === 1 && pushedIncidents[0] === draftId, `${rel}: pushes must target only the draft incident, got ${JSON.stringify(pushedIncidents)}`);
+  assert(pushedIncidents.length === 1 && pushedIncidents[0] === incId, `${rel}: pushes must target only the medic's incident, got ${JSON.stringify(pushedIncidents)}`);
   assert(!pushes.some((p) => p.events.some((e) => e.local_event_id === 'legacy-unstamped-1')), `${rel}: an unstamped entry must never be pushed`);
   const legacy = await page.evaluate(() => getOutbox().find((e) => e.local_event_id === 'legacy-unstamped-1'));
   assert(legacy.syncRejected && legacy.syncRejectReason === 'no_incident_context', `${rel}: unstamped entry must be visibly rejected, got ${JSON.stringify(legacy)}`);
@@ -279,29 +283,30 @@ async function checkFile(browser, file) {
   await unlockOrSetupPin(page);
   await page.waitForFunction(() => ['screen-enroute', 'screen-incident-picker'].includes(document.querySelector('.screen.active')?.id), { timeout: 5000 });
   assert((await activeScreen(page)) === 'screen-enroute', `${rel}: reload should resume the medic's incident, got ${await activeScreen(page)}`);
-  assert(await page.evaluate((id) => activeIncident?.id === id, draftId), `${rel}: resumed incident should be the draft`);
+  assert(await page.evaluate((id) => activeIncident?.id === id, incId), `${rel}: resumed incident should be the medic's incident`);
 
-  // 6. PC: pulsing approval banner, acknowledge, confirm; no demo patients on the role dashboard.
+  // 6. PC: pulsing "incident opened" banner until acknowledged (D10); no demo patients on the role dashboard.
   await page.evaluate(() => signOut());
   await login(page, 'pc@test');
   await page.waitForSelector('#screen-incident-picker.active', { timeout: 5000 });
-  await page.waitForFunction(() => document.getElementById('draft-approval-banner').style.display === 'flex', { timeout: 5000 });
-  assert(await page.evaluate(() => document.getElementById('draft-approval-banner').classList.contains('pulse')), `${rel}: unacknowledged draft banner should pulse`);
-  await page.click('#draft-approval-banner button:has-text("ראיתי")');
-  await page.waitForFunction(() => !document.getElementById('draft-approval-banner').classList.contains('pulse'), { timeout: 5000 });
-  await page.click('#draft-approval-banner button:has-text("אשר")');
-  await page.waitForFunction(() => document.getElementById('draft-approval-banner').style.display === 'none', { timeout: 5000 });
+  await page.evaluate(() => pollIncidentOpenAlerts());
+  await page.waitForFunction(() => document.getElementById('incident-open-alert-banner').style.display === 'flex', { timeout: 5000 });
+  assert(await page.evaluate(() => document.getElementById('incident-open-alert-banner').classList.contains('pulse')), `${rel}: unacknowledged open alert should pulse`);
+  assert((await page.textContent('#incident-open-alert-banner')).includes('Synthetic Site Alpha'), `${rel}: the banner should name the medic's incident`);
+  await page.click('#incident-open-alert-banner button:has-text("ראיתי")');
+  await page.waitForFunction(() => document.getElementById('incident-open-alert-banner').style.display === 'none', { timeout: 5000 });
   const rpcNames = await page.evaluate(() => window.__fakeRpcLog.map((r) => r.name));
-  assert(rpcNames.includes('acknowledge_draft') && rpcNames.includes('confirm_draft'), `${rel}: expected acknowledge_draft and confirm_draft calls, got ${rpcNames.join(',')}`);
+  assert(rpcNames.includes('acknowledge_incident_opened') && !rpcNames.includes('confirm_draft'), `${rel}: expected acknowledge_incident_opened and no draft calls, got ${rpcNames.join(',')}`);
   await page.click(`#incident-picker-list button:has-text("הצטרף לאירוע")`);
   await page.waitForSelector('#screen-role-dashboard.active', { timeout: 5000 });
   assert(await page.evaluate(() => patients.length === 0), `${rel}: logged-in PC dashboard must not auto-load demo patients`);
-  assert((await page.textContent('#incident-context-strip')).includes('פעיל'), `${rel}: strip should show the confirmed incident as active`);
+  assert((await page.textContent('#incident-context-strip')).includes('פעיל'), `${rel}: strip should show the incident as active`);
+  assert(!(await page.locator('#incident-strip-false-alarm-btn').isVisible()), `${rel}: only the opener is offered the false-alarm cancel`);
 
   // 6b. Close guard (V2.99.28): PC cannot close while patients are open; override needs a reason.
   await page.evaluate((id) => localStorage.setItem('__fake_openpatients', JSON.stringify({ [id]: [
     { id: 'p1', visual_id: 'P101', triage: 'red', status: 'evacuating' },
-    { id: 'p2', visual_id: 'P102', triage: 'pending', status: 'identified' }] })), draftId);
+    { id: 'p2', visual_id: 'P102', triage: 'pending', status: 'identified' }] })), incId);
   const stripClose = page.locator('#incident-strip-close-btn');
   assert(await stripClose.isVisible(), `${rel}: PC should see the close button on the incident strip`);
   await stripClose.click();
