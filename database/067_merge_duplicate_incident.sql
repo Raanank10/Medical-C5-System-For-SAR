@@ -1,5 +1,5 @@
 -- Merge a duplicate incident into another (decision D8, revised by D10; docs/GAP_CLOSURE_PLAN.md
--- WP-11 part 2 PR B, V2.99.49).
+-- WP-11 part 2 PR B, V2.99.50).
 --
 -- Two medics can still open the same event twice (D10 warns at opening, but offline phones or a
 -- hurried "open anyway" get through). Company-level command (cc, chamal, admin) merges the
@@ -37,6 +37,10 @@
 -- 5. sync-log (v11) sends later pushes for the source (an offline phone that still works in it)
 --    to the target; the client switches a phone that is in the source to the target.
 --
+-- Applied live 2026-10-22 as 066_merge_duplicate_incident (the event type as
+-- 065_incident_merged_enum_value); renumbered 067/066 in the repo because database/065 is
+-- medics_in_platoons (merged first).
+--
 -- Idempotent: merging the same pair again returns the earlier result's shape with changed:false.
 
 alter table events add column if not exists origin_incident_id uuid references incidents(id) on delete set null;
@@ -50,7 +54,7 @@ language plpgsql
 set search_path = public
 as $$
 begin
-  -- The one exception (database/066, D8): merge_incident() re-tags a duplicate incident's events
+  -- The one exception (database/067, D8): merge_incident() re-tags a duplicate incident's events
   -- to the target. Only incident_id and origin_incident_id may change, and origin_incident_id
   -- must keep the first incident the event was recorded in.
   if tg_op = 'UPDATE'

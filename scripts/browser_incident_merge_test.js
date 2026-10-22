@@ -1,5 +1,5 @@
-// Real-browser test of merging a duplicate incident (decision D8, database/066, sync-log v11,
-// V2.99.49). Two medics opened the same event twice: incident A (the one to keep) and incident B
+// Real-browser test of merging a duplicate incident (decision D8, database/067, sync-log v11,
+// V2.99.50). Two medics opened the same event twice: incident A (the one to keep) and incident B
 // (the duplicate), each with a patient P001. CC merges B into A from the incident picker:
 // - only cc/chamal/admin get the "מיזוג כפילות" button (not the PC); a reason is required;
 // - a medic still in B with unsent work is moved to A by the push itself (sync-log answers
@@ -10,7 +10,7 @@
 // CC, PC and three medic phones share one fake backend in this Node process (same harness as
 // scripts/browser_incident_open_alerts_test.js). The fake mirrors merge_incident()'s and
 // sync-log's contract; the SQL itself was verified live by role impersonation
-// (docs/RLS_AUDIT_v1.md, 066 follow-up).
+// (docs/RLS_AUDIT_v1.md, 066-067 follow-up).
 //
 // Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
 // Run: npm install && node scripts/browser_incident_merge_test.js

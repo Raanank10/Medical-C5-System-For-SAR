@@ -268,7 +268,7 @@ async function handlePush(
     return json({ error: "missing_device_id_or_events" }, 400);
   }
 
-  // database/066 (D8): a duplicate incident merged into another is closed with
+  // database/067 (D8): a duplicate incident merged into another is closed with
   // metadata.merged_into. An offline phone that still works in it pushes here later; its events
   // go to the incident it was merged into (following a chain of merges, at most 5 steps), so
   // nothing recorded offline is lost or stranded in the closed duplicate.
@@ -389,7 +389,7 @@ async function handlePush(
         created_by: callerId,
       };
       let { error: patientErr } = await userClient.from("patients").insert(patientRow);
-      // After a merge (database/066) the target may already use this temporary id for another
+      // After a merge (database/067) the target may already use this temporary id for another
       // patient. If this patient itself does not exist yet, create it under a renamed id, the
       // same "<id>-<last 4 characters of the duplicate incident's id>" rule merge_incident() uses.
       if (patientErr?.code === "23505" && redirected_to && requested_incident_id) {
@@ -533,7 +533,7 @@ async function handlePush(
     high_risk_flags,
     field_conflicts,
     next_pull_cursor,
-    // Set when the requested incident had been merged into another (database/066); the client
+    // Set when the requested incident had been merged into another (database/067); the client
     // switches to it.
     redirected_to,
   });

@@ -28,9 +28,9 @@
 --    A false-alarm cancellation stays listed (cancelled = true) until acknowledged.
 --    acknowledge_incident_opened() stores the acknowledgment per person.
 -- 5. set_incident_platoon(): the PC or RCC of the incident's company chooses its platoon. In 053
---    only an RPC is placed in a platoon (app.guard_profile_unit), so a medic's incident never
---    gets one at opening and the PC/RCC always chooses it; that platoon's RPC then sees it and is
---    informed. Found live 2026-10-22: it must set app.incident_unit_via_rpc, the guard's own
+--    only an RPC was placed in a platoon (app.guard_profile_unit), so a medic's incident never
+--    got one at opening and the PC/RCC chose it; that platoon's RPC then sees it and is
+--    informed. (Since 065 a medic can be attached to a platoon; open_incident() then sets it.) Found live 2026-10-22: it must set app.incident_unit_via_rpc, the guard's own
 --    hook for server functions that check the caller themselves. Company-level
 --    command keeps set_incident_unit() for everything else.
 -- 6. cancel_incident_false_alarm(): only the opener, only while the incident is active and has no
