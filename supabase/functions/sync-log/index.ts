@@ -262,10 +262,33 @@ async function handlePush(
     return json({ error: "invalid_json_body" }, 400);
   }
 
-  const { device_id, incident_id, events } = body;
+  const { device_id, incident_id: requested_incident_id, events } = body;
   if (!device_id || !Array.isArray(events)) {
-    logEvent("missing_device_id_or_events", { caller_id: callerId, role: callerRole, incident_id: incident_id ?? null });
+    logEvent("missing_device_id_or_events", { caller_id: callerId, role: callerRole, incident_id: requested_incident_id ?? null });
     return json({ error: "missing_device_id_or_events" }, 400);
+  }
+
+  // database/066 (D8): a duplicate incident merged into another is closed with
+  // metadata.merged_into. An offline phone that still works in it pushes here later; its events
+  // go to the incident it was merged into (following a chain of merges, at most 5 steps), so
+  // nothing recorded offline is lost or stranded in the closed duplicate.
+  let incident_id = requested_incident_id;
+  let redirected_to: string | null = null;
+  let requestedVisualId: string | null = null;
+  for (let hop = 0; incident_id && hop < 5; hop++) {
+    const { data: inc } = await serviceClient
+      .from("incidents")
+      .select("status, metadata, visual_id")
+      .eq("id", incident_id)
+      .maybeSingle();
+    if (hop === 0) requestedVisualId = (inc?.visual_id as string | undefined) ?? null;
+    const mergedInto = inc?.status === "closed" ? (inc?.metadata?.merged_into?.target_id as string | undefined) : undefined;
+    if (!mergedInto) break;
+    incident_id = mergedInto;
+    redirected_to = mergedInto;
+  }
+  if (redirected_to) {
+    logEvent("push_redirected_after_merge", { caller_id: callerId, device_id, from: requested_incident_id, to: redirected_to });
   }
 
   const accepted: Record<string, unknown>[] = [];
@@ -356,7 +379,7 @@ async function handlePush(
       const visualId = (payload_json?.visual_id as string | undefined)
         ?? (payload_json?.visualId as string | undefined)
         ?? local_event_id;
-      const { error: patientErr } = await userClient.from("patients").insert({
+      const patientRow = {
         id: patient_id,
         incident_id: incident_id ?? null,
         visual_id: visualId,
@@ -364,7 +387,21 @@ async function handlePush(
         // timestamp is a known, documented gap (see docs/API_SURFACE_v1.2.md), not a silent one.
         t_injury: local_timestamp,
         created_by: callerId,
-      });
+      };
+      let { error: patientErr } = await userClient.from("patients").insert(patientRow);
+      // After a merge (database/066) the target may already use this temporary id for another
+      // patient. If this patient itself does not exist yet, create it under a renamed id, the
+      // same "<id>-<last 4 characters of the duplicate incident's id>" rule merge_incident() uses.
+      if (patientErr?.code === "23505" && redirected_to && requested_incident_id) {
+        const { data: same } = await serviceClient.from("patients").select("id").eq("id", patient_id).maybeSingle();
+        if (!same) {
+          const suffix = (requestedVisualId ?? requested_incident_id).replace(/[^A-Za-z0-9]/g, "").slice(-4).toUpperCase();
+          for (let n = 1; n <= 5 && patientErr?.code === "23505"; n++) {
+            const renamed = n === 1 ? `${visualId}-${suffix}` : `${visualId}-${suffix}-${n}`;
+            ({ error: patientErr } = await userClient.from("patients").insert({ ...patientRow, visual_id: renamed }));
+          }
+        }
+      }
       // 23505 = unique violation - same patient_id (or incident_id+visual_id) already created,
       // e.g. a retried push. Treat as idempotent success, not an error.
       if (patientErr && patientErr.code !== "23505") {
@@ -475,6 +512,7 @@ async function handlePush(
   logEvent("push_batch_completed", {
     device_id,
     incident_id: incident_id ?? null,
+    requested_incident_id: requested_incident_id ?? null,
     caller_id: callerId,
     role: callerRole,
     batch_size: events.length,
@@ -495,6 +533,9 @@ async function handlePush(
     high_risk_flags,
     field_conflicts,
     next_pull_cursor,
+    // Set when the requested incident had been merged into another (database/066); the client
+    // switches to it.
+    redirected_to,
   });
 }
 
