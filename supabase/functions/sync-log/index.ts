@@ -275,6 +275,10 @@ async function handlePush(
   let incident_id = requested_incident_id;
   let redirected_to: string | null = null;
   let requestedVisualId: string | null = null;
+  // database/068 (D9): a closed incident's patient data is unreadable for everyone but admin, but
+  // records that arrive late (an offline phone) are still accepted. They are inserted without
+  // reading the row back (no RETURNING), which the read policies would refuse.
+  let incidentClosed = false;
   for (let hop = 0; incident_id && hop < 5; hop++) {
     const { data: inc } = await serviceClient
       .from("incidents")
@@ -283,7 +287,10 @@ async function handlePush(
       .maybeSingle();
     if (hop === 0) requestedVisualId = (inc?.visual_id as string | undefined) ?? null;
     const mergedInto = inc?.status === "closed" ? (inc?.metadata?.merged_into?.target_id as string | undefined) : undefined;
-    if (!mergedInto) break;
+    if (!mergedInto) {
+      incidentClosed = inc?.status === "closed";
+      break;
+    }
     incident_id = mergedInto;
     redirected_to = mergedInto;
   }
@@ -348,7 +355,9 @@ async function handlePush(
       let blocked: { device_id: string; local_event_id: string } | null = null;
       for (const dep of depends_on) {
         if (dep.device_id === device_id && acceptedInBatch.has(dep.local_event_id)) continue;
-        const { data: parentRows } = await userClient
+        // Existence only. In a closed incident (database/068) the caller can no longer read events,
+        // so the check runs with the service client; nothing is returned to the caller.
+        const { data: parentRows } = await (incidentClosed ? serviceClient : userClient)
           .from("events")
           .select("id")
           .eq("device_id", dep.device_id)
@@ -427,6 +436,28 @@ async function handlePush(
       local_event_id,
       local_timestamp,
     };
+
+    if (incidentClosed) {
+      const { error: lateErr } = await userClient.from("events").insert(insertRow);
+      if (!lateErr) {
+        accepted.push({ local_event_id, server_event_id: null, server_cursor: null, after_close: true });
+        acceptedInBatch.add(local_event_id);
+        continue;
+      }
+      if (lateErr.code === "23505") {
+        duplicates.push({ local_event_id, server_event_id: null, server_cursor: null, after_close: true });
+        continue;
+      }
+      const lateRls = lateErr.code === "42501" || /row-level security/i.test(lateErr.message ?? "");
+      rejected.push({
+        local_event_id,
+        terminal: lateRls,
+        error_code: lateRls ? "FORBIDDEN_ACTOR_ROLE" : "MALFORMED_EVENT_ENVELOPE",
+        message: lateErr.message,
+      });
+      await quarantine(evt, lateRls ? "FORBIDDEN_ACTOR_ROLE" : "MALFORMED_EVENT_ENVELOPE", lateErr.message);
+      continue;
+    }
 
     const { data: inserted, error: insertErr } = await userClient
       .from("events")
@@ -536,6 +567,8 @@ async function handlePush(
     // Set when the requested incident had been merged into another (database/067); the client
     // switches to it.
     redirected_to,
+    // database/068 (D9): the incident is closed; accepted events were stored but cannot be read back.
+    incident_closed: incidentClosed,
   });
 }
 
