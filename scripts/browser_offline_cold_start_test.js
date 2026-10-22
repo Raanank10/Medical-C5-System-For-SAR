@@ -215,7 +215,17 @@ let SERVER = null;
 // the fake backend follows this flag to behave like an unreachable server.
 let NET_DOWN = false;
 const INACTIVE = new Set(); // profiles the fake server reports as inactive
-const setNetwork = async (context, up) => { NET_DOWN = !up; await context.setOffline(!up); };
+// From Chromium 151 (Playwright 1.62's build) setOffline no longer flips navigator.onLine or fires
+// the window "online" / "offline" events. A real phone does, and the app re-reads the profile on
+// "online" (verifyOfflineProfile), so where the browser does not, the test fires the event itself.
+let EMULATES_ONLINE_EVENTS = null;
+const setNetwork = async (context, up) => {
+  NET_DOWN = !up;
+  await context.setOffline(!up);
+  const pages = context.pages();
+  if (!up && EMULATES_ONLINE_EVENTS === null && pages.length) EMULATES_ONLINE_EVENTS = await pages[0].evaluate(() => navigator.onLine === false);
+  if (up && EMULATES_ONLINE_EVENTS === false) for (const p of pages) await p.evaluate(() => window.dispatchEvent(new Event('online')));
+};
 const serve = (req) => (NET_DOWN ? { data: null, error: { message: 'Failed to fetch' } } : handle(SERVER, req));
 
 // The network is really off for this context: a navigation fails with ERR_INTERNET_DISCONNECTED
