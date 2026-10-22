@@ -207,6 +207,14 @@ body.field-mode .patient-card{padding:16px 15px;margin-top:8px;margin-bottom:8px
 .bp-btn[data-bp="carotid_strong"].selected{border-color:var(--yellow);background:rgba(244,162,97,0.12);}
 .bp-btn[data-bp="carotid_weak"].selected{border-color:var(--orange);background:rgba(255,107,53,0.12);}
 .bp-btn[data-bp="absent"].selected{border-color:var(--red);background:rgba(230,57,70,0.12);}
+/* Same unmistakable selected state as the tap choices (V2.99.57): solid fill, ring, check mark. */
+.bp-btn{position:relative;}
+.bp-btn.selected .bp-btn-desc,.bp-btn.selected .bp-btn-value{color:#fff !important;}
+.bp-btn[data-bp="radial"].selected,.bp-btn[data-bp="radial_strong"].selected{background:rgba(52,199,89,0.38);box-shadow:0 0 0 3px var(--green);}
+.bp-btn[data-bp="carotid"].selected,.bp-btn[data-bp="radial_weak"].selected,.bp-btn[data-bp="carotid_strong"].selected{background:rgba(255,204,0,0.32);box-shadow:0 0 0 3px var(--yellow);}
+.bp-btn[data-bp="carotid_weak"].selected{background:rgba(255,107,53,0.4);box-shadow:0 0 0 3px var(--orange);}
+.bp-btn[data-bp="absent"].selected{background:rgba(230,57,70,0.5);box-shadow:0 0 0 3px var(--red);}
+.bp-btn.selected::after{content:'✓';position:absolute;top:-10px;inset-inline-start:-6px;box-shadow:0 0 0 2px var(--surface);width:22px;height:22px;border-radius:50%;background:#fff;color:#111;font-size:14px;font-weight:900;line-height:22px;text-align:center;font-family:var(--sans);}
 
 /* ── CHIPS ── */
 .chip-grid{display:flex;flex-wrap:wrap;gap:10px;}
@@ -285,6 +293,14 @@ body.field-mode .patient-card{padding:16px 15px;margin-top:8px;margin-bottom:8px
 .count-stepper .vital-btn{flex:1;min-width:42px;font-size:16px;font-weight:700;}
 .count-stepper .vital-val{min-width:56px;flex:none;}
 .count-row + .calc-confirm{margin-top:8px;}
+/* The count stepper must fit the screen width with no sideways scroll (owner 2026-10-22: the
+   64px field buttons pushed -5 off-screen). The label and the multiplier sit on a small line
+   above, the stepper takes the full row and its buttons share the width instead of a fixed 64px. */
+.count-row{flex-wrap:wrap;row-gap:4px;}
+.count-row .count-label{order:1;min-width:0;}
+.count-row .count-mult{order:1;min-width:0;margin-inline-start:auto;}
+.count-row .count-stepper{order:2;flex:1 1 100% !important;min-width:0;}
+.count-stepper .vital-btn{width:auto;min-width:0;}
 .count-timer{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;margin-top:8px;}
 .count-timer button{min-height:44px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;font-weight:800;cursor:pointer;}
 .count-timer button.primary{border-color:var(--accent);background:rgba(67,97,238,.16);color:#fff;}
