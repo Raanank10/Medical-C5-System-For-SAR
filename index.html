@@ -3310,15 +3310,23 @@ function newUuid(){
 // Human-readable display id (server's patients.visual_id). Distinct from the real UUID p.id.
 // The server keeps one patient per incident + visual_id, and two phones offline at once would
 // both make P004 from their own count, so signed in the id carries the initials of whoever
-// registers the patient (medic, paramedic or the first responder): P004-דכ. If two people with
-// the same initials still clash, sync-log renames the second one and the pull brings the new id.
-// Local demo (one device, no server) keeps the plain P004.
+// registers the patient (medic, paramedic or the first responder): P004-DK. Patient ids are Latin
+// letters and digits only (owner decision), so a Hebrew name's initials are transliterated
+// (דני כהן -> DK). If two people with the same initials still clash, sync-log renames the second
+// one and the pull brings the new id. Local demo (one device, no server) keeps the plain P004.
+const HEBREW_INITIAL_TO_LATIN={'א':'A','ב':'B','ג':'G','ד':'D','ה':'H','ו':'V','ז':'Z','ח':'H','ט':'T','י':'Y','כ':'K','ך':'K','ל':'L','מ':'M','ם':'M','נ':'N','ן':'N','ס':'S','ע':'A','פ':'P','ף':'P','צ':'Z','ץ':'Z','ק':'K','ר':'R','ש':'S','ת':'T'};
+function latinInitials(text){
+  const words=String(text||'').normalize('NFD').replace(/[̀-֑ͯ-ׇ'"״׳]/g,'')
+    .split(/[\s._\-]+/)
+    .map(w=>[...w].map(ch=>HEBREW_INITIAL_TO_LATIN[ch]||(/[A-Za-z]/.test(ch)?ch:'')).join(''))
+    .filter(Boolean);
+  return (words.length>=2 ? words[0][0]+words[1][0] : (words[0]||'').slice(0,2)).toUpperCase();
+}
 function registrantInitials(){
   if(!currentUser) return '';
-  const name=String(_myDisplayName||'').trim() || String(currentUser.email||'').split('@')[0];
-  const words=name.split(/[\s._\-]+/).map(w=>w.replace(/[^\p{L}]/gu,'')).filter(Boolean);
-  const ini=(words.length>=2 ? words[0][0]+words[1][0] : (words[0]||'').slice(0,2)).toUpperCase();
-  return ini || String(getDeviceId()).replace(/[^A-Za-z0-9]/g,'').slice(-2).toUpperCase();
+  return latinInitials(_myDisplayName)
+    || latinInitials(String(currentUser.email||'').split('@')[0])
+    || String(getDeviceId()).replace(/[^A-Za-z0-9]/g,'').slice(-2).toUpperCase();
 }
 function maxVisualNumber(prefix){
   let max=0;

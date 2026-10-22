@@ -313,8 +313,8 @@ Add a CI job running `npm ci`, then every `scripts/browser_*.js` with the pre-in
 - `patients` has `UNIQUE (incident_id, visual_id)`. `sync-log` took every unique violation (23505) for a retried push, so the second `TMP-001` was never created and its events failed the foreign key.
 - `nextVisualId()` was `patients.length+1` per phone, so two medics offline in one incident could both make `P004` and lose the second patient the same way.
 
-**Fix (V2.99.51).** Owner decision 2026-10-22: the id carries the initials of whoever registers the patient (medic, paramedic or first responder).
-1. Client: signed in, `P004-דכ` and sweep markers `TMP-004-דכ`, numbered from the highest `visualId` already on the phone; local demo keeps plain `P004` / `TMP-004`. The sweep counter reads `visualId`, not `id`.
+**Fix (V2.99.51).** Owner decision 2026-10-22: the id carries the initials of whoever registers the patient (medic, paramedic or first responder), in Latin letters and digits only (a Hebrew name is transliterated: `דני כהן` gives `DK`; fallback the email address, then the device id).
+1. Client: signed in, `P004-DK` and sweep markers `TMP-004-DK`, numbered from the highest `visualId` already on the phone; local demo keeps plain `P004` / `TMP-004`. The sweep counter reads `visualId`, not `id`.
 2. `sync-log`: on 23505, success only if this `patient_id` already exists. Otherwise create the patient as `<visual_id>-<last 4 of the device id>` (after a merge, of the duplicate incident's id, as before), log `patient_visual_id_renamed`, and return `patient_visual_id` on the accepted entry; after 5 failed names, reject with `PATIENT_CREATE_FAILED`.
 3. Client: shows the server's id at once from the push reply and on every pull (this also brings `merge_incident()` renames to the phone that created the patient, which did not happen before), with a timeline note.
 

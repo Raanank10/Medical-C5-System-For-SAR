@@ -57,7 +57,7 @@ node scripts/browser_inventory_sync_test.js       # WP-9: two medics' consumptio
 node scripts/browser_sweep_sync_test.js           # WP-11: manual sweep override sent as MSTART_OVERRIDE (after the patient's create); a finished sweep reaches the PC's board on another phone and stays
 node scripts/browser_incident_open_alerts_test.js  # D10: no drafts; "join this instead?" before a medic opens, PC/RCC/CC and every company RPC (until the platoon is chosen) get a banner until each acknowledges, false-alarm cancel while empty
 node scripts/browser_incident_merge_test.js          # D8: CC merges a duplicate incident from the picker (reason required, PC cannot); late pushes for the duplicate land in the target (redirected_to); phones in the duplicate switch
-node scripts/browser_patient_number_test.js        # patient numbers: sweep markers count up, ids carry the registrant's initials (P004-דכ), a clash on the server is renamed instead of losing the patient, the phone shows the new id
+node scripts/browser_patient_number_test.js        # patient numbers: sweep markers count up, ids carry the registrant's initials (P004-DK, Latin only), a clash on the server is renamed instead of losing the patient, the phone shows the new id
 node scripts/test_outbox_eviction.js              # F1: persistOutbox() never evicts an unsynced event, even past the 500 cap (docs/FAILURE_MODE_REVIEW.md)
 
 # Analytics package

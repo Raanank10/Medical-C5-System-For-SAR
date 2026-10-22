@@ -5,9 +5,9 @@
 // were skipped and their events failed the patient FK.
 // Two medics whose names give the same initials (two browser contexts, so two devices) share one
 // fake backend that copies sync-log's patient-create rule and the real UNIQUE (incident_id, visual_id):
-// - sweep markers count up and carry the registrant's initials (TMP-001-דכ, TMP-002-דכ, ...);
+// - sweep markers count up and carry the registrant's initials (TMP-001-DK, TMP-002-DK, ...);
 // - a full/quick patient gets P00n-<initials>;
-// - when the second medic, offline, makes the same TMP-001-דכ, the server creates that patient under
+// - when the second medic, offline, makes the same TMP-001-DK, the server creates that patient under
 //   a renamed id, every event of both medics is accepted, and the second phone shows the new id;
 // - a later server rename (merge_incident, database/067) reaches the phone on the next pull;
 // - local demo (signed out) keeps plain ids and still counts up.
@@ -30,7 +30,7 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-// Synthetic names; both give the initials דכ.
+// Synthetic Hebrew names; both transliterate to the initials DK.
 const USERS = {
   'medic-a@test': { id: MEDIC_A, role: 'medic', display_name: 'דני כהן' },
   'medic-b@test': { id: MEDIC_B, role: 'medic', display_name: 'דנה כץ' },
@@ -212,34 +212,37 @@ async function checkFile(browser, file) {
   const a = await phone();
   await login(a.page, 'medic-a@test');
   const aSweep = await sweep(a.page, 3);
-  assert(JSON.stringify(aSweep.map((x) => x.visualId)) === JSON.stringify(['TMP-001-דכ', 'TMP-002-דכ', 'TMP-003-דכ']),
+  assert(JSON.stringify(aSweep.map((x) => x.visualId)) === JSON.stringify(['TMP-001-DK', 'TMP-002-DK', 'TMP-003-DK']),
     `${rel}: sweep markers must count up with the registrant's initials (got ${aSweep.map((x) => x.visualId)})`);
+  const ini = await a.page.evaluate(() => [latinInitials('דני כהן'), latinInitials('Dan Cohen'), latinInitials('שָׁרָה'), latinInitials('ד"ר צבי'), latinInitials('123'), latinInitials('')]);
+  assert(JSON.stringify(ini) === JSON.stringify(['DK', 'DC', 'SR', 'DZ', '', '']), `${rel}: initials must be Latin letters only (got ${ini})`);
   const nextP = await a.page.evaluate(() => nextVisualId());
-  assert(/^P\d{3}-דכ$/.test(nextP), `${rel}: a new patient must be P00n-<initials> (got ${nextP})`);
+  assert(/^P\d{3}-DK$/.test(nextP), `${rel}: a new patient must be P00n-<initials> (got ${nextP})`);
   await pushAll(a.page);
   assert(SERVER.patients.length === 3 && SERVER.rejected.length === 0, `${rel}: all three sweep patients must reach the server (patients ${SERVER.patients.length}, rejected ${SERVER.rejected})`);
 
-  // 2. Medic B, same initials, has not pulled yet (offline) and makes TMP-001-דכ too.
+  // 2. Medic B, same initials, has not pulled yet (offline) and makes TMP-001-DK too.
   const b = await phone();
   await login(b.page, 'medic-b@test');
   await b.page.evaluate(() => { patients.splice(0, patients.length, ...patients.filter((p) => !p.sourcedFromRemote)); });
   const bSweep = await sweep(b.page, 1);
-  assert(bSweep[0].visualId === 'TMP-001-דכ', `${rel}: the test needs a real clash (got ${bSweep[0].visualId})`);
+  assert(bSweep[0].visualId === 'TMP-001-DK', `${rel}: the test needs a real clash (got ${bSweep[0].visualId})`);
   await pushAll(b.page);
   assert(SERVER.rejected.length === 0, `${rel}: a clashing number must not lose the patient or its events (rejected ${SERVER.rejected})`);
   const bRow = SERVER.patients.find((p) => p.id === bSweep[0].id);
-  assert(bRow && /^TMP-001-דכ-[A-Z0-9]{4}$/.test(bRow.visual_id), `${rel}: the server must create B's patient under a renamed id (got ${bRow && bRow.visual_id})`);
+  assert(bRow && /^TMP-001-DK-[A-Z0-9]{4}$/.test(bRow.visual_id), `${rel}: the server must create B's patient under a renamed id (got ${bRow && bRow.visual_id})`);
   const bLocal = await b.page.evaluate((id) => patients.find((p) => p.id === id).visualId, bSweep[0].id);
+  assert(SERVER.patients.every((p) => /^[A-Z0-9-]+$/.test(p.visual_id)), `${rel}: patient ids must be Latin letters, digits and '-' only (got ${SERVER.patients.map((p) => p.visual_id)})`);
   assert(bLocal === bRow.visual_id, `${rel}: B's phone must show the server's id right after the push (got ${bLocal})`);
   assert(b.toasts.some((t) => t.includes(bRow.visual_id)), `${rel}: B must be told the patient got a new number`);
 
   // 3. A later rename on the server (as merge_incident does) reaches A's phone on the next pull.
   const aRow = SERVER.patients.find((p) => p.id === aSweep[1].id);
-  aRow.visual_id = 'TMP-002-דכ-MRG1'; aRow.version = 2;
+  aRow.visual_id = 'TMP-002-DK-MRG1'; aRow.version = 2;
   await a.page.evaluate(async () => { await pullProjectedPatientStateAll(); });
   await a.page.waitForTimeout(300);
   const aLocal = await a.page.evaluate((id) => { const p = patients.find((q) => q.id === id); return { v: p.visualId, note: (p.events || [])[0]?.detail || '' }; }, aSweep[1].id);
-  assert(aLocal.v === 'TMP-002-דכ-MRG1' && aLocal.note.includes('TMP-002-דכ-MRG1'), `${rel}: a server rename must reach the phone with a timeline note (got ${JSON.stringify(aLocal)})`);
+  assert(aLocal.v === 'TMP-002-DK-MRG1' && aLocal.note.includes('TMP-002-DK-MRG1'), `${rel}: a server rename must reach the phone with a timeline note (got ${JSON.stringify(aLocal)})`);
 
   // 4. Local demo (signed out): plain ids, still counting up from visualId.
   const demo = await a.page.evaluate(() => {
