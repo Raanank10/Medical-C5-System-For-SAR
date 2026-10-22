@@ -111,7 +111,7 @@ async function main() {
   // trail the npm-installed Playwright version, which would otherwise try to download a new
   // browser build); fall back to Playwright's own managed browser otherwise.
   const preinstalled = '/opt/pw-browsers/chromium';
-  const launchOptions = fs.existsSync(preinstalled) ? { executablePath: preinstalled } : {};
+  const launchOptions = fs.existsSync(preinstalled) ? { executablePath: preinstalled } : { channel: 'chromium' };
   const browser = await chromium.launch(launchOptions);
   try {
     for (const file of files) {

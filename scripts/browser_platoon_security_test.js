@@ -339,7 +339,7 @@ async function checkFile(browser, file) {
 
 (async () => {
   const preinstalled = '/opt/pw-browsers/chromium';
-  const browser = await chromium.launch(fs.existsSync(preinstalled) ? { executablePath: preinstalled } : {});
+  const browser = await chromium.launch(fs.existsSync(preinstalled) ? { executablePath: preinstalled } : { channel: 'chromium' });
   try {
     for (const file of files) await checkFile(browser, file);
   } finally {

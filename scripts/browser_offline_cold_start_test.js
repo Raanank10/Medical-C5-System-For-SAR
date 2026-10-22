@@ -239,7 +239,7 @@ async function main() {
   const httpServer = await startServer();
   const base = `http://127.0.0.1:${httpServer.address().port}/index.html`;
   const preinstalled = '/opt/pw-browsers/chromium';
-  const browser = await chromium.launch(fs.existsSync(preinstalled) ? { executablePath: preinstalled } : {});
+  const browser = await chromium.launch(fs.existsSync(preinstalled) ? { executablePath: preinstalled } : { channel: 'chromium' });
   try {
     // 0. file:// never registers a worker.
     {
