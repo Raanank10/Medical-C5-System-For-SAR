@@ -587,6 +587,8 @@ textarea{resize:vertical;min-height:70px;}
 .incident-status-badge.draft{color:var(--orange);border-color:var(--orange);}
 .incident-status-badge.active{color:var(--green);border-color:var(--green);}
 .incident-status-badge.closed{color:var(--red);border-color:var(--red);}
+.incident-merge-panel{margin-top:8px;padding:10px;border:1px solid var(--orange);border-radius:10px;background:rgba(255,107,53,0.08);}
+.incident-merge-panel select,.incident-merge-panel input{width:100%;margin:0 0 8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;}
 .open-dupes{background:rgba(255,107,53,0.12);border:1px solid var(--orange);border-radius:12px;padding:10px;margin-bottom:10px;font-size:13px;}
 .open-dupes .open-dupe-row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);}
 .close-guard-list{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;max-height:40dvh;overflow-y:auto;}
@@ -761,7 +763,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9949</div>
+      <div class="demo-kicker">Demo V2.9950</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -858,7 +860,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9949</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9950</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -868,7 +870,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9949</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9950</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2879,7 +2881,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.49';
+const APP_VERSION = '2.99.50';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -12871,6 +12873,7 @@ function deactivateIncidentContext(){
   _openIncidents=[];
   _incidentOverviewState={};
   _incidentOpenAlerts=[];
+  _mergePanelFor=null;
   _seenOpenAlertIds=new Set();
   _platoonsByCompany={};
   hideOpenIncidentDupes(); // another user's company incidents must not stay on screen
@@ -12920,7 +12923,8 @@ function renderIncidentPicker(){
       return `<div class="incident-card ${inc.status==='draft'?'draft':''}">
         <div class="incident-card-head"><strong>${escAttr(inc.visual_id||'')} · ${escAttr(inc.location_name||'')}</strong><span class="incident-status-badge ${escAttr(inc.status)}">${escAttr(SERVER_INCIDENT_STATUS_LABELS[inc.status]||inc.status)}</span></div>
         <div class="incident-card-meta">${inc.address?escAttr(inc.address)+' · ':''}${inc.incident_type?escAttr(INCIDENT_TYPE_LABELS[inc.incident_type]||inc.incident_type)+' · ':''}נפתח ${inc.opened_at?new Date(inc.opened_at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):''}${inc.opened_by_name?' ע״י '+escAttr(inc.opened_by_name):''} · ${inc.patient_count||0} פצועים${counts}</div>
-        <div class="incident-card-actions"><button onclick="enterIncidentFromPicker('${escAttr(inc.id)}')">${enterLabel}</button></div>
+        <div class="incident-card-actions"><button onclick="enterIncidentFromPicker('${escAttr(inc.id)}')">${enterLabel}</button>${canMergeIncidents() && ['active','staging'].includes(inc.status) && _openIncidents.length>1 ? `<button onclick="toggleIncidentMergePanel('${escAttr(inc.id)}')">מיזוג כפילות</button>`:''}</div>
+        ${_mergePanelFor===inc.id && canMergeIncidents() ? incidentMergePanelHtml(inc) : ''}
       </div>`;
     }).join('');
   }
@@ -13036,6 +13040,73 @@ async function cancelActiveIncidentFalseAlarm(){
   if(!r) return;
   activeIncident.false_alarm=true;
   applyServerIncidentStatus('closed', role, 'האירוע בוטל: אזעקת שווא');
+}
+
+// ── Merge a duplicate incident (D8, database/067) ──
+// Company-level command (cc, chamal, admin) merges a duplicate into the incident everyone should
+// work in. The server moves the patients and their records, re-tags the events and closes the
+// duplicate; phones still in the duplicate switch to the target on their next status refresh or
+// push (sync-log v11 already stores their late events in the target).
+const INCIDENT_MERGE_ROLES=new Set(['cc','chamal','admin']);
+let _mergePanelFor=null; // incident id whose merge panel is open in the picker
+let _switchingToMerged=false;
+function canMergeIncidents(){ return INCIDENT_MERGE_ROLES.has(currentUser?.role); }
+function toggleIncidentMergePanel(id){
+  _mergePanelFor=_mergePanelFor===id?null:id;
+  renderIncidentPicker();
+}
+function incidentMergePanelHtml(inc){
+  const targets=_openIncidents.filter(t=>t.id!==inc.id && ['active','staging'].includes(t.status));
+  if(!targets.length) return `<div class="incident-merge-panel" data-merge-panel="${escAttr(inc.id)}"><div class="demo-strip-sub">אין אירוע פתוח אחר למיזוג.</div></div>`;
+  return `<div class="incident-merge-panel" data-merge-panel="${escAttr(inc.id)}">
+    <div class="demo-strip-sub" style="margin-bottom:6px">מיזוג כפילות: כל הפצועים, הרישומים והאירועים של ${escAttr(inc.visual_id||'')} יועברו לאירוע שתבחר/י, והוא ייסגר כ״אוחד״. לא ניתן לבטל.</div>
+    <select id="merge-target-${escAttr(inc.id)}"><option value="">לאיזה אירוע למזג?</option>${targets.map(t=>`<option value="${escAttr(t.id)}">${escAttr(t.visual_id||'')} · ${escAttr(t.location_name||'')} · ${t.patient_count||0} פצועים</option>`).join('')}</select>
+    <input type="text" id="merge-reason-${escAttr(inc.id)}" placeholder="סיבה (חובה), לדוגמה: אותו מבנה, שני חובשים פתחו">
+    <div class="login-error" id="merge-error-${escAttr(inc.id)}"></div>
+    <button onclick="submitIncidentMerge('${escAttr(inc.id)}')">מזג לאירוע הנבחר</button>
+  </div>`;
+}
+async function submitIncidentMerge(sourceId){
+  const targetId=document.getElementById('merge-target-'+sourceId)?.value||'';
+  const reason=(document.getElementById('merge-reason-'+sourceId)?.value||'').trim();
+  const err=document.getElementById('merge-error-'+sourceId);
+  if(err) err.textContent='';
+  if(!targetId){ if(err) err.textContent='נא לבחור את האירוע שאליו ממזגים'; return; }
+  if(!reason){ if(err) err.textContent='חובה לציין סיבה למיזוג'; return; }
+  const src=_openIncidents.find(i=>i.id===sourceId), tgt=_openIncidents.find(i=>i.id===targetId);
+  if(!confirm(`למזג את ${src?.visual_id||''} (${src?.location_name||''}) לתוך ${tgt?.visual_id||''} (${tgt?.location_name||''})? הפעולה אינה הפיכה.`)) return;
+  const client=getSupabaseClient();
+  if(!client){ if(err) err.textContent='אין חיבור לשרת'; return; }
+  let r;
+  try{ r=await client.rpc('merge_incident', {p_source_id:sourceId, p_target_id:targetId, p_reason:reason, p_device_id:getDeviceId(), p_local_event_id:`incident-merge-${sourceId}`}); }catch(e){ r={error:e}; }
+  if(r.error || !r.data){ if(err) err.textContent='המיזוג נכשל: '+(r.error?.message||'שגיאה'); return; }
+  _mergePanelFor=null;
+  const renames=Array.isArray(r.data.renamed_patients)?r.data.renamed_patients:[];
+  const moved=r.data.moved||{};
+  toast(`אוחד לתוך ${r.data.target_visual_id||tgt?.visual_id||''} · ${moved.patients??0} פצועים הועברו`+(renames.length?` · ${renames.length} מזהים שונו: `+renames.slice(0,3).map(x=>`${x.from}→${x.to}`).join(', '):'')
+    +(r.data.pre_evacuation_kept_on_source?' · דיווח פינוי מוקדם נשאר באירוע המקורי, יש לבדוק':''));
+  if(activeIncident?.id===sourceId){ await switchToMergedIncident(targetId, r.data.target_visual_id||null); return; }
+  await refreshIncidentContext();
+  if(document.getElementById('screen-incident-picker')?.classList.contains('active')) renderIncidentPicker();
+}
+async function switchToMergedIncident(targetId, targetVisualId){
+  if(!currentUser || !targetId || _switchingToMerged) return;
+  if(activeIncident?.id===targetId) return;
+  _switchingToMerged=true;
+  try{
+    const fromLabel=activeIncident ? (activeIncident.visual_id||'') : '';
+    await refreshOpenIncidents();
+    const target=_openIncidents.find(i=>i.id===targetId);
+    if(!target){
+      // The target is not open (or not visible to this user): stay, but say where the data went.
+      if(activeIncident){ activeIncident.status='closed'; activeIncident.merged_into={target_id:targetId, target_visual_id:targetVisualId}; persistActiveIncident(); }
+      renderIncidentContext();
+      toast(`האירוע ${fromLabel} אוחד לתוך ${targetVisualId||'אירוע אחר'}, שאינו פתוח עבורך · פנה/י לפיקוד`);
+      return;
+    }
+    toast(`האירוע ${fromLabel} אוחד לתוך ${target.visual_id||targetVisualId||''} · עוברים אליו. נתונים שטרם נשלחו יישלחו לשם.`);
+    await activateIncident(target);
+  }finally{ _switchingToMerged=false; }
 }
 
 // ── Incident close guard (database/040_close_incident_guard.sql) ──
@@ -13194,6 +13265,8 @@ async function refreshActiveIncidentStatus(){
     const client=getSupabaseClient();
     try{
       const r=await client.from('incidents').select('status,metadata,opened_by,closed_at').eq('id', activeIncident.id).maybeSingle();
+      const mergedInto=!r.error && r.data?.status==='closed' ? r.data.metadata?.merged_into : null;
+      if(mergedInto?.target_id){ persistActiveIncident(); setTimeout(()=>switchToMergedIncident(mergedInto.target_id, mergedInto.target_visual_id||null), 0); return; }
       if(!r.error && r.data){
         activeIncident.status=r.data.status;
         activeIncident.draft_resolution=r.data.metadata?.draft_resolution||null;
@@ -13222,7 +13295,8 @@ function renderIncidentContext(){
       const st=activeIncident.status;
       const rejected=st==='closed' && activeIncident.draft_resolution==='rejected';
       const falseAlarm=st==='closed' && activeIncident.false_alarm;
-      const statusText=rejected?'טיוטת האירוע נדחתה ע״י פיקוד, הנתונים נשמרים':falseAlarm?'בוטל: אזעקת שווא':(SERVER_INCIDENT_STATUS_LABELS[st]||st);
+      const merged=st==='closed' && activeIncident.merged_into;
+      const statusText=rejected?'טיוטת האירוע נדחתה ע״י פיקוד, הנתונים נשמרים':merged?`אוחד לתוך ${activeIncident.merged_into.target_visual_id||'אירוע אחר'}`:falseAlarm?'בוטל: אזעקת שווא':(SERVER_INCIDENT_STATUS_LABELS[st]||st);
       strip.style.display='flex';
       strip.className='incident-strip'+(st==='draft'?' draft':st==='closed'?' closed':'');
       const label=strip.querySelector('.incident-strip-text');
@@ -13325,6 +13399,9 @@ async function syncPush(){
     // tie-break, mirroring high_risk_flags above rather than waiting for the command-tier pull.
     (result.field_conflicts||[]).forEach(f=>_fieldConflictFlags.unshift({...f, _ts:Date.now(), incidentId}));
     if(_fieldConflictFlags.length>200) _fieldConflictFlags.length=200;
+    // database/067 (D8): the incident was merged into another; the server already stored these
+    // events there. A phone still working in the duplicate moves to the target.
+    if(result.redirected_to && activeIncident?.id===incidentId) setTimeout(()=>switchToMergedIncident(result.redirected_to, null), 0);
   }
   // Single combined write-back at the end, not per-group, so a mid-loop failure never leaves
   // localStorage in a partially-updated state.
