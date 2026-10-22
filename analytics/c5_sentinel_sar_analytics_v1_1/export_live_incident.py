@@ -32,6 +32,8 @@ per-table mapping notes below):
     genuinely don't match. Not needed - kpis.py's command_summary() already
     falls back to computing the same aggregates locally when this table is
     empty, from the real exported patients/watchdog_alerts data.
+  - device_sync_state is not exported: it was always empty live and is in the
+    archive schema since database/070 (WP-15); its SQLite table is left empty.
   - sectors and local_event_queue are not exported: db.py never queries
     sectors, and local_event_queue represents a device's own *unsynced*
     local queue, which by definition the server never sees.
@@ -167,12 +169,9 @@ def export_incident(incident_id: str, out_path: Path, service_key: str) -> None:
         (r["id"], r["incident_id"], r["actor_id"], r["device_id"], r["last_heartbeat_at"], r["sync_status"], None, r["updated_at"]) for r in presence
     ])
 
-    sync_state = fetch_table("device_sync_state", service_key, incident_id)
-    insert_rows(conn, "device_sync_state", ["device_id", "actor_id", "incident_id", "last_successful_pull_at", "last_successful_push_at", "sync_mode", "battery_pct", "updated_at"], [
-        # sync_mode <- power_mode: the closest semantic analog live has (normal/critical_only
-        # etc.), not a literal renaming of the same concept.
-        (r["device_id"], r["actor_id"], r["incident_id"], r["last_successful_pull_at"], r["last_successful_push_at"], r["power_mode"], r["battery_percent"], r["updated_at"]) for r in sync_state
-    ])
+    # device_sync_state is not fetched: live it was always empty and database/070 (WP-15) moved it
+    # to the archive schema, which the API cannot reach. The SQLite table stays (KPIEngine reads
+    # it) and is left empty.
 
     errors = fetch_table("sync_ingestion_errors", service_key, incident_id)
     insert_rows(conn, "sync_ingestion_errors", ["id", "incident_id", "device_id", "actor_id", "local_event_id", "depends_on_local_event_id", "error_code", "error_message", "raw_payload", "created_at", "resolved_at", "dependency_status", "parent_error_id"], [

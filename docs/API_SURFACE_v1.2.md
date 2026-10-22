@@ -532,7 +532,7 @@ Behavior:
 
 # 8. Internal Worker APIs
 
-Realtime outbox processing is internal-only. It has no client-facing route. Only backend worker/service-role code may read and mark `realtime_outbox` entries as processed.
+Realtime outbox processing is internal-only. It has no client-facing route. Only backend worker/service-role code may read and mark `realtime_outbox` entries as processed. (No such worker was ever built: since `database/070`, WP-15, nothing writes the outbox and the table, with its rows, is in the `archive` schema.)
 
 
 ---

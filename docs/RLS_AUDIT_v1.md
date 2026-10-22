@@ -430,3 +430,9 @@ Verified live 2026-10-22 in a rolled-back block (a medic opens two incidents wit
 | CC closes; stored report `external_reports` | total 1, by source mda 1, reported red 2 / yellow 1, linked patients 1, linked MDA vs field yellow -> moderate 1 |
 
 `get_advisors` (security) after applying: nothing new; `app.build_incident_aar*` are not in an exposed schema.
+
+## Follow-up: unused tables archived (`database/070`, WP-15)
+
+Nine tables moved from `public` to a new `archive` schema with their rows, policies, indexes and foreign keys: `device_sync_state` (4 policies), `experiment_observer_notes` (2), `high_risk_override_confirmations` (2), `patient_edit_conflicts` (1), `sync_event_dependencies` (1), `supply_request_items` (4), `treatment_catalog` (4, 1 seed row), `treatment_inventory_items` (4), `realtime_outbox` (0, 19 rows). `archive` has no usage for `public`, `anon` or `authenticated`, so the API cannot reach them whatever their policies say. Live after the change: `public` 34 tables / 75 policies, `archive` 9 tables / 22 policies. Re-checked right before: 0 rows except the two noted, and the only functions naming them were `merge_incident()` (statements removed, edited from its live definition with each removal asserted) and the two outbox trigger functions (`apply_event_projection_and_outbox()` keeps its `conflict_log` part unchanged; `trg_draft_incident_approval_outbox` disabled, not dropped). No view, trigger, publication, client query or edge function named them.
+
+Verified live 2026-10-22: a rolled-back dry run (an `MSTART_OVERRIDE` still writes `conflict_log`, the outbox stays at 19 rows, `merge_incident()` as CC moves a patient, `authenticated`/`anon` have no usage on `archive`), then after applying, a rolled-back insert of one event of each of the 82 `event_type` values: all accepted, none naming a missing relation. `get_advisors` (security): unchanged apart from `realtime_outbox` now listed under `archive`.

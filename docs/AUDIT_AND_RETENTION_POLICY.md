@@ -33,7 +33,7 @@ This is the actual medical/incident record. Real-world SAR/EMS record retention 
 
 ### Class B: Operational/audit trail — medium retention, purpose expires with the incident
 
-`conflict_log`, `device_presence`, `device_sync_state`, `sync_ingestion_errors` (**for successfully-diagnosed and resolved entries** — see Class C for the raw-payload carve-out), `aar_context_notes`, `external_reports`, `external_patient_links`.
+`conflict_log`, `device_presence`, `device_sync_state` (never written; in the `archive` schema since `database/070`), `sync_ingestion_errors` (**for successfully-diagnosed and resolved entries** — see Class C for the raw-payload carve-out), `aar_context_notes`, `external_reports`, `external_patient_links`.
 
 This data's purpose is operational awareness *during* an incident and after-action review *shortly after* — a `device_presence` heartbeat from three incidents ago has no ongoing operational value once the incident that produced it is closed and its AAR is generated. Recommend: retain in full through incident close + AAR generation, then either archive (move out of the hot operational tables, keep for historical AAR/analytics purposes) or apply a defined retention window (e.g. N months post-close) — the exact window is a policy decision, not a technical one, but *some* defined window belongs here, unlike Class A.
 
