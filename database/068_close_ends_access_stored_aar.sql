@@ -32,6 +32,9 @@
 --    failed report must not block a close.
 -- 4. get_incident_aar_reports(id): the stored versions, newest first, plus how many events
 --    arrived after the latest close. Clients no longer write aar_reports directly.
+--
+-- Applied live 2026-10-22 in two parts: 068_close_ends_access_stored_aar (sections 1-2) and
+-- 068b_stored_aar_report (sections 3-4); this file is the combined result.
 
 create or replace function app.can_read_incident_patients(p_incident_id uuid)
 returns boolean
@@ -304,7 +307,7 @@ begin
       then (select count(*) from events e where e.incident_id = p_incident_id and e.server_timestamp > v_inc.closed_at
               and e.type not in ('INCIDENT_CLOSED','INCIDENT_REOPENED')) else 0 end,
     'reports', coalesce((select jsonb_agg(jsonb_build_object('version', (r.report_json->>'version')::int, 'generated_at', r.generated_at, 'report', r.report_json)
-                                          order by r.generated_at desc)
+                                          order by (r.report_json->>'version')::int desc, r.generated_at desc)
                          from aar_reports r where r.incident_id = p_incident_id), '[]'::jsonb));
 end;
 $$;
