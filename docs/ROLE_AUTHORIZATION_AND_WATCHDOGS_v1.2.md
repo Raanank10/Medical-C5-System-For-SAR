@@ -6,21 +6,22 @@ This document defines the operating roles, the demo authorization matrix, and th
 
 | Role | Meaning |
 | --- | --- |
-| Medic | Field clinician. Creates casualty records, captures vitals/interventions, requests resupply, and may create a local draft incident only when no official incident is available. |
-| חוג״ד / חפ״ק רפואי | Opens official incidents, confirms drafts, supervises clinical and command state, dispatches supply to Log-O, and unlocks live incident summary / AAR. |
+| Medic | Field clinician. Creates casualty records, captures vitals/interventions, requests resupply, and opens an official incident when no open incident of their company fits (D10). |
+| חוג״ד / חפ״ק רפואי | Opens official incidents, is informed of incidents its company's medics open and chooses their platoon, supervises clinical and command state, dispatches supply to Log-O, and unlocks live incident summary / AAR. |
 | Logistics Officer (Log-O) | Manages kit templates, resupply runners, and company equipment status. Does not create or edit clinical casualty records. |
 | מ״פ רפואה | Company medical-resource command authority for official incident confirmation, closure/reopen, site clear, resource allocation, dashboard, conflict log, and AAR. |
-| Chamal | Higher command/operations room. Confirms draft incidents, manages official incident state, sees command dashboards, conflict log, and AAR. |
+| Chamal | Higher command/operations room. Informed of every incident a medic opens, manages official incident state, sees command dashboards, conflict log, and AAR. |
 
-Medic-created draft incidents are local-first capture containers. They must later be confirmed by חוג״ד, מ״פ רפואה, or Chamal, and the confirmation must be represented as an auditable event.
+There are no draft incidents (D10, `database/064`, V2.99.48). A medic opens an official incident after the phone offered to join an open incident of the medic's company; חוג״ד, מ״פ חילוץ, the platoon's מ״מ, מ״פ רפואה and Chamal are informed by a banner until each acknowledges it. The opener may cancel it as a false alarm while it has no patients. Earlier drafts were confirmed by חוג״ד, מ״פ רפואה, or Chamal with an auditable event; those server functions remain for history.
 
 ## Authorization Matrix
 
 | Action | Medic | חוג״ד | Log-O | מ״פ רפואה | Chamal |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Create local draft incident | Yes | Yes | No | Yes | Yes |
-| Open official incident and set T0 | No | Yes | No | Yes | Yes |
-| Confirm draft incident | No | Yes | No | Yes | Yes |
+| Open official incident (D10) | Yes | Yes | No | Yes | Yes |
+| Set T0 (site authority) | No | Yes | No | Yes | Yes |
+| Informed of an incident a medic opened, acknowledge | No | Yes | No | Yes | Yes |
+| Cancel own incident as a false alarm while it has no patients | Yes | Yes | No | Yes | Yes |
 | Close / reopen official incident | Limited | Yes | No | Yes | Yes |
 | Register new patient | Yes | Yes | No | No | No |
 | Record vitals and interventions | Yes | Yes | No | No | No |

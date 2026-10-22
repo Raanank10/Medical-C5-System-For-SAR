@@ -32,7 +32,13 @@
 --    command keeps set_incident_unit() for everything else.
 -- 6. cancel_incident_false_alarm(): only the opener, only while the incident is active and has no
 --    patients. Closes it through the close guard (040) with the reason in metadata and an
---    INCIDENT_CLOSED event marked false_alarm.
+--    INCIDENT_CLOSED event marked false_alarm. app.is_false_alarm_close() tells that close apart
+--    from a later ordinary close after a reopen (reopen keeps the metadata as history): the
+--    false-alarm close is the one whose closed_at equals false_alarm.at (applied live as
+--    064c_false_alarm_close_marker, 2026-10-22).
+--
+-- Applied live 2026-10-22 as 064_no_drafts_incident_open_alerts, 064b_set_incident_platoon_rpc_flag
+-- and 064c_false_alarm_close_marker; this file is the combined result.
 
 create table if not exists incident_open_acknowledgments (
   incident_id uuid not null references incidents(id) on delete cascade,
@@ -192,6 +198,20 @@ begin
 end;
 $$;
 
+-- A false-alarm cancel writes metadata.false_alarm.at = closed_at in the same statement. A reopen
+-- (reopen_incident) keeps the metadata as history, so only a close at that same moment is the
+-- false-alarm close; a later ordinary close is not.
+create or replace function app.is_false_alarm_close(i incidents)
+returns boolean
+language sql
+stable
+set search_path = public
+as $$
+  select i.metadata ? 'false_alarm' and i.closed_at is not null
+     and (i.metadata->'false_alarm'->>'at')::timestamptz = i.closed_at
+$$;
+revoke execute on function app.is_false_alarm_close(incidents) from public, anon, authenticated;
+
 create or replace function list_incident_open_alerts()
 returns table (id uuid, visual_id text, location_name text, address text, status incident_status,
                opened_at timestamptz, opened_by_name text, opened_by_role text, company_id uuid,
@@ -216,13 +236,13 @@ begin
          (select count(*) from patients p where p.incident_id = i.id),
          i.company_id is null,
          i.company_id is not null and i.platoon_id is null,
-         i.status = 'closed' and (i.metadata ? 'false_alarm'),
+         i.status = 'closed' and app.is_false_alarm_close(i),
          i.metadata->'false_alarm'->>'reason'
   from incidents i
   join profiles op on op.id = i.opened_by
   where op.role in ('medic','paramedic')
     and i.opened_at > now() - interval '24 hours'
-    and (i.status in ('active','staging') or (i.status = 'closed' and i.metadata ? 'false_alarm'))
+    and (i.status in ('active','staging') or (i.status = 'closed' and app.is_false_alarm_close(i)))
     and not exists (select 1 from incident_open_acknowledgments a where a.incident_id = i.id and a.profile_id = auth.uid())
     and (
       v_role in ('cc','chamal','admin')
@@ -310,7 +330,7 @@ begin
   if v_inc.opened_by is distinct from auth.uid() then
     raise exception 'only the person who opened the incident can cancel it as a false alarm' using errcode = '42501';
   end if;
-  if v_inc.status = 'closed' and v_inc.metadata ? 'false_alarm' then
+  if v_inc.status = 'closed' and app.is_false_alarm_close(v_inc) then
     return jsonb_build_object('id', p_incident_id, 'status', 'closed', 'changed', false);
   end if;
   if v_inc.status <> 'active' then
