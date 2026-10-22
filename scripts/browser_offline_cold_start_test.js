@@ -195,7 +195,7 @@ async function login(page, email) {
   await page.fill('#login-email', email);
   await page.fill('#login-password', 'synthetic');
   await page.click('#login-submit-btn');
-  await page.waitForFunction(() => !!currentUser, null, { timeout: 5000 });
+  await waitFor(page, `login ${email}`, () => !!currentUser, 5000);
   await page.waitForTimeout(400);
 }
 async function enter(page) {
@@ -231,6 +231,15 @@ const serve = (req) => (NET_DOWN ? { data: null, error: { message: 'Failed to fe
 // The network is really off for this context: a navigation fails with ERR_INTERNET_DISCONNECTED
 // (online it would fail with "connection refused" instead). navigator.onLine is not used: from
 // Chromium 151 (Playwright 1.62's build) context.setOffline no longer turns it false.
+// A wait that, on timeout, says which step and what the page saw (CI runs another Chromium build).
+async function waitFor(page, label, fn, timeout) {
+  try {
+    await page.waitForFunction(fn, null, { timeout });
+  } catch (e) {
+    const st = await page.evaluate(() => ({ onLine: navigator.onLine, user: currentUser ? { id: currentUser.id, role: currentUser.role, offlineProfile: !!currentUser.offlineProfile } : null, screen: document.querySelector('.screen.active')?.id || null, incident: activeIncident?.id || null })).catch((x) => String(x));
+    throw new Error(`${label}: timed out after ${timeout} ms (page: ${JSON.stringify(st)}; online events emulated: ${EMULATES_ONLINE_EVENTS})`);
+  }
+}
 async function networkIsOff(context) {
   const probe = await context.newPage();
   try {
@@ -312,7 +321,7 @@ async function main() {
       await setNetwork(context, false);
       await page.reload({ waitUntil: 'domcontentloaded' });
       await unlock(page);
-      await page.waitForFunction(() => !!currentUser && !!activeIncident, null, { timeout: 10000 });
+      await waitFor(page, 'step 2: offline reload signs in', () => !!currentUser && !!activeIncident, 10000);
       const st = await page.evaluate(() => ({ user: currentUser?.id, role: currentUser?.role, offline: !!currentUser?.offlineProfile, inc: activeIncident?.id, strip: document.querySelector('#auth-status-strip')?.innerText || '' }));
       assert(st.user === RPC && st.role === 'rpc' && st.offline, `offline, the saved profile must sign the user back in (got ${JSON.stringify(st)})`);
       assert(st.inc === INC1, `the active incident must come back offline (got ${JSON.stringify(st)})`);
@@ -324,7 +333,7 @@ async function main() {
       await setNetwork(context, true);
       await syncAll(page);
       assert(SERVER.events.some((e) => e.type === 'BUILDING_STATUS_UPDATED'), 'the offline event must be sent once the network returns');
-      await page.waitForFunction(() => currentUser && !currentUser.offlineProfile, null, { timeout: 5000 });
+      await waitFor(page, 'step 2: back online, profile re-read', () => currentUser && !currentUser.offlineProfile, 5000);
       // The worker never stores a Supabase API call.
       const apiCached = await page.evaluate(async () => {
         for (const n of await caches.keys()) for (const r of await (await caches.open(n)).keys()) if (/supabase\.co|\/functions\/v1\/|\/rest\/v1\//.test(r.url)) return r.url;
@@ -338,10 +347,10 @@ async function main() {
       await setNetwork(context, false);
       await page.reload({ waitUntil: 'domcontentloaded' });
       await unlock(page);
-      await page.waitForFunction(() => !!currentUser?.offlineProfile, null, { timeout: 10000 });
+      await waitFor(page, 'step 3: offline reload with saved profile', () => !!currentUser?.offlineProfile, 10000);
       INACTIVE.add(RPC);
       await setNetwork(context, true);
-      await page.waitForFunction(() => !currentUser, null, { timeout: 5000 });
+      await waitFor(page, 'step 3: inactive account signed out online', () => !currentUser, 5000);
       INACTIVE.delete(RPC);
       // 4. After an explicit sign-out, an offline reload does not sign anyone in.
       await login(page, 'rpc@test');
