@@ -8,7 +8,7 @@
 // The Supabase client and the admin-users Edge Function are STUBBED here (an in-page fake that
 // mimics the database/042 RPC contracts), so this proves client behavior only - not the server.
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_admin_users_test.js
 const fs = require('fs');
 const path = require('path');

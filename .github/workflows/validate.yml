@@ -23,3 +23,28 @@ jobs:
 
       - name: Run domain rule tests
         run: node tests/domain-rules.test.js
+
+  # WP-13 (docs/GAP_CLOSURE_PLAN.md): every browser test (Playwright, headless Chromium), the
+  # other test scripts and the smoke scripts, run one after the other by scripts/run_tests.js.
+  # Kept separate from repo-check so the fast checks report in seconds.
+  browser-and-smoke-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dev dependencies
+        run: npm ci
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser, other and smoke tests
+        run: npm test

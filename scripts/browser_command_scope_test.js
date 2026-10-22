@@ -3,7 +3,7 @@
 // (docs/ROLE_COMMAND_MODEL_v2.7.md). Local demo mode, which has two sites (SITE_A = PLT-A,
 // SITE_B = PLT-B); signed in there is only the active incident, so nothing narrows further there.
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_command_scope_test.js
 const fs = require('fs');
 const path = require('path');

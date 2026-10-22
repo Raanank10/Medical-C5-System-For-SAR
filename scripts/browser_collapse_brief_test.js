@@ -5,7 +5,7 @@
 // V2.99.57: the building section opens by itself only for a missile strike; other types ask
 // "מבנה נפגע / לכודים במבנה?" first ("yes" opens it, "no" clears the collapse) and get their own
 // optional questions (shooting, road accident, explosion) with safety warnings.
-// Manual-only, not wired into CI. Run: npm install && node scripts/browser_collapse_brief_test.js
+// Runs in CI through scripts/run_tests.js (WP-13). Run: npm install && node scripts/browser_collapse_brief_test.js
 const path = require('path');
 const fs = require('fs');
 const { chromium } = require('playwright');

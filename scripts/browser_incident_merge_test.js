@@ -12,7 +12,7 @@
 // sync-log's contract; the SQL itself was verified live by role impersonation
 // (docs/RLS_AUDIT_v1.md, 066-067 follow-up).
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_incident_merge_test.js
 const fs = require('fs');
 const path = require('path');

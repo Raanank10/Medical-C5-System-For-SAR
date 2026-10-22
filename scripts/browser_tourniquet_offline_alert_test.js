@@ -7,7 +7,7 @@
 // 3. A remote tourniquet refreshed from the server keeps its alert level (no repeat).
 // 4. A handed-over patient's tourniquet does not alert.
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_tourniquet_offline_alert_test.js
 const fs = require('fs');
 const path = require('path');
@@ -19,6 +19,19 @@ const PIN = '135790';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+// The network is really off for this context: a navigation fails with ERR_INTERNET_DISCONNECTED
+// (online it would fail with "connection refused" instead). navigator.onLine is not used: from
+// Chromium 151 (Playwright 1.62's build) context.setOffline no longer turns it false.
+async function networkIsOff(context) {
+  const probe = await context.newPage();
+  try {
+    const err = await probe.goto('http://127.0.0.1:9/', { timeout: 5000 }).then(() => '', (e) => String(e.message || e));
+    return /ERR_INTERNET_DISCONNECTED/.test(err);
+  } finally {
+    await probe.close();
+  }
 }
 
 async function checkFile(browser, file) {
@@ -37,7 +50,7 @@ async function checkFile(browser, file) {
   await page.fill('#pin-gate-setup-confirm', PIN);
   await page.click('#pin-gate-setup-btn');
   await page.waitForFunction(() => document.querySelector('.screen.active')?.id === 'screen-login', { timeout: 5000 });
-  assert(await page.evaluate(() => navigator.onLine === false), `${rel}: the test must run with the network off`);
+  assert(await networkIsOff(context), `${rel}: the test must run with the network off`);
 
   // A patient whose tourniquet went on 59 minutes ago: nothing yet beyond the 45-minute notice.
   await page.evaluate(() => {
