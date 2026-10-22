@@ -587,6 +587,18 @@ textarea{resize:vertical;min-height:70px;}
 .incident-status-badge.draft{color:var(--orange);border-color:var(--orange);}
 .incident-status-badge.active{color:var(--green);border-color:var(--green);}
 .incident-status-badge.closed{color:var(--red);border-color:var(--red);}
+.aar-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;margin-bottom:10px;}
+.aar-head select{margin:0;padding:6px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);}
+.aar-note{font-size:12px;color:var(--muted);margin-bottom:10px;}
+.aar-warn{font-size:13px;color:var(--orange);border:1px solid var(--orange);border-radius:10px;padding:8px 10px;margin-bottom:10px;}
+.aar-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:12px;}
+.aar-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:0;}
+.aar-k{font-size:12px;color:var(--muted);font-weight:700;}
+.aar-v{font-size:24px;font-weight:900;font-variant-numeric:tabular-nums;}
+.aar-chip{display:inline-block;font-size:12px;border:1px solid var(--border);border-radius:8px;padding:2px 8px;margin:0 0 4px 4px;}
+.aar-table-wrap{overflow-x:auto;}
+.aar-table{border-collapse:collapse;width:100%;min-width:560px;font-size:12px;}
+.aar-table th,.aar-table td{border-bottom:1px solid var(--border);padding:6px;text-align:right;}
 .incident-merge-panel{margin-top:8px;padding:10px;border:1px solid var(--orange);border-radius:10px;background:rgba(255,107,53,0.08);}
 .incident-merge-panel select,.incident-merge-panel input{width:100%;margin:0 0 8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;}
 .open-dupes{background:rgba(255,107,53,0.12);border:1px solid var(--orange);border-radius:12px;padding:10px;margin-bottom:10px;font-size:13px;}
@@ -613,6 +625,7 @@ textarea{resize:vertical;min-height:70px;}
   <span class="incident-strip-text"></span>
   <div style="display:flex;gap:6px">
     <button id="incident-strip-false-alarm-btn" style="display:none" onclick="cancelActiveIncidentFalseAlarm()">ביטול: אזעקת שווא</button>
+    <button id="incident-strip-report-btn" style="display:none" onclick="openIncidentReport()">דוח סיכום</button>
     <button id="incident-strip-close-btn" style="display:none" onclick="toggleActiveIncidentClosed()">סגור אירוע</button>
     <button onclick="openIncidentPicker()">החלף / כל האירועים</button>
   </div>
@@ -698,6 +711,18 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 
+<!-- ══════════════════════ INCIDENT REPORT (closed incident, D9) ══ -->
+<div id="screen-incident-report" class="screen">
+  <div class="header">
+    <div class="header-left">
+      <div class="header-subtitle">C5 SENTINEL-SAR // AAR</div>
+      <div class="header-title">דוח סיכום אירוע</div>
+    </div>
+    <button class="demo-mini-btn" onclick="openIncidentPicker()">חזרה</button>
+  </div>
+  <div class="demo-panel" style="margin:16px" id="incident-report-body"></div>
+</div>
+
 <!-- ══════════════════════ SET PASSWORD (invite / recovery) ══ -->
 <div id="screen-set-password" class="screen">
   <div class="header">
@@ -763,7 +788,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9951</div>
+      <div class="demo-kicker">Demo V2.9952</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -860,7 +885,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9951</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9952</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -870,7 +895,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9951</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9952</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2881,7 +2906,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.51';
+const APP_VERSION = '2.99.52';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -6392,11 +6417,13 @@ function renderPcAssessmentDebtBoard(){
 let _remoteSweepEvents={}; // incidentId -> events rows
 async function pullRemoteSweeps(client){
   if(!activeIncident || !client) return;
+  // Captured before the await: a sign-out or incident switch during the query clears activeIncident.
+  const incId=activeIncident.id;
   let r;
-  try{ r=await client.from('events').select('device_id,local_event_id,local_timestamp,payload_json').eq('incident_id',activeIncident.id).eq('type','MSTART_SWEEP_COMPLETED').order('local_timestamp',{ascending:false}).limit(50); }
+  try{ r=await client.from('events').select('device_id,local_event_id,local_timestamp,payload_json').eq('incident_id',incId).eq('type','MSTART_SWEEP_COMPLETED').order('local_timestamp',{ascending:false}).limit(50); }
   catch(e){ return; }
   if(r.error || !Array.isArray(r.data)) return;
-  _remoteSweepEvents[activeIncident.id]=r.data.filter(e=>e.device_id!==getDeviceId());
+  _remoteSweepEvents[incId]=r.data.filter(e=>e.device_id!==getDeviceId());
 }
 function sweepSessionsForBoard(){
   const own=siteData.sweepSessions||[];
@@ -12946,7 +12973,7 @@ function renderIncidentPicker(){
   // The user's own incident may have left the open list (closed, or a rejected draft) - keep a
   // way back into it so its patients and unsynced work stay reachable.
   const currentClosed=activeIncident && !_openIncidents.some(i=>i.id===activeIncident.id)
-    ? `<div class="incident-card"><div class="incident-card-head"><strong>${escAttr(incidentDisplayName(activeIncident))}</strong><span class="incident-status-badge ${escAttr(activeIncident.status)}">${escAttr(activeIncident.draft_resolution==='rejected'?'טיוטה נדחתה':(SERVER_INCIDENT_STATUS_LABELS[activeIncident.status]||activeIncident.status))}</span></div><div class="incident-card-meta">האירוע הנוכחי שלך במכשיר זה</div><div class="incident-card-actions"><button onclick="activateIncident(activeIncident)">המשך באירוע</button></div></div>`
+    ? `<div class="incident-card"><div class="incident-card-head"><strong>${escAttr(incidentDisplayName(activeIncident))}</strong><span class="incident-status-badge ${escAttr(activeIncident.status)}">${escAttr(activeIncident.draft_resolution==='rejected'?'טיוטה נדחתה':(SERVER_INCIDENT_STATUS_LABELS[activeIncident.status]||activeIncident.status))}</span></div><div class="incident-card-meta">האירוע הנוכחי שלך במכשיר זה</div><div class="incident-card-actions"><button onclick="activateIncident(activeIncident)">המשך באירוע</button>${activeIncident.status==='closed'?'<button onclick="openIncidentReport()">דוח סיכום</button>':''}</div></div>`
     : '';
   if(!_openIncidents.length){
     list.innerHTML=currentClosed+`<div class="demo-strip-sub" style="margin-bottom:10px">${_incidentListError?'':'אין אירועים פתוחים כרגע.'}</div>`;
@@ -13145,6 +13172,100 @@ async function switchToMergedIncident(targetId, targetVisualId){
   }finally{ _switchingToMerged=false; }
 }
 
+// ── Closed incident: patient access ends, stored report (D9, database/068) ──
+// On the server, closing ends patient access for everyone but admin and stores a statistics-only
+// report. On the phone, the closed incident's patients are removed once every record this phone
+// made for it has reached the server: an unsent record is never deleted (late records are still
+// accepted by sync-log v12). Admin keeps access and keeps the local copy.
+let _incidentReports=null; // get_incident_aar_reports() result for the incident on the report screen
+let _incidentReportVersion=null;
+function unsentRecordsForIncident(incidentId){
+  return getOutbox().filter(e=>!e.synced && !e.syncRejected && e.incident_id===incidentId && SYNC_ELIGIBLE_EVENT_TYPES.has(e.type)).length;
+}
+async function handleClosedIncidentOnDevice(incidentId){
+  if(!currentUser || currentUser.role==='admin' || !activeIncident || activeIncident.id!==incidentId) return;
+  if(activeIncident.merged_into) return; // a merged duplicate moves the phone instead (D8)
+  if(activeIncident.removed_from_device) return;
+  const unsent=unsentRecordsForIncident(incidentId);
+  if(unsent>0){ scheduleSyncPush(); renderIncidentContext(); return; }
+  removeClosedIncidentFromDevice(incidentId);
+}
+function removeClosedIncidentFromDevice(incidentId){
+  if(activeIncident?.id===incidentId){
+    patients=[];
+    reinforcementRequests=[];
+    _pulledEvents=[];
+    _remoteExternalReports={};
+    clearWorkingSiteData();
+    activeIncident.removed_from_device=true;
+    persistActiveIncident();
+  }
+  if(state && Array.isArray(state.localEvents)) state.localEvents=state.localEvents.filter(e=>e.incident_id!==incidentId);
+  // Sent entries and local-only notes of this incident go; anything not yet accepted stays.
+  _outboxCache=getOutbox().filter(e=>e.incident_id!==incidentId || (!e.synced && SYNC_ELIGIBLE_EVENT_TYPES.has(e.type)));
+  persistOutbox();
+  saveDemoState();
+  renderIncidentContext();
+  if(document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard(activeRoleDashboard);
+  toast('האירוע נסגר · נתוני הפצועים הוסרו מהמכשיר · דוח הסיכום זמין');
+}
+async function openIncidentReport(incidentId){
+  const id=incidentId||activeIncident?.id;
+  if(!id) return;
+  const client=getSupabaseClient();
+  if(!client){ toast('אין חיבור לשרת'); return; }
+  let r;
+  try{ r=await client.rpc('get_incident_aar_reports', {p_incident_id:id}); }catch(e){ r={error:e}; }
+  if(r.error || !r.data){ toast('טעינת דוח הסיכום נכשלה: '+(r.error?.message||'')); return; }
+  _incidentReports=r.data;
+  _incidentReportVersion=null;
+  goTo('incident-report');
+  renderIncidentReport();
+}
+const AAR_STATUS_LABELS={identified:'זוהה',treating:'בטיפול',evacuating:'בפינוי',handed_over:'נמסר',self_evacuated:'התפנה עצמאית',deceased:'נפטר',closed:'נסגר',unknown:'לא ידוע'};
+function aarCountChips(obj, labels){
+  const entries=Object.entries(obj||{});
+  if(!entries.length) return '<span class="demo-strip-sub">אין</span>';
+  return entries.map(([k,v])=>`<span class="aar-chip">${escAttr((labels&&labels[k])||k)}: <b>${escAttr(v)}</b></span>`).join('');
+}
+function renderIncidentReport(){
+  const el=document.getElementById('incident-report-body');
+  if(!el) return;
+  const data=_incidentReports;
+  const reports=Array.isArray(data?.reports)?data.reports:[];
+  if(!reports.length){
+    el.innerHTML='<div class="demo-strip-sub">אין עדיין דוח שמור לאירוע זה. הדוח נשמר אוטומטית בכל סגירה.</div>';
+    return;
+  }
+  const chosen=reports.find(x=>x.version===_incidentReportVersion)||reports[0];
+  const rep=chosen.report||{};
+  const inc=rep.incident||{}, pt=rep.patients||{}, tq=rep.tourniquets||{};
+  const fmt=t=>t?new Date(t).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+  const versionPicker=reports.length>1
+    ? `<label class="demo-strip-sub" for="incident-report-version">גרסה:</label> <select id="incident-report-version" onchange="_incidentReportVersion=Number(this.value);renderIncidentReport()">${reports.map(x=>`<option value="${x.version}" ${x.version===chosen.version?'selected':''}>גרסה ${x.version} · ${fmt(x.generated_at)}</option>`).join('')}</select>`
+    : `<span class="demo-strip-sub">גרסה ${escAttr(chosen.version)} · נשמר ${fmt(chosen.generated_at)}</span>`;
+  const late=Number(data.late_records_after_close||0);
+  const rows=(rep.patient_rows||[]).map(r=>`<tr><td>${escAttr(r.visual_id||'')}</td><td>${escAttr(TRIAGE_LABELS[r.triage]||r.triage||'')}</td><td>${escAttr(AAR_STATUS_LABELS[r.status]||r.status||'')}</td><td>${r.minutes_from_open??'—'}</td><td>${r.minutes_to_handover??'—'}</td><td>${escAttr(r.evacuation_destination||'—')}</td><td>${escAttr(r.mda_classification||'—')}</td><td>${r.tourniquets||0}</td></tr>`).join('');
+  el.innerHTML=`
+    <div class="aar-head"><div><strong>${escAttr(inc.visual_id||'')} · ${escAttr(inc.location_name||'')}</strong><div class="demo-strip-sub">נפתח ${fmt(inc.opened_at)} · נסגר ${fmt(inc.closed_at)} · ${inc.duration_minutes??'—'} דקות${inc.false_alarm?' · אזעקת שווא':''}${inc.closed_with_override?' · נסגר בעקיפה':''}</div></div><div>${versionPicker}</div></div>
+    ${late>0?`<div class="aar-warn">${late} רשומות הגיעו לשרת אחרי הסגירה ואינן בדוח זה. פתיחה וסגירה מחדש של האירוע תשמור גרסה מלאה.</div>`:''}
+    <div class="aar-note">דוח סטטיסטי בלבד: ללא שמות וללא פרטים מזהים. פצועים מוצגים לפי מספר זמני.</div>
+    <div class="aar-grid">
+      <div class="aar-box"><div class="aar-k">פצועים</div><div class="aar-v">${pt.total??0}</div><div>${aarCountChips(pt.by_triage, TRIAGE_LABELS)}</div></div>
+      <div class="aar-box"><div class="aar-k">מצב בסגירה</div><div>${aarCountChips(pt.by_status, AAR_STATUS_LABELS)}</div><div class="demo-strip-sub">נמסרו ${pt.handed_over??0} · חציון עד מסירה ${pt.median_minutes_open_to_handover??'—'} דק׳ · ילדים ${pt.pediatric??0} · עם מדדים ${pt.with_vitals??0} · ממתינים להערכה מלאה ${pt.still_needing_full_assessment??0}</div></div>
+      <div class="aar-box"><div class="aar-k">חסמי עורקים</div><div class="aar-v">${tq.total??0}</div><div class="demo-strip-sub">פעילים בסגירה ${tq.active_at_close??0} · מקסימום ${tq.max_minutes??'—'} דק׳ · מעל 120 דק׳: ${tq.over_120_minutes??0}</div></div>
+      <div class="aar-box"><div class="aar-k">פינוי לפי יעד</div><div>${aarCountChips(rep.evacuations_by_destination)}</div></div>
+      <div class="aar-box"><div class="aar-k">מד״א מול מיון שטח</div><div>${(rep.mda_vs_field||[]).length?(rep.mda_vs_field||[]).map(x=>`<span class="aar-chip">${escAttr(TRIAGE_LABELS[x.field_triage]||x.field_triage)} → ${escAttr(x.mda_classification)}: <b>${x.count}</b></span>`).join(''):'<span class="demo-strip-sub">אין</span>'}</div></div>
+      <div class="aar-box"><div class="aar-k">פונו לפני הגעת הכוח</div><div class="demo-strip-sub">${rep.pre_evacuation?`סה״כ ${rep.pre_evacuation.total??0} · קשה ${rep.pre_evacuation.severe??0} · בינוני ${rep.pre_evacuation.moderate??0} · קל ${rep.pre_evacuation.light??0}`:'אין דיווח'}</div></div>
+      <div class="aar-box"><div class="aar-k">צריכת ציוד</div><div>${aarCountChips(rep.supply_consumed)}</div><div class="demo-strip-sub">בקשות אספקה: ${Object.entries(rep.supply_requests_by_status||{}).map(([k,v])=>`${escAttr(k)} ${v}`).join(' · ')||'אין'}</div></div>
+      <div class="aar-box"><div class="aar-k">בקשות רפואיות</div><div>${aarCountChips(rep.medical_requests)}</div></div>
+      <div class="aar-box"><div class="aar-k">התראות</div><div>${aarCountChips(rep.alerts_by_type)}</div></div>
+      <div class="aar-box"><div class="aar-k">בעיות סנכרון</div><div>${aarCountChips(rep.sync_problems)}</div></div>
+      <div class="aar-box"><div class="aar-k">פצועים לפי יחידה</div><div>${aarCountChips(rep.patients_by_unit)}</div></div>
+    </div>
+    <div class="aar-table-wrap"><table class="aar-table"><thead><tr><th>מספר</th><th>מיון</th><th>מצב</th><th>דקות מפתיחה</th><th>דקות עד מסירה</th><th>יעד פינוי</th><th>מד״א</th><th>חסמים</th></tr></thead><tbody>${rows||'<tr><td colspan="8">אין פצועים</td></tr>'}</tbody></table></div>`;
+}
+
 // ── Incident close guard (database/040_close_incident_guard.sql) ──
 // An incident cannot be closed while any patient on it is still open, meaning not handed over,
 // self-evacuated, deceased or closed. Rescue command (rpc/rcc) and medical command may close;
@@ -13313,7 +13434,9 @@ async function refreshActiveIncidentStatus(){
       }else if(listed) activeIncident.status=listed.status;
     }catch(e){ if(listed) activeIncident.status=listed.status; }
   }
+  if(activeIncident.status!=='closed') activeIncident.removed_from_device=false;
   persistActiveIncident();
+  if(activeIncident.status==='closed') await handleClosedIncidentOnDevice(activeIncident.id);
 }
 async function refreshIncidentContext(){
   if(!currentUser) return;
@@ -13344,6 +13467,12 @@ function renderIncidentContext(){
       }
       const falseAlarmBtn=document.getElementById('incident-strip-false-alarm-btn');
       if(falseAlarmBtn) falseAlarmBtn.style.display=canCancelActiveIncidentAsFalseAlarm()?'':'none';
+      const reportBtn=document.getElementById('incident-strip-report-btn');
+      if(reportBtn) reportBtn.style.display=st==='closed' && !merged ? '' : 'none';
+      if(st==='closed' && !merged && currentUser.role!=='admin' && !activeIncident.removed_from_device && label){
+        const unsent=unsentRecordsForIncident(activeIncident.id);
+        if(unsent>0) label.textContent+=` · ${unsent} רשומות ממתינות לשליחה לפני הסרה מהמכשיר`;
+      }
       // The rescue-authority panel reads SITE_A's local status; keep it equal to the server's.
       ensureSiteStatusFields('SITE_A').incidentStatus=st==='closed'?'closed':st==='draft'?'draft':'official';
     }else{

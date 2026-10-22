@@ -386,6 +386,28 @@ Verified live 2026-10-22 in a rolled-back block (two incidents opened by two med
 | duplicate | closed with the reason in `metadata.merged_into` |
 | plain update of an event; flagged update that changes the payload; delete | refused; refused; refused |
 
+## Follow-up: closing ends patient access, stored report (`database/068`, decision D9)
+
+New helper `app.can_read_incident_patients(id)` (`SECURITY DEFINER`, executable by `authenticated`): `app.can_access_incident(id)` and the incident is not closed, or the caller is admin. Changed with `ALTER POLICY` (nothing dropped), SELECT only: `patients`, `events`, `tourniquets`, `watchdog_alerts`, `death_confirmations`, `high_risk_override_confirmations`, `medical_resource_requests`, `supply_requests`, `supply_request_items`, `external_reports`, `external_patient_links`, `inventory_ledger_v12`, `inventory_ledger_v11_archived`, `incident_pre_evacuations`, `conflict_log`, `patient_edit_conflicts`, `aar_context_notes`, `sectors`, `sync_ingestion_errors`, `experiment_observer_notes` (each keeps its other conditions). Unchanged: `incidents`, `incident_memberships`, `incident_site_authority`, `device_presence`, `device_sync_state`, `incident_open_acknowledgments` (about the incident, not its patients), and every insert policy (late records accepted). `aar_reports` insert/update/delete policies now `false` for clients; the report is written by the trigger function `app.store_incident_aar_on_close()` (execute revoked), built by `app.build_incident_aar()` (execute revoked), read through `get_incident_aar_reports()` (own check: member, or pc / rcc / cc / chamal / physician / admin with access). `get_supply_request_queue()` and `update_patient_identity()` (`SECURITY DEFINER`) now check the new helper. The views are `security_invoker`; `vw_kpi_incident_command_summary` is not, but `authenticated` has no SELECT on it (checked live).
+
+Verified live 2026-10-22 in a rolled-back block (a medic opens an incident with a patient that has a synthetic name and description and a vitals event; CC closes it with an override):
+
+| Check | Result |
+|---|---|
+| medic and cc read the patient while open | 1; 1 |
+| after close: cc patients / events; medic patients / events | 0 / 0; 0 / 0 |
+| paramedic (not a member) patients after close | 0 |
+| admin patients after close | 1 |
+| stored report | 1 version, `patients.total` 1, contains neither the name nor the description |
+| medic (member) reads the report; logistics; paramedic not a member | allowed; refused; refused |
+| medic inserts a late event after close | accepted |
+| medic `update_patient_identity` after close | refused |
+| direct insert into `aar_reports` (admin) | refused |
+| cc reopens; medic reads the patient | 1 |
+| second close | 2 versions, newest first after `068c` |
+
+`get_advisors` (security) after applying: `get_incident_aar_reports()` appears only under the usual `authenticated_security_definer_function_executable` notice, like every other lifecycle RPC; the `app.*` helpers are not in an exposed schema.
+
 ## Explicitly not re-litigated here
 
 - T6 (leaked-password protection) and T5 (service-role key handling) — out of scope, not RLS/authorization, already tracked in `docs/THREAT_MODEL.md`.
