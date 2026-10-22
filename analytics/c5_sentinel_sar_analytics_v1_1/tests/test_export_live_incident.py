@@ -43,7 +43,6 @@ def live_rows():
             "inventory_ledger_v12": [{"id": _uid(), "incident_id": incident_id, "actor_id": actor_id, "item_type": "tourniquet", "movement_type": "consumed", "quantity_delta": -1, "device_id": "dev-1", "local_event_id": "evt-2", "patient_id": patient_id, "created_at": now, "payload_json": {}}],
             "watchdog_alerts": [{"id": _uid(), "incident_id": incident_id, "patient_id": patient_id, "actor_id": actor_id, "alert_type": "vitals_overdue", "severity": "warning", "message": "test", "triggered_at": now, "acknowledged_by": None, "acknowledged_at": None, "resolved_at": None, "payload_json": {}, "updated_at": now, "version": 1, "dedupe_key": "dk1", "source_event_id": None, "resolved_by_event_id": None, "suppressed_before_dashboard": False}],
             "device_presence": [{"id": _uid(), "incident_id": incident_id, "actor_id": actor_id, "device_id": "dev-1", "current_location_json": {}, "current_patient_id": patient_id, "last_heartbeat_at": now, "sync_status": "online", "updated_at": now, "version": 1}],
-            "device_sync_state": [{"id": _uid(), "incident_id": incident_id, "actor_id": actor_id, "device_id": "dev-1", "last_successful_push_at": now, "last_successful_pull_at": now, "last_pull_cursor": 5, "unsynced_event_count": 0, "battery_percent": 80, "power_mode": "normal", "gps_enabled": True, "logistics_location_tracking_enabled": False, "updated_at": now}],
             "sync_ingestion_errors": [],
             "conflict_log": [],
             "aar_context_notes": [{"id": _uid(), "incident_id": incident_id, "source_event_id": None, "patient_id": patient_id, "sector_id": None, "actor_id": actor_id, "note_type": "context_note", "note_text": "test note", "voice_memo_uri": None, "voice_memo_duration_seconds": None, "created_at": now}],
@@ -55,6 +54,8 @@ def live_rows():
 def exported_db_path(tmp_path, monkeypatch, live_rows):
     def fake_fetch_table(table, service_key, incident_id, incident_column="incident_id"):
         assert service_key == "fake-key"
+        # Archived by database/070 (WP-15): not reachable through the API, so never fetched.
+        assert table != "device_sync_state"
         return live_rows["rows"].get(table, [])
 
     monkeypatch.setattr(export_mod, "fetch_table", fake_fetch_table)
