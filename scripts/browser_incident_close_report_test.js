@@ -1,4 +1,4 @@
-// Real-browser test of D9 (database/068, sync-log v12, V2.99.51): closing an incident ends patient
+// Real-browser test of D9 (database/068, sync-log v12, V2.99.52): closing an incident ends patient
 // access for everyone but admin and stores a statistics-only report.
 // - The medic's phone keeps the closed incident's patients while it still has an unsent record,
 //   says how many are waiting, and removes them once that record has reached the server (the

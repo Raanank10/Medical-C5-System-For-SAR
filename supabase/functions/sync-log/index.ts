@@ -305,6 +305,7 @@ async function handlePush(
   const high_risk_flags: Record<string, unknown>[] = [];
   const field_conflicts: Record<string, unknown>[] = [];
   const acceptedInBatch = new Set<string>();
+  const renamedPatients = new Map<string, string>(); // local_event_id -> visual_id the server assigned
 
   async function quarantine(evt: Partial<IncomingEvent>, code: string, message: string, dependency?: { device_id: string; local_event_id: string }) {
     await serviceClient.from("sync_ingestion_errors").insert({
@@ -398,22 +399,34 @@ async function handlePush(
         created_by: callerId,
       };
       let { error: patientErr } = await userClient.from("patients").insert(patientRow);
-      // After a merge (database/067) the target may already use this temporary id for another
-      // patient. If this patient itself does not exist yet, create it under a renamed id, the
-      // same "<id>-<last 4 characters of the duplicate incident's id>" rule merge_incident() uses.
-      if (patientErr?.code === "23505" && redirected_to && requested_incident_id) {
+      // 23505 = unique violation. Either this same patient already exists (a retried push:
+      // idempotent success), or another patient in the incident already has this visual_id
+      // (two phones whose medics share initials, offline at once, or a merged incident,
+      // database/067). The second case used to count as success too, so the patient was never
+      // created and every later event failed its FK (9 sweep patients lost live, 2026-10-20).
+      // Now it is created under a renamed id: "<id>-<last 4 characters of the duplicate
+      // incident's id>" after a merge, as merge_incident() does, otherwise "<id>-<last 4
+      // characters of the device id>". The phone gets the new name in this reply
+      // (patient_visual_id on the accepted entry) and on every pull.
+      let renamedVisualId: string | null = null;
+      if (patientErr?.code === "23505") {
         const { data: same } = await serviceClient.from("patients").select("id").eq("id", patient_id).maybeSingle();
-        if (!same) {
-          const suffix = (requestedVisualId ?? requested_incident_id).replace(/[^A-Za-z0-9]/g, "").slice(-4).toUpperCase();
+        if (same) {
+          patientErr = null;
+        } else {
+          const suffixSource = redirected_to && requested_incident_id ? (requestedVisualId ?? requested_incident_id) : device_id;
+          const suffix = String(suffixSource).replace(/[^A-Za-z0-9]/g, "").slice(-4).toUpperCase() || "DUP";
           for (let n = 1; n <= 5 && patientErr?.code === "23505"; n++) {
             const renamed = n === 1 ? `${visualId}-${suffix}` : `${visualId}-${suffix}-${n}`;
             ({ error: patientErr } = await userClient.from("patients").insert({ ...patientRow, visual_id: renamed }));
+            if (!patientErr) renamedVisualId = renamed;
+          }
+          if (renamedVisualId) {
+            logEvent("patient_visual_id_renamed", { caller_id: callerId, device_id, incident_id: incident_id ?? null, patient_id, from: visualId, to: renamedVisualId });
           }
         }
       }
-      // 23505 = unique violation - same patient_id (or incident_id+visual_id) already created,
-      // e.g. a retried push. Treat as idempotent success, not an error.
-      if (patientErr && patientErr.code !== "23505") {
+      if (patientErr) {
         rejected.push({
           local_event_id,
           terminal: false,
@@ -423,6 +436,7 @@ async function handlePush(
         await quarantine(evt, "PATIENT_CREATE_FAILED", patientErr.message);
         continue; // skip this event's insert below - the FK would fail anyway
       }
+      if (renamedVisualId) renamedPatients.set(local_event_id, renamedVisualId);
     }
 
     const insertRow = {
@@ -470,6 +484,7 @@ async function handlePush(
         local_event_id,
         server_event_id: inserted.id,
         server_cursor: inserted.sync_cursor,
+        ...(renamedPatients.has(local_event_id) ? { patient_visual_id: renamedPatients.get(local_event_id) } : {}),
       });
       acceptedInBatch.add(local_event_id);
 
