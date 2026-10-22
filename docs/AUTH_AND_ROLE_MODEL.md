@@ -56,13 +56,19 @@ Why `SECURITY DEFINER`: these functions need to read `profiles`/`incident_member
 Structure confirmed with the repo owner on 2026-10-20 (1 מ״פ רפואה, 3 מ״פ חילוץ, 3 חוג״ד, 9 מ״מ, one ambulance team):
 
 ```
-מ״פ רפואה (cc, one)              sees every site
-├─ rescue company A, B, C          each: 1 מ״פ חילוץ (rcc), 1 חוג״ד (pc) with medics
-│   └─ platoons A1-A3, ...         each: 1 מ״מ (rpc)
-└─ ambulance team                  1 pc + 1 physician or paramedic + 3 medics, sent by assignment
+Same command level:  מ״פ רפואה (cc, one) ── ambulance team        מ״פ חילוץ A, B, C (rcc, one per company)
+                         ┆ medical guidance                           │ attached (command)
+                         ┆                                            ├─ חוג״ד (pc) of the company
+                         └┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┘    (medical guidance from מ״פ רפואה)
+                                                                      ├─ מ״מ A1 ── medics (attached; medical guidance from the חוג״ד)
+                                                                      ├─ מ״מ A2 ── medics
+                                                                      └─ מ״מ A3 ── medics
+Ambulance team: 1 pc + 1 physician or paramedic + 3 medics, belongs to מ״פ רפואה, sent by assignment.
 ```
 
-- `companies` (`kind` `rescue` or `ambulance`) and `platoons` (always inside a rescue company). A `pc`, `rcc`, medic, paramedic or physician has `profiles.company_id`; an `rpc` has `profiles.platoon_id` and its company is the platoon's. A site has `incidents.company_id` and optionally `platoon_id`, and the company always follows the platoon. A site opened by a unit member belongs to the opener's unit; a pc confirming a draft with no company makes it its company's site.
+Two kinds of line (owner, 2026-10-22): every medic is attached to a מ״מ and takes medical guidance from the company's חוג״ד; every חוג״ד is attached to a מ״פ חילוץ and takes medical guidance from מ״פ רפואה. מ״פ רפואה and the מ״פ חילוץ are on the same command level. In the data, a medic is placed in its מ״מ's platoon (`database/065`) and its company follows from the platoon.
+
+- `companies` (`kind` `rescue` or `ambulance`) and `platoons` (always inside a rescue company). A `pc`, `rcc` or physician has `profiles.company_id`; an `rpc` has `profiles.platoon_id` and its company is the platoon's; a medic or paramedic has a platoon (attached to that מ״מ) or, for the ambulance team, a company, never both (`database/065`). `app.my_company_id()` and `pc_may_manage_membership()` follow a platoon to its company, so a pc assigns exactly the medics under its guidance. A site has `incidents.company_id` and optionally `platoon_id`, and the company always follows the platoon. A site opened by a unit member belongs to the opener's unit; a pc confirming a draft with no company makes it its company's site.
 - Only company-level command (cc/chamal/admin/physician) creates and renames companies and platoons (`create_company()`, `update_company()`, `create_platoon()`, `update_platoon()`) and places people (`set_profile_unit()`). Those roles move any site (`set_incident_unit()`); an `rcc` moves a site only between its own company's platoons. Trigger guards enforce the same rules on direct table writes, refuse a company that contradicts the platoon, and on a role change keep only what still fits the new role.
 - Every change is recorded in `unit_audit` (append-only for every role; readable by company-level command).
 - `database/045`'s `profiles.platoon_commander_id` is deprecated and no longer read; `set_platoon_commander()` remains as a compatibility wrapper that places the medic in that PC's company.

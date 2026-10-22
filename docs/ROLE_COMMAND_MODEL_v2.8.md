@@ -117,13 +117,19 @@ Requested by the repo owner: casualties who left the site before any medical sta
 Structure confirmed with the repo owner on 2026-10-20: 1 מ״פ רפואה, 3 מ״פ חילוץ, 3 חוג״ד, 9 מ״מ, and one ambulance team.
 
 ```
-מ״פ רפואה (cc, one)              sees every site
-├─ rescue company A, B, C          each: 1 מ״פ חילוץ (rcc), 1 חוג״ד (pc) with medics
-│   └─ platoons A1-A3, ...         each: 1 מ״מ (rpc)
-└─ ambulance team                  1 pc + 1 physician or paramedic + 3 medics, sent by assignment
+Same command level:  מ״פ רפואה (cc, one) ── ambulance team        מ״פ חילוץ A, B, C (rcc, one per company)
+                         ┆ medical guidance                           │ attached (command)
+                         ┆                                            ├─ חוג״ד (pc) of the company
+                         └┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┘    (medical guidance from מ״פ רפואה)
+                                                                      ├─ מ״מ A1 ── medics (attached; medical guidance from the חוג״ד)
+                                                                      ├─ מ״מ A2 ── medics
+                                                                      └─ מ״מ A3 ── medics
+Ambulance team: 1 pc + 1 physician or paramedic + 3 medics, belongs to מ״פ רפואה, sent by assignment.
 ```
 
-- **Each rescue company** has one מ״פ חילוץ, one חוג״ד with the company's medics, and three platoons, each led by a מ״מ. The חוג״ד is the medical commander of that rescue company.
+Two kinds of line (owner, 2026-10-22): every medic is attached to a מ״מ and takes medical guidance from the company's חוג״ד; every חוג״ד is attached to a מ״פ חילוץ and takes medical guidance from מ״פ רפואה. מ״פ רפואה and the מ״פ חילוץ are on the same command level. In the data, a medic is placed in its מ״מ's platoon (`database/065`) and its company follows from the platoon.
+
+- **Each rescue company** has one מ״פ חילוץ, one חוג״ד and three platoons, each led by a מ״מ, with its medics attached. The חוג״ד is the medical commander of that rescue company: it guides the company's medics and may assign any of them (from any of its platoons) to any site of the company or any site it belongs to, but no medic from another company or from the ambulance team (`database/065`). A medic still enters only sites it opened or was assigned to.
 - **The ambulance team** (one חוג״ד, one physician or paramedic, three medics) is its own unit under מ״פ רפואה and goes where it is assigned.
 - **A site belongs to at most one company, and to one platoon of it.** A site opened by a unit member belongs to the opener's unit (a מ״מ's site to its platoon). There are no drafts any more (D10, `database/064`): a medic's or paramedic's site takes the opener's company, and the company's חוג״ד or מ״פ חילוץ chooses its platoon from the incident-opened banner (`set_incident_platoon`). Until then every מ״מ of the company sees the banner (header fields only, `064d`); after it, only the chosen platoon's מ״מ, who can then enter the site. The roster never places a medic in a platoon (`053`: only a מ״מ is), so this choice is always needed for a medic's site. Company-level command can move any site; a מ״פ חילוץ can move a site between its own platoons.
 - **Who sees what:** מ״פ רפואה, חמ״ל, admin, the physician and the paramedic see every site. A חוג״ד and a מ״פ חילוץ see their own company's sites; a מ״מ its own platoon's. Everyone also sees sites they opened, drafted or were assigned to. A medic still enters only sites it was assigned to or drafted.

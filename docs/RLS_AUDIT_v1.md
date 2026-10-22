@@ -347,6 +347,27 @@ Verified live on 2026-10-22 by role impersonation in rolled-back transactions (t
 
 `get_advisors` (security) after applying: no finding for the new table (it has a policy). The five new functions appear only under `authenticated_security_definer_function_executable`, the same intended warning as every other lifecycle RPC (`038`, `040`, `053`): signed-in users must call them, and each checks the caller's role and unit itself.
 
+## Follow-up: medics attached to platoons (`database/065`)
+
+Owner, 2026-10-22: every medic is attached to a מ״מ and takes medical guidance from the company's חוג״ד; the חוג״ד may assign only the medics under its guidance, to any site of its company or any site it belongs to. A medic still reaches only sites it opened or was assigned to. `065` replaces `app.guard_profile_unit()`, `set_profile_unit()` and `app.pc_may_manage_membership()` (live bodies checked unchanged since `053` first). It leaves `open_incident()` as redefined live by `064` (D10), which already gives a medic's site the medic's platoon.
+
+**Verified before applying** with `scripts/rls_test_065_medics_in_platoons.sql` on the local PostgreSQL 16 copy (`053` test still passes on top; `065` re-applies cleanly):
+
+| Check | Result |
+| --- | --- |
+| medic placed in a platoon; paramedic in the ambulance company | both work |
+| platoon and company together; pc or rcc in a platoon | refused |
+| pc (company A) reads a medic attached to A1 / to B1 | 1 / 0 |
+| pc assigns an A1 medic to a site of platoon A2 (real `incident_memberships` insert) | allowed |
+| pc assigns a B1 medic | refused |
+| pc changes the roster | refused |
+| B1 medic sees the A2 site | 0 |
+| cc places a medic in A2; platoon and company together; pc in a platoon | ok; refused; refused |
+| role change: A2 medic -> pc / A1 medic -> rpc / paramedic -> logistics | keeps company A / keeps A1 / clears unit |
+| `unit_audit` rows for these changes | 6 |
+
+**Applied live** by the owner (2026-10-22). `scripts/rls_test_065_medics_in_platoons.sql` was run live as a rolled-back test: every check above passed and nothing persisted. `scripts/rls_test_053_platoons.sql` was updated to match: an rpc who becomes a pc now keeps its platoon's company and drops the platoon.
+
 ## Explicitly not re-litigated here
 
 - T6 (leaked-password protection) and T5 (service-role key handling) — out of scope, not RLS/authorization, already tracked in `docs/THREAT_MODEL.md`.
