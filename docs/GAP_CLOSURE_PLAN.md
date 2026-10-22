@@ -41,6 +41,8 @@ Some WPs cannot finish without one of these. Ask before starting the WP that nee
 | D5 | **Decided 2026-10-20 by the owner: remove the copy.** The two files were identical and having both caused confusion. `index.html` stays (GitHub Pages serves it as the live demo); `demo/rescue-app.html` was deleted and every check and test now reads `index.html` only. Original question: keep as a byte-identical copy, generate it, or replace with a redirect? | WP-14 | - |
 | D6 | Supabase Pro plan, required for leaked-password protection. | Track T5 | Cost decision |
 | D7 | Can the `admin` role record patients? `sync-log` allows admin every event type, but the `patients_insert` RLS policy allowed only medic/pc/paramedic/rpc/rcc, so an admin's patients were rejected (see Baseline results). | WP-0 part 2, WP-1 | **Decided 2026-10-19: admin may do everything**, matching `AUTH_MATRIX` in `index.html`. `database/047_admin_full_access.sql` adds admin to `patients_insert`, `high_risk_override_insert`, `death_confirmations_insert` and the physician-death guard in `project_patient_state()`. Follow-up decision the same day: admin also **wins** the concurrent-edit tie-break (`database/048`, rank above physician). Event log and audit tables stay append-only for every role, admin included (CLAUDE.md: never remove audit history). The rejected-patient warning on the phone (V2.99.35) is a separate part of the same fix. |
+| D8 | **Decided 2026-10-22 by the owner: draft merge moves the data; CC, chamal and admin only.** Merging a draft into an existing incident moves the draft's patients and their records (tourniquets, requests, stock rows, memberships, ...) into the target; colliding temporary patient ids are renamed; the draft's events stay recorded under the draft (append-only) and the draft is closed as merged into the target; `sync-log` redirects late pushes from offline phones to the target. | WP-11 part 2 | (moving vs linking vs no merge, and PC vs company level, were the options) |
+| D9 | **Decided 2026-10-22 by the owner: closing an incident ends access to its patients for everyone but admin, and stores an after-action report automatically.** Report: statistics only, no identities (counts by triage, timings, tourniquet times, evacuations by destination, MDA vs field counts, supply use, sync problems, per-unit breakdown; patients by temporary number only); command and everyone else read the report instead of the patients. Names and identifying descriptions are still erased only by the manual finalize (command), as today, until clinical governance (track T2) decides retention; finalize stays allowed on a closed incident. Reopening restores the previous access; the next close stores a new report version and keeps the old one. A "leave incident" button is dropped: it came from the 2026-10-19 audit, not the field, and its real concern (access kept after an incident ends) is covered by this decision. | WP-16 | |
 
 ## Work packages
 
@@ -241,7 +243,7 @@ One PR each, or grouped if small:
 - MSTART sweep completion and colour overrides (`MSTART_SWEEP_COMPLETED`, `MSTART_SWEEP_COLOR_OVERRIDDEN`): decide synced or local-only and record it in the WP-1 contract.
 - Dead man's switch: either emit `DEAD_MAN_SWITCH_ESCALATED` or remove it from the sync list; record the choice.
 - Draft merge (`INCIDENT_DRAFT_MERGED`): server RPC plus UI, per spec sec 202-221.
-- "Leave incident" action in the incident picker.
+- ~~"Leave incident" action in the incident picker.~~ Dropped by D9 (2026-10-22): access after closing is handled by WP-16.
 - `RECOMMENDATION_ACKNOWLEDGED`: classify in the contract.
 
 ---
@@ -274,13 +276,28 @@ Add a CI job running `npm ci`, then every `scripts/browser_*.js` with the pre-in
 
 ---
 
+### WP-16: Closing ends patient access and stores the after-action report (P2, needs D9)
+
+**Why.** Today closing only stops new joins: every member keeps reading the incident's patients after the event (`AUTH_AND_ROLE_MODEL.md`), and the after-action review is computed live on each device, never stored (`aar_reports` is empty).
+
+**Steps.**
+1. On `close_incident()` (and the closing paths it guards), build a statistics-only report in SQL from the incident's own tables and store it in `aar_reports` (new version per close; nothing with a name or identifying description). Fields per D9.
+2. RLS: patient-scoped tables (patients, events, tourniquets, treatment view, requests, ledger, ...) readable only while the incident is not closed, except for admin. `aar_reports` readable by the incident's command roles and admin, and by every member if decided later.
+3. `reopen_incident()` restores access by status alone; the old report stays.
+4. Client: a closed incident shows the stored report in place of the patient lists; finalize stays available to command.
+5. Linking an external report to a patient later (`EXTERNAL_REPORT_LINKED`) is built here if the owner wants it: the report then shows MDA vs field matching.
+
+**Verify.** Live, rolled back: close with real accounts, each role's reads before/after, report contents have no identities, reopen restores; browser test with medic, PC, CC, admin.
+
+---
+
 ### WP-15: Unused server tables and writes (P3)
 
 **Why.** Checked live 2026-10-21: of 42 tables, 9 are empty and nothing reads or writes them (no client query, edge function, server function, view or trigger): `aar_reports`, `device_sync_state`, `experiment_observer_notes`, `high_risk_override_confirmations`, `patient_edit_conflicts`, `sync_event_dependencies`, `supply_request_items`, `treatment_catalog` (1 seed row), `treatment_inventory_items`. Each was replaced by another mechanism (phone-side sync cursor, events, `conflict_log`, `sync_ingestion_errors`, `supply_requests.items_json`, client constants) or belongs to an API never built (`aar_reports`, track T3). `realtime_outbox` is written by two triggers on every event (`apply_event_projection_and_outbox`, `draft_incident_approval_outbox`) and read by nothing (no realtime publication, no reader): an extra write per event and one more copy of patient data. Unused tables still cost RLS review and mislead new sessions into assuming they are wired.
 
 **Steps.**
 1. Re-check each table live (row count, references) right before the change; anything that gained a use moves off the list.
-2. Move the unused tables to a new `archive` schema (`alter table ... set schema archive`), not dropped (owner's rule: no data dropped without the owner); no grants on `archive` for `anon`/`authenticated`. Keep `aar_reports` in `public` if track T3 (AAR API) is still planned.
+2. Move the unused tables to a new `archive` schema (`alter table ... set schema archive`), not dropped (owner's rule: no data dropped without the owner); no grants on `archive` for `anon`/`authenticated`. Keep `aar_reports` in `public`: WP-16 (D9) uses it.
 3. Stop the `realtime_outbox` writes: replace the two trigger functions without the outbox insert (keep `apply_event_projection_and_outbox`'s `conflict_log` part unchanged), then archive the table with its 19 rows.
 4. A new numbered file records the move (`001` is history and stays unedited). Update `RLS_AUDIT_v1.md` (policy count), `ARCHITECTURE.md`, and `analytics/.../export_live_incident.py` if it names a moved table (it lists `device_sync_state`).
 
@@ -322,7 +339,8 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-12 Durable watchdog | P3 | Not started | | needs D1 |
 | WP-13 Tests in CI | P3 | Not started | | the 34 smoke scripts pass again (WP-14), so they can be wired in |
 | WP-14 Duplicate HTML, doc drift | P3 | Done (2026-10-20) | | D5: `demo/rescue-app.html` removed. Visible labels were stuck at V2.9934 since V2.99.34; fixed to match `APP_VERSION` and `check_repo.py` now checks them against `APP_VERSION`. Smoke scripts refreshed: no version pins (`scripts/lib/smoke_version.js`), stale assertions updated to the commits that changed the behaviour; all 34 pass. Docs: CLAUDE.md, README, DEVELOPMENT, ARCHITECTURE, PHASE_4_PLAN, ROADMAP, THREAT_MODEL, PRODUCTION_READINESS, FIELD_EXPERIMENT_GAPS |
-| WP-15 Unused server tables | P3 | Not started (added 2026-10-21 at the owner's request) | | 9 unused tables to an `archive` schema, stop the never-read `realtime_outbox` writes; nothing dropped |
+| WP-16 Close ends access + stored AAR | P2 | Not started (D9 decided 2026-10-22) | | |
+| WP-15 Unused server tables | P3 | Not started (added 2026-10-21 at the owner's request) | | 8 unused tables to an `archive` schema (`aar_reports` stays, WP-16), stop the never-read `realtime_outbox` writes; nothing dropped |
 
 ## Revisions after #73 (2026-10-19)
 
