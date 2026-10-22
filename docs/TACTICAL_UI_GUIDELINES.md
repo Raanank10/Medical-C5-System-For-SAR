@@ -100,6 +100,19 @@ When Black is selected:
 
 For children under age 8, the UI must not require exact weight before treatment. Use age group or age estimate locally, warn on adult-range doses, require double confirmation, and write override metadata into the event payload. The save action still completes locally; risk is escalated through watchdog alerts and AAR review.
 
+## Patient Detail Order (V2.99.58)
+
+Owner request: vital signs come first. The patient detail screen ("פרטי פצוע") reads top to bottom in the order a medic needs it in the field, following the monitor convention of large color-coded numbers plus how fresh they are:
+
+1. Safety banners (sync rejection, shared "בטיפול" acknowledgment).
+2. Hero card, framed in the triage color (dashed muted frame while triage is pending, never green): triage, status, age band, "עדכן מדדים", how old the vitals are and when the next reassessment is due (red when overdue or missing), the tourniquet clock, then pulse and SpO2 gauges with large colored values, RR, BP and AVPU, and the deterioration / priority recommendation.
+3. Vitals trend.
+4. Elderly warning, injury and location, treatments (this device and other devices).
+5. Evacuation, late MDA update, manual triage override, optional identity.
+6. Timeline.
+
+The title shows the patient number (`visualId`, e.g. P004-DK), not the internal UUID.
+
 ## Tourniquet Clock
 
 Once a tourniquet is recorded, it becomes a persistent clinical timer.
