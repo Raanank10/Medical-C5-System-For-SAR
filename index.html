@@ -163,6 +163,16 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .tap-btn.triage-yellow.selected{background:rgba(244,162,97,0.12);border-color:var(--yellow);}
 .tap-btn.triage-green.selected{background:rgba(42,157,143,0.12);border-color:var(--green);}
 .tap-btn.triage-black.selected{background:rgba(74,74,74,0.15);border-color:#666;}
+/* Selected must be unmistakable at a glance (owner 2026-10-22: on the MSTART card "it is not clear
+   what is chosen" for A/V/P/U - a 12% tint was nearly invisible on the dark theme). A selected button
+   gets a solid fill, an outer ring and a check mark, so the choice reads without comparing colours. */
+.tap-btn{position:relative;}
+.tap-btn.selected{background:rgba(67,97,238,0.45);box-shadow:0 0 0 3px var(--accent);color:#fff;font-weight:900;}
+.tap-btn.triage-red.selected{background:rgba(230,57,70,0.5);box-shadow:0 0 0 3px var(--red);}
+.tap-btn.triage-yellow.selected{background:rgba(255,204,0,0.32);box-shadow:0 0 0 3px var(--yellow);}
+.tap-btn.triage-green.selected{background:rgba(52,199,89,0.38);box-shadow:0 0 0 3px var(--green);}
+.tap-btn.triage-black.selected{background:#4a4a4a;border-color:#9a9a9a;box-shadow:0 0 0 3px #9a9a9a;}
+.tap-btn.selected::after,.avpu-btn.selected::after{content:'✓';position:absolute;top:5px;inset-inline-start:7px;width:22px;height:22px;border-radius:50%;background:#fff;color:#111;font-size:14px;font-weight:900;line-height:22px;text-align:center;font-family:var(--sans);}
 body.field-mode .screen{padding-bottom:132px;}
 body.field-mode .tap-btn{min-height:72px;font-size:15px;border-width:2px;}
 body.field-mode .demo-mini-btn, body.field-mode .btn-secondary{min-height:56px;font-size:14px;}
@@ -281,7 +291,8 @@ body.field-mode .patient-card{padding:16px 15px;margin-top:8px;margin-bottom:8px
 .count-timer .timer-readout{font-family:var(--mono);font-size:12px;color:var(--accent);min-width:54px;text-align:center;}
 .avpu-row{display:flex;gap:8px;}
 .avpu-btn{flex:1;padding:14px 4px;background:var(--surface2);border:2px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:18px;font-weight:700;cursor:pointer;text-align:center;transition:all 0.12s;min-height:56px;touch-action:manipulation;}
-.avpu-btn.selected{border-color:var(--accent);background:rgba(67,97,238,0.15);color:var(--accent);}
+.avpu-btn{position:relative;}
+.avpu-btn.selected{border-color:var(--accent);background:rgba(67,97,238,0.45);box-shadow:0 0 0 3px var(--accent);color:#fff;font-weight:900;}
 #no-breathing-btn{min-height:56px;touch-action:manipulation;}
 
 /* ── REQUIRED FIELD ── */
@@ -818,7 +829,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9956</div>
+      <div class="demo-kicker">Demo V2.9957</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -915,7 +926,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9956</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9957</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -925,7 +936,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9956</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9957</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2936,7 +2947,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.56';
+const APP_VERSION = '2.99.57';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -8402,7 +8413,7 @@ function renderMstartSweep(){
            </div>
            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
              <button class="tap-btn triage-yellow" onclick="recordSweepTreatment('pressure_bandage')">חבישת לחץ בלבד</button>
-             <button class="tap-btn selected" style="background:transparent;border-color:var(--border);color:var(--muted);font-size:12px" onclick="setSweepMstartField(null,'massiveBleeding','none')">✕ אין דימום מסכן חיים</button>
+             <button class="tap-btn" style="background:transparent;border-color:var(--border);color:var(--muted);font-size:12px" onclick="setSweepMstartField(null,'massiveBleeding','none')">✕ אין דימום מסכן חיים</button>
            </div>`
       }
     </div>`;
