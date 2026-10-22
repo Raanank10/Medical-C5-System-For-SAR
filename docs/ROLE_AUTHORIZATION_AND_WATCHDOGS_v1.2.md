@@ -12,7 +12,7 @@ This document defines the operating roles, the demo authorization matrix, and th
 | מ״פ רפואה | Company medical-resource command authority for official incident confirmation, closure/reopen, site clear, resource allocation, dashboard, conflict log, and AAR. |
 | Chamal | Higher command/operations room. Informed of every incident a medic opens, manages official incident state, sees command dashboards, conflict log, and AAR. |
 
-There are no draft incidents (D10, `database/064`, V2.99.48). A medic opens an official incident after the phone offered to join an open incident of the medic's company; חוג״ד, מ״פ חילוץ, the platoon's מ״מ, מ״פ רפואה and Chamal are informed by a banner until each acknowledges it. The opener may cancel it as a false alarm while it has no patients. Earlier drafts were confirmed by חוג״ד, מ״פ רפואה, or Chamal with an auditable event; those server functions remain for history.
+There are no draft incidents (D10, `database/064`, V2.99.48). A medic opens an official incident after the phone offered to join an open incident of the medic's company; חוג״ד, מ״פ חילוץ, the company's מ״מים (only the chosen platoon's once it is set), מ״פ רפואה and Chamal are informed by a banner until each acknowledges it. The opener may cancel it as a false alarm while it has no patients. Earlier drafts were confirmed by חוג״ד, מ״פ רפואה, or Chamal with an auditable event; those server functions remain for history.
 
 ## Authorization Matrix
 

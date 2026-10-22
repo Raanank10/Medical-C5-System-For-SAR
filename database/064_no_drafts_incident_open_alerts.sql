@@ -21,7 +21,10 @@
 --    - cc, chamal, admin: every one (they already see every incident; also the safety net for a
 --      medic without a unit, flagged no_unit);
 --    - pc, rcc: incidents of their own company;
---    - rpc: incidents of their own platoon.
+--    - rpc: incidents of their own platoon, and (064d, owner 2026-10-22) every incident of their
+--      own company whose platoon is not chosen yet; once the PC/RCC chooses it, only that
+--      platoon's RPC keeps the row. The banner gives header fields only: an RPC still reaches
+--      the incident itself only through its platoon (053).
 --    A false-alarm cancellation stays listed (cancelled = true) until acknowledged.
 --    acknowledge_incident_opened() stores the acknowledgment per person.
 -- 5. set_incident_platoon(): the PC or RCC of the incident's company chooses its platoon. In 053
@@ -37,8 +40,8 @@
 --    false-alarm close is the one whose closed_at equals false_alarm.at (applied live as
 --    064c_false_alarm_close_marker, 2026-10-22).
 --
--- Applied live 2026-10-22 as 064_no_drafts_incident_open_alerts, 064b_set_incident_platoon_rpc_flag
--- and 064c_false_alarm_close_marker; this file is the combined result.
+-- Applied live 2026-10-22 as 064_no_drafts_incident_open_alerts, 064b_set_incident_platoon_rpc_flag,
+-- 064c_false_alarm_close_marker and 064d_rpc_informed_before_platoon; this file is the combined result.
 
 create table if not exists incident_open_acknowledgments (
   incident_id uuid not null references incidents(id) on delete cascade,
@@ -248,6 +251,8 @@ begin
       v_role in ('cc','chamal','admin')
       or (v_role in ('pc','rcc') and v_company is not null and i.company_id = v_company)
       or (v_role = 'rpc' and v_platoon is not null and i.platoon_id = v_platoon)
+      -- 064d: until the platoon is chosen, every RPC of the incident's company is informed.
+      or (v_role = 'rpc' and i.platoon_id is null and v_company is not null and i.company_id = v_company)
     )
   order by i.opened_at desc;
 end;
@@ -268,7 +273,10 @@ begin
   if not exists (select 1 from incidents where id = p_incident_id) then
     raise exception 'incident % not found', p_incident_id using errcode = 'P0002';
   end if;
-  if not (v_role in ('cc','chamal','admin') or app.can_access_incident(p_incident_id)) then
+  if not (v_role in ('cc','chamal','admin') or app.can_access_incident(p_incident_id)
+          -- 064d: a company RPC informed of an incident whose platoon is not chosen yet.
+          or (v_role = 'rpc' and exists (select 1 from incidents i where i.id = p_incident_id and i.platoon_id is null
+                                          and i.company_id is not null and i.company_id = app.my_company_id()))) then
     raise exception 'access denied to incident %', p_incident_id using errcode = '42501';
   end if;
   insert into incident_open_acknowledgments (incident_id, profile_id)

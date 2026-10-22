@@ -12616,7 +12616,9 @@ async function retryHighStakesSync(localEventId, label){
 const ACTIVE_INCIDENT_KEY='c5_active_incident_v1';
 const INCIDENT_FIELD_OPEN_ROLES=new Set(['medic','paramedic']);
 const INCIDENT_OFFICIAL_OPEN_ROLES=new Set(['pc','cc','chamal','admin','physician','rpc','rcc']);
-// Informed when a medic or paramedic opens an incident (database/064 list_incident_open_alerts).
+// Informed when a medic or paramedic opens an incident (database/064 list_incident_open_alerts):
+// pc/rcc of the company, every rpc of the company until the platoon is chosen and then only that
+// platoon's rpc (064d), cc/chamal/admin all.
 const INCIDENT_OPEN_ALERT_ROLES=new Set(['pc','rcc','rpc','cc','chamal','admin']);
 // May choose the platoon of a medic's incident (set_incident_platoon): the incident company's PC
 // or RCC, and company-level command (app.is_unit_manager()).
@@ -12759,13 +12761,14 @@ function renderIncidentOpenAlertBanner(){
     }
     const flags=[
       a.no_unit?'<span class="open-alert-flag">⚠ ללא פלוגה: החובש לא שובץ לפלוגה (תקלת הגדרה)</span>':'',
-      a.needs_platoon?'<span class="open-alert-flag">טרם נקבעה מחלקה: מ״מ לא קיבל התראה</span>':''
+      a.needs_platoon?'<span class="open-alert-flag">טרם נקבעה מחלקה: כל מ״מי הפלוגה מקבלים התראה עד השיבוץ</span>':''
     ].filter(Boolean).join(' · ');
     const platoons=_platoonsByCompany[a.company_id]||[];
     const choose=a.needs_platoon && INCIDENT_PLATOON_CHOOSER_ROLES.has(role) && platoons.length
       ? `<select id="open-alert-platoon-${id}"><option value="">בחר/י מחלקה</option>${platoons.map(pl=>`<option value="${escAttr(pl.id)}">${escAttr(pl.name)}</option>`).join('')}</select><button onclick="chooseIncidentPlatoon('${id}')">שבץ מחלקה</button>`
       : '';
-    const enter=activeIncident?.id===a.id ? '' : `<button onclick="enterIncidentFromAlert('${id}')">כניסה</button>`;
+    // An RPC reaches the incident only through its platoon (053): no entry before the platoon is chosen.
+    const enter=activeIncident?.id===a.id || (role==='rpc' && a.needs_platoon) ? '' : `<button onclick="enterIncidentFromAlert('${id}')">כניסה</button>`;
     return `<div class="open-alert-row" data-incident-id="${id}">
       <div><strong>🚨 אירוע חדש נפתח בשטח:</strong> ${where} · נפתח ${time} ע״י ${who} · ${a.patient_count||0} פצועים${flags?'<br>'+flags:''}</div>
       <div class="actions"><button onclick="acknowledgeIncidentOpened('${id}')">ראיתי</button>${enter}${choose}</div>

@@ -334,6 +334,17 @@ Verified live on 2026-10-22 by role impersonation in rolled-back transactions (t
 | opener cancels an empty incident; repeat | closed, `INCIDENT_CLOSED` with `false_alarm: true`; repeat `changed:false` |
 | pc after the cancel | sees it as `cancelled` with the reason |
 
+`064d` (owner's revision, 2026-10-22): every rpc of the incident's company is informed until the platoon is chosen, and may acknowledge it; nothing else widened. Verified live the same day in a rolled-back block (company A with platoons A1, A2; company B with B1):
+
+| Check | Result |
+|---|---|
+| rpc of A1, three company-A incidents with no platoon | all 3 listed, `needs_platoon` |
+| same rpc: plain read of those incidents; `join_incident` | 0 rows; refused |
+| same rpc acknowledges one of them | allowed; gone from its list |
+| pc sets A1 on one, A2 on another; rpc of A1 | keeps the A1 incident, the A2 one is gone |
+| rpc of A1 acknowledges the A2 incident | refused |
+| rpc of company B | none of company A's |
+
 `get_advisors` (security) after applying: no finding for the new table (it has a policy). The five new functions appear only under `authenticated_security_definer_function_executable`, the same intended warning as every other lifecycle RPC (`038`, `040`, `053`): signed-in users must call them, and each checks the caller's role and unit itself.
 
 ## Explicitly not re-litigated here

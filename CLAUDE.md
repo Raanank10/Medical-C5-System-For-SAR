@@ -55,7 +55,7 @@ node scripts/browser_rescue_site_authority_test.js # RPC/RCC T0, building status
 node scripts/browser_offline_cold_start_test.js  # WP-10: serves the repo on localhost, sw.js caches the shell, network off + reload: PIN gate, local data, signed-in session and incident come back
 node scripts/browser_inventory_sync_test.js       # WP-9: two medics' consumption reaches logistics (incident-wide burn rate, each bag's stock), PC truck issue, no double count
 node scripts/browser_sweep_sync_test.js           # WP-11: manual sweep override sent as MSTART_OVERRIDE (after the patient's create); a finished sweep reaches the PC's board on another phone and stays
-node scripts/browser_incident_open_alerts_test.js  # D10: no drafts; "join this instead?" before a medic opens, PC/RPC/CC banner until each acknowledges, PC/RCC choose the platoon, false-alarm cancel while empty
+node scripts/browser_incident_open_alerts_test.js  # D10: no drafts; "join this instead?" before a medic opens, PC/RCC/CC and every company RPC (until the platoon is chosen) get a banner until each acknowledges, false-alarm cancel while empty
 node scripts/test_outbox_eviction.js              # F1: persistOutbox() never evicts an unsynced event, even past the 500 cap (docs/FAILURE_MODE_REVIEW.md)
 
 # Analytics package

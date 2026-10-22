@@ -138,7 +138,7 @@ Chamal
 Platoon Commander, if authorized
 ```
 
-**No draft incidents (decision D10, `docs/GAP_CLOSURE_PLAN.md`, `database/064`, V2.99.48).** A Medic or Paramedic opens an **official** incident directly, in their own company (and platoon, when the roster gives them one). Before opening, the phone lists the open incidents of the medic's company from the last 12 hours and offers to join one instead. Once opened, the company's חוג״ד and מ״פ חילוץ, the platoon's מ״מ (once the platoon is set), and מ״פ רפואה / Chamal / Admin see a pulsing banner until each of them acknowledges it (per person, stored on the server). A medic's incident has no platoon unless the roster sets one, so the חוג״ד or מ״פ חילוץ chooses it from the banner, which then informs that platoon's מ״מ. The opener may cancel the incident as a false alarm while it has no patients; after that, closing follows the close guard (`040`). Duplicates that still happen are merged into one incident by מ״פ רפואה / Chamal / Admin (D8, WP-11 part 2). The earlier draft path (`incidents.status = 'draft'`, `confirm_draft` / `reject_draft` / `acknowledge_draft`) is no longer used by the client; the server functions remain for history.
+**No draft incidents (decision D10, `docs/GAP_CLOSURE_PLAN.md`, `database/064`, V2.99.48).** A Medic or Paramedic opens an **official** incident directly, in their own company (and platoon, when the roster gives them one). Before opening, the phone lists the open incidents of the medic's company from the last 12 hours and offers to join one instead. Once opened, the company's חוג״ד and מ״פ חילוץ, every מ״מ of the company (only the chosen platoon's מ״מ once the platoon is set), and מ״פ רפואה / Chamal / Admin see a pulsing banner until each of them acknowledges it (per person, stored on the server). A medic's incident has no platoon unless the roster sets one, so the חוג״ד or מ״פ חילוץ chooses it from the banner, which then informs that platoon's מ״מ. The opener may cancel the incident as a false alarm while it has no patients; after that, closing follows the close guard (`040`). Duplicates that still happen are merged into one incident by מ״פ רפואה / Chamal / Admin (D8, WP-11 part 2). The earlier draft path (`incidents.status = 'draft'`, `confirm_draft` / `reject_draft` / `acknowledge_draft`) is no longer used by the client; the server functions remain for history.
 
 ## Authorization Matrix
 
@@ -543,7 +543,7 @@ Opened [time] by [role] [name] · [count] patients
 [ראיתי] [enter]
 ```
 
-Who sees it: the company's חוג״ד and מ״פ חילוץ; the מ״מ of the incident's platoon; מ״פ רפואה, Chamal and Admin for every incident. It stays until that person presses "ראיתי" (one acknowledgment per person; others still see it). A false-alarm cancel shows as "✖ incident cancelled (false alarm)" with the reason, until acknowledged. Alerts cover incidents opened in the last 24 hours.
+Who sees it: the company's חוג״ד and מ״פ חילוץ; every מ״מ of the company until the platoon is chosen, then only the מ״מ of the chosen platoon (`064d`, owner 2026-10-22; a מ״מ gets no entry button until then, since it reaches an incident only through its platoon); מ״פ רפואה, Chamal and Admin for every incident. It stays until that person presses "ראיתי" (one acknowledgment per person; others still see it). A false-alarm cancel shows as "✖ incident cancelled (false alarm)" with the reason, until acknowledged. Alerts cover incidents opened in the last 24 hours.
 
 ### Stat Row
 

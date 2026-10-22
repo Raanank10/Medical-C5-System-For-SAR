@@ -2,8 +2,9 @@
 // draft incidents any more. A medic opens an official incident at once; before that the phone
 // lists the open incidents of the medic's company and offers to join one instead; once opened,
 // the PC and RCC of that company, the platoon's RPC (after the PC or RCC chooses the platoon) and
-// CC see a banner until each of them acknowledges it; the opener may cancel the incident as a
-// false alarm while it has no patients, and command then sees that it was cancelled.
+// CC see a banner until each of them acknowledges it, and so does every RPC of the company until
+// the PC or RCC chooses the platoon (then only that platoon's RPC, 064d); the opener may cancel the
+// incident as a false alarm while it has no patients, and command then sees that it was cancelled.
 //
 // Medic, PC, RPC, CC and logistics phones share one fake backend in this Node process (same
 // harness as scripts/browser_platoon_security_test.js). The fake mirrors database/064's rules;
@@ -107,13 +108,15 @@ function handle(server, req) {
       const rows = server.incidents.filter((i) => ['medic', 'paramedic'].includes(userById(i.opened_by)?.role)
         && (i.status === 'active' || isFalseAlarmClose(i))
         && !server.acks.some((a) => a.incident_id === i.id && a.profile_id === u.id)
-        && (['cc', 'chamal', 'admin'].includes(u.role) || (['pc', 'rcc'].includes(u.role) && !!myCompany && i.company_id === myCompany) || (u.role === 'rpc' && !!myPlatoon && i.platoon_id === myPlatoon)));
+        && (['cc', 'chamal', 'admin'].includes(u.role) || (['pc', 'rcc'].includes(u.role) && !!myCompany && i.company_id === myCompany) || (u.role === 'rpc' && !!myPlatoon && i.platoon_id === myPlatoon)
+          || (u.role === 'rpc' && !i.platoon_id && !!myCompany && i.company_id === myCompany)));
       return { data: clone(rows.map((i) => ({ id: i.id, visual_id: i.visual_id, location_name: i.location_name, address: i.address, status: i.status, opened_at: i.opened_at,
         opened_by_name: userById(i.opened_by)?.display_name, opened_by_role: userById(i.opened_by)?.role, company_id: i.company_id, platoon_id: i.platoon_id,
         patient_count: server.patients[i.id] || 0, no_unit: !i.company_id, needs_platoon: !!i.company_id && !i.platoon_id, cancelled: isFalseAlarmClose(i), cancel_reason: i.metadata.false_alarm?.reason || null }))), error: null };
     }
     if (req.name === 'acknowledge_incident_opened') {
       if (!['cc', 'chamal', 'admin', 'pc', 'rcc', 'rpc'].includes(u.role)) return denied('not informed');
+      if (!['cc', 'chamal', 'admin'].includes(u.role) && !canSee(inc) && !(u.role === 'rpc' && !inc.platoon_id && !!myCompany && inc.company_id === myCompany)) return denied('no access');
       server.acks.push({ incident_id: p.p_incident_id, profile_id: u.id });
       return { data: { id: p.p_incident_id, acknowledged: true }, error: null };
     }
@@ -256,7 +259,8 @@ async function checkFile(browser, file) {
   const incB = SERVER.incidents[1];
 
   // 4. PC 1 (company A): both incidents on the pulsing banner, flagged as needing a platoon;
-  // only company A's platoons are offered. The RPC of platoon A1 sees nothing yet.
+  // only company A's platoons are offered. Every RPC of company A (here the RPC of A1) is informed
+  // of both before a platoon is chosen, without an entry button (it cannot reach them yet).
   const pc1 = await openPhone(context, file);
   await login(pc1.page, 'pc1@test');
   const pcBanner = await bannerText(pc1.page);
@@ -268,15 +272,23 @@ async function checkFile(browser, file) {
 
   const rpc1 = await openPhone(context, file);
   await login(rpc1.page, 'rpc1@test');
-  assert((await bannerText(rpc1.page)) === '', `${rel}: the RPC must not be informed before the platoon is chosen`);
+  const rpcBefore = await bannerText(rpc1.page);
+  assert(rpcBefore.includes('Synthetic Site North') && rpcBefore.includes('Synthetic Site South'), `${rel}: every RPC of the company must be informed before the platoon is chosen (got ${rpcBefore})`);
+  assert(!(await rpc1.page.locator('#incident-open-alert-banner button:has-text("כניסה")').count()), `${rel}: an RPC gets no entry button before its platoon is chosen`);
 
-  // 5. PC chooses platoon A1 for incident A: the RPC of A1 is now informed of A (not of B).
+  // 5. PC chooses platoon A2 for incident B and A1 for incident A: the RPC of A1 keeps A (now with
+  // an entry button) and loses B, which belongs to another platoon now.
+  await pc1.page.selectOption(`#open-alert-platoon-${incB.id}`, A2);
+  await pc1.page.click(`.open-alert-row[data-incident-id="${incB.id}"] button:has-text("שבץ מחלקה")`);
+  await pc1.page.waitForTimeout(300);
+  assert(incB.platoon_id === A2, `${rel}: set_incident_platoon must set platoon A2 for B (got ${incB.platoon_id})`);
   await pc1.page.selectOption(`#open-alert-platoon-${incA.id}`, A1);
   await pc1.page.click(`.open-alert-row[data-incident-id="${incA.id}"] button:has-text("שבץ מחלקה")`);
   await pc1.page.waitForTimeout(300);
   assert(incA.platoon_id === A1, `${rel}: set_incident_platoon must set platoon A1 (got ${incA.platoon_id})`);
   const rpcBanner = await bannerText(rpc1.page);
   assert(rpcBanner.includes('Synthetic Site North') && !rpcBanner.includes('Synthetic Site South'), `${rel}: the RPC of A1 must now see incident A only (got ${rpcBanner})`);
+  assert(await rpc1.page.locator('#incident-open-alert-banner button:has-text("כניסה")').count() === 1, `${rel}: once its platoon is chosen the RPC can enter`);
   assert(!rpcBanner.includes('שבץ מחלקה'), `${rel}: an RPC is not offered the platoon choice`);
 
   // 6. Acknowledgment is per person: the PC acknowledges A; it stays on the RPC's and CC's banner.
