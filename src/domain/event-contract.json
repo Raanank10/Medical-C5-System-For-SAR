@@ -157,12 +157,17 @@
       "PC_TRUCK_SHORTAGE_ESCALATED",
       "RED_CASUALTY_CREATED",
       "RED_WITHOUT_EVAC_STATUS",
+      "SERVER_TOURNIQUET_TIME",
+      "SERVER_VITALS_OVERDUE",
       "STALE_VITALS_GREEN",
       "STALE_VITALS_PRIORITY",
       "TOURNIQUET_CRITICAL",
       "TOURNIQUET_WARNING",
       "TRAPPED_NO_MEDIC_CONTACT",
       "UNSYNCED_EVENT_BACKLOG"
+    ],
+    "watchdog_alerts.alert_type written by the server watchdog (database/072) and only read by the phone (pullServerWatchdogAlerts)": [
+      "VITALS_OVERDUE"
     ]
   },
   "known_gaps": {
