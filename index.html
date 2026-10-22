@@ -788,7 +788,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9953</div>
+      <div class="demo-kicker">Demo V2.9954</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -885,7 +885,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9953</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9954</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -895,7 +895,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9953</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9954</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2906,7 +2906,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.53';
+const APP_VERSION = '2.99.54';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -9566,6 +9566,7 @@ function openPatient(id){
         <div style="font-weight:700;font-size:14px">מדדים נוכחיים</div>
         <button onclick="openQuickVitals('${p.id}')" style="background:var(--accent);border:none;color:white;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">עדכן מדדים</button>
       </div>
+      ${remoteVitalsSourceLine(p)}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
         <div style="background:var(--surface2);border-radius:10px;padding:6px 10px 10px">${renderGaugeArc({value:p.vitals.pulse,min:40,max:180,needleColor:pulseCol(p.vitals.pulse),zones:pulseZones,label:'דופק bpm'})}</div>
         <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:#f4a261">${p.vitals.rr ?? '—'}</div><div style="font-size:11px;color:var(--muted)">נשימות / דקה</div></div>
@@ -11082,6 +11083,8 @@ async function saveModalVitals(){
   p.vitals = {...next};
   p.vitalsCapture = vitalsCapturePayload('modal');
   p.lastVitalsAt = Date.now();
+  p.vitalsValuesAt = p.lastVitalsAt; // values measured on this phone, now (see applyRemoteVitals)
+  p.vitalsFrom = null;
   p.lastTouchedBy = medicName;
   p.lastModifiedAt = new Date().toISOString();
   p.unsyncedEvents=(p.unsyncedEvents||0)+1;
@@ -13920,7 +13923,7 @@ function applyProjectedPatientState(rows){
       }
       // Remote patients cached before V2.99.32 were created with VITALS_BASELINE; clear those
       // placeholder values unless this device has actually recorded vitals for the patient.
-      if(existing.sourcedFromRemote && !(existing.vitalsHistory||[]).length && existing.vitals?.pulse===VITALS_BASELINE.pulse && existing.vitals?.rr===VITALS_BASELINE.rr){
+      if(existing.sourcedFromRemote && !existing.vitalsFrom && !(existing.vitalsHistory||[]).length && existing.vitals?.pulse===VITALS_BASELINE.pulse && existing.vitals?.rr===VITALS_BASELINE.rr){
         existing.vitals={...VITALS_NOT_ON_DEVICE};
         changed=true;
       }
@@ -14028,7 +14031,7 @@ function applyServerTourniquets(rows, incidentId){
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
 function pullProjectedPatientStateAll(){
-  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); pullAlertAcknowledgments(id); pullRemoteTreatments(id); });
+  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); pullAlertAcknowledgments(id); pullRemoteTreatments(id); pullRemoteVitals(id); });
 }
 // ── Pre-evacuation report pull (V2.99.36, database/050) ──
 // incident_pre_evacuations is the server's verdict on who owns the report (first medical
@@ -14135,6 +14138,75 @@ function applyRemoteTreatments(rows){
     changed=true;
   });
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
+}
+// ── Vitals values from other devices (gap N6) ──
+// The projected patients row carries only last_vitals_at, so another phone showed "מדדים אצל
+// החובש" and no numbers. The values travel in VITALS_RECORDED's payload; this reads them from
+// events (RLS decides who sees what, as for the sweep board) and puts the newest reading from
+// another device on the patient when it is newer than the values this phone holds. The card says
+// where and when they were measured. Values are range-checked; anything else is dropped, never
+// guessed. This phone's own readings are never replaced by an older remote one.
+const REMOTE_VITALS_LIMITS={pulse:[0,300], spo2:[0,100], rr:[0,80]};
+function sanitizeRemoteVitals(pl){
+  const v={...VITALS_NOT_ON_DEVICE};
+  if(!pl || typeof pl!=='object') return v;
+  Object.entries(REMOTE_VITALS_LIMITS).forEach(([k,[lo,hi]])=>{
+    const n=Number(pl[k]);
+    if(pl[k]!=null && pl[k]!=='' && Number.isFinite(n) && n>=lo && n<=hi) v[k]=Math.round(n);
+  });
+  if(typeof pl.bp_estimate==='string' && Object.prototype.hasOwnProperty.call(BP_LABELS, pl.bp_estimate)) v.bp_estimate=pl.bp_estimate;
+  if(['A','V','P','U'].includes(pl.avpu)) v.avpu=pl.avpu;
+  return v;
+}
+// When the values in p.vitals were measured: set on this phone by the vitals modal and by a
+// remote reading; for older local data, the newest local trend point.
+function vitalsValuesTime(p){
+  if(p.vitalsValuesAt) return p.vitalsValuesAt;
+  const local=(p.vitalsHistory||[]).filter(h=>!h.remote).map(h=>h.t||0);
+  // A patient created on this phone carries the vitals taken at creation (full flow), with no
+  // trend point yet: count them as measured when the patient was created.
+  if(!p.sourcedFromRemote) local.push(Date.parse(p.createdAt||'')||0);
+  return local.length ? Math.max(...local) : 0;
+}
+async function pullRemoteVitals(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let r;
+  try{ r=await client.from('events').select('patient_id,device_id,actor_role,local_timestamp,payload_json').eq('incident_id', incidentId).eq('type','VITALS_RECORDED').order('local_timestamp',{ascending:false}).limit(1000); }
+  catch(e){ return; }
+  if(r.error || !Array.isArray(r.data)) return;
+  applyRemoteVitals(r.data);
+}
+function applyRemoteVitals(rows){
+  const me=getDeviceId();
+  const latest={}; // patient_id -> newest reading from another device
+  rows.forEach(row=>{
+    if(!row || !row.patient_id || row.device_id===me) return;
+    const at=Date.parse(row.local_timestamp);
+    if(!Number.isFinite(at)) return;
+    if(!latest[row.patient_id] || at>latest[row.patient_id].at) latest[row.patient_id]={at, row};
+  });
+  let changed=false;
+  patients.forEach(p=>{
+    const hit=latest[p.id];
+    if(!hit || hit.at<=vitalsValuesTime(p)) return;
+    const v=sanitizeRemoteVitals(hit.row.payload_json);
+    if(v.pulse==null && v.spo2==null && v.rr==null && v.bp_estimate==null && v.avpu==null) return;
+    p.vitals=v;
+    p.vitalsValuesAt=hit.at;
+    p.vitalsFrom={at:hit.at, role:sanitizeRemoteText(hit.row.actor_role, 20)||null};
+    p.vitalsHistory=p.vitalsHistory||[];
+    if(!p.vitalsHistory.some(h=>h.t===hit.at && h.remote)) p.vitalsHistory.push({t:hit.at, pulse:v.pulse, spo2:v.spo2, rr:v.rr, avpu:v.avpu, bp_estimate:v.bp_estimate, remote:true});
+    changed=true;
+  });
+  if(changed){ saveDemoState(); refreshActiveScreenData(); }
+}
+const REMOTE_VITALS_ROLE_LABELS={medic:'חובש', paramedic:'פראמדיק', physician:'רופא', pc:'חוג״ד', admin:'מנהל מערכת'};
+function remoteVitalsSourceLine(p){
+  if(!p?.vitalsFrom) return '';
+  const role=REMOTE_VITALS_ROLE_LABELS[p.vitalsFrom.role]||'';
+  return `<div class="remote-vitals-source" style="font-size:11px;color:var(--muted);margin:-6px 0 10px">נמדד במכשיר אחר${role?` (${role})`:''} · ${escAttr(timeAgoLabel(p.vitalsFrom.at))}</div>`;
 }
 function remoteTreatmentsSection(p){
   const list=p?.remoteTreatments||[];

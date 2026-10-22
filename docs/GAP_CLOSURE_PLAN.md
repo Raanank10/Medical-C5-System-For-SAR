@@ -128,7 +128,7 @@ Order: WP-0 and WP-1 first (they make every later WP safer). Then WP-2 to WP-5, 
 3. Map client treatment names to `INTERVENTION_RECORDED` with `payload_json.intervention_type` (keep the local timeline names for display). Check `013`'s `INTERVENTION_RECORDED` branch for the payload keys it reads, and the `treatment_catalog` keys.
 4. Vitals modal treatments (`queueModalTreatmentEvents`, ~10231): confirm they reach the outbox as `INTERVENTION_RECORDED`.
 5. Remove the patient-less status events from `projectPatientStatus` (the server derives status itself in `project_patient_state()`), or attach the patient id once known.
-6. Pull side: decide with the owner whether other devices should show remote treatment and vitals values, or keep "מדדים אצל החובש" (V2.99.32). The minimum for this WP is that the data is on the server for command counts, AAR and analytics.
+6. Pull side: decide with the owner whether other devices should show remote treatment and vitals values, or keep "מדדים אצל החובש" (V2.99.32). Treatments shown since V2.99.41; vitals values since V2.99.54 (owner, 2026-10-22). The minimum for this WP is that the data is on the server for command counts, AAR and analytics.
 
 **Verify.** Update `browser_remote_patient_and_resupply_test.js` or add `browser_intake_sync_test.js`: two patients in a row on one device, each produces its own ordered events with the right `patient_id`. Live: WP-0 queries 2 and 3 before and after.
 
