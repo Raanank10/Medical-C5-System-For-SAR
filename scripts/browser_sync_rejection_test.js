@@ -13,7 +13,7 @@
 // The Supabase client and the sync-log endpoint are stubbed in the page; this proves client
 // behavior only, not the server side (verified separately against the live project).
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_sync_rejection_test.js
 const fs = require('fs');
 const path = require('path');

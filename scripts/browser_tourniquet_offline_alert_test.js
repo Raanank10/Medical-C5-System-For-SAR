@@ -7,7 +7,7 @@
 // 3. A remote tourniquet refreshed from the server keeps its alert level (no repeat).
 // 4. A handed-over patient's tourniquet does not alert.
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_tourniquet_offline_alert_test.js
 const fs = require('fs');
 const path = require('path');

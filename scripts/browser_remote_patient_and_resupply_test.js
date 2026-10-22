@@ -11,7 +11,7 @@
 // Runs in local demo mode and calls the page's own functions; no Supabase client is involved,
 // so this proves client behavior only, not the server side.
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_remote_patient_and_resupply_test.js
 const fs = require('fs');
 const path = require('path');

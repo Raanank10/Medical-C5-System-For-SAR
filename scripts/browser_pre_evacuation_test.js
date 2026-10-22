@@ -8,7 +8,7 @@
 //   kept in the event log and logged to conflict_log as PRE_EVACUATION_REPORT_LOCKED.
 // It proves client behavior only; database/050 itself must be exercised against real Postgres.
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_pre_evacuation_test.js
 const fs = require('fs');
 const path = require('path');

@@ -2,7 +2,7 @@
 // Movement screen, choosing a collapse building state adds the crush/trapped brief and
 // "+ קריסת מבנה" to the chosen type (explosion here), never twice for the missile type, and the
 // rescue chain's progressive-collapse status counts too. Local demo mode (not logged in).
-// Manual-only, not wired into CI. Run: npm install && node scripts/browser_collapse_brief_test.js
+// Runs in CI through scripts/run_tests.js (WP-13). Run: npm install && node scripts/browser_collapse_brief_test.js
 const path = require('path');
 const fs = require('fs');
 const { chromium } = require('playwright');

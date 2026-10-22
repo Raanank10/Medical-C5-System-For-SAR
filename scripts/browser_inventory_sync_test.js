@@ -13,7 +13,7 @@
 // truck's issue on an approved request reaching logistics.
 // It proves client behavior only; database/062 itself is exercised against real Postgres.
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_inventory_sync_test.js
 const fs = require('fs');
 const path = require('path');

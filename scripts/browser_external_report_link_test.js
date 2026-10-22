@@ -8,7 +8,7 @@
 //   action 'unlink'; external_patient_links embedded in the external_reports read.
 // It proves client behavior only; database/069 itself was verified against the live Postgres.
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_external_report_link_test.js
 const fs = require('fs');
 const path = require('path');

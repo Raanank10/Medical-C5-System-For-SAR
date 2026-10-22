@@ -9,7 +9,7 @@
 // - incident_site_authority RLS: every member of the incident reads it.
 // It proves client behavior only; database/060 itself is exercised against real Postgres.
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_rescue_site_authority_test.js
 const fs = require('fs');
 const path = require('path');

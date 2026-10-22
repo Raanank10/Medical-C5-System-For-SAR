@@ -13,7 +13,7 @@
 // - RLS (decision D3): pc/cc/chamal/physician/admin see every request, others only their own.
 // It proves client behavior only; database/052 itself must be exercised against real Postgres.
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_reinforcement_sync_test.js
 const fs = require('fs');
 const path = require('path');

@@ -7,7 +7,7 @@
 // Also checks the worker never caches a Supabase API call and that file:// does not register one.
 // The fake backend is the same harness as scripts/browser_rescue_site_authority_test.js.
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_offline_cold_start_test.js
 const fs = require('fs');
 const http = require('http');

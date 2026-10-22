@@ -30,7 +30,7 @@ node scripts/smoke_v2_992_decision_support.js
 for f in scripts/smoke_*.js; do node "$f" || echo "FAILED: $f"; done
 
 # Real-browser smoke test (Playwright, headless Chromium) — loads index.html and
-# checks it actually renders, not just that the HTML text contains expected strings. Manual-only, not wired into CI, requires `npm install` once.
+# checks it actually renders, not just that the HTML text contains expected strings. All of them run in CI (WP-13); locally `npm test` runs every browser, other and smoke test after `npm install` once.
 npm install
 npm run test:browser-smoke            # or: node scripts/browser_smoke_test.js
 node scripts/browser_incident_lifecycle_test.js   # logged-in incident picker/open flow (no drafts since D10) + close guard, stubbed Supabase client
@@ -74,7 +74,7 @@ python -m pytest                  # pytest suite for db.py/kpis.py/charts.py/rep
 python -c "from db import DB; from kpis import KPIEngine; from report import ReportGenerator; db=DB('rescue_demo_v1_1.db'); kpi=KPIEngine(db); ReportGenerator(kpi).save('aar_report_v1_1.html')"
 ```
 
-CI (`.github/workflows/validate.yml`) runs exactly two things on every PR and push to `main`: `python scripts/check_repo.py` and `node tests/domain-rules.test.js`. The smoke scripts under `scripts/smoke_*.js`, `scripts/browser_smoke_test.js` (Playwright), and the analytics package's `pytest` suite are not wired into CI — they're run manually (string-assertion smoke scripts and the Playwright smoke test against `index.html`; pytest requires the analytics venv/dependencies CI doesn't install).
+CI (`.github/workflows/validate.yml`) runs two jobs on every PR and push to `main`: `repo-check` (`python scripts/check_repo.py` and `node tests/domain-rules.test.js`, fast) and, since WP-13, `browser-and-smoke-tests` (`npm ci`, Playwright's Chromium, then `npm test` = `scripts/run_tests.js`: every `scripts/browser_*.js`, the other `scripts/test_*.js` and every `scripts/smoke_*.js`, one after the other, about 4 minutes). The analytics package's `pytest` suite is still not in CI (it needs the analytics venv/dependencies).
 
 `scripts/check_repo.py` enforces (stdlib only, no deps):
 - a fixed list of required paths exist (`REQUIRED_PATHS` in the script — update it when adding/renaming core docs, schema files, or archive folders)
@@ -151,5 +151,5 @@ This repo's actual product/API/data contracts live in `docs/`, not in code comme
 
 - Branch names: `feature/...`, `fix/...`, `docs/...`, `analytics/...` (short, descriptive).
 - UI strings are in Hebrew (RTL); the app is field-tested in Hebrew, so keep new UI copy consistent with existing terminology rather than introducing English strings.
-- No new production dependencies until there's a clear module boundary (per `docs/DEVELOPMENT.md`); the prototype and its core tests are meant to run with nothing beyond Python stdlib, Node stdlib (`node:assert/strict`), and a browser. The one deliberate, scoped exception is the root `package.json`'s Playwright dev dependency, used only by `scripts/browser_smoke_test.js` — it's manual-only, not wired into CI, and not required to open or use the prototype.
+- No new production dependencies until there's a clear module boundary (per `docs/DEVELOPMENT.md`); the prototype and its core tests are meant to run with nothing beyond Python stdlib, Node stdlib (`node:assert/strict`), and a browser. The one deliberate, scoped exception is the root `package.json`'s Playwright dev dependency, used only by the browser test scripts (`scripts/browser_*.js`) — dev-only, run in CI by the `browser-and-smoke-tests` job, and not required to open or use the prototype.
 - Preserve historical versions under `archive/` rather than deleting superseded docs/schema.

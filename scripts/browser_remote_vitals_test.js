@@ -4,7 +4,7 @@
 // the events read policy does (members and blanket command roles of the incident). It proves client
 // behavior only; the query is a plain events select, so the live RLS decides who sees what.
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_remote_vitals_test.js
 const fs = require('fs');
 const path = require('path');
