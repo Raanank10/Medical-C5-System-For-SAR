@@ -763,7 +763,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9950</div>
+      <div class="demo-kicker">Demo V2.9951</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -860,7 +860,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9950</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9951</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -870,7 +870,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9950</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9951</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2881,7 +2881,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.50';
+const APP_VERSION = '2.99.51';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3308,7 +3308,40 @@ function newUuid(){
   return `${h.slice(0,4).join('')}-${h.slice(4,6).join('')}-${h.slice(6,8).join('')}-${h.slice(8,10).join('')}-${h.slice(10,16).join('')}`;
 }
 // Human-readable display id (server's patients.visual_id). Distinct from the real UUID p.id.
-function nextVisualId(){ return 'P'+String(patients.length+1).padStart(3,'0'); }
+// The server keeps one patient per incident + visual_id, and two phones offline at once would
+// both make P004 from their own count, so signed in the id carries the initials of whoever
+// registers the patient (medic, paramedic or the first responder): P004-DK. Patient ids are Latin
+// letters and digits only (owner decision), so a Hebrew name's initials are transliterated
+// (דני כהן -> DK). If two people with the same initials still clash, sync-log renames the second
+// one and the pull brings the new id. Local demo (one device, no server) keeps the plain P004.
+const HEBREW_INITIAL_TO_LATIN={'א':'A','ב':'B','ג':'G','ד':'D','ה':'H','ו':'V','ז':'Z','ח':'H','ט':'T','י':'Y','כ':'K','ך':'K','ל':'L','מ':'M','ם':'M','נ':'N','ן':'N','ס':'S','ע':'A','פ':'P','ף':'P','צ':'Z','ץ':'Z','ק':'K','ר':'R','ש':'S','ת':'T'};
+function latinInitials(text){
+  const words=String(text||'').normalize('NFD').replace(/[̀-֑ͯ-ׇ'"״׳]/g,'')
+    .split(/[\s._\-]+/)
+    .map(w=>[...w].map(ch=>HEBREW_INITIAL_TO_LATIN[ch]||(/[A-Za-z]/.test(ch)?ch:'')).join(''))
+    .filter(Boolean);
+  return (words.length>=2 ? words[0][0]+words[1][0] : (words[0]||'').slice(0,2)).toUpperCase();
+}
+function registrantInitials(){
+  if(!currentUser) return '';
+  return latinInitials(_myDisplayName)
+    || latinInitials(String(currentUser.email||'').split('@')[0])
+    || String(getDeviceId()).replace(/[^A-Za-z0-9]/g,'').slice(-2).toUpperCase();
+}
+function maxVisualNumber(prefix){
+  let max=0;
+  patients.forEach(p=>{
+    const v=String(p.visualId||'');
+    const m=v.startsWith(prefix) ? /^(\d+)/.exec(v.slice(prefix.length)) : null;
+    if(m) max=Math.max(max, Number(m[1]));
+  });
+  return max;
+}
+function nextVisualId(){
+  const ini=registrantInitials();
+  if(!ini) return 'P'+String(patients.length+1).padStart(3,'0');
+  return 'P'+String(Math.max(patients.length, maxVisualNumber('P'))+1).padStart(3,'0')+'-'+ini;
+}
 function triageKey(value){ return TRIAGE_LABELS[value] ? value : 'pending'; }
 function triagePill(value){
   const key=triageKey(value);
@@ -7706,9 +7739,12 @@ function sweepCounts(list=sweepPatientsForCurrentZone()){
     unknownIdentity:list.filter(p=>p.identityStatus==='unknown').length
   };
 }
+// Counted from visualId: p.id is a UUID since the server sync, so counting ids that start with
+// TMP- always gave TMP-001 and the server kept only the first sweep casualty (2026-10-20).
 function createTmpCasualtyId(){
-  const n=patients.filter(p=>String(p.id).startsWith('TMP-')).length+1;
-  return `TMP-${String(n).padStart(3,'0')}`;
+  const n=maxVisualNumber('TMP-')+1;
+  const ini=registrantInitials();
+  return `TMP-${String(n).padStart(3,'0')}${ini?'-'+ini:''}`;
 }
 function suggestedSweepColor(m={}){
   return C5Rules.suggestedSweepColor(m);
@@ -13384,6 +13420,16 @@ async function syncPush(){
     let result;
     try{ result=await resp.json(); }catch(e){ continue; }
     [...(result.accepted||[]),...(result.duplicates||[])].forEach(x=>doneIds.add(x.local_event_id));
+    // Another patient in the incident already had this id, so the server created this one
+    // under a new id (sync-log): show it now rather than at the next pull.
+    (result.accepted||[]).filter(x=>x.patient_visual_id).forEach(x=>{
+      const p=patients.find(q=>q.id===entries.find(e=>e.local_event_id===x.local_event_id)?.patient_id);
+      if(!p || p.visualId===x.patient_visual_id) return;
+      const from=p.visualId;
+      p.visualId=x.patient_visual_id;
+      (p.events=p.events||[]).unshift({type:'REMOTE_STATE_APPLIED',time:nowT(),detail:`מספר הפצוע עודכן בשרת: ${from||'—'} ← ${x.patient_visual_id} (מספר זהה כבר היה באירוע)`,warn:true});
+      toast(`פצוע ${from} נרשם בשרת כ-${x.patient_visual_id}: המספר כבר היה בשימוש באירוע`);
+    });
     // Keep the server's reason with each rejected entry: a rejected patient create means command
     // can't see that casualty at all, so the patient card has to say so (V2.99.35).
     (result.rejected||[]).forEach(x=>{ rejectedIds.add(x.local_event_id); rejectedReasons.set(x.local_event_id, {code:x.error_code||null, message:x.message||null}); anyRejected=true; });
@@ -13609,6 +13655,14 @@ function applyProjectedPatientState(rows){
     const status=VALID_LOCAL_STATUS.has(row.current_status) ? row.current_status : null;
     const existing=patients.find(x=>x.id===row.id);
     if(existing){
+      // The server's visual_id wins: sync-log renames a patient whose id another patient in the
+      // incident already uses, and merge_incident() (database/067) renames clashes on merge.
+      if(row.visual_id && existing.visualId!==row.visual_id){
+        const from=existing.visualId;
+        existing.visualId=row.visual_id;
+        (existing.events=existing.events||[]).unshift({type:'REMOTE_STATE_APPLIED',time:nowT(),detail:`מספר הפצוע עודכן בשרת: ${from||'—'} ← ${row.visual_id} (מספר זהה כבר היה באירוע)`,warn:true});
+        changed=true;
+      }
       // Remote patients cached before V2.99.32 were created with VITALS_BASELINE; clear those
       // placeholder values unless this device has actually recorded vitals for the patient.
       if(existing.sourcedFromRemote && !(existing.vitalsHistory||[]).length && existing.vitals?.pulse===VITALS_BASELINE.pulse && existing.vitals?.rr===VITALS_BASELINE.rr){

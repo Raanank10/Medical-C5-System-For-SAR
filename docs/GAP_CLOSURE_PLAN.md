@@ -304,6 +304,26 @@ Add a CI job running `npm ci`, then every `scripts/browser_*.js` with the pre-in
 
 **Verify.** Before/after: every browser test, a live rolled-back push of each synced event type (no trigger references a moved table), `get_advisors`.
 
+### WP-17: Patients lost on a duplicate patient number (P0, found 2026-10-22)
+
+**Why.** In the phone test on 2026-10-20 (device `PHONE-SPSZ`), an MSTART sweep of 10 casualties stored 1 patient. The other 9 `QUICK_PATIENT_CREATED` events and their `PATIENT_LOCATION_UPDATED` sit in `sync_ingestion_errors` with `events_patient_id_fkey`.
+
+**Evidence.**
+- `createTmpCasualtyId()` counted patients whose `id` starts with `TMP-`. Patient ids are UUIDs since the server sync, so every sweep marker was `TMP-001`.
+- `patients` has `UNIQUE (incident_id, visual_id)`. `sync-log` took every unique violation (23505) for a retried push, so the second `TMP-001` was never created and its events failed the foreign key.
+- `nextVisualId()` was `patients.length+1` per phone, so two medics offline in one incident could both make `P004` and lose the second patient the same way.
+
+**Fix (V2.99.51).** Owner decision 2026-10-22: the id carries the initials of whoever registers the patient (medic, paramedic or first responder), in Latin letters and digits only (a Hebrew name is transliterated: `דני כהן` gives `DK`; fallback the email address, then the device id).
+1. Client: signed in, `P004-DK` and sweep markers `TMP-004-DK`, numbered from the highest `visualId` already on the phone; local demo keeps plain `P004` / `TMP-004`. The sweep counter reads `visualId`, not `id`.
+2. `sync-log`: on 23505, success only if this `patient_id` already exists. Otherwise create the patient as `<visual_id>-<last 4 of the device id>` (after a merge, of the duplicate incident's id, as before), log `patient_visual_id_renamed`, and return `patient_visual_id` on the accepted entry; after 5 failed names, reject with `PATIENT_CREATE_FAILED`.
+3. Client: shows the server's id at once from the push reply and on every pull (this also brings `merge_incident()` renames to the phone that created the patient, which did not happen before), with a timeline note.
+
+**Verify.** `scripts/browser_patient_number_test.js` (fails on the old client with `TMP-001,TMP-001,TMP-001`). Live, after deploying `sync-log`: one phone sweeps several casualties, and two accounts with the same initials each create a patient offline; all reach `patients`, none in `sync_ingestion_errors`.
+
+**Not done.** The 9 patients already lost on 2026-10-20 are still unresolved rows in `sync_ingestion_errors`; their phone can resend them from the patient card after this fix is live.
+
+---
+
 ## Tracks outside this plan's PRs
 
 These need a decision, people or money rather than a code change in this repo. Listed so nothing is lost:
@@ -342,6 +362,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-14 Duplicate HTML, doc drift | P3 | Done (2026-10-20) | | D5: `demo/rescue-app.html` removed. Visible labels were stuck at V2.9934 since V2.99.34; fixed to match `APP_VERSION` and `check_repo.py` now checks them against `APP_VERSION`. Smoke scripts refreshed: no version pins (`scripts/lib/smoke_version.js`), stale assertions updated to the commits that changed the behaviour; all 34 pass. Docs: CLAUDE.md, README, DEVELOPMENT, ARCHITECTURE, PHASE_4_PLAN, ROADMAP, THREAT_MODEL, PRODUCTION_READINESS, FIELD_EXPERIMENT_GAPS |
 | WP-16 Close ends access + stored AAR | P2 | Not started (D9 decided 2026-10-22) | | |
 | WP-15 Unused server tables | P3 | Not started (added 2026-10-21 at the owner's request) | | 8 unused tables to an `archive` schema (`aar_reports` stays, WP-16), stop the never-read `realtime_outbox` writes; nothing dropped |
+| WP-17 Lost patients on a duplicate number | P0 | Client done (V2.99.51); `sync-log` deployed live as v13 on 2026-10-22 = the live v12 (D9, `database/068`, branch `ccr-ac5f2da7-4m38kr`, not yet in `main`) plus WP-17. Whoever deploys `sync-log` next must start from a file that has both; live two-phone check pending | this PR | found by the 2026-10-22 feature-map audit from live `sync_ingestion_errors`; ids carry the registrant's initials (owner decision); the server renames a clash instead of dropping the patient |
 
 ## Revisions after #73 (2026-10-19)
 
