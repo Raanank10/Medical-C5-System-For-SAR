@@ -788,7 +788,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9954</div>
+      <div class="demo-kicker">Demo V2.9955</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -885,7 +885,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9954</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9955</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -895,7 +895,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9954</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9955</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2906,7 +2906,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.54';
+const APP_VERSION = '2.99.55';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -12180,8 +12180,9 @@ function renderCommandOperationalPanels(pts, site){
     if(!errors.length && !flags.length && !conflicts.length){
       quarantineEl.innerHTML=`<div class="cmd-matrix-row"><div class="cmd-matrix-sub">${currentUser?'אין אירועים חסומים, סיכון גבוה או ניגודי עדכון פעילים':'זמין רק במצב מחובר (לא בדמו מקומי)'}</div></div>`;
     } else {
-      const errorRows=errors.map(e=>`<div class="cmd-matrix-row critical">
-        <div><div class="cmd-matrix-title">חסום · ${e.error_code}</div><div class="cmd-matrix-sub">${e.error_message} · מכשיר ${e.device_id||'—'} · ${e.dependency_status||''} · ${timeAgoLabel(Date.parse(e.created_at)||0)}</div></div>
+      const errorRows=errors.map(e=>`<div class="cmd-matrix-row critical sync-rejection-row" data-rejection-id="${escAttr(e.id)}">
+        <div style="flex:1"><div class="cmd-matrix-title">חסום · ${escAttr(e.error_code)}${e.event_type?' · '+escAttr(e.event_type):''}</div><div class="cmd-matrix-sub">${escAttr(e.error_message)} · מכשיר ${escAttr(e.device_id||'—')}${e.dependency_status?' · '+escAttr(e.dependency_status):''} · ${timeAgoLabel(Date.parse(e.created_at)||0)}</div></div>
+        <button class="btn-secondary" style="width:auto;padding:6px 10px;flex:none" onclick="openSyncRejectionResolve('${escAttr(e.id)}','${escAttr(incId)}')">סגור</button>
       </div>`).join('');
       const flagRows=flags.map(f=>`<div class="cmd-matrix-row ${f.severity==='critical'?'critical':''}">
         <div><div class="cmd-matrix-title">סיכון גבוה · ${f.code}</div><div class="cmd-matrix-sub">${f.message} · חומרה: ${f.severity} · ${timeAgoLabel(f._ts||0)}</div></div>
@@ -14939,7 +14940,7 @@ async function pullSyncIngestionErrors(incidentId){
   let result;
   try{
     result=await client.from('sync_ingestion_errors')
-      .select('id,incident_id,device_id,local_event_id,error_code,error_message,dependency_status,created_at')
+      .select('id,incident_id,device_id,local_event_id,error_code,error_message,dependency_status,created_at,event_type:raw_payload->>type')
       .eq('incident_id', incidentId)
       .is('resolved_at', null)
       .order('created_at', {ascending:false})
@@ -14947,6 +14948,66 @@ async function pullSyncIngestionErrors(incidentId){
   }catch(e){ return; }
   if(result.error || !result.data) return;
   _syncIngestionErrors[incidentId]=result.data;
+}
+// Closing a sync rejection (database/071, gap N7). A rejection also closes by itself when the
+// phone resends the same record and the server accepts it. Closing by hand needs a reason (a note
+// for "not recoverable" and "other"); the nightly privacy job then deletes the stored copy of the
+// rejected record, so the sheet says so first. pc, cc, chamal, physician and admin.
+const SYNC_REJECTION_REASONS=[
+  ['resent','נשלח מחדש בדרך אחרת'], ['duplicate','כבר קיים בשרת (כפילות)'], ['test_data','נתוני בדיקה / תרגול'],
+  ['not_recoverable','לא ניתן לשחזר'], ['other','אחר']
+];
+let syncRejectionResolveState={id:null, incidentId:null, reason:null};
+function openSyncRejectionResolve(id, incidentId){
+  const row=(_syncIngestionErrors[incidentId]||[]).find(e=>e.id===id); if(!row) return;
+  syncRejectionResolveState={id, incidentId, reason:null};
+  let modal=document.getElementById('sync-rejection-modal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='sync-rejection-modal';
+    modal.className='modal-overlay hidden';
+    modal.onclick=function(event){ if(event.target===this) closeSyncRejectionResolve(); };
+    document.body.appendChild(modal);
+  }
+  renderSyncRejectionResolve();
+  modal.classList.remove('hidden');
+}
+function renderSyncRejectionResolve(){
+  const modal=document.getElementById('sync-rejection-modal'); if(!modal) return;
+  const {id, incidentId, reason}=syncRejectionResolveState;
+  const row=(_syncIngestionErrors[incidentId]||[]).find(e=>e.id===id); if(!row) return;
+  const noteNeeded=reason==='not_recoverable'||reason==='other';
+  const note=document.getElementById('sync-rejection-note')?.value||'';
+  modal.innerHTML=`<div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">סגירת אירוע חסום · ${escAttr(row.error_code)}</div>
+    <div style="font-size:12px;color:var(--muted);margin:6px 0 10px;line-height:1.5">${escAttr(row.event_type||'')} · מכשיר ${escAttr(row.device_id||'—')} · ${escAttr(row.error_message||'')}</div>
+    <div style="font-size:12px;color:var(--orange);font-weight:700;margin-bottom:10px">אם המכשיר ישלח את הרשומה שוב והיא תתקבל, האירוע ייסגר לבד. לאחר סגירה ידנית, העותק השמור של הרשומה יימחק מהשרת בלילה (כלל פרטיות).</div>
+    <div class="field-label">סיבה</div>
+    <div class="chip-row" id="sync-rejection-reasons">${SYNC_REJECTION_REASONS.map(([k,l])=>`<button class="chip${reason===k?' selected':''}" data-reason="${k}" onclick="selectSyncRejectionReason('${k}')">${l}</button>`).join('')}</div>
+    <div class="field-label" style="margin-top:10px">הערה${noteNeeded?' (חובה)':''}</div>
+    <input type="text" id="sync-rejection-note" maxlength="300" value="${escAttr(note)}" placeholder="מה קרה לרשומה">
+    <button class="btn-primary" id="sync-rejection-confirm" style="margin-top:14px" onclick="confirmSyncRejectionResolve()">סגור אירוע</button>
+    <button class="btn-secondary" style="margin-top:8px" onclick="closeSyncRejectionResolve()">ביטול</button>
+  </div>`;
+}
+function selectSyncRejectionReason(k){ syncRejectionResolveState.reason=k; renderSyncRejectionResolve(); }
+function closeSyncRejectionResolve(){ document.getElementById('sync-rejection-modal')?.classList.add('hidden'); }
+async function confirmSyncRejectionResolve(){
+  const {id, incidentId, reason}=syncRejectionResolveState;
+  const note=(document.getElementById('sync-rejection-note')?.value||'').trim();
+  if(!reason){ toast('בחר סיבה'); return; }
+  if((reason==='not_recoverable'||reason==='other') && !note){ toast('נדרשת הערה'); return; }
+  const client=getSupabaseClient();
+  if(!client){ toast('סגירה דורשת חיבור לשרת'); return; }
+  let res;
+  try{ res=await client.rpc('resolve_sync_ingestion_error', {p_id:id, p_reason:reason, p_note:note||null}); }
+  catch(e){ toast('אין חיבור לשרת — נסה שוב'); return; }
+  if(res?.error){ toast('הסגירה נדחתה בשרת'); return; }
+  _syncIngestionErrors[incidentId]=(_syncIngestionErrors[incidentId]||[]).filter(e=>e.id!==id);
+  closeSyncRejectionResolve();
+  refreshActiveScreenData();
+  toast('האירוע החסום נסגר');
 }
 async function pullSyncIngestionErrorsAll(){
   await Promise.all(Object.values(SITE_TO_INCIDENT_ID).map(id=>pullSyncIngestionErrors(id)));

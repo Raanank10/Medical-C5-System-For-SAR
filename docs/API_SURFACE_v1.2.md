@@ -650,6 +650,8 @@ The sync endpoint processes events individually, but not blindly. Events may dec
 
 If a parent event is malformed, dependent child events are stored in `sync_ingestion_errors` with `dependency_status = blocked_dependency`. They are not inserted into the clinical event log as orphans.
 
+Closing a rejection (`database/071`, V2.99.55). A rejection closes by itself when an event with the same `device_id` + `local_event_id` is later accepted (the phone resent it): `resolved_at` is set and `reconciled_event_id` names the accepted event. Command closes one by hand with `resolve_sync_ingestion_error(p_id, p_reason, p_note)`: reasons `resent`, `duplicate`, `test_data`, `not_recoverable`, `other` (the last two need a note); roles pc, cc, chamal, physician and admin who can still read the incident's patients (a rejection with no incident: admin only); an already closed one is returned with `changed: false`. The row keeps who closed it, when and why (`resolved_by`, `reviewed_by`, `reviewed_at`, `resolution_notes`). Clients still cannot write the table directly.
+
 ## Data Freshness in Pull Response
 
 `GET /sync/log` returns:
