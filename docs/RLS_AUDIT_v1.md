@@ -406,6 +406,8 @@ Verified live 2026-10-22 in a rolled-back block (a medic opens an incident with 
 | cc reopens; medic reads the patient | 1 |
 | second close | 2 versions, newest first after `068c` |
 
+`get_advisors` (security) after applying: `get_incident_aar_reports()` appears only under the usual `authenticated_security_definer_function_executable` notice, like every other lifecycle RPC; the `app.*` helpers are not in an exposed schema.
+
 ## Explicitly not re-litigated here
 
 - T6 (leaked-password protection) and T5 (service-role key handling) — out of scope, not RLS/authorization, already tracked in `docs/THREAT_MODEL.md`.
