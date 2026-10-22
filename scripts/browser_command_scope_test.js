@@ -21,6 +21,9 @@ async function checkFile(browser, file) {
   const rel = path.relative(root, file);
   const context = await browser.newContext({ viewport: { width: 420, height: 900 } });
   const page = await context.newPage();
+  // No backend in this test: serve an empty supabase-js instead of waiting on the CDN, which
+  // otherwise holds DOMContentLoaded (a slow jsDelivr response timed page.goto out in CI).
+  await page.route('**/supabase-js@*/**', (r) => r.fulfill({ contentType: 'application/javascript', body: '' }));
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('dialog', (d) => d.accept());
