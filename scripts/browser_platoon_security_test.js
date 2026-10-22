@@ -114,7 +114,8 @@ function handle(server, req) {
     if (req.name === 'set_profile_unit') {
       if (!UNIT_MANAGERS.includes(u.role)) return denied('only company-level command');
       const target = userById(p.p_profile_id);
-      if (target.role === 'rpc' ? !!p.p_company_id : !!p.p_platoon_id) return { data: null, error: { code: '22023', message: 'wrong unit for role' } };
+      const platoonRole = ['rpc', 'medic', 'paramedic'].includes(target.role);
+      if ((p.p_company_id && p.p_platoon_id) || (target.role === 'rpc' && p.p_company_id) || (!platoonRole && p.p_platoon_id)) return { data: null, error: { code: '22023', message: 'wrong unit for role' } };
       server.units[p.p_profile_id] = { company_id: p.p_company_id, platoon_id: p.p_platoon_id };
       return { data: { profile_id: p.p_profile_id }, error: null };
     }
@@ -148,7 +149,7 @@ function handle(server, req) {
       const target = userById(r.profile_id);
       const pcOk = u.role === 'pc' && r.profile_id !== u.id && ['medic', 'paramedic'].includes(target?.role)
         && !!myCompany && (member(r.incident_id) || server.incidents.find((i) => i.id === r.incident_id)?.company_id === myCompany)
-        && unit(r.profile_id).company_id === myCompany;
+        && companyOf(r.profile_id) === myCompany;
       if (!UNIT_MANAGERS.includes(u.role) && !pcOk) return denied('new row violates row-level security policy');
       const ex = server.members.find((m) => m.incident_id === r.incident_id && m.profile_id === r.profile_id);
       if (ex) Object.assign(ex, r); else server.members.push({ created_at: new Date().toISOString(), ...r });
@@ -292,9 +293,10 @@ async function checkFile(browser, file) {
   const A2 = SERVER.platoons.find((p) => p.name === 'A2' && p.company_id === CA)?.id;
   assert(!!A2, `${rel}: CC must be able to create a platoon in company A`);
   await cc.page.waitForSelector(`[data-roster-member="${M2}"]`, { timeout: 5000 });
-  await cc.page.selectOption(`[data-roster-member="${M2}"]`, CA);
+  // database/065: a medic is attached to a מ"מ's platoon (here A2); its company follows.
+  await cc.page.selectOption(`[data-roster-member="${M2}"]`, `p:${A2}`);
   await cc.page.waitForTimeout(300);
-  assert(SERVER.units[M2].company_id === CA && !SERVER.units[M2].platoon_id, `${rel}: CC must place a medic in a company`);
+  assert(SERVER.units[M2].platoon_id === A2 && !SERVER.units[M2].company_id, `${rel}: CC must attach a medic to a platoon`);
   await cc.page.selectOption(`[data-roster-member="${RPC1}"]`, A2);
   await cc.page.waitForTimeout(300);
   assert(SERVER.units[RPC1].platoon_id === A2 && !SERVER.units[RPC1].company_id, `${rel}: CC must place a מ"מ in a platoon`);
@@ -317,9 +319,13 @@ async function checkFile(browser, file) {
   await pc1.page.evaluate((id) => enterIncidentFromPicker(id), INC1);
   await pc1.page.waitForTimeout(300);
   const pc1Options = await pc1.page.evaluate(async () => { await loadRealMedicProfiles(); return _realMedicProfiles.map((p) => p.id); });
-  assert(pc1Options.length === 2 && pc1Options.includes(M1) && pc1Options.includes(M2), `${rel}: PC1 must be offered exactly its company's medics (got ${JSON.stringify(pc1Options)})`);
+  assert(pc1Options.length === 2 && pc1Options.includes(M1) && pc1Options.includes(M2), `${rel}: PC1 must be offered exactly the medics under its guidance (got ${JSON.stringify(pc1Options)})`);
+  // M2 is attached to platoon A2; INC1 is A1's site. The PC may still send it there.
   await pc1.page.evaluate((id) => assignRealMedic(id, '', ''), M2);
-  assert(SERVER.members.some((m) => m.incident_id === INC1 && m.profile_id === M2 && m.assigned_by === PC1), `${rel}: PC1 must assign its own company's medic`);
+  assert(SERVER.members.some((m) => m.incident_id === INC1 && m.profile_id === M2 && m.assigned_by === PC1), `${rel}: PC1 must assign an A2 medic to an A1 site`);
+  // PC2 (company B) is offered none of company A's medics.
+  const pc2Options = await pc2.page.evaluate(async () => { await loadRealMedicProfiles(); return _realMedicProfiles.map((p) => p.id); });
+  assert(!pc2Options.includes(M1) && !pc2Options.includes(M2), `${rel}: PC2 must not be offered company A's medics (got ${JSON.stringify(pc2Options)})`);
   assert(!(await pc1.page.evaluate(() => canManagePlatoonRoster())), `${rel}: a PC must not be offered the roster panel`);
   await pc1.page.evaluate(() => startRoleDashboard('pc'));
   assert(await pc1.page.locator('#platoon-roster-panel').count() === 0, `${rel}: no roster panel on the PC dashboard`);

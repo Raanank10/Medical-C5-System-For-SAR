@@ -309,6 +309,27 @@ New table `incident_site_authority` (one row per incident), RLS enabled, one pol
 
 `inventory_ledger` (v1.1) renamed `inventory_ledger_v11_archived`; its two policies follow it, and insert/update/delete are revoked from `anon` and `authenticated`. `inventory_ledger_v12`: `inventory_ledger_v12_write` (insert) altered to `with check (false)`, since `project_inventory_movement()` (new `SECURITY DEFINER` trigger, execute revoked) is now the only writer; `inventory_ledger_v12_read` unchanged. `trg_process_logistics_event_safety_v12()` made `SECURITY DEFINER` with a fixed `search_path` and execute revoked. Verified 2026-10-21 in a rolled-back block with real medic, PC, logistics, RPC and non-member medic profiles: 6 of 13 movements projected (an unknown item, a non-numeric quantity, an unknown movement, a medic writing to a truck, logistics or RPC writing to a medic bag were refused; all 13 events kept); a client-side patient id dropped safely; one negative-stock alert; a member reads the rows, a non-member reads none; direct inserts into either table denied. `get_advisors` (security): nothing new.
 
+## Follow-up: medics attached to platoons (`database/065`)
+
+Owner, 2026-10-22: every medic is attached to a מ״מ and takes medical guidance from the company's חוג״ד; the חוג״ד may assign only the medics under its guidance, to any site of its company or any site it belongs to. A medic still reaches only sites it opened or was assigned to. `065` replaces `app.guard_profile_unit()`, `set_profile_unit()` and `app.pc_may_manage_membership()` (live bodies checked unchanged since `053` first). It leaves `open_incident()` as redefined live by `064` (D10), which already gives a medic's site the medic's platoon.
+
+**Verified before applying** with `scripts/rls_test_065_medics_in_platoons.sql` on the local PostgreSQL 16 copy (`053` test still passes on top; `065` re-applies cleanly):
+
+| Check | Result |
+| --- | --- |
+| medic placed in a platoon; paramedic in the ambulance company | both work |
+| platoon and company together; pc or rcc in a platoon | refused |
+| pc (company A) reads a medic attached to A1 / to B1 | 1 / 0 |
+| pc assigns an A1 medic to a site of platoon A2 (real `incident_memberships` insert) | allowed |
+| pc assigns a B1 medic | refused |
+| pc changes the roster | refused |
+| B1 medic sees the A2 site | 0 |
+| cc places a medic in A2; platoon and company together; pc in a platoon | ok; refused; refused |
+| role change: A2 medic -> pc / A1 medic -> rpc / paramedic -> logistics | keeps company A / keeps A1 / clears unit |
+| `unit_audit` rows for these changes | 6 |
+
+**Not applied live yet.** After applying: run `scripts/rls_test_065_medics_in_platoons.sql` once in the SQL editor and `get_advisors` (security).
+
 ## Explicitly not re-litigated here
 
 - T6 (leaked-password protection) and T5 (service-role key handling) — out of scope, not RLS/authorization, already tracked in `docs/THREAT_MODEL.md`.

@@ -755,7 +755,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9947</div>
+      <div class="demo-kicker">Demo V2.9948</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -852,7 +852,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9947</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9948</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -862,7 +862,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9947</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9948</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2873,7 +2873,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.47';
+const APP_VERSION = '2.99.48';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3124,9 +3124,13 @@ function commandPlatoons(){
   if(patients.some(p=>patientPlatoonId(p)===NO_PLATOON_ID)) list.push({platoonId:NO_PLATOON_ID, name:'ללא שיוך', companyId:'COMP-1', real:true});
   return list;
 }
-// People of one unit: a company's pc / rcc / medics, or a platoon's rpc.
+// A person's company: set directly, or through their platoon (an rpc, or a medic attached to a
+// מ״מ, database/065).
+function memberCompanyId(m){ return m.company_id || _realPlatoons.find(p=>p.id===m.platoon_id)?.company_id || null; }
+// People of one unit: everyone of a company (including those attached to its platoons), or a
+// platoon's rpc and attached medics.
 function platoonMembers(unitId, roles){
-  return _realPlatoonMembers.filter(m=>(m.company_id===unitId || m.platoon_id===unitId) && (!roles || roles.includes(m.role)));
+  return _realPlatoonMembers.filter(m=>(memberCompanyId(m)===unitId || m.platoon_id===unitId) && (!roles || roles.includes(m.role)));
 }
 function platoonCommanderLabel(pl){
   if(!pl.real) return displayUser(pl.pcId);
@@ -6969,15 +6973,22 @@ async function loadPlatoonRoster(){
   const names=list=>list.map(m=>escAttr(m.display_name||'ללא שם')).join(', ')||'—';
   const structure=companies.map(c=>{
     const ppl=platoonMembers(c.id);
-    const pls=platoons.filter(p=>p.company_id===c.id).map(p=>`${escAttr(p.name)} (מ״מ: ${names(platoonMembers(p.id,['rpc']))})`).join(' · ');
+    const pls=platoons.filter(p=>p.company_id===c.id).map(p=>`${escAttr(p.name)} (מ״מ: ${names(platoonMembers(p.id,['rpc']))} · ${platoonMembers(p.id,['medic','paramedic']).length} חובשים)`).join(' · ');
     return `<div style="padding:4px 0"><b style="color:var(--text)">${escAttr(c.name)}</b> · ${COMPANY_KIND_LABELS[c.kind]||c.kind}<br>`
       +(c.kind==='rescue'?`מ״פ חילוץ: ${names(ppl.filter(m=>m.role==='rcc'))} · `:'')
       +`חוג״ד: ${names(ppl.filter(m=>m.role==='pc'))} · ${ppl.filter(m=>['medic','paramedic','physician'].includes(m.role)).length} אנשי רפואה`
       +(pls?`<br>מחלקות: ${pls}`:'')+`</div>`;
   }).join('');
+  // A medic or paramedic is attached to a מ״מ's platoon, or placed directly in a company (the
+  // ambulance team has no platoons). database/065.
+  const medicOptions=m=>opt('','— ללא שיבוץ —',!m.platoon_id&&!m.company_id)
+    +platoons.map(p=>opt(`p:${p.id}`,`${realCompanyName(p.company_id)} · ${p.name}`,p.id===m.platoon_id)).join('')
+    +companies.map(c=>opt(`c:${c.id}`,`${c.name} (ללא מחלקה)`,c.id===m.company_id)).join('');
   const memberRows=_realPlatoonMembers.map(m=>row(`${escAttr(m.display_name||'ללא שם')} (${UNIT_MEMBER_ROLE_LABELS[m.role]||m.role})`,
     m.role==='rpc'
       ? `<select data-roster-member="${escAttr(m.id)}" onchange="setProfileUnit('${escAttr(m.id)}','rpc',this.value)" style="max-width:55%">${platoonOptions(m.platoon_id)}</select>`
+      : ['medic','paramedic'].includes(m.role)
+      ? `<select data-roster-member="${escAttr(m.id)}" onchange="setProfileUnit('${escAttr(m.id)}','${escAttr(m.role)}',this.value)" style="max-width:55%">${medicOptions(m)}</select>`
       : `<select data-roster-member="${escAttr(m.id)}" onchange="setProfileUnit('${escAttr(m.id)}','${escAttr(m.role)}',this.value)" style="max-width:55%">${companyOptions(m.company_id, m.role==='rcc'?['rescue']:null)}</select>`
   )).join('');
   target.innerHTML=`
@@ -7018,9 +7029,11 @@ async function createPlatoonFromPanel(){
   if(!name){ toast('הזן/י שם מחלקה'); return; }
   await platoonRpc('create_platoon', {p_company_id:companyId, p_name:name}, `מחלקה "${name}" נוספה`);
 }
-// A מ״מ is placed in a platoon; everyone else in a company.
+// A מ״מ is placed in a platoon; a medic / paramedic in a platoon or a company ('p:' / 'c:' value,
+// database/065); everyone else in a company.
 async function setProfileUnit(profileId, role, unitId){
   const args=role==='rpc' ? {p_profile_id:profileId, p_company_id:null, p_platoon_id:unitId||null}
+    : ['medic','paramedic'].includes(role) ? {p_profile_id:profileId, p_company_id:unitId?.startsWith('c:')?unitId.slice(2):null, p_platoon_id:unitId?.startsWith('p:')?unitId.slice(2):null}
     : {p_profile_id:profileId, p_company_id:unitId||null, p_platoon_id:null};
   await platoonRpc('set_profile_unit', args, unitId?'השיבוץ נשמר':'הוסר מהשיבוץ');
 }
