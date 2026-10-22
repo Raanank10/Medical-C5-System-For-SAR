@@ -7,7 +7,7 @@ These guidelines capture the design intent for C5 Sentinel-SAR as a development 
 - Use high contrast for every operationally important state.
 - Keep touch targets large enough for stress, movement, rain, dust, and gloves.
 - Prefer steppers, toggles, and large tap choices over free typing.
-- Keep critical controls at least 56px by 56px.
+- Keep critical controls at least 56px by 56px. Since V2.99.56 (owner, 2026-10-22) the main field buttons (tap choices, primary and secondary actions, vitals steppers, AVPU, blood pressure) are 60-64px tall, every other field control is at least 56px, and small toggles, filters and links at least 44px; the body-map injury hotspots are about 49x44px.
 - Show the current clinical clock when time changes the risk.
 - Never communicate triage by color alone; pair color with text.
 - Treat stale data, missing data, and pending triage as first-class states.

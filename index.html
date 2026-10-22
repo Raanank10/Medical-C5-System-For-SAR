@@ -606,6 +606,36 @@ textarea{resize:vertical;min-height:70px;}
 .close-guard-list{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;max-height:40dvh;overflow-y:auto;}
 .close-guard-row{display:flex;justify-content:space-between;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;}
 #incident-open-form select{width:100%;padding:13px;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--text);font-size:15px;margin-bottom:10px;direction:rtl;}
+/* Field touch targets (owner 2026-10-22: "make all the buttons a bit bigger in the field").
+   docs/TACTICAL_UI_GUIDELINES.md asks for at least 56px on critical controls for stress, movement,
+   rain and gloves. The main field buttons go one step above that (64px) and every control that
+   was below it is raised to it. Later in the cascade than the base rules on purpose. */
+.tap-btn{min-height:64px;padding:18px 12px;font-size:15px;}
+.chip{min-height:60px;padding:12px 18px;font-size:15px;}
+.btn-primary{min-height:64px;padding:19px;font-size:18px;}
+.btn-secondary{min-height:60px;padding:17px;font-size:17px;}
+.vital-btn{width:64px;height:64px;}
+.avpu-btn{padding:18px 4px;}
+.bp-btn{padding:16px 8px;min-height:64px;}
+.limb-btn{padding:16px 12px;min-height:56px;}
+.action-btn{min-height:64px;}
+.demo-mini-btn{min-height:56px;font-size:14px;padding:12px 10px;}
+.count-timer button{min-height:56px;font-size:14px;}
+.field-mode-toggle{min-height:48px;padding:13px 16px;font-size:13px;}
+.home-btn{height:52px;min-width:64px;font-size:14px;}
+/* The fixed "ראשי" button sits over the header's left edge; leave it room so the clock and the
+   header's own close button are not hidden under it (they were partly hidden before). */
+.header{padding-left:88px;}
+.alert-slice{min-height:44px;padding:11px 14px;font-size:13px;}
+.briefing-trigger{min-height:44px;padding:10px 14px;font-size:13px;}
+.icon-close-btn{width:48px!important;height:48px!important;}
+.inline-link-btn{min-height:44px;padding:10px 12px!important;}
+/* Body map: the hotspots are the only way to mark an injury zone. The whole figure is scaled, so
+   every zone keeps its place and none overlap; hotspots grow from 34x28 to about 49x44. */
+.body-map-wrap{grid-template-columns:186px 1fr;}
+.body-map{zoom:1.45;}
+.body-hotspot{height:31px;}
+.toggle-pill-btn{min-height:44px;padding:10px 16px!important;}
 </style>
 </head>
 <body>
@@ -788,7 +818,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9955</div>
+      <div class="demo-kicker">Demo V2.9956</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -885,17 +915,17 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9955</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9956</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <div class="header-time" id="role-clock">--:--</div>
-      <button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goHome()">✕</button>
+      <button class="icon-close-btn" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goHome()">✕</button>
     </div>
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9955</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9956</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -1118,7 +1148,7 @@ textarea{resize:vertical;min-height:70px;}
   <div class="site-section">
     <div class="site-section-header">
       <span>דיווחים חיצוניים</span>
-      <button onclick="prepareExternalReport();goTo('add-report')" style="background:none;border:none;color:var(--accent);font-size:13px;font-weight:700;cursor:pointer">+ הוסף</button>
+      <button class="inline-link-btn" onclick="prepareExternalReport();goTo('add-report')" style="background:none;border:none;color:var(--accent);font-size:13px;font-weight:700;cursor:pointer">+ הוסף</button>
     </div>
     <div class="site-section-body" id="ext-reports-list"><div style="color:var(--muted);font-size:13px;text-align:center;padding:8px 0">אין דיווחים עדיין</div></div>
   </div>
@@ -1497,7 +1527,7 @@ textarea{resize:vertical;min-height:70px;}
     <div class="vital-row column">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div><div class="vital-label">סטורציה SpO₂</div><div class="vital-unit">אופציונלי — אם יש מד</div></div>
-        <button id="spo2-toggle-btn" onclick="toggleSpo2()" style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:6px 14px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer">+ הוסף</button>
+        <button id="spo2-toggle-btn" class="toggle-pill-btn" onclick="toggleSpo2()" style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:6px 14px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer">+ הוסף</button>
       </div>
       <div id="spo2-input-wrap" style="display:none">
         <div class="vital-ctrl" style="justify-content:center">
@@ -2068,7 +2098,7 @@ textarea{resize:vertical;min-height:70px;}
         <span>📖</span><span>תדריך תפקיד</span><span class="briefing-badge" id="cmd-briefing-badge" style="display:none">0</span>
       </button>
       <div class="header-time" id="cmd-clock">--:--</div>
-      <button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goTo('dashboard')">✕</button>
+      <button class="icon-close-btn" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goTo('dashboard')">✕</button>
     </div>
   </div>
   <div class="demo-strip">
@@ -2143,7 +2173,7 @@ textarea{resize:vertical;min-height:70px;}
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <div class="header-time" id="log-clock">--:--</div>
-      <button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goTo('dashboard')">✕</button>
+      <button class="icon-close-btn" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goTo('dashboard')">✕</button>
     </div>
   </div>
   <div class="demo-strip">
@@ -2176,7 +2206,7 @@ textarea{resize:vertical;min-height:70px;}
       <div class="header-title">קיטים מוגדרים מראש</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
-      <button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goTo('dashboard')">✕</button>
+      <button class="icon-close-btn" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goTo('dashboard')">✕</button>
     </div>
   </div>
   <div class="demo-strip">
@@ -2201,7 +2231,7 @@ textarea{resize:vertical;min-height:70px;}
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <div class="header-time" id="role-clock">--:--</div>
-      <button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goTo('dashboard')">✕</button>
+      <button class="icon-close-btn" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goTo('dashboard')">✕</button>
     </div>
   </div>
   <div class="demo-strip">
@@ -2229,7 +2259,7 @@ textarea{resize:vertical;min-height:70px;}
       <div class="header-subtitle">LIVE INCIDENT SUMMARY</div>
       <div class="header-title">סיכום אירוע חי</div>
     </div>
-    <button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goTo('commander')">✕</button>
+    <button class="icon-close-btn" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" onclick="goTo('commander')">✕</button>
   </div>
   <div class="demo-strip">
     <div>
@@ -2287,7 +2317,7 @@ textarea{resize:vertical;min-height:70px;}
     <!-- SpO2 -->
     <div class="vital-row row" style="margin-bottom:9px">
       <div><div class="vital-label">סטורציה</div><div class="vital-unit">SpO₂ %</div></div>
-      <button id="modal-spo2-toggle" onclick="toggleModalSpo2()" style="background:var(--surface2);border:1px solid var(--border);color:var(--accent);border-radius:10px;padding:10px 12px;font-size:12px;font-weight:800;cursor:pointer">+ הוסף</button>
+      <button id="modal-spo2-toggle" class="toggle-pill-btn" onclick="toggleModalSpo2()" style="background:var(--surface2);border:1px solid var(--border);color:var(--accent);border-radius:10px;padding:10px 12px;font-size:12px;font-weight:800;cursor:pointer">+ הוסף</button>
       <div class="vital-ctrl" id="modal-spo2-ctrl" style="display:none">
         <button class="vital-btn" onmousedown="startHold('mspo2',-1)" onmouseup="stopHold()" ontouchstart="startHold('mspo2',-1)" ontouchend="stopHold()" onclick="changeVital('mspo2',-1)">−</button>
         <div class="vital-val" id="mv-spo2">98</div>
@@ -2906,7 +2936,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.55';
+const APP_VERSION = '2.99.56';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
