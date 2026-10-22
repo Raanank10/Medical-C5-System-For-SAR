@@ -186,9 +186,12 @@ for event in events:
       "message": "Role-authority override on current_triage: physician edit (red) overrides medic edit (yellow)"
     }
   ],
-  "next_pull_cursor": 1843
+  "next_pull_cursor": 1843,
+  "redirected_to": null
 }
 ```
+
+`redirected_to` (sync-log v11, `database/066`): when the pushed `incident_id` was merged into another incident (closed with `metadata.merged_into`), the events are stored in that incident instead (following up to 5 merges) and `redirected_to` is its id; the client then switches to it. A patient created by such a late push whose temporary id the target already uses is created under the same renamed id rule as `merge_incident()`.
 
 Clinical events should almost never be rejected. Bad-but-important clinical data is accepted and flagged.
 Only malformed/unparseable envelopes are rejected and quarantined.
@@ -492,7 +495,7 @@ Command actions may be implemented as events through `/sync/log` or as thin serv
 
 ```http
 POST /command/incidents/:incidentId/confirm-draft   (superseded by D10: no drafts)
-POST /command/incidents/:incidentId/merge-draft     (superseded by D8/D10: merge duplicate incidents)
+POST /command/incidents/:incidentId/merge-draft     (superseded by D8/D10: merge_incident(), database/066)
 POST /command/incidents/:incidentId/reject-draft    (superseded by D10: no drafts)
 POST /command/sectors/:sectorId/site-clear
 POST /command/sectors/:sectorId/building-status
@@ -720,6 +723,7 @@ Lets an incident come into existence from the field instead of from seed data (`
 | `list_incident_open_alerts()` (`064`) | pc, rcc, rpc, cc, chamal, admin (others get no rows) | Incidents a medic or paramedic opened in the last 24 hours that the caller has not acknowledged: active ones, and ones the opener cancelled as a false alarm. pc and rcc get their own company's; rpc its own platoon's, plus (`064d`) every incident of its company whose platoon is not chosen yet; cc/chamal/admin all. Flags: `no_unit` (no company), `needs_platoon` (company set, platoon not), `cancelled` with `cancel_reason`. |
 | `acknowledge_incident_opened(p_incident_id)` (`064`) | pc, rcc, rpc, cc, chamal, admin, with access to the incident (an rpc also for its company's incident with no platoon yet, `064d`) | Records the caller's own acknowledgment (`incident_open_acknowledgments`); the incident leaves only the caller's banner. Idempotent. |
 | `set_incident_platoon(p_incident_id, p_platoon_id)` (`064`) | the incident company's pc or rcc, or company-level command (`app.is_unit_manager()`) | Sets the platoon of an incident (an active platoon of the incident's company), which informs that platoon's rpc. Passes the unit guard (`053`) through its own flag, and the guard still writes `unit_audit`. |
+| `merge_incident(p_source_id, p_target_id, p_reason, p_device_id?, p_local_event_id?)` (`066`, D8) | cc, chamal, admin | Merges a duplicate open incident (source) into another open incident (target); reason required. Moves the source's patients and every per-incident record to the target; a temporary patient id the target already uses is renamed `<id>-<last 4 characters of the source's visual id>` (a counter if taken), listed in `renamed_patients`. Sectors, memberships, device rows, active alerts, site authority and the pre-evacuation report follow the rules in the file header (no duplicates; the target's own values win, the source's fill gaps; a second pre-evacuation report stays on the source and `pre_evacuation_kept_on_source` says so). Events are re-tagged to the target with `events.origin_incident_id` = the incident they were first recorded in (the one exception to append-only, allowed only inside this function). The source is closed with `metadata.merged_into {target_id, target_visual_id, at, by, reason}` and an `INCIDENT_CLOSED` event; the target gets an `INCIDENT_MERGED` event with the counts and renames. Returns `{changed, moved, renamed_patients, pre_evacuation_kept_on_source, target_visual_id}`; a repeat returns `changed:false`. |
 | `cancel_incident_false_alarm(p_incident_id, p_reason?, p_device_id?, p_local_event_id?)` (`064`) | the opener only | Only while the incident is `active` and has no patients: closes it through the close guard (`040`) with `metadata.false_alarm {reason, at, by}` and appends `INCIDENT_CLOSED` with `false_alarm: true`. A repeat returns `changed:false`. After a reopen, a later ordinary close is not a false alarm (`app.is_false_alarm_close`: `false_alarm.at` equals `closed_at`). |
 
 Joining is recorded on the membership row itself (`assigned_by`, `created_at`); there is no join event type. Since `064` (D10) the client no longer opens drafts or calls `confirm_draft` / `reject_draft` / `acknowledge_draft`; they stay on the server for history. Draft merge (`INCIDENT_DRAFT_MERGED`) is replaced by merging duplicate official incidents (D8, WP-11 part 2, not built yet).

@@ -347,6 +347,24 @@ Verified live on 2026-10-22 by role impersonation in rolled-back transactions (t
 
 `get_advisors` (security) after applying: no finding for the new table (it has a policy). The five new functions appear only under `authenticated_security_definer_function_executable`, the same intended warning as every other lifecycle RPC (`038`, `040`, `053`): signed-in users must call them, and each checks the caller's role and unit itself.
 
+## Follow-up: merging duplicate incidents (`database/065`-`066`, decision D8)
+
+No new table or policy. New `authenticated`-callable `SECURITY DEFINER` function `merge_incident()`, execute revoked from `public` and `anon`, with its own role check (cc, chamal, admin only) and a required reason. New column `events.origin_incident_id`. `prevent_event_mutation()` now lets exactly one update through: inside `merge_incident()` (`app.incident_merge_via_rpc`), changing only `incident_id` and `origin_incident_id`, with `origin_incident_id` keeping the first incident; every other update and every delete is still refused. `authenticated` has no update policy on `events`, so the flag cannot be used from a client. The duplicate is closed through the close guard (`040`) with its own flag. `sync-log` v11 reads `incidents.metadata.merged_into` with the service client only to choose where to store a push; the events and patients are still inserted as the calling user, so RLS applies as before (the merge made every member of the duplicate a member of the target).
+
+Verified live 2026-10-22 in a rolled-back block (two incidents opened by two medics, a patient `P001` in each, an event and a tourniquet in the duplicate):
+
+| Check | Result |
+|---|---|
+| pc `merge_incident` | refused |
+| cc without a reason; cc merging an incident into itself | refused; refused |
+| cc merges the duplicate | moved 2 patients, 1 tourniquet, 2 events, 1 membership added; `P001` renamed `P001-B8F5` |
+| repeat; merge into the now-closed duplicate | `changed:false`; refused |
+| the event | `incident_id` = target, `origin_incident_id` = duplicate |
+| events left on the duplicate | only its `INCIDENT_CLOSED` |
+| target | one `INCIDENT_MERGED` event |
+| duplicate | closed with the reason in `metadata.merged_into` |
+| plain update of an event; flagged update that changes the payload; delete | refused; refused; refused |
+
 ## Explicitly not re-litigated here
 
 - T6 (leaked-password protection) and T5 (service-role key handling) — out of scope, not RLS/authorization, already tracked in `docs/THREAT_MODEL.md`.
