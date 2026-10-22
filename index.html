@@ -570,12 +570,14 @@ textarea{resize:vertical;min-height:70px;}
 .incident-strip.draft{background:rgba(255,107,53,0.14);border-bottom-color:var(--orange);}
 .incident-strip.closed{background:rgba(255,59,59,0.14);border-bottom-color:var(--red);}
 .incident-strip button{background:none;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer;white-space:nowrap;}
-.draft-approval-banner{display:none;flex-direction:column;gap:8px;background:rgba(255,107,53,0.16);border-bottom:2px solid var(--orange);padding:10px 16px;font-size:13px;color:var(--text);}
-.draft-approval-banner.pulse{animation:draftPulse 1.4s ease-in-out infinite;}
-@keyframes draftPulse{0%,100%{background:rgba(255,107,53,0.10);}50%{background:rgba(255,107,53,0.32);}}
-.draft-approval-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;}
-.draft-approval-row .actions{display:flex;gap:6px;flex-wrap:wrap;}
-.draft-approval-row button,.incident-card button{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;}
+.open-alert-banner{display:none;flex-direction:column;gap:8px;background:rgba(255,107,53,0.16);border-bottom:2px solid var(--orange);padding:10px 16px;font-size:13px;color:var(--text);}
+.open-alert-banner.pulse{animation:openAlertPulse 1.4s ease-in-out infinite;}
+@keyframes openAlertPulse{0%,100%{background:rgba(255,107,53,0.10);}50%{background:rgba(255,107,53,0.32);}}
+.open-alert-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;}
+.open-alert-row .actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.open-alert-row select{margin:0;padding:6px 8px;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);}
+.open-alert-flag{color:var(--orange);font-weight:800;}
+.open-alert-row button,.incident-card button,.open-dupes button{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;}
 .incident-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;}
 .incident-card.draft{border-color:var(--orange);}
 .incident-card .incident-card-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;}
@@ -585,6 +587,8 @@ textarea{resize:vertical;min-height:70px;}
 .incident-status-badge.draft{color:var(--orange);border-color:var(--orange);}
 .incident-status-badge.active{color:var(--green);border-color:var(--green);}
 .incident-status-badge.closed{color:var(--red);border-color:var(--red);}
+.open-dupes{background:rgba(255,107,53,0.12);border:1px solid var(--orange);border-radius:12px;padding:10px;margin-bottom:10px;font-size:13px;}
+.open-dupes .open-dupe-row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);}
 .close-guard-list{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;max-height:40dvh;overflow-y:auto;}
 .close-guard-row{display:flex;justify-content:space-between;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;}
 #incident-open-form select{width:100%;padding:13px;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--text);font-size:15px;margin-bottom:10px;direction:rtl;}
@@ -606,11 +610,12 @@ textarea{resize:vertical;min-height:70px;}
 <div id="incident-context-strip" class="incident-strip">
   <span class="incident-strip-text"></span>
   <div style="display:flex;gap:6px">
+    <button id="incident-strip-false-alarm-btn" style="display:none" onclick="cancelActiveIncidentFalseAlarm()">ביטול: אזעקת שווא</button>
     <button id="incident-strip-close-btn" style="display:none" onclick="toggleActiveIncidentClosed()">סגור אירוע</button>
     <button onclick="openIncidentPicker()">החלף / כל האירועים</button>
   </div>
 </div>
-<div id="draft-approval-banner" class="draft-approval-banner"></div>
+<div id="incident-open-alert-banner" class="open-alert-banner"></div>
 
 <!-- ══════════════════════ PIN GATE (local-storage encryption unlock) ══ -->
 <div id="screen-pin-gate" class="screen active">
@@ -685,6 +690,7 @@ textarea{resize:vertical;min-height:70px;}
       <input type="text" id="incident-open-address" placeholder="כתובת (אופציונלי)" style="margin-bottom:10px">
       <select id="incident-open-type"><option value="">סוג אירוע: לא ידוע</option></select>
       <div class="login-error" id="incident-open-error"></div>
+      <div id="incident-open-dupes" class="open-dupes" style="display:none"></div>
       <button class="btn-primary" id="incident-open-btn" onclick="submitOpenIncident()">פתח אירוע</button>
     </div>
   </div>
@@ -755,7 +761,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9948</div>
+      <div class="demo-kicker">Demo V2.9949</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -852,7 +858,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9948</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9949</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -862,7 +868,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9948</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9949</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2173,8 +2179,8 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Local draft incident rule</div>
-      <div class="demo-strip-sub">חובש רשאי לפתוח טיוטת אירוע רק כשאין אירוע רשמי. חוג"ד / מ״פ רפואה / חמ״ל מאשרים טיוטה באירוע audit בלתי מחיק.</div>
+      <div class="demo-strip-title">Incident opening rule (D10)</div>
+      <div class="demo-strip-sub">חובש / פראמדיק פותח אירוע רשמי מיד, אחרי בדיקת אירועים פתוחים של הפלוגה. חוג״ד, מ״פ רפואה, מ״פ חילוץ ומ״מ מקבלים התראה עד שכל אחד מאשר שראה.</div>
     </div>
     <div class="sync-pill" id="sync-pill-roles">AUTH</div>
   </div>
@@ -2873,7 +2879,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.48';
+const APP_VERSION = '2.99.49';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3243,21 +3249,21 @@ const MEDICATION_LABELS = {morphine:'Morphine', atq:'Actiq/Fentanyl'};
 const MEDICATION_ROUTES = {morphine:'IV', atq:'PO/BUCCAL'};
 const LIMB_LABELS = {yl:'יד שמאל', yr:'יד ימין', rl:'רגל שמאל', rr:'רגל ימין'};
 const ROLE_DEFS = [
-  {key:'medic', label:'Medic', he:'חובש', desc:'פותח פצועים, מדדים, התערבויות, מסירת מצב רפואי לפינוי וטיוטת אירוע מקומית כשאין אירוע רשמי.'},
+  {key:'medic', label:'Medic', he:'חובש', desc:'פותח פצועים, מדדים, התערבויות, מסירת מצב רפואי לפינוי, ופתיחת אירוע רשמי כשאין אירוע פתוח של הפלוגה (ביטול כאזעקת שווא כל עוד אין בו פצועים).'},
   {key:'pc', label:'חוג"ד', he:'חוג"ד / חפ״ק רפואי', desc:'פותח ומאשר אירוע רשמי, מנהל תמונת מצב, התראות, אספקה וסיכום אירוע חי.'},
   {key:'log_o', label:'Log-O', he:'קצין לוגיסטיקה', desc:'מנהל ערכות ורצי אספקה, רואה מלאי לפי פלוגה, לא מבצע רישום קליני.'},
   {key:'cc', label:'מ״פ רפואה', he:'מפקד פלוגה רפואית', desc:'סמכות פיקודית לפתיחת/אישור אירוע, סגירה, אתר נקי, דשבורד וייצוא.'},
   {key:'physician', label:'Physician', he:'רופא', desc:'סמכות פיקודית כמו מ״פ רפואה (ניהול אירוע, מכשירים, תמונת מצב, ניגודי עדכון) בתוספת סמכות רישום קליני מלאה: מדדים, טיפול, מיון. אינו פותח פצוע חדש. הדרג הגבוה ביותר בהכרעת ניגודי עדכון בין מכשירים. בעל סמכות אישור מוות קליני.'},
   {key:'paramedic', label:'Paramedic', he:'פראמדיק', desc:'אותה סמכות טיפול שדה כמו חובש: פתיחת פצוע, מדדים, תרופות, מיון, מסירת מצב — כולל אישור חריגת סיכון גבוה. ללא הסמכות הפיקודית של רופא/מ״פ רפואה וללא סמכות אישור מוות קליני.'},
-  {key:'chamal', label:'Chamal', he:'חמ״ל', desc:'תמונת מצב מלאה, אישור טיוטות, ניהול אירוע ברמת חטיבה וסיכום אירוע חי, ללא רישום פצועים.'},
+  {key:'chamal', label:'Chamal', he:'חמ״ל', desc:'תמונת מצב מלאה, התראה על אירועים שנפתחו בשטח, ניהול אירוע ברמת חטיבה וסיכום אירוע חי, ללא רישום פצועים.'},
   {key:'rpc', label:'מ״מ', he:'מפקד מחלקת חילוץ', desc:'פאנל טקטי למחלקה שלו: תג, מיון, אזור, לכוד/נייד, סטטוס פינוי, חובש אחראי (כינוי קריאה). ללא מדדים, טיפול, מנגנון פציעה או זהות. סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא אישור רפואי. יכול לדווח פצוע ראשוני (מיקום/לכוד/חסם בלבד).'},
   {key:'rcc', label:'מ״פ חילוץ', he:'מפקד פלוגת חילוץ', desc:'פאנל טקטי מרוכז לפי מחלקות עבור הפלוגה שלו, כולל בקשות אספקה פתוחות (לוגיסטיקת פלוגת חילוץ). ללא מדדים, טיפול, מנגנון פציעה או זהות. סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא אישור רפואי. יכול לדווח פצוע ראשוני (מיקום/לכוד/חסם בלבד).'},
   {key:'admin', label:'Admin', he:'מנהל מערכת', desc:'גישה טכנית מלאה: כל הנתונים הגולמיים, טעינת/ניקוי תרחישים, ייצוא ניסוי, בדיקת גרסה וסנכרון. תפקיד טכני להרצת דמו/בדיקות, לא תפקיד פיקודי מבצעי.'}
 ];
 const AUTH_MATRIX = [
-  {action:'Create local draft incident', medic:'yes', pc:'yes', log_o:'no', cc:'yes', physician:'yes', paramedic:'yes', chamal:'yes', rpc:'no', rcc:'no', admin:'yes'},
+  {action:'Open official incident', medic:'yes', pc:'yes', log_o:'no', cc:'yes', physician:'yes', paramedic:'yes', chamal:'yes', rpc:'yes', rcc:'yes', admin:'yes'},
   {action:'Open official incident and set T0', medic:'no', pc:'yes', log_o:'no', cc:'yes', physician:'yes', paramedic:'no', chamal:'yes', rpc:'yes', rcc:'yes', admin:'yes'},
-  {action:'Confirm draft incident', medic:'no', pc:'yes', log_o:'no', cc:'yes', physician:'yes', paramedic:'no', chamal:'yes', rpc:'yes', rcc:'yes', admin:'yes'},
+  {action:'Informed of an incident a medic opened (acknowledge)', medic:'no', pc:'yes', log_o:'no', cc:'yes', physician:'no', paramedic:'no', chamal:'yes', rpc:'yes', rcc:'yes', admin:'yes'},
   {action:'Close / reopen official incident', medic:'limited', pc:'yes', log_o:'no', cc:'yes', physician:'yes', paramedic:'limited', chamal:'yes', rpc:'yes', rcc:'yes', admin:'yes'},
   {action:'Register new patient', medic:'yes', pc:'yes', log_o:'no', cc:'no', physician:'no', paramedic:'yes', chamal:'no', rpc:'limited', rcc:'limited', admin:'yes'},
   {action:'Record vitals and interventions', medic:'yes', pc:'yes', log_o:'no', cc:'no', physician:'yes', paramedic:'yes', chamal:'no', rpc:'no', rcc:'no', admin:'yes'},
@@ -5386,7 +5392,7 @@ function startRoleDashboard(role){
 function roleConfig(role){
   return {
     medic:{title:'חובש — מפעיל פצועים', actor:'חובש — משתמש מחובר', audience:'medic', legacy:'dashboard', responsibilities:['פתיחת פצועים ועדכון מדדים','תיעוד טיפול ומיון','סימון לכוד / לא לכוד / לא ידוע','טיוטת מוקד ראשונית','סימון חשד לנפטר / לא בר הצלה ופתיחת בקשת רופא אוטומטית']},
-    pc:{title:'חוג"ד / חפ״ק רפואי', actor:'חוג"ד — משתמש מחובר', audience:'pc', legacy:'commander', responsibilities:['ניהול כל החובשים במחלקה','אישור טיוטות מוקד','הקצאה מחדש בתוך המחלקה','בקשת חובשים / פראמדיק / רופא','ניהול פינוי ותעדוף מקומי','יכול לפתוח ולטפל בפצוע ישירות כמו חובש, כולל סריקת MSTART, כשנדרש']},
+    pc:{title:'חוג"ד / חפ״ק רפואי', actor:'חוג"ד — משתמש מחובר', audience:'pc', legacy:'commander', responsibilities:['ניהול כל החובשים במחלקה','התראה על אירוע שחובש פתח ושיבוץ המחלקה שלו','הקצאה מחדש בתוך המחלקה','בקשת חובשים / פראמדיק / רופא','ניהול פינוי ותעדוף מקומי','יכול לפתוח ולטפל בפצוע ישירות כמו חובש, כולל סריקת MSTART, כשנדרש']},
     cc:{title:'מ״פ רפואה', actor:'מ״פ רפואה — משתמש מחובר', audience:'cc', legacy:'commander', responsibilities:['פיקוד ישיר על משאבים רפואיים','הקצאה בין מחלקות','אישור / דחייה / ניתוב בקשות תגבור','ניהול תורי רופא / פראמדיק / קביעת מוות','הסרת צווארי בקבוק ברמת פלוגה']},
     physician:{title:'רופא / פראמדיק — תור סקירה רפואית', actor:'רופא / פראמדיק — משתמש מחובר', audience:'physician', legacy:'commander', responsibilities:['סקירת פצועים קשים','מענה לבקשות חוג"ד / מ״פ רפואה','החלטה רפואית בכירה','קביעת מוות / אישור מוות','סגירת בקשת סקירה רפואית']},
     logistics:{title:'קצין לוגיסטיקה / Log-O', actor:'רס״ם אמיר דגן — Log-O', audience:'logistics', legacy:'logistics', responsibilities:['מלאי ציוד רפואי לפי מחלקה / מוקד','מענה לבקשות ציוד','הקצאת אספקה מחדש','מעקב burn rate','הצפת חוסר המשפיע על טיפול']},
@@ -12612,20 +12618,35 @@ async function retryHighStakesSync(localEventId, label){
 // ═══════════════════════════════════════════════
 // Logged-in mode never invents an incident or patients. After login the user resumes the
 // incident they were working in on this device (if still open), or picks one from
-// list_open_incidents(), or opens a new one with open_incident(): medic/paramedic get a
-// draft that command confirms or rejects (C5_SENTINEL_SAR_MVP_SPEC_v1.2.md sec 141, 202-221),
-// command and rescue-command roles get an active incident directly. The chosen incident is
+// list_open_incidents(), or opens a new one with open_incident(). Every opening role gets an
+// active incident directly (D10, database/064: no more drafts). A medic or paramedic is first
+// shown the open incidents of their own company and offered to join one instead; once they do
+// open, their PC, RCC, the platoon's RPC and CC/chamal/admin see a banner until each of them
+// acknowledges it (list_incident_open_alerts). The opener may cancel it as a false alarm while it
+// has no patients (cancel_incident_false_alarm). The chosen incident is
 // bound to site key SITE_A, so every existing SITE_TO_INCIDENT_ID[currentSiteId()] read works
 // unchanged; SITE_B (a local-demo-only second site) is hidden while logged in.
 const ACTIVE_INCIDENT_KEY='c5_active_incident_v1';
-const INCIDENT_DRAFT_OPEN_ROLES=new Set(['medic','paramedic']);
+const INCIDENT_FIELD_OPEN_ROLES=new Set(['medic','paramedic']);
 const INCIDENT_OFFICIAL_OPEN_ROLES=new Set(['pc','cc','chamal','admin','physician','rpc','rcc']);
+// Informed when a medic or paramedic opens an incident (database/064 list_incident_open_alerts):
+// pc/rcc of the company, every rpc of the company until the platoon is chosen and then only that
+// platoon's rpc (064d), cc/chamal/admin all.
+const INCIDENT_OPEN_ALERT_ROLES=new Set(['pc','rcc','rpc','cc','chamal','admin']);
+// May choose the platoon of a medic's incident (set_incident_platoon): the incident company's PC
+// or RCC, and company-level command (app.is_unit_manager()).
+const INCIDENT_OPENER_ROLE_LABELS={medic:'חובש', paramedic:'פראמדיק'};
+const INCIDENT_PLATOON_CHOOSER_ROLES=new Set(['pc','rcc','cc','chamal','admin','physician']);
 const INCIDENT_COMMAND_ROLES=new Set(['pc','cc','chamal','admin','physician']); // app.is_command_role()
 // Company-level command (database/045): every site, assigns PCs, owns the platoon roster.
 const COMPANY_COMMAND_ROLES=new Set(['cc','chamal','admin','physician']);
 const INCIDENT_BLANKET_ROLES=new Set(['cc','chamal','admin','rpc','rcc','physician']); // app.can_access_incident() without membership
 const SERVER_INCIDENT_STATUS_LABELS={draft:'טיוטה, ממתין לאישור',staging:'בהכנה',active:'פעיל',closed:'סגור'};
-let activeIncident=null; // {id, visual_id, status, location_name, address, incident_type, draft_resolution}
+let activeIncident=null; // {id, visual_id, status, location_name, address, incident_type, draft_resolution, opened_by, false_alarm}
+let _incidentOpenAlerts=[]; // list_incident_open_alerts() rows not yet acknowledged by this user
+let _seenOpenAlertIds=new Set(); // vibrate once per new alert, not on every poll
+let _platoonsByCompany={}; // company id -> [{id,name}], for the banner's platoon choice
+let _openDupesShownFor=null; // location the duplicate warning was shown for; a second press opens anyway
 let _workingIncidentId=null; // which incident patients[] currently holds (in memory only)
 let _openIncidents=[];
 let _incidentListError='';
@@ -12633,7 +12654,7 @@ let _incidentOverviewState={}; // incidentId -> get_incident_command_state row, 
 let _legacySiteB=null;
 
 function incidentDisplayName(inc){ return inc ? `${inc.visual_id||'אירוע'} · ${inc.location_name||''}` : ''; }
-function canOpenIncident(){ const r=currentUser?.role; return INCIDENT_DRAFT_OPEN_ROLES.has(r) || INCIDENT_OFFICIAL_OPEN_ROLES.has(r); }
+function canOpenIncident(){ const r=currentUser?.role; return INCIDENT_FIELD_OPEN_ROLES.has(r) || INCIDENT_OFFICIAL_OPEN_ROLES.has(r); }
 function isIncidentCommandRole(){ return INCIDENT_COMMAND_ROLES.has(currentUser?.role); }
 function hasBlanketIncidentAccess(){ return INCIDENT_BLANKET_ROLES.has(currentUser?.role); }
 
@@ -12692,6 +12713,7 @@ async function refreshOpenIncidents(){
   return true;
 }
 async function enterIncidentContextAfterLogin(){
+  pollIncidentOpenAlerts(); // D10: command sees incidents opened in the field right after sign-in
   const stored=await loadStoredActiveIncident();
   const listed=await refreshOpenIncidents();
   if(stored){
@@ -12704,6 +12726,92 @@ async function enterIncidentContextAfterLogin(){
   openIncidentPicker();
   // A medic the PC already assigned goes straight into that incident (pullIncidentAssignmentState).
   pullIncidentAssignmentState();
+}
+// ── D10: incident opened in the field, command informed (database/064) ──
+async function refreshIncidentOpenAlerts(){
+  if(!currentUser || !INCIDENT_OPEN_ALERT_ROLES.has(currentUser.role)){ _incidentOpenAlerts=[]; return; }
+  const client=getSupabaseClient();
+  if(!client) return;
+  let r;
+  try{ r=await client.rpc('list_incident_open_alerts'); }catch(e){ return; } // offline: keep the last list on screen
+  if(r.error || !Array.isArray(r.data)) return;
+  _incidentOpenAlerts=r.data;
+  const fresh=_incidentOpenAlerts.filter(a=>!_seenOpenAlertIds.has(a.id+(a.cancelled?':x':'')));
+  fresh.forEach(a=>_seenOpenAlertIds.add(a.id+(a.cancelled?':x':'')));
+  if(fresh.length){ try{ navigator.vibrate?.([200,100,200]); }catch(e){} }
+  const companies=[...new Set(_incidentOpenAlerts.filter(a=>a.needs_platoon && a.company_id).map(a=>a.company_id))];
+  if(INCIDENT_PLATOON_CHOOSER_ROLES.has(currentUser.role)) await Promise.all(companies.filter(c=>!_platoonsByCompany[c]).map(async c=>{
+    try{
+      const q=await client.from('platoons').select('id,name,company_id,is_active').eq('company_id', c).eq('is_active', true);
+      if(!q.error && Array.isArray(q.data)) _platoonsByCompany[c]=q.data.filter(pl=>pl.company_id===c && pl.is_active!==false).sort((a,b)=>String(a.name).localeCompare(String(b.name),'he'));
+    }catch(e){}
+  }));
+}
+async function pollIncidentOpenAlerts(){
+  if(!currentUser) return;
+  await refreshIncidentOpenAlerts();
+  renderIncidentOpenAlertBanner();
+}
+setInterval(()=>{ if(currentUser && INCIDENT_OPEN_ALERT_ROLES.has(currentUser.role)) pollIncidentOpenAlerts(); }, 20000);
+function renderIncidentOpenAlertBanner(){
+  const banner=document.getElementById('incident-open-alert-banner');
+  if(!banner) return;
+  const rows=currentUser ? _incidentOpenAlerts : [];
+  if(!rows.length){ banner.style.display='none'; banner.innerHTML=''; banner.classList.remove('pulse'); return; }
+  banner.style.display='flex';
+  banner.classList.add('pulse'); // every row is unacknowledged by this user until "ראיתי"
+  const role=currentUser.role;
+  banner.innerHTML=rows.map(a=>{
+    const id=escAttr(a.id);
+    const who=`${escAttr(INCIDENT_OPENER_ROLE_LABELS[a.opened_by_role]||a.opened_by_role||'')}${a.opened_by_name?' '+escAttr(a.opened_by_name):''}`;
+    const where=`${escAttr(a.visual_id||'')} · ${escAttr(a.location_name||'')}${a.address?' · '+escAttr(a.address):''}`;
+    const time=a.opened_at?new Date(a.opened_at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):'';
+    if(a.cancelled){
+      return `<div class="open-alert-row" data-incident-id="${id}">
+        <div><strong>✖ אירוע בוטל (אזעקת שווא):</strong> ${where} · נפתח ${time} ע״י ${who}${a.cancel_reason?' · סיבה: '+escAttr(a.cancel_reason):''}</div>
+        <div class="actions"><button onclick="acknowledgeIncidentOpened('${id}')">ראיתי</button></div>
+      </div>`;
+    }
+    const flags=[
+      a.no_unit?'<span class="open-alert-flag">⚠ ללא פלוגה: החובש לא שובץ לפלוגה (תקלת הגדרה)</span>':'',
+      a.needs_platoon?'<span class="open-alert-flag">טרם נקבעה מחלקה: כל מ״מי הפלוגה מקבלים התראה עד השיבוץ</span>':''
+    ].filter(Boolean).join(' · ');
+    const platoons=_platoonsByCompany[a.company_id]||[];
+    const choose=a.needs_platoon && INCIDENT_PLATOON_CHOOSER_ROLES.has(role) && platoons.length
+      ? `<select id="open-alert-platoon-${id}"><option value="">בחר/י מחלקה</option>${platoons.map(pl=>`<option value="${escAttr(pl.id)}">${escAttr(pl.name)}</option>`).join('')}</select><button onclick="chooseIncidentPlatoon('${id}')">שבץ מחלקה</button>`
+      : '';
+    // An RPC reaches the incident only through its platoon (053): no entry before the platoon is chosen.
+    const enter=activeIncident?.id===a.id || (role==='rpc' && a.needs_platoon) ? '' : `<button onclick="enterIncidentFromAlert('${id}')">כניסה</button>`;
+    return `<div class="open-alert-row" data-incident-id="${id}">
+      <div><strong>🚨 אירוע חדש נפתח בשטח:</strong> ${where} · נפתח ${time} ע״י ${who} · ${a.patient_count||0} פצועים${flags?'<br>'+flags:''}</div>
+      <div class="actions"><button onclick="acknowledgeIncidentOpened('${id}')">ראיתי</button>${enter}${choose}</div>
+    </div>`;
+  }).join('');
+}
+async function acknowledgeIncidentOpened(id){
+  const client=getSupabaseClient();
+  if(!client){ toast('אין חיבור לשרת'); return; }
+  let r;
+  try{ r=await client.rpc('acknowledge_incident_opened', {p_incident_id:id}); }catch(e){ r={error:e}; }
+  if(r.error){ toast('האישור נכשל, בדוק/י חיבור'); return; }
+  _incidentOpenAlerts=_incidentOpenAlerts.filter(a=>a.id!==id);
+  renderIncidentOpenAlertBanner();
+}
+async function chooseIncidentPlatoon(id){
+  const platoonId=document.getElementById('open-alert-platoon-'+id)?.value||'';
+  if(!platoonId){ toast('נא לבחור מחלקה'); return; }
+  const client=getSupabaseClient();
+  if(!client){ toast('אין חיבור לשרת'); return; }
+  let r;
+  try{ r=await client.rpc('set_incident_platoon', {p_incident_id:id, p_platoon_id:platoonId}); }catch(e){ r={error:e}; }
+  if(r.error){ toast('שיבוץ המחלקה נכשל: '+(r.error.message||'')); return; }
+  toast('המחלקה שובצה · המ״מ שלה יקבל התראה');
+  await pollIncidentOpenAlerts();
+}
+async function enterIncidentFromAlert(id){
+  if(!_openIncidents.some(i=>i.id===id)) await refreshOpenIncidents();
+  if(!_openIncidents.some(i=>i.id===id)){ toast('האירוע כבר אינו פתוח'); return; }
+  await enterIncidentFromPicker(id);
 }
 function freshSiteAuthority(){
   return {incidentStatus:'draft', t0:null, buildingStatus:null, incidentType:null, siteClear:{cleared:false,clearedAt:null,clearedByRole:null}, lastRescueStatusChange:null};
@@ -12727,7 +12835,9 @@ function clearWorkingSiteData(){
 }
 async function activateIncident(inc){
   if(!inc || !currentUser) return;
-  activeIncident={id:inc.id, visual_id:inc.visual_id, status:inc.status, location_name:inc.location_name, address:inc.address||'', incident_type:inc.incident_type||null, draft_resolution:inc.draft_resolution||null};
+  const prev=activeIncident?.id===inc.id ? activeIncident : null;
+  activeIncident={id:inc.id, visual_id:inc.visual_id, status:inc.status, location_name:inc.location_name, address:inc.address||'', incident_type:inc.incident_type||null, draft_resolution:inc.draft_resolution||null,
+    opened_by:inc.opened_by!==undefined?inc.opened_by:(prev?prev.opened_by:undefined), false_alarm:!!(inc.false_alarm||prev?.false_alarm)};
   if(_workingIncidentId!==inc.id){ resetWorkingStateForIncident(inc); _workingIncidentId=inc.id; }
   siteData.name=siteData.name||inc.location_name||'';
   siteData.address=siteData.address||inc.address||'';
@@ -12760,6 +12870,10 @@ function deactivateIncidentContext(){
   _workingIncidentId=null;
   _openIncidents=[];
   _incidentOverviewState={};
+  _incidentOpenAlerts=[];
+  _seenOpenAlertIds=new Set();
+  _platoonsByCompany={};
+  hideOpenIncidentDupes(); // another user's company incidents must not stay on screen
   patients=[];
   reinforcementRequests=[];
   _pulledEvents=[];
@@ -12803,13 +12917,10 @@ function renderIncidentPicker(){
       const counts=st ? ` · אדומים פעילים ${st.active_red_patients??0} · חסרי מדדים ${st.patients_missing_full_vitals??0} · התראות ${st.active_watchdog_alerts??0}` : '';
       const isCurrent=activeIncident?.id===inc.id;
       const enterLabel=isCurrent?'המשך באירוע':(inc.is_member||hasBlanketIncidentAccess())?'כניסה':'הצטרף לאירוע';
-      const cmd=inc.status==='draft' && isIncidentCommandRole()
-        ? `<button onclick="confirmDraftIncident('${escAttr(inc.id)}')">אשר טיוטה</button><button onclick="rejectDraftIncident('${escAttr(inc.id)}')">דחה</button>${inc.draft_acknowledged_at?'':`<button onclick="acknowledgeDraftIncident('${escAttr(inc.id)}')">ראיתי</button>`}`
-        : '';
       return `<div class="incident-card ${inc.status==='draft'?'draft':''}">
         <div class="incident-card-head"><strong>${escAttr(inc.visual_id||'')} · ${escAttr(inc.location_name||'')}</strong><span class="incident-status-badge ${escAttr(inc.status)}">${escAttr(SERVER_INCIDENT_STATUS_LABELS[inc.status]||inc.status)}</span></div>
         <div class="incident-card-meta">${inc.address?escAttr(inc.address)+' · ':''}${inc.incident_type?escAttr(INCIDENT_TYPE_LABELS[inc.incident_type]||inc.incident_type)+' · ':''}נפתח ${inc.opened_at?new Date(inc.opened_at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):''}${inc.opened_by_name?' ע״י '+escAttr(inc.opened_by_name):''} · ${inc.patient_count||0} פצועים${counts}</div>
-        <div class="incident-card-actions"><button onclick="enterIncidentFromPicker('${escAttr(inc.id)}')">${enterLabel}</button>${cmd}</div>
+        <div class="incident-card-actions"><button onclick="enterIncidentFromPicker('${escAttr(inc.id)}')">${enterLabel}</button></div>
       </div>`;
     }).join('');
   }
@@ -12818,10 +12929,10 @@ function renderIncidentPicker(){
   const title=document.getElementById('incident-open-title');
   const openSub=document.getElementById('incident-open-sub');
   const btn=document.getElementById('incident-open-btn');
-  if(INCIDENT_DRAFT_OPEN_ROLES.has(role)){
-    if(title) title.textContent='פתיחת טיוטת אירוע';
-    if(openSub) openSub.textContent='אין אירוע רשמי? פתח/י טיוטה והתחל/י לתעד מיד. חוג״ד / מ״פ רפואה / חמ״ל יאשרו או ידחו אותה.';
-    if(btn) btn.textContent='פתח טיוטת אירוע';
+  if(INCIDENT_FIELD_OPEN_ROLES.has(role)){
+    if(title) title.textContent='פתיחת אירוע';
+    if(openSub) openSub.textContent='האירוע נפתח כפעיל מיד. לפני הפתיחה יוצגו אירועים פתוחים של הפלוגה שלך כדי להצטרף במקום לפתוח כפילות. החוג״ד, מ״פ רפואה, מ״פ החילוץ ומ״מ המחלקה יקבלו התראה.';
+    if(btn) btn.textContent='פתח אירוע';
   }else{
     if(title) title.textContent='פתיחת אירוע רשמי';
     if(openSub) openSub.textContent='האירוע נפתח כפעיל מיד ומופיע לכל המשתמשים ברשימת האירועים הפתוחים.';
@@ -12845,6 +12956,41 @@ async function enterIncidentFromPicker(incidentId){
   }
   await activateIncident(inc);
 }
+function hideOpenIncidentDupes(){
+  const box=document.getElementById('incident-open-dupes');
+  if(box){ box.style.display='none'; box.innerHTML=''; }
+  _openDupesShownFor=null;
+  const btn=document.getElementById('incident-open-btn');
+  if(btn && btn.textContent.includes('בכל זאת')) btn.textContent='פתח אירוע';
+}
+// D10: before a medic or paramedic opens an incident, show their company's open incidents and
+// offer to join one instead. Returns true when the open should go ahead now.
+async function checkUnitOpenIncidentsBeforeOpen(location){
+  const client=getSupabaseClient();
+  let r;
+  try{ r=await client.rpc('list_unit_open_incidents'); }catch(e){ return true; } // open_incident reports the network error itself
+  if(r.error || !Array.isArray(r.data) || !r.data.length) return true;
+  if(_openDupesShownFor===location) return true; // second press: "open anyway"
+  _openDupesShownFor=location;
+  const box=document.getElementById('incident-open-dupes');
+  if(!box) return true;
+  box.innerHTML=`<div style="font-weight:800;margin-bottom:6px">⚠ יש ${r.data.length} אירועים פתוחים בפלוגה שלך. אולי זה אותו אירוע? הצטרף/י במקום לפתוח כפילות.</div>`
+    +r.data.map(inc=>`<div class="open-dupe-row"><span>${escAttr(inc.visual_id||'')} · ${escAttr(inc.location_name||'')}${inc.address?' · '+escAttr(inc.address):''} · נפתח ${inc.opened_at?new Date(inc.opened_at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):''}${inc.opened_by_name?' ע״י '+escAttr(inc.opened_by_name):''} · ${inc.patient_count||0} פצועים</span><button onclick="joinUnitOpenIncident('${escAttr(inc.id)}')">${inc.is_member?'המשך באירוע זה':'הצטרף לאירוע זה'}</button></div>`).join('')
+    +`<div style="margin-top:8px;color:var(--muted)">זה אירוע אחר? לחיצה נוספת על "פתח אירוע חדש בכל זאת" תפתח אותו.</div>`;
+  box.style.display='';
+  const btn=document.getElementById('incident-open-btn');
+  if(btn) btn.textContent='פתח אירוע חדש בכל זאת';
+  return false;
+}
+async function joinUnitOpenIncident(incidentId){
+  const client=getSupabaseClient();
+  if(!client){ toast('אין חיבור לשרת'); return; }
+  await refreshOpenIncidents();
+  const inc=_openIncidents.find(i=>i.id===incidentId);
+  if(!inc){ toast('האירוע כבר אינו פתוח'); return; }
+  hideOpenIncidentDupes();
+  await enterIncidentFromPicker(incidentId);
+}
 async function submitOpenIncident(){
   const errEl=document.getElementById('incident-open-error');
   if(errEl) errEl.textContent='';
@@ -12856,6 +13002,10 @@ async function submitOpenIncident(){
   if(!client){ if(errEl) errEl.textContent='אין חיבור לשרת'; return; }
   const btn=document.getElementById('incident-open-btn');
   if(btn) btn.disabled=true;
+  if(INCIDENT_FIELD_OPEN_ROLES.has(currentUser?.role) && !(await checkUnitOpenIncidentsBeforeOpen(location))){
+    if(btn) btn.disabled=false;
+    return;
+  }
   const incidentId=newUuid();
   let r;
   try{
@@ -12864,30 +13014,28 @@ async function submitOpenIncident(){
   if(btn) btn.disabled=false;
   if(r.error || !r.data){ if(errEl) errEl.textContent='פתיחת האירוע נכשלה: '+(r.error?.message||'שגיאה'); return; }
   ['incident-open-location','incident-open-address'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-  toast(r.data.status==='draft'?'טיוטת אירוע נפתחה · ממתינה לאישור פיקוד':'אירוע נפתח');
-  await activateIncident({id:r.data.id, visual_id:r.data.visual_id, status:r.data.status, location_name:location, address, incident_type:type, is_member:true});
+  hideOpenIncidentDupes();
+  toast(INCIDENT_FIELD_OPEN_ROLES.has(currentUser?.role)?'אירוע נפתח · הפיקוד קיבל התראה':'אירוע נפתח');
+  await activateIncident({id:r.data.id, visual_id:r.data.visual_id, status:r.data.status, location_name:location, address, incident_type:type, is_member:true, opened_by:currentUser.id});
 }
-async function runDraftAction(rpcName, params, okText){
-  const client=getSupabaseClient();
-  if(!client) return;
-  let r;
-  try{ r=await client.rpc(rpcName, params); }catch(e){ r={error:e}; }
-  if(r.error){ toast('הפעולה נכשלה: '+(r.error.message||'')); return; }
-  toast(okText);
-  await refreshIncidentContext();
-  if(document.getElementById('screen-incident-picker')?.classList.contains('active')) renderIncidentPicker();
+// D10: the opener may cancel the incident as a false alarm while it has no patients
+// (database/064 cancel_incident_false_alarm). With patients, closing follows the close guard.
+function canCancelActiveIncidentAsFalseAlarm(){
+  if(!currentUser || !activeIncident || activeIncident.status!=='active') return false;
+  if(!activeIncident.opened_by || activeIncident.opened_by!==currentUser.id) return false;
+  const listed=_openIncidents.find(i=>i.id===activeIncident.id);
+  if(listed && Number(listed.patient_count||0)>0) return false;
+  return !patients.some(p=>(p.siteId||'SITE_A')==='SITE_A');
 }
-function confirmDraftIncident(id){
-  if(!confirm('לאשר את טיוטת האירוע כאירוע פעיל?')) return;
-  runDraftAction('confirm_draft', {p_incident_id:id, p_device_id:getDeviceId(), p_local_event_id:`incident-confirm-${id}`}, 'הטיוטה אושרה · האירוע פעיל');
-}
-function rejectDraftIncident(id){
-  const reason=prompt('סיבת דחיית הטיוטה (לדוגמה: כפילות של אירוע קיים)');
+async function cancelActiveIncidentFalseAlarm(){
+  if(!canCancelActiveIncidentAsFalseAlarm()){ toast('לא ניתן לבטל: יש פצועים באירוע או שלא את/ה פתחת אותו'); return; }
+  const reason=prompt('ביטול האירוע כאזעקת שווא. סיבה (אופציונלי):');
   if(reason===null) return;
-  runDraftAction('reject_draft', {p_incident_id:id, p_reason:reason||null, p_device_id:getDeviceId(), p_local_event_id:`incident-reject-${id}`}, 'הטיוטה נדחתה · הנתונים נשמרו');
-}
-function acknowledgeDraftIncident(id){
-  runDraftAction('acknowledge_draft', {p_incident_id:id}, 'סומן כנראה');
+  const role=currentUser.role;
+  const r=await callIncidentCloseRpc('cancel_incident_false_alarm', {p_incident_id:activeIncident.id, p_reason:reason.trim()||null, p_device_id:getDeviceId(), p_local_event_id:`incident-false-alarm-${activeIncident.id}`});
+  if(!r) return;
+  activeIncident.false_alarm=true;
+  applyServerIncidentStatus('closed', role, 'האירוע בוטל: אזעקת שווא');
 }
 
 // ── Incident close guard (database/040_close_incident_guard.sql) ──
@@ -12948,6 +13096,7 @@ async function requestIncidentReopen(role, siteId){
     if(!activeIncident) return;
     const r=await callIncidentCloseRpc('reopen_incident', {p_incident_id:activeIncident.id, p_device_id:getDeviceId(), p_local_event_id:`incident-reopen-${newUuid()}`});
     if(!r) return;
+    activeIncident.false_alarm=false;
     applyServerIncidentStatus(r.status||'active', role, 'האירוע נפתח מחדש');
     return;
   }
@@ -13038,14 +13187,22 @@ async function submitIncidentCloseOverride(){
 async function refreshActiveIncidentStatus(){
   if(!activeIncident || !currentUser) return;
   const listed=_openIncidents.find(i=>i.id===activeIncident.id);
-  if(listed){ activeIncident.status=listed.status; activeIncident.draft_resolution=null; }
+  if(listed && activeIncident.opened_by!==undefined){ activeIncident.status=listed.status; activeIncident.draft_resolution=null; }
   else{
-    // Not in the open list any more: closed (or a rejected draft). A member can still read it.
+    // Not in the open list any more (closed, a rejected legacy draft, or cancelled as a false
+    // alarm), or the opener is not known yet on this device. A member can still read the row.
     const client=getSupabaseClient();
     try{
-      const r=await client.from('incidents').select('status,metadata').eq('id', activeIncident.id).maybeSingle();
-      if(!r.error && r.data){ activeIncident.status=r.data.status; activeIncident.draft_resolution=r.data.metadata?.draft_resolution||null; }
-    }catch(e){}
+      const r=await client.from('incidents').select('status,metadata,opened_by,closed_at').eq('id', activeIncident.id).maybeSingle();
+      if(!r.error && r.data){
+        activeIncident.status=r.data.status;
+        activeIncident.draft_resolution=r.data.metadata?.draft_resolution||null;
+        // Same rule as app.is_false_alarm_close(): a later ordinary close after a reopen is not one.
+        const fa=r.data.metadata?.false_alarm;
+        activeIncident.false_alarm=!!(fa && r.data.closed_at && Date.parse(fa.at)===Date.parse(r.data.closed_at));
+        activeIncident.opened_by=r.data.opened_by||null;
+      }else if(listed) activeIncident.status=listed.status;
+    }catch(e){ if(listed) activeIncident.status=listed.status; }
   }
   persistActiveIncident();
 }
@@ -13053,18 +13210,19 @@ async function refreshIncidentContext(){
   if(!currentUser) return;
   await refreshOpenIncidents();
   await refreshActiveIncidentStatus();
+  await refreshIncidentOpenAlerts();
   renderIncidentContext();
   await pullIncidentAssignmentState();
 }
 setInterval(()=>{ if(currentUser) refreshIncidentContext(); }, 45000);
 function renderIncidentContext(){
   const strip=document.getElementById('incident-context-strip');
-  const banner=document.getElementById('draft-approval-banner');
   if(strip){
     if(currentUser && activeIncident){
       const st=activeIncident.status;
       const rejected=st==='closed' && activeIncident.draft_resolution==='rejected';
-      const statusText=rejected?'טיוטת האירוע נדחתה ע״י פיקוד, הנתונים נשמרים':(SERVER_INCIDENT_STATUS_LABELS[st]||st);
+      const falseAlarm=st==='closed' && activeIncident.false_alarm;
+      const statusText=rejected?'טיוטת האירוע נדחתה ע״י פיקוד, הנתונים נשמרים':falseAlarm?'בוטל: אזעקת שווא':(SERVER_INCIDENT_STATUS_LABELS[st]||st);
       strip.style.display='flex';
       strip.className='incident-strip'+(st==='draft'?' draft':st==='closed'?' closed':'');
       const label=strip.querySelector('.incident-strip-text');
@@ -13074,22 +13232,15 @@ function renderIncidentContext(){
         closeBtn.style.display=INCIDENT_CLOSE_ROLES.has(currentUser.role) && st!=='draft' && !rejected ? '' : 'none';
         closeBtn.textContent=st==='closed'?'פתח אירוע מחדש':'סגור אירוע';
       }
+      const falseAlarmBtn=document.getElementById('incident-strip-false-alarm-btn');
+      if(falseAlarmBtn) falseAlarmBtn.style.display=canCancelActiveIncidentAsFalseAlarm()?'':'none';
       // The rescue-authority panel reads SITE_A's local status; keep it equal to the server's.
       ensureSiteStatusFields('SITE_A').incidentStatus=st==='closed'?'closed':st==='draft'?'draft':'official';
     }else{
       strip.style.display='none';
     }
   }
-  if(banner){
-    const drafts=currentUser && isIncidentCommandRole() ? _openIncidents.filter(i=>i.status==='draft') : [];
-    if(!drafts.length){ banner.style.display='none'; banner.innerHTML=''; return; }
-    banner.style.display='flex';
-    banner.classList.toggle('pulse', drafts.some(d=>!d.draft_acknowledged_at));
-    banner.innerHTML=drafts.map(d=>`<div class="draft-approval-row">
-      <div><strong>⚠ טיוטת אירוע ממתינה לאישור:</strong> ${escAttr(d.visual_id||'')} · ${escAttr(d.location_name||'')}${d.opened_by_name?' · נפתחה ע״י '+escAttr(d.opened_by_name):''} · ${d.patient_count||0} פצועים</div>
-      <div class="actions"><button onclick="confirmDraftIncident('${escAttr(d.id)}')">אשר</button><button onclick="rejectDraftIncident('${escAttr(d.id)}')">דחה</button>${d.draft_acknowledged_at?'':`<button onclick="acknowledgeDraftIncident('${escAttr(d.id)}')">ראיתי</button>`}</div>
-    </div>`).join('');
-  }
+  renderIncidentOpenAlertBanner();
 }
 
 // ── Sync push: outbox → deployed /sync/log Edge Function ──

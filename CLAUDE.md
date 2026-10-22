@@ -33,7 +33,7 @@ for f in scripts/smoke_*.js; do node "$f" || echo "FAILED: $f"; done
 # checks it actually renders, not just that the HTML text contains expected strings. Manual-only, not wired into CI, requires `npm install` once.
 npm install
 npm run test:browser-smoke            # or: node scripts/browser_smoke_test.js
-node scripts/browser_incident_lifecycle_test.js   # logged-in incident picker/draft flow + close guard, stubbed Supabase client
+node scripts/browser_incident_lifecycle_test.js   # logged-in incident picker/open flow (no drafts since D10) + close guard, stubbed Supabase client
 node scripts/browser_collapse_brief_test.js       # Movement screen: building collapse with any incident type
 node scripts/browser_medic_assignment_test.js     # cross-device PC -> medic assignment: PC, medic and rescue tabs sharing one stubbed backend
 node scripts/browser_evacuation_tracking_test.js  # cross-device evacuation destination/MDA classification, location board, UH report: PC, CC and medic tabs
@@ -55,6 +55,7 @@ node scripts/browser_rescue_site_authority_test.js # RPC/RCC T0, building status
 node scripts/browser_offline_cold_start_test.js  # WP-10: serves the repo on localhost, sw.js caches the shell, network off + reload: PIN gate, local data, signed-in session and incident come back
 node scripts/browser_inventory_sync_test.js       # WP-9: two medics' consumption reaches logistics (incident-wide burn rate, each bag's stock), PC truck issue, no double count
 node scripts/browser_sweep_sync_test.js           # WP-11: manual sweep override sent as MSTART_OVERRIDE (after the patient's create); a finished sweep reaches the PC's board on another phone and stays
+node scripts/browser_incident_open_alerts_test.js  # D10: no drafts; "join this instead?" before a medic opens, PC/RCC/CC and every company RPC (until the platoon is chosen) get a banner until each acknowledges, false-alarm cancel while empty
 node scripts/test_outbox_eviction.js              # F1: persistOutbox() never evicts an unsynced event, even past the 500 cap (docs/FAILURE_MODE_REVIEW.md)
 
 # Analytics package
@@ -71,7 +72,7 @@ CI (`.github/workflows/validate.yml`) runs exactly two things on every PR and pu
 
 `scripts/check_repo.py` enforces (stdlib only, no deps):
 - a fixed list of required paths exist (`REQUIRED_PATHS` in the script — update it when adding/renaming core docs, schema files, or archive folders)
-- `index.html` has a doctype and closing `</html>`, and its three visible version labels ("Demo V2.9948", "ROLE // V2.9948", "Role-Based Medical Command System V2.9948") match `APP_VERSION`
+- `index.html` has a doctype and closing `</html>`, and its three visible version labels ("Demo V2.9949", "ROLE // V2.9949", "Role-Based Medical Command System V2.9949") match `APP_VERSION`
 - every relative markdown link across the repo resolves to a real file (no broken/external-repo links)
 - the domain-rules module inlined in `index.html` hasn't drifted from `src/domain/rules.js`
 - `database/*.sql` structural sanity: balanced parens/`$$` dollar-quoted blocks, and every `references table(...)` target resolves to a real `create table` — see docs/DEVELOPMENT.md's "Validating SQL Drafts" for what this does and doesn't catch (it's not a real SQL parser; a Postgres instance is still the only full validation)
@@ -85,7 +86,7 @@ CI (`.github/workflows/validate.yml`) runs exactly two things on every PR and pu
 `index.html` is the whole prototype, and the file GitHub Pages serves as the live demo. It used to have a byte-identical copy, `demo/rescue-app.html`; that copy was removed (decision D5 in `docs/GAP_CLOSURE_PLAN.md`), so there is only one file to edit. It is ~14,200 lines of self-contained HTML/CSS/JS, with no bundler and no framework. Its one external script is the pinned supabase-js build from jsDelivr (real auth and sync; bump the pinned version deliberately, never float `@2`). Next to it, `sw.js` + `manifest.webmanifest` + `icon.svg` (WP-10) keep the page and that exact supabase-js build cached for an offline cold start; `check_repo.py` fails if the pinned URL in `sw.js` differs from `index.html`'s. The `src/domain/rules.js` logic is inlined directly into the HTML (the standalone `src/domain/rules.js` module is a separately extracted, testable copy of that logic, see below).
 
 Inside the HTML, look for:
-- `const APP_VERSION = '2.99.48';` — bump this and the three visible label strings ("Demo V2.9948", "ROLE // V2.9948", "Role-Based Medical Command System V2.9948") together when shipping a version; `scripts/check_repo.py` fails CI if they disagree.
+- `const APP_VERSION = '2.99.49';` — bump this and the three visible label strings ("Demo V2.9949", "ROLE // V2.9949", "Role-Based Medical Command System V2.9949") together when shipping a version; `scripts/check_repo.py` fails CI if they disagree.
 - `const ROLE_LABELS` / `const ROLE_DEFS` — defines the role-based views. Ten roles exist in the live `user_role` enum: `medic`, `paramedic` and `physician` (added in `database/019`/`020`), `pc` (חוג"ד — platoon commander), `cc` (מ״פ רפואה — company/command medical), `logistics_officer` (mapped to the client-side `logistics` key via `SERVER_ROLE_TO_CLIENT_ROLE`), `chamal` (command system), `rpc`/`rcc` (rescue-chain platoon/company commander — site-authority actions per `docs/ROLE_COMMAND_MODEL_v2.8.md`, added in `database/006`/`007`), and `admin`. New users are invited by an admin from the in-app "ניהול משתמשים" screen (`supabase/functions/admin-users/index.ts`, `database/042`), or with the fallback CLI `scripts/invite_user.js`; never the Supabase dashboard button, which can't set a role. Both keep a `VALID_ROLES` list that must match this enum.
 - `render*` functions (e.g. `renderDashboard`, `renderCommander`, `renderMstartSweep`, `renderAar`, `renderCcHeroDashboard`, `renderLogisticsOfficer`) — each is a self-contained view renderer for one role/screen. Grep for `^function render` to find the current screen inventory before adding a new one.
 - A legacy step-based New Patient flow (`screen-step1`..`screen-step8`, guarded by a `LEGACY_FULL_ASSESSMENT_DO_NOT_DELETE_WITHOUT_TESTS` comment) coexists with the newer Quick/Extended patient flows — don't delete it without checking what still depends on it (smoke scripts assert on its presence).

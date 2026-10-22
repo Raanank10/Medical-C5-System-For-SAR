@@ -91,15 +91,15 @@ begin
   select app.pc_may_manage_membership(IA, M1, 'medic') into ok; r := r || 'pc may assign own medic=' || ok || '; ';
   select app.pc_may_manage_membership(IA, M2, 'medic') into ok; r := r || 'pc may assign B medic=' || ok || ' (want false); ';
 
-  -- medic of company A drafts; the draft is company A's, so pc A sees and confirms it
+  -- medic of company A opens a site (since database/064, D10: active, no draft); it is company A's,
+  -- so pc A sees it
   perform set_config('request.jwt.claims', json_build_object('sub', M1, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
-  select open_incident(DRAFT, 'TEST medic draft') into j; r := r || 'draft in A=' || ((j->>'company_id')::uuid = CA) || '; ';
+  select open_incident(DRAFT, 'TEST medic site') into j; r := r || 'medic site in A=' || ((j->>'company_id')::uuid = CA) || '; ';
   execute 'reset role';
   perform set_config('request.jwt.claims', json_build_object('sub', PC, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
-  select count(*) into n from list_open_incidents() l where l.id = DRAFT; r := r || 'pc lists draft=' || n || '; ';
-  perform confirm_draft(DRAFT); select count(*) into n from incidents where id = DRAFT and status = 'active'; r := r || 'pc confirmed=' || n || '; ';
+  select count(*) into n from incidents where id = DRAFT and status = 'active'; r := r || 'pc sees medic site=' || n || '; ';
   begin update incidents set company_id = CB where id = DRAFT; r := r || 'FAIL pc moved platoon-less site; ';
   exception when others then r := r || 'ok pc move platoon-less site refused; '; end;
   execute 'reset role';
@@ -151,7 +151,7 @@ begin
   update profiles set role = 'paramedic' where id = M1;
   select count(*) into n from profiles where id = M1 and company_id = CA; r := r || 'medic->paramedic keeps company=' || n || '; ';
   update profiles set role = 'pc' where id = RPC;
-  select count(*) into n from profiles where id = RPC and platoon_id is null and company_id is null; r := r || 'rpc->pc clears platoon=' || n || '; ';
+  select count(*) into n from profiles where id = RPC and platoon_id is null and company_id = CA; r := r || 'rpc->pc keeps company A, clears platoon=' || n || '; ';
   begin update unit_audit set detail = '{}'; r := r || 'FAIL audit mutable; ';
   exception when others then r := r || 'ok audit append-only; '; end;
 

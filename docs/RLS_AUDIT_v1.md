@@ -309,6 +309,44 @@ New table `incident_site_authority` (one row per incident), RLS enabled, one pol
 
 `inventory_ledger` (v1.1) renamed `inventory_ledger_v11_archived`; its two policies follow it, and insert/update/delete are revoked from `anon` and `authenticated`. `inventory_ledger_v12`: `inventory_ledger_v12_write` (insert) altered to `with check (false)`, since `project_inventory_movement()` (new `SECURITY DEFINER` trigger, execute revoked) is now the only writer; `inventory_ledger_v12_read` unchanged. `trg_process_logistics_event_safety_v12()` made `SECURITY DEFINER` with a fixed `search_path` and execute revoked. Verified 2026-10-21 in a rolled-back block with real medic, PC, logistics, RPC and non-member medic profiles: 6 of 13 movements projected (an unknown item, a non-numeric quantity, an unknown movement, a medic writing to a truck, logistics or RPC writing to a medic bag were refused; all 13 events kept); a client-side patient id dropped safely; one negative-stock alert; a member reads the rows, a non-member reads none; direct inserts into either table denied. `get_advisors` (security): nothing new.
 
+## Follow-up: no drafts, incident-opened alerts (`database/064`, decision D10)
+
+New table `incident_open_acknowledgments` (incident, profile, time; primary key on both), RLS enabled, one policy: `incident_open_acknowledgments_read_own` (select, `profile_id = auth.uid()`). No insert/update/delete policy: only `acknowledge_incident_opened()` (`SECURITY DEFINER`) writes. New `authenticated`-callable `SECURITY DEFINER` functions, each with its own role check, execute revoked from `public` and `anon`: `list_unit_open_incidents()`, `list_incident_open_alerts()`, `acknowledge_incident_opened()`, `set_incident_platoon()`, `cancel_incident_false_alarm()`. Internal helper `app.is_false_alarm_close()`, execute revoked from `public`, `anon`, `authenticated`. Changed: `open_incident()` (medic and paramedic open `active`, with the opener's company and platoon) and `join_incident()` (a medic or paramedic may also join an open incident of their own company; nothing else widened). `set_incident_platoon()` passes `app.guard_incident_unit()` through `app.incident_unit_via_rpc` after its own check (the incident company's pc/rcc, or `app.is_unit_manager()`; the platoon must be an active platoon of that company); the guard still validates and writes `unit_audit`. `cancel_incident_false_alarm()` passes the close guard (`040`) through `app.incident_close_via_rpc` after its own checks.
+
+Verified live on 2026-10-22 by role impersonation in rolled-back transactions (two temporary companies A and B with platoons A1 and B1; medics, pc and rcc in company A, the paramedic in company B, the rpc in platoon A1):
+
+| Check | Result |
+|---|---|
+| medic opens; second medic of the company opens another | both `active`, company A, no platoon |
+| second medic: `list_unit_open_incidents` lists the first; `join_incident` on it | listed; joined |
+| paramedic (company B) `join_incident` on company A's incident | allowed: the paramedic already reaches every incident (`053`), not a `064` change |
+| paramedic `list_unit_open_incidents` | none of company A's |
+| medic `list_incident_open_alerts` | no rows |
+| pc of company A | both alerts, `needs_platoon` |
+| rpc of A1 before the platoon is set | no rows |
+| rcc of company A; cc | both; both |
+| cc acknowledges the first | cc sees 1; pc still sees 2 |
+| pc `set_incident_platoon` to company B's platoon | refused |
+| pc sets A1; rpc of A1 | allowed; rpc sees that incident |
+| medic `set_incident_platoon` | refused |
+| non-opener `cancel_incident_false_alarm` | refused |
+| opener cancels while the incident has a patient | refused |
+| opener cancels an empty incident; repeat | closed, `INCIDENT_CLOSED` with `false_alarm: true`; repeat `changed:false` |
+| pc after the cancel | sees it as `cancelled` with the reason |
+
+`064d` (owner's revision, 2026-10-22): every rpc of the incident's company is informed until the platoon is chosen, and may acknowledge it; nothing else widened. Verified live the same day in a rolled-back block (company A with platoons A1, A2; company B with B1):
+
+| Check | Result |
+|---|---|
+| rpc of A1, three company-A incidents with no platoon | all 3 listed, `needs_platoon` |
+| same rpc: plain read of those incidents; `join_incident` | 0 rows; refused |
+| same rpc acknowledges one of them | allowed; gone from its list |
+| pc sets A1 on one, A2 on another; rpc of A1 | keeps the A1 incident, the A2 one is gone |
+| rpc of A1 acknowledges the A2 incident | refused |
+| rpc of company B | none of company A's |
+
+`get_advisors` (security) after applying: no finding for the new table (it has a policy). The five new functions appear only under `authenticated_security_definer_function_executable`, the same intended warning as every other lifecycle RPC (`038`, `040`, `053`): signed-in users must call them, and each checks the caller's role and unit itself.
+
 ## Follow-up: medics attached to platoons (`database/065`)
 
 Owner, 2026-10-22: every medic is attached to a מ״מ and takes medical guidance from the company's חוג״ד; the חוג״ד may assign only the medics under its guidance, to any site of its company or any site it belongs to. A medic still reaches only sites it opened or was assigned to. `065` replaces `app.guard_profile_unit()`, `set_profile_unit()` and `app.pc_may_manage_membership()` (live bodies checked unchanged since `053` first). It leaves `open_incident()` as redefined live by `064` (D10), which already gives a medic's site the medic's platoon.
@@ -328,7 +366,7 @@ Owner, 2026-10-22: every medic is attached to a מ״מ and takes medical guidanc
 | role change: A2 medic -> pc / A1 medic -> rpc / paramedic -> logistics | keeps company A / keeps A1 / clears unit |
 | `unit_audit` rows for these changes | 6 |
 
-**Not applied live yet.** After applying: run `scripts/rls_test_065_medics_in_platoons.sql` once in the SQL editor and `get_advisors` (security).
+**Applied live** by the owner (2026-10-22). `scripts/rls_test_065_medics_in_platoons.sql` was run live as a rolled-back test: every check above passed and nothing persisted. `scripts/rls_test_053_platoons.sql` was updated to match: an rpc who becomes a pc now keeps its platoon's company and drops the platoon.
 
 ## Explicitly not re-litigated here
 
