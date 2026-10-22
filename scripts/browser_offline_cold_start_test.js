@@ -215,16 +215,18 @@ let SERVER = null;
 // the fake backend follows this flag to behave like an unreachable server.
 let NET_DOWN = false;
 const INACTIVE = new Set(); // profiles the fake server reports as inactive
-// From Chromium 151 (Playwright 1.62's build) setOffline no longer flips navigator.onLine or fires
-// the window "online" / "offline" events. A real phone does, and the app re-reads the profile on
-// "online" (verifyOfflineProfile), so where the browser does not, the test fires the event itself.
-let EMULATES_ONLINE_EVENTS = null;
+// With Chromium 151 (Playwright 1.62's build), a page reloaded while the context is offline reports
+// navigator.onLine === true, so going back online changes nothing for it and no window "online"
+// event fires. A real phone that reloads with no signal knows it is offline and gets the event on
+// reconnect, and the app re-reads the profile on it (verifyOfflineProfile). So, just before
+// reconnecting, a page that already believes it is online gets the event from the test.
+let PAGES_MISSING_ONLINE_EVENT = 0;
 const setNetwork = async (context, up) => {
   NET_DOWN = !up;
+  const stale = [];
+  if (up) for (const p of context.pages()) if (await p.evaluate(() => navigator.onLine)) stale.push(p);
   await context.setOffline(!up);
-  const pages = context.pages();
-  if (!up && EMULATES_ONLINE_EVENTS === null && pages.length) EMULATES_ONLINE_EVENTS = await pages[0].evaluate(() => navigator.onLine === false);
-  if (up && EMULATES_ONLINE_EVENTS === false) for (const p of pages) await p.evaluate(() => window.dispatchEvent(new Event('online')));
+  for (const p of stale) { PAGES_MISSING_ONLINE_EVENT++; await p.evaluate(() => window.dispatchEvent(new Event('online'))); }
 };
 const serve = (req) => (NET_DOWN ? { data: null, error: { message: 'Failed to fetch' } } : handle(SERVER, req));
 
@@ -237,7 +239,7 @@ async function waitFor(page, label, fn, timeout) {
     await page.waitForFunction(fn, null, { timeout });
   } catch (e) {
     const st = await page.evaluate(() => ({ onLine: navigator.onLine, user: currentUser ? { id: currentUser.id, role: currentUser.role, offlineProfile: !!currentUser.offlineProfile } : null, screen: document.querySelector('.screen.active')?.id || null, incident: activeIncident?.id || null })).catch((x) => String(x));
-    throw new Error(`${label}: timed out after ${timeout} ms (page: ${JSON.stringify(st)}; online events emulated: ${EMULATES_ONLINE_EVENTS})`);
+    throw new Error(`${label}: timed out after ${timeout} ms (page: ${JSON.stringify(st)}; online events fired by the test so far: ${PAGES_MISSING_ONLINE_EVENT})`);
   }
 }
 async function networkIsOff(context) {
