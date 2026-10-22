@@ -69,6 +69,6 @@ async function checkFile(browser, file) {
 
 (async () => {
   const pre = '/opt/pw-browsers/chromium';
-  const browser = await chromium.launch(fs.existsSync(pre) ? { executablePath: pre } : { channel: 'chromium' });
+  const browser = await chromium.launch(fs.existsSync(pre) ? { executablePath: pre } : {});
   try { for (const f of files) await checkFile(browser, f); } finally { await browser.close(); }
 })().catch((e) => { console.error(e.message || e); process.exit(1); });

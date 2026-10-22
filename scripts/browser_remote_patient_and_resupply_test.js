@@ -100,7 +100,7 @@ async function main() {
   for (const file of files) assert(fs.existsSync(file), `missing file: ${path.relative(root, file)}`);
   // Same pre-installed Chromium preference as scripts/browser_smoke_test.js.
   const preinstalled = '/opt/pw-browsers/chromium';
-  const browser = await chromium.launch(fs.existsSync(preinstalled) ? { executablePath: preinstalled } : { channel: 'chromium' });
+  const browser = await chromium.launch(fs.existsSync(preinstalled) ? { executablePath: preinstalled } : {});
   try {
     for (const file of files) await checkFile(browser, file);
   } finally {

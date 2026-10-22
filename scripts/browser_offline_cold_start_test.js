@@ -218,6 +218,18 @@ const INACTIVE = new Set(); // profiles the fake server reports as inactive
 const setNetwork = async (context, up) => { NET_DOWN = !up; await context.setOffline(!up); };
 const serve = (req) => (NET_DOWN ? { data: null, error: { message: 'Failed to fetch' } } : handle(SERVER, req));
 
+// The network is really off for this context: a navigation fails with ERR_INTERNET_DISCONNECTED
+// (online it would fail with "connection refused" instead). navigator.onLine is not used: from
+// Chromium 151 (Playwright 1.62's build) context.setOffline no longer turns it false.
+async function networkIsOff(context) {
+  const probe = await context.newPage();
+  try {
+    const err = await probe.goto('http://127.0.0.1:9/', { timeout: 5000 }).then(() => '', (e) => String(e.message || e));
+    return /ERR_INTERNET_DISCONNECTED/.test(err);
+  } finally {
+    await probe.close();
+  }
+}
 async function waitForWorker(page) {
   await page.waitForFunction(async () => {
     if (!navigator.serviceWorker?.controller) return false;
@@ -239,7 +251,7 @@ async function main() {
   const httpServer = await startServer();
   const base = `http://127.0.0.1:${httpServer.address().port}/index.html`;
   const preinstalled = '/opt/pw-browsers/chromium';
-  const browser = await chromium.launch(fs.existsSync(preinstalled) ? { executablePath: preinstalled } : { channel: 'chromium' });
+  const browser = await chromium.launch(fs.existsSync(preinstalled) ? { executablePath: preinstalled } : {});
   try {
     // 0. file:// never registers a worker.
     {
@@ -269,8 +281,8 @@ async function main() {
       await page.waitForSelector('#screen-login.active', { timeout: 10000 });
       await page.evaluate(() => continueDemo()); // the launcher's "continue saved demo"
       await page.waitForTimeout(500);
-      const ok = await page.evaluate(() => ({ lib: typeof window.supabase?.createClient, has: patients.some((p) => p.visualId === 'P-OFFLINE-1'), offline: !navigator.onLine }));
-      assert(ok.offline, 'the page must be offline for this check');
+      const ok = await page.evaluate(() => ({ lib: typeof window.supabase?.createClient, has: patients.some((p) => p.visualId === 'P-OFFLINE-1') }));
+      assert(await networkIsOff(context), 'the page must be offline for this check');
       assert(ok.lib === 'function', `the cached supabase-js must load offline (got ${ok.lib})`);
       assert(ok.has, 'a patient recorded before the offline reload must still be there');
       assert(errors.length === 0, `page errors: ${errors.join(' | ')}`);

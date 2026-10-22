@@ -406,7 +406,7 @@ async function checkFile(browser, file) {
 (async () => {
   // Same browser selection as scripts/browser_smoke_test.js: prefer a pre-installed Chromium.
   const preinstalled = '/opt/pw-browsers/chromium';
-  const browser = await chromium.launch(fs.existsSync(preinstalled) ? { executablePath: preinstalled } : { channel: 'chromium' });
+  const browser = await chromium.launch(fs.existsSync(preinstalled) ? { executablePath: preinstalled } : {});
   try {
     for (const file of files) await checkFile(browser, file);
   } finally {

@@ -106,7 +106,7 @@ async function checkFile(browser, file) {
   // trail the npm-installed Playwright version, which would otherwise try to download a new
   // browser build) - same fallback pattern as scripts/browser_smoke_test.js.
   const preinstalled = '/opt/pw-browsers/chromium';
-  const launchOptions = fs.existsSync(preinstalled) ? { executablePath: preinstalled } : { channel: 'chromium' };
+  const launchOptions = fs.existsSync(preinstalled) ? { executablePath: preinstalled } : {};
   const browser = await chromium.launch(launchOptions);
   try {
     for (const file of files) {

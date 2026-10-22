@@ -292,7 +292,7 @@ async function checkFile(browser, file) {
 (async () => {
   // Cloud sessions pre-install Chromium here; elsewhere Playwright's own download is used.
   const preinstalled = '/opt/pw-browsers/chromium';
-  const browser = await chromium.launch(fs.existsSync(preinstalled) ? { executablePath: preinstalled } : { channel: 'chromium' });
+  const browser = await chromium.launch(fs.existsSync(preinstalled) ? { executablePath: preinstalled } : {});
   try {
     for (const file of files) await checkFile(browser, file);
   } finally {
