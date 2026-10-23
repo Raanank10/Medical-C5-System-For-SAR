@@ -68,6 +68,7 @@ node scripts/browser_sweep_vitals_debt_test.js     # one "no vitals" key (missin
 node scripts/browser_vitals_not_counted_test.js    # no invented vitals (MSTART breathing, quick flow, untouched counters = "לא נספר"), empty vitals saves refused, stricter full set, honest MIST/patient screen, white "!" critical chips, short patient bar that never covers content
 node scripts/browser_march_paws_test.js           # V2.99.62: full-flow treatment step ordered by MARCH-PAWS, per-letter "treated / checked / not documented", treatments sent with march_section, march_review on the create event; cric / needle decompression for paramedic and physician only; documentation only
 node scripts/browser_mobile_layout_test.js        # phone layout at 375x812 / 412x915: no overlaps, nothing past the viewport or clipped by a card, nothing left under the FAB/bottom bar, header <= 64px, no raw keys
+node scripts/browser_command_panel_test.js        # V2.99.62: PC/CC panel: sticky strip + 4 tap-only tabs, every alert in the strip, per-patient badges, entry on תמונת מצב, server-contact label, three evacuation stages
 node scripts/test_outbox_eviction.js              # F1: persistOutbox() never evicts an unsynced event, even past the 500 cap (docs/FAILURE_MODE_REVIEW.md)
 
 # Analytics package

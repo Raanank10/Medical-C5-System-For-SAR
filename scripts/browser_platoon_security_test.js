@@ -280,6 +280,8 @@ async function checkFile(browser, file) {
   await cc.page.evaluate((id) => enterIncidentFromPicker(id), INC1);
   await cc.page.waitForTimeout(300);
   await cc.page.evaluate(() => startRoleDashboard('cc'));
+  // V2.99.62: the roster is on the CC panel's כוחות tab.
+  await cc.page.click('[data-cmd-tab="forces"]');
   await cc.page.waitForSelector('[data-roster-member]', { timeout: 5000 });
   assert(await cc.page.inputValue(`[data-incident-unit="${INC1}"]`) === `p:${A1}`, `${rel}: the roster panel must show the site's platoon`);
   await cc.page.fill('#new-company-name', 'פלוגה ג');
@@ -303,6 +305,7 @@ async function checkFile(browser, file) {
   const ccTiles = await cc.page.evaluate(() => commandPlatoons().map((p) => p.name));
   assert(ccTiles.includes('פלוגה א') && ccTiles.includes('פלוגה ב') && ccTiles.includes('פלוגה ג') && !ccTiles.includes('אמבולנס') && !ccTiles.includes('מחלקה רפואית א'),
     `${rel}: CC tiles must be the real rescue companies (got ${JSON.stringify(ccTiles)})`);
+  await cc.page.click('[data-cmd-tab="overview"]');
   assert((await cc.page.locator('#role-dashboard-body').innerText()).includes('פלוגות פעילות'), `${rel}: CC dashboard must count companies`);
   const ccOptions = await cc.page.evaluate(async () => { await loadRealMedicProfiles(); return _realMedicProfiles.map((p) => p.role); });
   assert(ccOptions.includes('pc'), `${rel}: CC must be offered PC accounts to assign`);
@@ -329,6 +332,7 @@ async function checkFile(browser, file) {
   assert(!(await pc1.page.evaluate(() => canManagePlatoonRoster())), `${rel}: a PC must not be offered the roster panel`);
   await pc1.page.evaluate(() => startRoleDashboard('pc'));
   assert(await pc1.page.locator('#platoon-roster-panel').count() === 0, `${rel}: no roster panel on the PC dashboard`);
+  await pc1.page.click('[data-cmd-tab="forces"]'); // V2.99.62: "הפלוגה שלי" is on the כוחות tab
   assert((await bodyRowAfter(pc1.page, 'הפלוגה שלי')).includes('פלוגה א'), `${rel}: the PC dashboard must name its company`);
 
   const errors = [...pc2.errors, ...rpc1.errors, ...rcc1.errors, ...cc.errors, ...pc1.errors];

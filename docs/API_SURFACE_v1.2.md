@@ -310,7 +310,7 @@ Example payload:
 
 Server projection rules:
 
-- update `patients.current_status = 'handed_over'` — this is the final custody state; distinct from `'evacuating'`, which is a separate, earlier status set by `PATIENT_STATUS_UPDATED` when a patient leaves the incident site for the company collection point but is not yet formally handed to MDA (still under the platoon commander's supervision). A completed handover must not leave a patient looking identical to one still waiting at the collection point.
+- update `patients.current_status = 'handed_over'` — this is the final custody state; distinct from `'evacuating'`, which is a separate, earlier status set by `PATIENT_STATUS_UPDATED` when the rescuers move a patient from the extraction site to the site's evacuation point (נקודת פינוי) to wait for an ambulance, not yet formally handed to MDA (still under the platoon commander's supervision). A completed handover must not leave a patient looking identical to one still waiting at the collection point.
 - set `patients.needs_full_assessment = false`
 - set `patients.handed_over_at` and `patients.handed_over_to`
 - resolve active vitals, reassessment, tourniquet, and missing-full-assessment watchdog alerts for that patient
@@ -359,7 +359,7 @@ Server projection rules:
 | `stabilizing` | Care is ongoing at the treatment site, such as tourniquet, medication, or airway management. |
 | `observing` | Care milestone completed; patient waits for extraction or reassessment. |
 | `extricating` | Casualty is being physically moved through the structure or ruins. |
-| `evacuating` | Left the incident site for the company collection point, still under the platoon commander's supervision - not yet formally handed to MDA. Set via `PATIENT_STATUS_UPDATED` (`payload_json.status = 'evacuating'`), an optional intermediate step before `handed_over`. |
+| `evacuating` | Moved by the rescuers from the extraction site to the site's evacuation point (נקודת פינוי, where the PC truck stands), waiting for an MDA ambulance, still under the platoon commander's supervision - not yet formally handed to MDA. The stored payload keeps `destination: 'company_collection_point'` (renamed in the UI only, V2.99.62). Set via `PATIENT_STATUS_UPDATED` (`payload_json.status = 'evacuating'`), an optional intermediate step before `handed_over`. |
 | `handed_over` | Transferred to MDA / evacuation force through `מסירת מצב רפואי לפינוי` (MIST) or secure QR. Final custody state. |
 | `deceased` | Black triage fast-path or casualty expired during care. |
 
@@ -368,7 +368,7 @@ The projection is event-driven (`project_patient_state()` in the schema - the si
 - `PATIENT_TRIAGED_EXPECTANT` or payload `current_triage = black` -> `deceased`
 - `TOURNIQUET_APPLIED`, `MEDICATION_ADMINISTERED`, `AIRWAY_MANAGED` -> `stabilizing`
 - `VITALS_RECORDED` from stabilizing -> `observing`
-- `PATIENT_STATUS_UPDATED` with payload `status` -> that status (e.g. `evacuating` for the collection-point step)
+- `PATIENT_STATUS_UPDATED` with payload `status` -> that status (e.g. `evacuating` for the evacuation-point (נקודת פינוי) step)
 - `PATIENT_HANDED_OVER` -> `handed_over`
 
 One deliberate exception to "single trigger function": `project_evacuation_tracking()` (`database/044`, V2.99.33) writes only `patients.evacuation_destination`, `mda_classification` and `evacuation_updated_at` (plus `version`/`updated_at`), from `PATIENT_HANDED_OVER` and `PATIENT_EVACUATION_UPDATED`, and inserts `external_reports` rows from `EXTERNAL_REPORT_CREATED`. It never touches triage, status or any column `project_patient_state()` owns, so the race that consolidation fixed cannot recur. It was kept separate so the triage-authority logic in `project_patient_state()` (021/041) did not have to be redefined to add three columns.

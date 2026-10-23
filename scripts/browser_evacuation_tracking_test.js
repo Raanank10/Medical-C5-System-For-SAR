@@ -235,7 +235,7 @@ async function checkFile(browser, file) {
 
   // Handover of A through the real sheet: destination + MDA classification.
   await pc.page.evaluate((id) => openPatient(id), idA);
-  // Since 2026-10-23 handover sits under "עוד" while "יצא לנקודת איסוף" holds the second slot.
+  // Since 2026-10-23 handover sits under "עוד" while "יצא לנקודת פינוי" holds the second slot.
   if (!(await pc.page.locator('#detail-bottom-bar button:has-text("הועבר למד״א — עכשיו")').isVisible())) await pc.page.click('#detail-bar-more-btn');
   await pc.page.click('#detail-bottom-bar button:has-text("הועבר למד״א — עכשיו")');
   await pc.page.waitForSelector('#evac-sheet-modal:not(.hidden)');

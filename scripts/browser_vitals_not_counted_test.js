@@ -12,7 +12,7 @@
 // 4. The patient screen and MIST say "נושם — לא נספר" and tag values taken from MSTART or inferred
 //    from walking; the vitals sheet does not pre-select an AVPU inferred from walking.
 // 5. A critical chip is a white chip with "!", an overdue one has "⏱".
-// 6. Patient screen: two actions (עדכן מדדים, יצא לנקודת איסוף) and "עוד"; nothing at the end of
+// 6. Patient screen: two actions (עדכן מדדים, יצא לנקודת פינוי) and "עוד"; nothing at the end of
 //    the page stays under the bar, also with "עוד" open.
 //
 // Runs in CI through scripts/run_tests.js; also runs on its own.
@@ -256,8 +256,8 @@ async function chipsAndPatientBar(browser) {
     const visible = [...document.querySelectorAll('#detail-bottom-bar button')].filter((b) => b.checkVisibility()).map((b) => b.innerText.trim());
     return { visible, height: Math.round(document.getElementById('detail-bottom-bar').getBoundingClientRect().height) };
   });
-  assert(bar.visible.length === 3 && /עדכן מדדים/.test(bar.visible[0]) && /יצא לנקודת איסוף/.test(bar.visible[1]) && /עוד/.test(bar.visible[2]),
-    `bar: עדכן מדדים, יצא לנקודת איסוף, עוד (got ${JSON.stringify(bar.visible)})`);
+  assert(bar.visible.length === 3 && /עדכן מדדים/.test(bar.visible[0]) && /יצא לנקודת פינוי/.test(bar.visible[1]) && /עוד/.test(bar.visible[2]),
+    `bar: עדכן מדדים, יצא לנקודת פינוי, עוד (got ${JSON.stringify(bar.visible)})`);
   assert(bar.height <= 130, `the bar must be about half its old 251px (got ${bar.height}px)`);
 
   const endClear = async () => page.evaluate(async () => {
