@@ -286,6 +286,8 @@ body.field-mode .patient-card{padding:16px 15px;margin-top:8px;margin-bottom:8px
 .march-hint{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;}
 .march-clear{margin-top:10px;width:100%;min-height:56px;background:transparent;border:2px dashed var(--border);border-radius:12px;color:var(--muted);font-size:14px;font-weight:700;cursor:pointer;touch-action:manipulation;}
 .march-clear.selected{border-style:solid;border-color:var(--green);color:var(--green);background:rgba(52,199,89,.12);}
+.chip.restricted{opacity:.45;border-style:dashed;}
+.chip-scope{font-size:11px;font-weight:600;color:var(--muted);}
 .march-phase-label{font-size:12px;font-weight:800;color:var(--muted);letter-spacing:.5px;margin:6px 0 10px;}
 
 /* ── VITALS ── */
@@ -1828,7 +1830,7 @@ body.field-mode{--bottom-bar-h:100px;}
         <button class="chip" data-tx="airway_mgmt" onclick="toggleChip(this,'airway_mgmt')"><span class="chip-icon">💨</span>פתיחת נ"א</button>
         <button class="chip" data-tx="npa" onclick="toggleChip(this,'npa')"><span class="chip-icon">👃</span>נתיב אוויר אפי (NPA)</button>
         <button class="chip" data-tx="recovery_position" onclick="toggleChip(this,'recovery_position')"><span class="chip-icon">🛌</span>תנוחת התאוששות</button>
-        <button class="chip" data-tx="cric" onclick="toggleChip(this,'cric')"><span class="chip-icon">🔪</span>קוניוטומיה</button>
+        <button class="chip" data-tx="cric" onclick="toggleChip(this,'cric')"><span class="chip-icon">🔪</span>קוניוטומיה <span class="chip-scope">פרמדיק / רופא</span></button>
       </div>
       <button class="march-clear" id="march-clear-a" onclick="toggleMarchClear(this,'a')">נבדק - לא נדרש טיפול</button>
     </div>
@@ -1836,7 +1838,7 @@ body.field-mode{--bottom-bar-h:100px;}
       <div class="march-head"><span class="march-letter">R</span><div><div class="march-title">נשימה</div><div class="march-sub">Respiration</div></div><span class="march-state" id="march-state-r">לא תועד</span></div>
       <div class="chip-grid">
         <button class="chip" data-tx="chest_seal" onclick="toggleChip(this,'chest_seal')"><span class="chip-icon">🫁</span>חבישה אוטמת לחזה</button>
-        <button class="chip" data-tx="needle_decompression" onclick="toggleChip(this,'needle_decompression')"><span class="chip-icon">💉</span>ניקור חזה</button>
+        <button class="chip" data-tx="needle_decompression" onclick="toggleChip(this,'needle_decompression')"><span class="chip-icon">💉</span>ניקור חזה <span class="chip-scope">פרמדיק / רופא</span></button>
         <button class="chip" data-tx="oxygen" onclick="toggleChip(this,'oxygen')"><span class="chip-icon">🫧</span>חמצן</button>
       </div>
       <button class="march-clear" id="march-clear-r" onclick="toggleMarchClear(this,'r')">נבדק - לא נדרש טיפול</button>
@@ -3496,6 +3498,13 @@ const MARCH_PAWS_SECTIONS = [
   {id:'s', letter:'S', label:'קיבוע', phase:'paws', keys:['splint']}
 ];
 const MARCH_REVIEW_LABELS = {treated:'טופל', clear:'נבדק - ללא טיפול'};
+// Owner 2026-10-23: only a paramedic or a physician performs these on scene. Checked on this
+// phone only; sync-log does not enforce it.
+const ADVANCED_PROCEDURE_KEYS = new Set(['cric','needle_decompression']);
+const ADVANCED_PROCEDURE_ROLES = new Set(['paramedic','physician']);
+function canPerformAdvancedProcedure(){
+  return ADVANCED_PROCEDURE_ROLES.has(currentUser ? currentUser.role : activeRoleDashboard);
+}
 const MEDICATION_LABELS = {morphine:'Morphine', atq:'Actiq/Fentanyl'};
 const MEDICATION_ROUTES = {morphine:'IV', atq:'PO/BUCCAL'};
 const LIMB_LABELS = {yl:'יד שמאל', yr:'יד ימין', rl:'רגל שמאל', rr:'רגל ימין'};
@@ -10805,6 +10814,10 @@ function maybeWarnHighRiskMedication(key){
   }
 }
 function toggleChip(btn, key){
+  if(ADVANCED_PROCEDURE_KEYS.has(key) && !state.interventions.has(key) && !canPerformAdvancedProcedure()){
+    toast('קוניוטומיה וניקור חזה - פרמדיק או רופא בלבד');
+    return;
+  }
   btn.classList.toggle('selected');
   const isSelected=btn.classList.contains('selected');
   if(!isSelected) {
@@ -10861,6 +10874,11 @@ function renderMarchProgress(){
   if(!root) return;
   // Chips follow state, so a restored draft shows what was already selected.
   root.querySelectorAll('.chip[data-tx]').forEach(chip=>chip.classList.toggle('selected', state.interventions.has(chip.dataset.tx)));
+  const advanced=canPerformAdvancedProcedure();
+  root.querySelectorAll('.chip[data-tx="cric"], .chip[data-tx="needle_decompression"]').forEach(chip=>{
+    chip.classList.toggle('restricted', !advanced);
+    chip.setAttribute('aria-disabled', advanced ? 'false' : 'true');
+  });
   const counts={march:[0,0], paws:[0,0]};
   MARCH_PAWS_SECTIONS.forEach(sec=>{
     const status=marchSectionStatus(sec);

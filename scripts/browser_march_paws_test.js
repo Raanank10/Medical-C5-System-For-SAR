@@ -158,6 +158,37 @@ async function main() {
     assert(quickTq.m === 'טופל', `immediate tourniquet from step 3 must mark M as treated, got ${quickTq.m}`);
     assert(!quickTq.quickHasReview, 'a quick-flow patient never saw step 7 and must not send march_review');
 
+    // 7. Cric and needle decompression: paramedic or physician only (owner 2026-10-23).
+    const scopeFor = async (setRole) => {
+      await page.evaluate((r) => {
+        currentUser = null;
+        activeRoleDashboard = 'medic';
+        if (r.signedIn) currentUser = { role: r.role }; else activeRoleDashboard = r.role;
+        startNewPatient('extended');
+        goTo('step7');
+      }, setRole);
+      // The button's own click (it is aria-disabled for other roles, and a refusal toast from the
+      // previous run can sit over it, so not a coordinate click).
+      await page.$eval('#march-sec-a .chip[data-tx="cric"]', (el) => el.click());
+      await page.$eval('#march-sec-r .chip[data-tx="needle_decompression"]', (el) => el.click());
+      const r = await page.evaluate(() => ({
+        selected: ['cric', 'needle_decompression'].filter((k) => state.interventions.has(k)).join(),
+        restricted: document.querySelector('#screen-step7 .chip[data-tx="cric"]').classList.contains('restricted'),
+      }));
+      await page.evaluate(() => { currentUser = null; activeRoleDashboard = 'medic'; });
+      return r;
+    };
+    const medic = await scopeFor({ role: 'medic' });
+    assert(medic.selected === '' && medic.restricted, `a medic must not record cric / needle decompression, got ${JSON.stringify(medic)}`);
+    const pc = await scopeFor({ role: 'pc', signedIn: true });
+    assert(pc.selected === '' && pc.restricted, `a signed-in PC must not record them, got ${JSON.stringify(pc)}`);
+    for (const role of ['paramedic', 'physician']) {
+      const ok = await scopeFor({ role, signedIn: true });
+      assert(ok.selected === 'cric,needle_decompression' && !ok.restricted, `a signed-in ${role} must record both, got ${JSON.stringify(ok)}`);
+    }
+    const demoParamedic = await scopeFor({ role: 'paramedic' });
+    assert(demoParamedic.selected === 'cric,needle_decompression', `demo paramedic must record both, got ${JSON.stringify(demoParamedic)}`);
+
     assert(pageErrors.length === 0, `uncaught page error(s): ${pageErrors.join(' | ')}`);
     await page.close();
     console.log('index.html: MARCH-PAWS treatment step browser test passed');

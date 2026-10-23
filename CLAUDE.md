@@ -65,7 +65,7 @@ node scripts/browser_sync_rejection_close_test.js  # N7: command closes a sync r
 node scripts/browser_server_watchdog_test.js      # WP-12: open server watchdog alerts (tourniquet 45/60/120 min, red/yellow vitals overdue) listed for command and the medic, marked "(שרת)", only when the phone does not raise the same alert itself
 node scripts/browser_patient_number_test.js        # patient numbers: sweep markers count up, ids carry the registrant's initials (P004-DK, Latin only), a clash on the server is renamed instead of losing the patient, the phone shows the new id
 node scripts/browser_sweep_vitals_debt_test.js     # one "no vitals" key (missing_vitals: MSTART answers do not clear it, a vitals save does), chip tiers/labels, one add button on the sweep, tourniquet limb fix from the patient screen, roster on cc/chamal/admin
-node scripts/browser_march_paws_test.js           # V2.99.61: full-flow treatment step ordered by MARCH-PAWS, per-letter "treated / checked / not documented", treatments sent with march_section, march_review on the create event; documentation only
+node scripts/browser_march_paws_test.js           # V2.99.61: full-flow treatment step ordered by MARCH-PAWS, per-letter "treated / checked / not documented", treatments sent with march_section, march_review on the create event; cric / needle decompression for paramedic and physician only; documentation only
 node scripts/browser_mobile_layout_test.js        # phone layout at 375x812 / 412x915: no overlaps, nothing past the viewport or clipped by a card, nothing left under the FAB/bottom bar, header <= 64px, no raw keys
 node scripts/test_outbox_eviction.js              # F1: persistOutbox() never evicts an unsynced event, even past the 500 cap (docs/FAILURE_MODE_REVIEW.md)
 
