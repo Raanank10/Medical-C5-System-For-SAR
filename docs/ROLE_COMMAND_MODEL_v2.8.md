@@ -8,9 +8,9 @@ Rescue command and medical command are different chains of authority that both o
 
 ## RPC — מ״מ (Rescue Platoon Commander)
 
-Tactical picture for their own platoon only: tag, triage color, zone, trapped/mobile status, evac status, patient identity (full name once reported/confirmed, otherwise the physical description used to locate an unidentified patient), and which medic is responsible (callsign only, never full name). No vitals, treatment, or mechanism of injury — this role never needs clinical detail to do its job, but it does need to know which physical person in the field is which patient, which is why identity (unlike vitals/treatment/mechanism) is in scope. See "Evacuation order visibility" below.
+Tactical picture for their own platoon only: tag, evacuation priority (urgent / not urgent / not yet sorted; the triage colour itself is not shown since V2.99.60, see "Clinical data stays with the medical roles" below), zone, trapped/mobile status, evac status, patient identity (full name once reported/confirmed, otherwise the physical description used to locate an unidentified patient), and which medic is responsible (callsign only, never full name). No vitals, treatment, or mechanism of injury — this role never needs clinical detail to do its job, but it does need to know which physical person in the field is which patient, which is why identity (unlike vitals/treatment/mechanism) is in scope. See "Evacuation order visibility" below.
 
-**Enforced by the database since `database/053` (V2.99.42).** An RPC reaches only its own platoon's sites and an RCC its own company's (plus any they opened or were assigned to), and RPC and RCC read only tactical event types: vitals, medication, treatment, injury and the MIST handover summary are hidden from both. Before `053` both rules existed only on the screen. See "Companies and platoons" below.
+**Enforced by the database since `database/053` (V2.99.42).** An RPC reaches only its own platoon's sites and an RCC its own company's (plus any they opened or were assigned to), and RPC and RCC read only tactical event types: vitals, medication, treatment, injury and the MIST handover summary are hidden from both. Before `053` both rules existed only on the screen. Since `database/073` (V2.99.60) they also no longer read the patients table, the triage colour, tourniquets or the MDA classification at all: their patients come from `get_rescue_patient_board()`. See "Companies and platoons" below.
 
 RPC does **not** submit medical reinforcement or resupply requests — that stays with חוג״ד/מ״פ רפואה.
 
@@ -20,15 +20,27 @@ RPC **can**:
 
 ## RCC — מ״פ חילוץ (Rescue Company Commander)
 
-Same tactical scope as RPC, rolled up across every platoon in their company: triage counts, trapped counts, and evac status per platoon, plus visibility into open resupply requests for the rescue company's own logistics (not medical resupply, which stays with חוג״ד/logistics).
+Same tactical scope as RPC, rolled up across every platoon in their company: priority counts (urgent / not urgent / not yet sorted), trapped counts, and evac status per platoon, plus visibility into open resupply requests for the rescue company's own logistics (not medical resupply, which stays with חוג״ד/logistics).
 
-RCC has the same clinical-data restrictions (no vitals/treatment/mechanism; identity is visible, same as RPC) and the same First Responder Quick Report and site-authority capabilities as RPC, scoped to the company instead of a single platoon.
+RCC has the same clinical-data restrictions (no triage colour, tourniquet, vitals, treatment or mechanism; identity is visible, same as RPC) and the same First Responder Quick Report and site-authority capabilities as RPC, scoped to the company instead of a single platoon.
 
 ## Evacuation order visibility (added after V2.8)
 
 RPC/RCC need to know which patient is evacuated first and what the order is after that — they're coordinating the physical vehicles/routes for the same evacuation sequence חוג״ד/מ״פ רפואה are prioritizing clinically. Their dashboards show an ordered "סדר פינוי מומלץ" list built from the exact same ranking PC/CC already use (tourniquet-window-closing can outrank triage color; otherwise sorted by triage color) — deliberately the same function and the same order, not a separately-computed one, so rescue command and medical command never disagree about sequence.
 
-One piece of that ranking's reasoning stays redacted for RPC/RCC: the tourniquet-based reason text is shown verbatim (tourniquet status is something RPC/RCC already see and report themselves), but the reason attached to a red patient without a tourniquet normally cites AVPU/respiratory rate — vitals detail outside RPC/RCC's scope — so that case is replaced with a non-clinical "אדום — פינוי בעדיפות" label instead.
+Since V2.99.60 (`database/073`) none of that ranking's reasoning reaches RPC/RCC: the server computes the order in `get_rescue_patient_board()` and returns only each patient's place in it (1, 2, 3...) and its priority (urgent / not urgent / not yet sorted). The reason text, which named the tourniquet time, the colour or the vitals, is gone from their screens, and the score itself is not sent because it would show minutes on a tourniquet. Before V2.99.60 the tourniquet reason was shown verbatim and only the vitals-based reason was redacted.
+
+## Clinical data stays with the medical roles (V2.99.60)
+
+Decided with the repo owner on 2026-10-23, after a live check of what each role could read. Enforced by the database (`database/073`), not only on the screen.
+
+- **Logistics officer: bags, not patients.** It sees each medic bag's and PC truck's movements (which item, how many, when, the count left) and the supply requests, across every site it joins, as before. It no longer reads patients, tourniquets, watchdog alerts, external or pre-evacuation reports, clinical events, or the patient each item was used on: the stock comes from `get_incident_stock_movements()`, which leaves the patient out, and the events it reads are an allowlist (incident lifecycle, supply requests, stock moves between holders). Its screen no longer names a patient on a consumption line. Before this, `join_incident()` let it join any open site and then read every patient and clinical event there.
+- **Rescue chain (מ״מ, מ״פ חילוץ): no clinical data at all.** They keep identity, location, trapped / access, evacuation status and the evacuation order. Triage reaches them only as a priority: **urgent** (red, or an active tourniquet), **not urgent** (yellow, green, black) or **not yet sorted** (never shown as not urgent). No colour, no tourniquet, no pulse / breathing / injury zones, no MDA classification, no vitals or treatments, no external-report colour counts and no pre-evacuation condition counts (`external_reports` and `incident_pre_evacuations` are now read through the clinical rule). Their patients come from `get_rescue_patient_board()`; they still write First Responder Quick Reports, including tourniquet yes/no, and see what they wrote themselves. The evacuation status shows on site / being evacuated / evacuated; a deceased patient is not told apart (that is a clinical status).
+- **Medic: the whole site, with its own patients marked.** Scope stays the site (a medic needs every patient there for handovers and the MSTART sweep). The patients this medic registered or treated on this phone (created, vitals, treatment, medication, airway, tourniquet, triage, handover, supplies used) are marked "✓ טיפלתי" and listed first, then "פצועים נוספים באתר". The mark is per user and kept with the phone's encrypted patient store; it does not follow the medic to another phone.
+- `get_incident_command_state()` (red counts, missing vitals) refuses logistics, מ״מ and מ״פ חילוץ.
+- Shared rule: `src/domain/rules.js` `rescueEvacPriority()`; the server computes the same.
+
+Not covered, on purpose: free text and item lists in supply requests stay readable to logistics (written for logistics by the requester), and the events these roles may read still carry the patient's internal id, which they cannot resolve to a patient.
 
 ## Site authority: final, without medical sign-off
 
@@ -117,7 +129,7 @@ Requested by the repo owner: casualties who left the site before any medical sta
 - **Who may write it:** the first medical staff on site (medic, paramedic, physician, pc, cc; admin per D7) sends the first report, which then locks. After that only חוג״ד (pc) and מ״פ רפואה (cc), plus admin, may change it. The first medic cannot edit their own report once sent; a PC/CC fixes it. `src/domain/rules.js` `canWritePreEvacuationReport`.
 - **"First" means first to sync** (decided with the repo owner): when two medics enter a report offline, the one whose report reaches the server first owns it. The other version is kept in the event log, does not change the report, and shows on the PC/CC board as "דיווחים נוספים נדחו", with its content listed in the sheet. The losing medic's phone switches to the server report and says it was not accepted.
 - Each device shows who entered the report and who last changed it.
-- chamal, rpc, rcc and logistics see the report where their screens already show site counters but cannot write it.
+- chamal sees the report where its screens already show site counters but cannot write it. Since V2.99.60 (`database/073`) rpc, rcc and logistics no longer read it: its condition split (light / moderate / severe) is clinical.
 - The "expected number" of casualties (requirement 3) was deferred by the repo owner.
 
 ## Companies and platoons (V2.99.42)
@@ -176,8 +188,8 @@ A deliberately minimal intake form, distinct from the medic's MSTART sweep:
 
 | Role | Owns | Explicitly excluded |
 |---|---|---|
-| RPC (מ״מ) | Tactical picture for own platoon; patient identity (name/description, for physical identification); recommended evacuation order for own platoon; site authority for own area; first-responder reports | Vitals, treatment, mechanism; medical reinforcement/resupply requests |
-| RCC (מ״פ חילוץ) | Tactical picture rolled up across own company's platoons; patient identity (name/description); recommended evacuation order across the company; site authority for own area; first-responder reports; rescue-company resupply visibility | Vitals, treatment, mechanism; medical reinforcement requests |
+| RPC (מ״מ) | Tactical picture for own platoon; patient identity (name/description, for physical identification); recommended evacuation order for own platoon; site authority for own area; first-responder reports | Triage colour (priority urgent / not urgent only), tourniquet, vitals, treatment, mechanism; medical reinforcement/resupply requests |
+| RCC (מ״פ חילוץ) | Tactical picture rolled up across own company's platoons; patient identity (name/description); recommended evacuation order across the company; site authority for own area; first-responder reports; rescue-company resupply visibility | Triage colour (priority urgent / not urgent only), tourniquet, vitals, treatment, mechanism; medical reinforcement requests |
 | Physician (רופא) | מ״פ רפואה's full command-adjacent scope plus clinical event write access; senior review; real physician-only clinical death confirmation (`PATIENT_DEATH_CONFIRMED`, distinct from official/legal certification, which stays out of scope); top rank in the F3 conflict-authority tie-break | Creating new patient records (same restriction as מ״פ רפואה) |
 | Paramedic (פראמדיק) | Same field/clinical authority as physician (drugs, procedures, high-risk override confirmation); same patient-creation/vitals/treatment/triage-status scope as medic otherwise; ranks above מ״פ רפואה in the F3 conflict-authority tie-break | Physician-only clinical death confirmation; physician's command-adjacent scope (incident/sector management, device presence, patient identity) |
 | Admin | Full technical access: raw data, scenario load/clear, experiment export, version/sync checks | Not an operational command role — demo/test-running only, same as V2.7 |

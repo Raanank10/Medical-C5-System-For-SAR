@@ -353,6 +353,18 @@
     return totals;
   }
 
+
+  // Evacuation priority for the rescue chain (rpc / rcc, database/073): triage reaches them only
+  // as urgent / not urgent, never as a colour. Urgent: red, or an active tourniquet. Not yet
+  // sorted (pending / unknown) is its own value and is never shown as not urgent. The server
+  // computes the same in get_rescue_patient_board().
+  const RESCUE_PRIORITIES = ["urgent", "pending", "not_urgent"];
+  function rescueEvacPriority(triage, tourniquetActive) {
+    if (triage === "red" || tourniquetActive === true) return "urgent";
+    if (triage === "yellow" || triage === "green" || triage === "black") return "not_urgent";
+    return "pending";
+  }
+
   return {
     AVPU_RANK,
     DEVICE_SILENCE_MS,
@@ -391,6 +403,8 @@
     PRE_EVAC_EVACUATORS,
     PRE_EVAC_FIRST_REPORT_ROLES,
     preEvacuationTotals,
+    RESCUE_PRIORITIES,
+    rescueEvacPriority,
     suggestedSweepColor,
     suggestMstartTriage,
     supplyBurnAlertLevel,
