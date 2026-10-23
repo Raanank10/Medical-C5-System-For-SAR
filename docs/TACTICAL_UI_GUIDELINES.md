@@ -10,6 +10,8 @@ These guidelines capture the design intent for C5 Sentinel-SAR as a development 
 - Keep critical controls at least 56px by 56px. Since V2.99.56 (owner, 2026-10-22) the main field buttons (tap choices, primary and secondary actions, vitals steppers, AVPU, blood pressure) are 60-64px tall, every other field control is at least 56px, and small toggles, filters and links at least 44px; the body-map injury hotspots are about 49x44px.
 - Show the current clinical clock when time changes the risk.
 - Never communicate triage by color alone; pair color with text.
+- A selected tap choice must be unmistakable at a glance, not a faint tint: since V2.99.59 (owner, 2026-10-22, AVPU on the MSTART card) a selected button gets a solid fill, an outer ring and a white check mark, so the choice reads without comparing colors.
+- Nothing in a field screen may need sideways scrolling. The pulse and breathing count steppers (-5/-1/+1/+5) take the full row width and share it, with "ספירה:" and the multiplier on a small line above (V2.99.59): at least 56px per button on a 360px-wide phone.
 - Treat stale data, missing data, and pending triage as first-class states.
 - Do not block forward movement for optional or incomplete fields; save the record and surface missing data as a background alert.
 
