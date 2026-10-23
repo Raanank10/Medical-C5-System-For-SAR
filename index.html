@@ -1057,7 +1057,7 @@ body.field-mode{--bottom-bar-h:100px;}
     <div id="enroute-address-source" style="font-size:12px;color:var(--accent);margin-bottom:12px"></div>
     <div class="field-label">הערכת זמן הגעה — אופציונלי</div>
     <input type="text" id="enroute-eta" placeholder="לדוגמה: 7 דקות / 14:35" style="margin-bottom:12px" oninput="siteData.eta=this.value">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+    <div id="enroute-floor-apt" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
       <input type="text" id="enroute-floor" placeholder="קומה / אגף" oninput="siteData.floorHint=this.value">
       <input type="text" id="enroute-apartment" placeholder="דירה / כניסה" oninput="siteData.apartmentHint=this.value">
     </div>
@@ -4794,6 +4794,10 @@ function setEnrouteIncidentDetail(key, value){
 function enrouteBuildingInvolved(){
   return siteData.buildingInvolved===true || (siteData.buildingInvolved==null && !!siteData.buildingType);
 }
+// The building section and the floor / apartment fields (V2.99.60) show together.
+function enrouteBuildingShown(){
+  return ensureSiteStatusFields(currentSiteId()).incidentType==='missile_strike_structural_collapse' || enrouteBuildingInvolved();
+}
 function setEnrouteBuildingInvolved(involved){
   siteData.buildingInvolved=!!involved;
   if(!involved){
@@ -4810,8 +4814,10 @@ function renderEnrouteSiteDetails(){
   const involved=enrouteBuildingInvolved();
   const ask=document.getElementById('enroute-building-ask');
   const section=document.getElementById('enroute-building-section');
+  const floorApt=document.getElementById('enroute-floor-apt');
   if(ask) ask.style.display=isMissile?'none':'block';
-  if(section) section.style.display=(isMissile||involved)?'block':'none';
+  if(section) section.style.display=enrouteBuildingShown()?'block':'none';
+  if(floorApt) floorApt.style.display=enrouteBuildingShown()?'grid':'none';
   document.querySelectorAll('#enroute-building-ask-grid .tap-btn').forEach(b=>{
     b.classList.toggle('selected', b.dataset.buildingInvolved===(involved?'yes':siteData.buildingInvolved===false?'no':''));
   });
@@ -9493,8 +9499,10 @@ function arriveAtSite(){
   const address=document.getElementById('enroute-address')?.value.trim() || siteData.address || 'מוקד חדש';
   const notes=document.getElementById('enroute-notes')?.value.trim() || '';
   logEnroutePrefillCorrections(document.getElementById('enroute-address')?.value.trim()||'', notes);
-  const floor=document.getElementById('enroute-floor')?.value.trim() || siteData.floorHint || '';
-  const apt=document.getElementById('enroute-apartment')?.value.trim() || siteData.apartmentHint || '';
+  // Hidden floor / apartment (no building involved) are not part of the arrival.
+  const building=enrouteBuildingShown();
+  const floor=building ? (document.getElementById('enroute-floor')?.value.trim() || siteData.floorHint || '') : '';
+  const apt=building ? (document.getElementById('enroute-apartment')?.value.trim() || siteData.apartmentHint || '') : '';
   const eta=document.getElementById('enroute-eta')?.value.trim() || siteData.eta || '';
   const zone=document.getElementById('enroute-zone')?.value.trim() || siteData.currentZone || [floor,apt].filter(Boolean).join(' / ');
   siteData.address=address;
