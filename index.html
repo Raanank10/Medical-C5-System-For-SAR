@@ -6532,12 +6532,12 @@ function renderPcResponsibilityBoard(){
   // One string per command-panel tab (V2.99.59); the status strip above the tabs is built
   // separately by renderCommandStatusStrip.
   const board=renderDedicatedPcCommandBoard(myPts);
-  const waiting=myPts.filter(p=>['red','yellow'].includes(p.triage) && !['evacuating','evacuated','handed_over','deceased'].includes(p.patientStatus)).length;
+  const waiting=myPts.filter(p=>p.patientStatus==='evacuating' || (['red','yellow'].includes(p.triage) && !['evacuated','handed_over','deceased'].includes(p.patientStatus))).length;
   return {
     overview:`${roleSection('סטטוס אתר (מפ"ק חילוץ)', roleRow('עדכון אחרון', siteStatusSummaryLine()))}
       ${roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds('pc'), {truckSiteId:pcPlatoonSite()}))}
       ${renderCommandEvacuationFunnel(myPts,'משפך פינוי מחלקתי')}
-      ${renderCollapsibleSection('pc-evac-priority','תעדוף פינוי מחלקתי', companyEvacuationPriorityRows(myPts), myPts.length, {criticalCount:myPts.filter(p=>p.triage==='red'&&!['evacuating','evacuated','handed_over','deceased'].includes(p.patientStatus)).length, emptyMessage:waiting?'אין פצועים במיקוד הנוכחי':'אין פצועים הממתינים לפינוי'})}
+      ${renderCollapsibleSection('pc-evac-priority','תעדוף פינוי מחלקתי', companyEvacuationPriorityRows(myPts), myPts.length, {criticalCount:myPts.filter(p=>p.triage==='red'&&!['evacuated','handed_over','deceased'].includes(p.patientStatus)).length, emptyMessage:waiting?'אין פצועים במיקוד הנוכחי':'אין פצועים הממתינים לפינוי'})}
       ${renderExtractedCounterBoard()}
       ${board.patientBoard}`,
     action:`${renderPcNowTaskBoard(myPts)}${board.alerts}${board.tq}${board.handsOn}${renderSweepBoardForPc()}${renderPcAssessmentDebtBoard()}${board.rhythm}`,
@@ -6717,16 +6717,24 @@ function evacuationPriorityRank(p){
   else if(p.triage==='yellow' && ['observing','stabilizing'].includes(p.patientStatus)){ rank=3; reason='צהוב מיוצב'; }
   return {rank, reason, tqMin, tqRemaining};
 }
+// Evacuation-to-hospital list. Patients at the site's evacuation point (status evacuating) are
+// still waiting for MDA, so they stay on it whatever their rank (owner, 2026-10-23), marked
+// "בנקודת פינוי"; the ranking itself is unchanged.
 function companyEvacuationPriorityRows(pts=patients){
   const rows=pts.map(p=>{
     const {rank,reason,tqMin,tqRemaining}=evacuationPriorityRank(p);
     return {...p, evacRank:rank, evacReason:reason, tqMin, tqRemaining};
-  }).filter(p=>p.evacRank<4 && !['evacuating','evacuated','handed_over','deceased'].includes(p.patientStatus));
+  }).filter(p=>p.patientStatus==='evacuating' || (p.evacRank<4 && !['evacuated','handed_over','deceased'].includes(p.patientStatus)));
   rows.sort((a,b)=>a.evacRank-b.evacRank || ((b.tqMin||0)-(a.tqMin||0)));
-  return rows.slice(0,8).map(p=>{
-    const label=p.evacRank===0?'עדיפות עליונה — חסם פחות מ־45 דק׳ לחלון':p.evacRank===1?'עדיפות 1 — חסם פעיל':p.evacRank===2?'עדיפות 2 — אדום הכרה / נשימה':'עדיפות 3 — צהוב מיוצב';
-    return roleRow(`${label} · ${p.visualId||p.id}`,`${p.evacReason} · ${p.location} · ${TRIAGE_LABELS[p.triage]||p.triage}`,`<span class="identity-chip">פעולה: שייך אמבולנס / אשר עיכוב / העבר למוקד פינוי</span>`);
-  }).join('');
+  const shown=rows.slice(0,8).map(p=>{
+    const atPoint=p.patientStatus==='evacuating';
+    const label=p.evacRank===0?'עדיפות עליונה — חסם פחות מ־45 דק׳ לחלון':p.evacRank===1?'עדיפות 1 — חסם פעיל':p.evacRank===2?'עדיפות 2 — אדום הכרה / נשימה':p.evacRank===3?'עדיפות 3 — צהוב מיוצב':'ממתין לפינוי מד״א';
+    const reason=p.evacRank===4?'':`${p.evacReason} · `;
+    const action=atPoint?'בנקודת פינוי · ממתין לפינוי מד״א':'פעולה: שייך אמבולנס / אשר עיכוב / העבר למוקד פינוי';
+    return roleRow(`${label} · ${p.visualId||p.id}`,`${atPoint?'בנקודת פינוי':'באתר החילוץ'} · ${reason}${p.location} · ${TRIAGE_LABELS[p.triage]||p.triage}`,`<span class="identity-chip">${action}</span>`);
+  });
+  if(rows.length>8) shown.push(roleRow(`+${rows.length-8} נוספים בתור הפינוי`,'מוצגים 8 הראשונים לפי סדר העדיפות'));
+  return shown.join('');
 }
 // Full-list evac-priority sort for PC/CC patient tile grids (as opposed to
 // companyEvacuationPriorityRows' top-8 highlight list): same ranking, extended to a total order.
@@ -7027,7 +7035,7 @@ function renderCcCommandBoard(){
   return {
     overview:`${roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds('cc')))}
     ${renderCcEvacuationFunnel()}
-    ${renderCollapsibleSection('cc-evac-priority','תעדוף פינוי פלוגתי', companyEvacuationPriorityRows(focusedPts), focusedPts.length, {criticalCount:patients.filter(p=>p.triage==='red'&&!['evacuating','evacuated','handed_over','deceased'].includes(p.patientStatus)).length, emptyMessage:'אין פצועים במיקוד הנוכחי'})}
+    ${renderCollapsibleSection('cc-evac-priority','תעדוף פינוי פלוגתי', companyEvacuationPriorityRows(focusedPts), focusedPts.length, {criticalCount:patients.filter(p=>p.triage==='red'&&!['evacuated','handed_over','deceased'].includes(p.patientStatus)).length, emptyMessage:'אין פצועים במיקוד הנוכחי'})}
     ${renderExtractedCounterBoard()}
     ${renderCollapsibleSection('cc-company-metrics','מדדים פלוגתיים', `<div class="role-top-grid">${snapshot}</div>`, 14)}`,
     action:`${renderCcHeroDashboard({openReqs,doctorReqs,deathReqs,blockedEvac,overloaded,ineffectiveTqs,tqPatients})}
