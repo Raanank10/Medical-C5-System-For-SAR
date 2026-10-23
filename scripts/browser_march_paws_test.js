@@ -1,4 +1,4 @@
-// Real-browser test for V2.99.61: the full-flow treatment step (screen-step7) ordered by
+// Real-browser test for V2.99.62: the full-flow treatment step (screen-step7) ordered by
 // MARCH-PAWS. Documentation only: no letter blocks the flow, changes triage or raises an alert.
 //
 // Checks, at phone width (375x812), in local demo mode with the page's own functions:
