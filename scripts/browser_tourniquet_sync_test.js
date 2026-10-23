@@ -91,6 +91,10 @@ async function checkFile(browser, file) {
     state.trapStatus = 'not_trapped';
     state.injury = 'שבר';
     quickTqData.applied = false;
+    // Vitals really taken: since 2026-10-23 an uncounted counter records nothing, so the test
+    // enters a counted set instead of relying on the counters' starting numbers.
+    flowVitals = { pulse: 96, spo2: null, bp_estimate: 'radial_strong', rr: 18, avpu: 'A' };
+    countedVitals = new Set(['pulse15', 'rr30']);
     projectPatientStatus('observing', 'VITALS_RECORDED');
     const inFlow = getOutbox().filter((e) => e.type === 'VITALS_RECORDED' && !e.patient_id).map((e) => !!e.localOnly);
     const before = getOutbox().length;

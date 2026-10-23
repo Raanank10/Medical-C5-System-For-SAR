@@ -65,7 +65,7 @@ async function vitalsKey(browser) {
   });
   assert(r.created.includes('missing_vitals'), `a new marker must show missing_vitals (got ${r.created})`);
   assert(!r.created.includes('full_vitals'), `full_vitals must no longer be emitted (got ${r.created})`);
-  assert(r.mstartRr === 16, `test premise: MSTART "breathing yes" sets a placeholder rr of 16 (got ${r.mstartRr})`);
+  assert(r.mstartRr === null, `MSTART "breathing yes" must not invent a breathing rate (got ${r.mstartRr})`);
   assert(r.mstartOnly.includes('missing_vitals'), `MSTART answers alone must not clear missing_vitals (got ${r.mstartOnly})`);
   assert(!r.measured.includes('missing_vitals'), `a saved vitals set must clear missing_vitals (got ${r.measured})`);
   assert(r.sweepCount === 0, `the sweep's "no full vitals" counter must drop after vitals (got ${r.sweepCount})`);
