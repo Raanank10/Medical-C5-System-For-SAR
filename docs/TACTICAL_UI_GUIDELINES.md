@@ -13,6 +13,18 @@ These guidelines capture the design intent for C5 Sentinel-SAR as a development 
 - Treat stale data, missing data, and pending triage as first-class states.
 - Do not block forward movement for optional or incomplete fields; save the record and surface missing data as a background alert.
 
+## Phone Layout (owner, 2026-10-23)
+
+Checked by `scripts/browser_mobile_layout_test.js` at 375x812 and 412x915, RTL, field mode on.
+
+- One top nav, 60px tall: "ראשי", "מצב שטח" and an account menu ("חשבון": user management for admins, bug report, sign out), equal-size buttons with a one-line label. Nothing else floats over the top of a screen; each screen's own sticky header sits under the nav.
+- Signed in, the nav shows the role and the email. "לא מקוון" (saved offline profile) comes first and is never cut short; only the email is.
+- At most one floating control above a screen's bottom bar (the sweep's "+ פצוע | אותו אזור"), placed from the bar's height, and the screen reserves room for both so no content ends up under them.
+- Inside a casualty card nothing is positioned out of flow and nothing is wider than the card. Below 480px the ID takes its own line and the triage banner stacks its text above its source pill. Mixed Hebrew/Latin labels ("אדום / RED") are isolated per direction.
+- One red frame per card: the triage banner inside a card has no border of its own, and an unacknowledged alert pulses as a ring on the card's outline, without a blur around it.
+- Missing-data chips have three tiers: red only for what changes care of a red casualty now (full or missing vitals, stale vitals, evacuation status, no reassessment), orange for a clock that is late or cannot run (stale vitals, tourniquet time or limb unknown), a neutral outline for the rest. All of them stay visible.
+- No internal key (such as `stale_vitals`) is ever shown: every missing-data key has a Hebrew label in `DEBT_LABELS` (`tests/debt-labels.test.js`).
+
 ## New Patient Flow
 
 The New Patient flow prioritizes speed and minimum safe capture.

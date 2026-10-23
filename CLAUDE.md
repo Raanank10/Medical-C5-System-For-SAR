@@ -21,6 +21,7 @@ python scripts/check_repo.py
 
 # Domain rule unit tests (required when triage/vitals/alert/timing rules change)
 node tests/domain-rules.test.js
+node tests/debt-labels.test.js         # every missing-data key index.html emits has a Hebrew label (no raw stale_vitals on screen)
 
 # Manual smoke tests against the built HTML (string-assertion checks, run individually as needed)
 node scripts/smoke_v2_991_medic_cc.js
@@ -63,6 +64,7 @@ node scripts/browser_remote_vitals_test.js         # N6: another phone's newest 
 node scripts/browser_sync_rejection_close_test.js  # N7: command closes a sync rejection from the panel (reason, note for "not recoverable", overnight-deletion warning); a resent and accepted record closes its rejection by itself
 node scripts/browser_server_watchdog_test.js      # WP-12: open server watchdog alerts (tourniquet 45/60/120 min, red/yellow vitals overdue) listed for command and the medic, marked "(שרת)", only when the phone does not raise the same alert itself
 node scripts/browser_patient_number_test.js        # patient numbers: sweep markers count up, ids carry the registrant's initials (P004-DK, Latin only), a clash on the server is renamed instead of losing the patient, the phone shows the new id
+node scripts/browser_mobile_layout_test.js        # phone layout at 375x812 / 412x915: no overlaps, nothing past the viewport or clipped by a card, nothing left under the FAB/bottom bar, header <= 64px, no raw keys
 node scripts/test_outbox_eviction.js              # F1: persistOutbox() never evicts an unsynced event, even past the 500 cap (docs/FAILURE_MODE_REVIEW.md)
 
 # Analytics package
@@ -75,7 +77,7 @@ python -m pytest                  # pytest suite for db.py/kpis.py/charts.py/rep
 python -c "from db import DB; from kpis import KPIEngine; from report import ReportGenerator; db=DB('rescue_demo_v1_1.db'); kpi=KPIEngine(db); ReportGenerator(kpi).save('aar_report_v1_1.html')"
 ```
 
-CI (`.github/workflows/validate.yml`) runs two jobs on every PR and push to `main`: `repo-check` (`python scripts/check_repo.py` and `node tests/domain-rules.test.js`, fast) and, since WP-13, `browser-and-smoke-tests` (`npm ci`, Playwright's Chromium, then `npm test` = `scripts/run_tests.js`: every `scripts/browser_*.js`, the other `scripts/test_*.js` and every `scripts/smoke_*.js`, one after the other, about 4 minutes). The analytics package's `pytest` suite is still not in CI (it needs the analytics venv/dependencies).
+CI (`.github/workflows/validate.yml`) runs two jobs on every PR and push to `main`: `repo-check` (`python scripts/check_repo.py`, `node tests/domain-rules.test.js` and `node tests/debt-labels.test.js`, fast) and, since WP-13, `browser-and-smoke-tests` (`npm ci`, Playwright's Chromium, then `npm test` = `scripts/run_tests.js`: every `scripts/browser_*.js`, the other `scripts/test_*.js` and every `scripts/smoke_*.js`, one after the other, about 4 minutes). The analytics package's `pytest` suite is still not in CI (it needs the analytics venv/dependencies).
 
 `scripts/check_repo.py` enforces (stdlib only, no deps):
 - a fixed list of required paths exist (`REQUIRED_PATHS` in the script — update it when adding/renaming core docs, schema files, or archive folders)

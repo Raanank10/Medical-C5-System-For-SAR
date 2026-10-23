@@ -164,7 +164,12 @@ async function checkFile(browser, file) {
   // 1. A non-admin (cc) never sees the entry point.
   await login(page, 'cc@test');
   await page.waitForSelector('#screen-incident-picker.active', { timeout: 5000 });
+  // The entry point lives in the top nav's account menu (owner, 2026-10-23); open it so this
+  // checks the button is really absent, not just hidden by a closed menu.
+  await page.click('#auth-account-menu summary');
+  assert(await page.locator('#auth-account-menu').evaluate((el) => el.open), `${rel}: the account menu must open`);
   assert(!(await page.locator('#auth-admin-users-btn').isVisible()), `${rel}: cc must not see the user-management button`);
+  await page.evaluate(() => closeAccountMenu());
   await page.evaluate(() => openAdminUsers());
   assert(!(await page.locator('#screen-admin-users').evaluate((el) => el.classList.contains('active'))), `${rel}: cc must not be able to open the admin screen`);
   await page.evaluate(() => signOut());
@@ -172,6 +177,7 @@ async function checkFile(browser, file) {
   // 2. Admin: button visible, screen lists users, own row has no controls.
   await login(page, 'admin@test');
   await page.waitForSelector('#screen-incident-picker.active', { timeout: 5000 });
+  await page.click('#auth-account-menu summary');
   assert(await page.locator('#auth-admin-users-btn').isVisible(), `${rel}: admin must see the user-management button`);
   await page.click('#auth-admin-users-btn');
   await page.waitForSelector('#screen-admin-users.active', { timeout: 5000 });
