@@ -718,6 +718,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 .vital-val.not-counted{color:var(--muted);opacity:.65;}
 .count-rate.not-counted{color:var(--muted);}
 .vital-val[role=button]{cursor:pointer;}
+#spo2-na-btn.selected,#mspo2-na-btn.selected{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important;}
 .bottom-bar{padding-bottom:calc(14px + env(safe-area-inset-bottom));}
 </style>
 </head>
@@ -1626,13 +1627,14 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     <!-- SpO2 optional -->
     <div class="vital-row column">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <div><div class="vital-label">סטורציה SpO₂</div><div class="vital-unit">אופציונלי — אם יש מד</div></div>
+        <div><div class="vital-label">סטורציה SpO₂</div><div class="vital-unit">נדרש למדדים מלאים · אם אין מד, סמן/י "אין מד"</div></div>
+        <button id="spo2-na-btn" class="toggle-pill-btn" onclick="markSpo2Unavailable('')" style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:6px 14px;color:var(--muted);font-size:12px;font-weight:800">אין מד סטורציה</button>
         <button id="spo2-toggle-btn" class="toggle-pill-btn" onclick="toggleSpo2()" style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:6px 14px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer">+ הוסף</button>
       </div>
       <div id="spo2-input-wrap" style="display:none">
         <div class="vital-ctrl" style="justify-content:center">
           <button class="vital-btn" style="border-radius:10px 0 0 10px" onmousedown="startHold('spo2',-1)" onmouseup="stopHold()" ontouchstart="startHold('spo2',-1)" ontouchend="stopHold()" onclick="changeVital('spo2',-1)">−</button>
-          <div class="vital-val" id="v-spo2" style="min-width:70px">98</div>
+          <div class="vital-val not-counted" id="v-spo2" style="min-width:70px" role="button" tabindex="0" aria-label="אישור ערך הסטורציה" onclick="confirmSpo2('')">98</div>
           <button class="vital-btn" style="border-radius:0 10px 10px 0" onmousedown="startHold('spo2',1)" onmouseup="stopHold()" ontouchstart="startHold('spo2',1)" ontouchend="stopHold()" onclick="changeVital('spo2',1)">+</button>
         </div>
       </div>
@@ -2417,10 +2419,11 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     <!-- SpO2 -->
     <div class="vital-row row" style="margin-bottom:9px">
       <div><div class="vital-label">סטורציה</div><div class="vital-unit">SpO₂ %</div></div>
+      <button id="mspo2-na-btn" class="toggle-pill-btn" onclick="markSpo2Unavailable('m')" style="background:var(--surface2);border:1px solid var(--border);color:var(--muted);border-radius:10px;padding:10px 12px;font-size:12px;font-weight:800">אין מד</button>
       <button id="modal-spo2-toggle" class="toggle-pill-btn" onclick="toggleModalSpo2()" style="background:var(--surface2);border:1px solid var(--border);color:var(--accent);border-radius:10px;padding:10px 12px;font-size:12px;font-weight:800;cursor:pointer">+ הוסף</button>
       <div class="vital-ctrl" id="modal-spo2-ctrl" style="display:none">
         <button class="vital-btn" onmousedown="startHold('mspo2',-1)" onmouseup="stopHold()" ontouchstart="startHold('mspo2',-1)" ontouchend="stopHold()" onclick="changeVital('mspo2',-1)">−</button>
-        <div class="vital-val" id="mv-spo2">98</div>
+        <div class="vital-val not-counted" id="mv-spo2" role="button" tabindex="0" aria-label="אישור ערך הסטורציה" onclick="confirmSpo2('m')">98</div>
         <button class="vital-btn" onmousedown="startHold('mspo2',1)" onmouseup="stopHold()" ontouchstart="startHold('mspo2',1)" ontouchend="stopHold()" onclick="changeVital('mspo2',1)">+</button>
       </div>
     </div>
@@ -3557,6 +3560,7 @@ const RETIRED_DEBT_KEYS = ['full_vitals','missing_treatment'];
 const OBSERVABLE_VITALS=['rr','pulse','avpu','bp_estimate','spo2'];
 function vitalObserved(p={}, key){
   if(p.vitalsObserved) return !!p.vitalsObserved[key];
+  if(key==='spo2' && p.vitals?.spo2_unavailable) return true;
   return !!(p.vitalsValuesAt || p.vitalsMeasuredAt) && p.vitals?.[key]!=null;
 }
 function observedFrom(v={}, at, src, skip=[]){
@@ -3565,11 +3569,11 @@ function observedFrom(v={}, at, src, skip=[]){
   return o;
 }
 function legacyObserved(p={}){ return p.vitalsObserved ? {...p.vitalsObserved} : observedFrom((p.vitalsValuesAt||p.vitalsMeasuredAt)?p.vitals||{}:{}, p.vitalsValuesAt||p.vitalsMeasuredAt||Date.now(), 'sheet'); }
-// "אין מדדים מלאים" clears only with a counted breathing rate, AVPU, and a pulse rate or
-// perfusion (owner, 2026-10-23).
-function hasMeasuredVitals(p={}){
-  return vitalObserved(p,'rr') && vitalObserved(p,'avpu') && (vitalObserved(p,'pulse') || vitalObserved(p,'bp_estimate'));
-}
+// "אין מדדים מלאים" clears only when all five vital signs were measured (owner, 2026-10-23): an
+// exactly counted pulse and breathing rate (a range is not enough), SpO₂ (or "אין מד סטורציה"),
+// AVPU and blood pressure / perfusion.
+const FULL_SET_VITALS=['pulse','rr','spo2','avpu','bp_estimate'];
+function hasMeasuredVitals(p={}){ return FULL_SET_VITALS.every(k=>vitalObserved(p,k)); }
 function vitalSourceTag(p={}, key){
   const o=p.vitalsObserved?.[key];
   if(o?.src==='mstart') return ' (MSTART)';
@@ -3584,12 +3588,15 @@ function rrDisplay(p={}, lang='he'){
   const rr=p.vitals?.rr;
   if(rr!=null && vitalObserved(p,'rr')) return `${rr}${vitalSourceTag(p,'rr')}`;
   if(rr===0) return lang==='he'?'0 — לא נושם':'0 (not breathing)';
+  if(p.vitals?.rr_range) return lang==='he'?`${p.vitals.rr_range} (טווח, לא נספר)`:`${p.vitals.rr_range} (range, not counted)`;
   if(breathingKnownYes(p)) return lang==='he'?'נושם — לא נספר':'breathing, not counted';
   return lang==='he'?'לא נמדד':'not measured';
 }
 function pulseDisplay(p={}, lang='he'){
   const v=p.vitals?.pulse;
-  return v!=null ? `${v}${vitalSourceTag(p,'pulse')}` : (lang==='he'?'לא נמדד':'not measured');
+  if(v!=null) return `${v}${vitalSourceTag(p,'pulse')}`;
+  if(p.vitals?.pulse_range) return lang==='he'?`${p.vitals.pulse_range} (טווח, לא נספר)`:`${p.vitals.pulse_range} (range, not counted)`;
+  return lang==='he'?'לא נמדד':'not measured';
 }
 function markAutoVital(key, auto){
   state.autoVitals=(state.autoVitals||[]).filter(k=>k!==key);
@@ -4574,7 +4581,21 @@ let counts = {...COUNT_BASELINE};
 // Owner, 2026-10-23: a counter's starting number (20 / 15 s = 80, 8 / 30 s = 16) is only a starting
 // point for the +/- buttons. Until the medic changes it, picks a bracket, or taps the number to
 // confirm, it is "לא נספר" and is recorded as nothing - never as 80 or 16.
-let countedVitals = new Set(); // pulse15, rr30 (patient flow), mpulse15, mrr30 (vitals sheet)
+let countedVitals = new Set(); // pulse15, rr30, spo2 (patient flow), mpulse15, mrr30, mspo2 (vitals sheet)
+// "אין מד סטורציה" (owner, 2026-10-23): recorded as such and counts for SpO₂ in a full set.
+let flowSpo2Unavailable = false;
+let modalSpo2Unavailable = false;
+// Range buttons on the patient flow's vitals screen record the range itself, never a stand-in
+// number (owner, 2026-10-23: "10-30" used to record 16, "60-100" 80). A range is used for triage but
+// is not an exact count, so it does not complete a full set.
+const RR_RANGES = {9:'<10', 16:'10-30', 35:'>30'};
+const PULSE_RANGES = {50:'<60', 80:'60-100', 110:'101-120', 135:'>120'};
+const RR_RANGE_FOR_TRIAGE = {'<10':9, '10-30':16, '>30':35};
+function triageVitalsFromFlow(){
+  const v={...flowVitals};
+  if(v.rr==null && v.rr_range) v.rr=RR_RANGE_FOR_TRIAGE[v.rr_range]??null;
+  return v;
+}
 const EMPTY_VITALS = {pulse:null, spo2:null, bp_estimate:null, rr:null, avpu:null};
 let spo2Active = false;
 let doses = {morphine:5, fluids:500};
@@ -10448,6 +10469,7 @@ function startNewPatient(mode='extended'){
   resetCounted('');
   state.autoVitals = [];
   spo2Active = false;
+  flowSpo2Unavailable = false;
   doses = {morphine:5, fluids:500};
   tqData = {time:null, limbs:new Set()};
   quickTqData = {applied:false, time:null, limbs:new Set()};
@@ -10697,8 +10719,39 @@ function toggleSpo2(){
   spo2Active = !spo2Active;
   document.getElementById('spo2-input-wrap').style.display = spo2Active?'block':'none';
   document.getElementById('spo2-toggle-btn').textContent = spo2Active?'✕ הסר':'+ הוסף';
-  if(!spo2Active) flowVitals.spo2=null;
-  else { flowVitals.spo2=98; document.getElementById('v-spo2').textContent='98'; }
+  flowVitals.spo2=null;
+  countedVitals.delete('spo2');
+  if(spo2Active){ flowSpo2Unavailable=false; renderSpo2State(''); }
+  else renderSpo2State('');
+}
+// SpO₂ starts at 98 only as a starting point for −/+ (owner, 2026-10-23: switching it on used to
+// record 98): "לא נמדד" until changed or the number is tapped to confirm.
+function renderSpo2State(prefix){
+  const isM=prefix==='m';
+  const el=document.getElementById(isM?'mv-spo2':'v-spo2');
+  const value=isM?modalVitals.spo2:flowVitals.spo2;
+  const measured=countedVitals.has(isM?'mspo2':'spo2') && value!=null;
+  if(el){ el.textContent=measured?value:(el.dataset.start||'98'); el.classList.toggle('not-counted', !measured); }
+  const na=document.getElementById(isM?'mspo2-na-btn':'spo2-na-btn');
+  if(na) na.classList.toggle('selected', isM?modalSpo2Unavailable:flowSpo2Unavailable);
+}
+function confirmSpo2(prefix){
+  const isM=prefix==='m';
+  if(isM && !modalSpo2Active){ toast('הוסף SpO₂ לפני אישור ערך'); return; }
+  const el=document.getElementById(isM?'mv-spo2':'v-spo2');
+  const v=Number(el?.textContent)||98;
+  if(isM){ modalVitals.spo2=v; modalSpo2Unavailable=false; } else { flowVitals.spo2=v; flowSpo2Unavailable=false; }
+  countedVitals.add(isM?'mspo2':'spo2');
+  renderSpo2State(prefix);
+  saveActiveRecoveryState(activeScreenId());
+}
+function markSpo2Unavailable(prefix){
+  const isM=prefix==='m';
+  const now=!(isM?modalSpo2Unavailable:flowSpo2Unavailable);
+  if(isM){ modalSpo2Unavailable=now; if(now) modalVitals.spo2=null; } else { flowSpo2Unavailable=now; if(now) flowVitals.spo2=null; }
+  countedVitals.delete(isM?'mspo2':'spo2');
+  renderSpo2State(prefix);
+  saveActiveRecoveryState(activeScreenId());
 }
 function selectBP(btn, val){
   document.querySelectorAll('#bp-grid .bp-btn').forEach(b=>b.classList.remove('selected'));
@@ -10897,7 +10950,7 @@ function selectTriage(btn, val){
   state.triage = val;
 }
 function showMstartSuggestion(){
-  const suggestion=C5Rules.suggestMstartTriage({vitals:flowVitals,accessibility:state.accessibility});
+  const suggestion=C5Rules.suggestMstartTriage({vitals:triageVitalsFromFlow(),accessibility:state.accessibility});
   const {triage, reason}=suggestion;
   const colors={red:'var(--red)',yellow:'var(--yellow)',green:'var(--green)',black:'#888'};
   const short={red:'אדום — דחוף',yellow:'צהוב — דחוף',green:'ירוק — לא דחוף',black:'שחור — לא בר הצלה'};
@@ -10914,6 +10967,7 @@ function showMstartSuggestion(){
 //  COUNT-BASED VITALS
 // ═══════════════════════════════════════════════
 function vitalRangeWarning(key, value){
+  if(value==null || value==='') return ''; // not counted / not measured: no value, no warning (Number(null) is 0)
   const v=Number(value);
   if(!Number.isFinite(v)) return '';
   if(key==='pulse' && v<50) return '<span class="vital-range-warn orange">⚠ ברדיקרדיה — פחות מ-50</span>';
@@ -10935,15 +10989,25 @@ function setVitalWarningAfterValue(valueElId, warnId, warnKey, value){
   }
   warn.innerHTML=vitalRangeWarning(warnKey, value);
 }
+function clearFlowRange(key){
+  if(key==='rr30' && flowVitals.rr_range){ delete flowVitals.rr_range; markBracketSelected('rr-bracket-grid', null); }
+  if(key==='pulse15' && flowVitals.pulse_range){ delete flowVitals.pulse_range; markBracketSelected('pulse-bracket-grid', null); }
+}
 function markCounted(key){
   countedVitals.add(key);
+  clearFlowRange(key);
   updateCountDisplay(key);
   saveActiveRecoveryState(activeScreenId());
 }
-function resetCounted(prefix=''){ ['pulse15','rr30'].forEach(k=>countedVitals.delete(prefix+k)); }
+function resetCounted(prefix=''){
+  ['pulse15','rr30'].forEach(k=>countedVitals.delete(prefix+k));
+  countedVitals.delete(prefix?'mspo2':'spo2');
+  if(prefix) modalSpo2Unavailable=false; else flowSpo2Unavailable=false;
+}
 function changeCount(key, delta){
   const lim=COUNT_LIMITS[key]; if(!lim) return;
   countedVitals.add(key);
+  clearFlowRange(key);
   counts[key]=Math.min(lim.max,Math.max(lim.min,(counts[key]||lim.min)+delta));
   updateCountDisplay(key);
   saveActiveRecoveryState(activeScreenId());
@@ -10981,35 +11045,53 @@ function markBracketSelected(gridId, btn){
   if(btn) btn.classList.add('selected');
 }
 function setVitalPulseBracket(btn, rate){
-  countedVitals.add('pulse15');
-  flowVitals.pulse=rate;
+  // A range, not a count: stored as the range, and the counter stays "לא נספר".
+  countedVitals.delete('pulse15');
   counts.pulse15=Math.max(1, Math.round(rate/4));
   updateCountDisplay('pulse15');
+  flowVitals.pulse=null;
+  flowVitals.pulse_range=PULSE_RANGES[rate]||null;
+  const elR=document.getElementById('v-pulse-rate'); if(elR) elR.textContent=flowVitals.pulse_range||'—';
+  const elC=document.getElementById('v-pulse-calc'); if(elC) elC.textContent=`טווח: ${flowVitals.pulse_range} · לספירה מדויקת השתמש/י במונה`;
   setVitalWarningAfterValue('v-pulse15', 'vital-warn-pulse15', 'pulse', rate);
   markBracketSelected('pulse-bracket-grid', btn);
   saveActiveRecoveryState(activeScreenId());
 }
 function setVitalRR(btn, rate){
-  countedVitals.add('rr30');
-  flowVitals.rr=rate;
   counts.rr30=Math.max(0, Math.round(rate/2));
   const el30=document.getElementById('v-rr30');
   const elR=document.getElementById('v-rr-rate');
-  el30?.classList.remove('not-counted'); elR?.classList.remove('not-counted');
   const elC=document.getElementById('v-rr-calc');
-  if(el30) el30.textContent=counts.rr30;
-  if(elR) elR.textContent=rate;
-  if(elC) elC.textContent=`${counts.rr30} נשימות ב-30 שניות = ${rate} / דקה`;
+  if(rate===0){
+    // "0 דום נשימה" is an exact observation.
+    countedVitals.add('rr30');
+    delete flowVitals.rr_range;
+    flowVitals.rr=0;
+    el30?.classList.remove('not-counted'); elR?.classList.remove('not-counted');
+    if(el30) el30.textContent=0;
+    if(elR) elR.textContent=0;
+    if(elC) elC.textContent='0 — לא נושם';
+  } else {
+    // A range, not a count: stored as the range (never as 9 / 16 / 35); triage uses its band.
+    countedVitals.delete('rr30');
+    flowVitals.rr=null;
+    flowVitals.rr_range=RR_RANGES[rate]||null;
+    el30?.classList.add('not-counted');
+    if(el30) el30.textContent=counts.rr30;
+    if(elR){ elR.textContent=flowVitals.rr_range||'—'; elR.classList.remove('not-counted'); }
+    if(elC) elC.textContent=`טווח: ${flowVitals.rr_range} · לספירה מדויקת השתמש/י במונה`;
+  }
   setVitalWarningAfterValue('v-rr30', 'vital-warn-rr30', 'rr', rate);
   markBracketSelected('rr-bracket-grid', btn);
   saveActiveRecoveryState(activeScreenId());
 }
 function changeVital(key, delta){
   const b=VITALS_BOUNDS[key]; if(!b) return;
-  if(key==='spo2'){ flowVitals.spo2=Math.min(b.max,Math.max(b.min,(flowVitals.spo2??98)+delta)); document.getElementById('v-spo2').textContent=flowVitals.spo2; }
+  const startOf=id=>Number(document.getElementById(id)?.textContent)||98;
+  if(key==='spo2'){ flowVitals.spo2=Math.min(b.max,Math.max(b.min,(flowVitals.spo2??startOf('v-spo2'))+delta)); countedVitals.add('spo2'); flowSpo2Unavailable=false; renderSpo2State(''); }
   if(key==='mspo2'){
     if(!modalSpo2Active){ toast('הוסף SpO₂ לפני שינוי ערך'); return; }
-    modalVitals.spo2=Math.min(b.max,Math.max(b.min,(modalVitals.spo2??98)+delta)); document.getElementById('mv-spo2').textContent=modalVitals.spo2;
+    modalVitals.spo2=Math.min(b.max,Math.max(b.min,(modalVitals.spo2??startOf('mv-spo2'))+delta)); countedVitals.add('mspo2'); modalSpo2Unavailable=false; renderSpo2State('m');
   }
   if(key==='spo2') setVitalWarningAfterValue('v-spo2', 'vital-warn-spo2', 'spo2', flowVitals.spo2);
   if(key==='mspo2') setVitalWarningAfterValue('mv-spo2', 'vital-warn-mspo2', 'spo2', modalVitals.spo2);
@@ -11283,7 +11365,9 @@ function savePatient(){
   // needs_full_assessment) from this event, so other devices do not show the patient as
   // vitals overdue. Never sent for a quick capture, which must stay flagged for assessment.
   const flowObserved=observedFrom(flowVitals, Date.now(), 'flow', state.autoVitals||[]);
-  if(!quickCapture && Object.keys(flowObserved).length && (state.localEvents||[]).some(e=>e.type==='VITALS_RECORDED')){
+  if(flowSpo2Unavailable){ flowObserved.spo2={at:Date.now(), src:'flow', unavailable:true}; flowVitals.spo2_unavailable=true; }
+  const flowHasAnything=Object.keys(flowObserved).length || flowVitals.rr_range || flowVitals.pulse_range;
+  if(!quickCapture && flowHasAnything && (state.localEvents||[]).some(e=>e.type==='VITALS_RECORDED')){
     saveLocalEvent({type:'VITALS_RECORDED',detail:`${newId} · מדדים בפתיחת פצוע`,warn:false,patient_id:patientUuid,
       payload_json:{...flowVitals,capture:vitalsCapture,capture_mode:state.flowMode,siteId:'SITE_A'}});
   }
@@ -11336,13 +11420,15 @@ function openQuickVitals(pid){
   modalVitalsAtOpen={...shown};
   resetCounted('m');
   modalSpo2Active=p.vitals.spo2 != null;
+  modalVitals.spo2=null; // the last reading is shown as a starting point, not re-recorded
+  const spo2El=document.getElementById('mv-spo2'); if(spo2El) spo2El.dataset.start=String(p.vitals.spo2 ?? 98);
   modalTreatmentNeeded=null;
   modalTreatments=new Set();
   counts.mpulse15=p.vitals.pulse!=null?Math.round(p.vitals.pulse/4):COUNT_BASELINE.mpulse15;
   counts.mrr30=p.vitals.rr!=null?Math.round(p.vitals.rr/2):COUNT_BASELINE.mrr30;
   document.getElementById('modal-pid-title').textContent=`עדכון מדדים — ${p.visualId||p.id}`;
   document.getElementById('modal-last-vitals').textContent=`אחרון: דופק ${p.vitals.pulse ?? '—'} · נשימות ${rrDisplay(p)} · SpO₂ ${p.vitals.spo2||'—'} · AVPU ${p.vitals.avpu||'—'}`;
-  document.getElementById('mv-spo2').textContent=p.vitals.spo2 ?? '—';
+  renderSpo2State('m');
   document.getElementById('modal-spo2-ctrl').style.display=modalSpo2Active?'flex':'none';
   document.getElementById('modal-spo2-toggle').textContent=modalSpo2Active?'✕ הסר':'+ הוסף';
   setDeviceLabels();
@@ -11363,9 +11449,10 @@ function toggleModalSpo2(){
   const btn=document.getElementById('modal-spo2-toggle');
   if(ctrl) ctrl.style.display=modalSpo2Active?'flex':'none';
   if(btn) btn.textContent=modalSpo2Active?'✕ הסר':'+ הוסף';
-  if(modalSpo2Active && modalVitals.spo2 == null) modalVitals.spo2=98;
-  if(!modalSpo2Active) modalVitals.spo2=null;
-  document.getElementById('mv-spo2').textContent=modalVitals.spo2 ?? '—';
+  modalVitals.spo2=null;
+  countedVitals.delete('mspo2');
+  if(modalSpo2Active) modalSpo2Unavailable=false;
+  renderSpo2State('m');
 }
 function selectModalBP(btn,val){
   document.querySelectorAll('#modal-bp-grid .bp-btn').forEach(b=>b.classList.remove('selected'));
@@ -11481,12 +11568,13 @@ async function saveModalVitals(){
   const measuredNow=OBSERVABLE_VITALS.filter(k=>next[k]!=null && !(k!=='spo2' && ['avpu','bp_estimate'].includes(k) && next[k]===modalVitalsAtOpen[k] && obs[k]));
   // Saving with nothing counted or chosen would only restart the reassessment clock and tell the
   // server vitals were taken (owner, 2026-10-23): refused instead.
-  if(!measuredNow.length){
+  if(!measuredNow.length && !modalSpo2Unavailable){
     toast('לא נספר ולא נבחר אף מדד — לא נשמר. ספור/י או הקש/י על המספר לאישור.');
     return;
   }
   const savedAt=Date.now();
   measuredNow.forEach(k=>{ obs[k]={at:savedAt, src:'sheet'}; });
+  if(modalSpo2Unavailable){ obs.spo2={at:savedAt, src:'sheet', unavailable:true}; next.spo2_unavailable=true; }
 
   // ── Deterioration detection ──────────────────
   const flags=detectDeterioration(prev,next);

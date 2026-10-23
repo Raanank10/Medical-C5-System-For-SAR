@@ -102,12 +102,14 @@ async function vitalsSheet(browser) {
     const clock = p.lastVitalsAt;
     openQuickVitals(id);
     const ui = { rate: document.getElementById('mv-rr-rate').textContent, grey: document.getElementById('mv-rr30').classList.contains('not-counted'),
-      pulse: modalVitals.pulse, rr: modalVitals.rr };
+      pulse: modalVitals.pulse, rr: modalVitals.rr,
+      warning: (document.getElementById('vital-warn-mrr30')?.innerText || '') + (document.getElementById('vital-warn-mpulse15')?.innerText || '') };
     await saveModalVitals();
     return { ui, clockKept: p.lastVitalsAt === clock, open: !document.getElementById('vitals-modal').classList.contains('hidden') };
   }, id);
   assert(untouched.ui.rate === '—' && untouched.ui.grey, `an untouched breathing counter must show "—" greyed (got ${JSON.stringify(untouched.ui)})`);
   assert(untouched.ui.pulse === null && untouched.ui.rr === null, `untouched counters record nothing (got ${JSON.stringify(untouched.ui)})`);
+  assert(!untouched.ui.warning, `an uncounted value must not raise a range warning (got "${untouched.ui.warning}")`);
   assert(untouched.clockKept && untouched.open, `an empty save must be refused: clock kept, sheet open (got ${JSON.stringify(untouched)})`);
   assert((await outboxVitals()).length === 0, 'an empty save must not send VITALS_RECORDED');
 
@@ -124,16 +126,45 @@ async function vitalsSheet(browser) {
   const sent = (await outboxVitals()).pop();
   assert(sent && sent.payload_json.pulse === 84 && sent.payload_json.rr == null, `the server gets the pulse and no breathing rate (got ${JSON.stringify(sent && sent.payload_json)})`);
 
-  // Breathing rate confirmed by tapping the number: now a full set with MSTART's AVPU and perfusion.
+  // Breathing rate confirmed by tapping the number: four of five (no SpO₂ yet), chip stays.
   await page.evaluate((id) => openQuickVitals(id), id);
   await page.click('#mv-rr30');
-  const full = await page.evaluate(async (id) => {
+  const four = await page.evaluate(async (id) => {
     const p = patients.find((x) => x.id === id);
     await saveModalVitals();
     return { rr: p.vitals.rr, chip: assessmentDebtList(p).includes('missing_vitals'), pulseKept: p.vitals.pulse };
   }, id);
-  assert(full.rr === 16 && !full.chip, `a confirmed count is recorded and completes the set (got ${JSON.stringify(full)})`);
-  assert(full.pulseKept === 84, `a vital not re-measured keeps its last observed value (got ${full.pulseKept})`);
+  assert(four.rr === 16, `a confirmed count is recorded (got ${JSON.stringify(four)})`);
+  assert(four.chip, `all five vital signs are needed: without SpO₂ the chip stays (got ${JSON.stringify(four)})`);
+  assert(four.pulseKept === 84, `a vital not re-measured keeps its last observed value (got ${four.pulseKept})`);
+
+  // SpO₂ switched on but not touched records nothing; "אין מד" counts and completes the set.
+  await page.evaluate((id) => openQuickVitals(id), id);
+  const spo2 = await page.evaluate(async (id) => {
+    toggleModalSpo2();
+    const untouched = { value: modalVitals.spo2, grey: document.getElementById('mv-spo2').classList.contains('not-counted') };
+    toggleModalSpo2();
+    return { untouched };
+  }, id);
+  assert(spo2.untouched.value === null && spo2.untouched.grey, `SpO₂ switched on but untouched records nothing (got ${JSON.stringify(spo2.untouched)})`);
+  await page.click('#mspo2-na-btn');
+  const full = await page.evaluate(async (id) => {
+    const p = patients.find((x) => x.id === id);
+    await saveModalVitals();
+    const ev = getOutbox().filter((e) => e.type === 'VITALS_RECORDED').pop();
+    return { chip: assessmentDebtList(p).includes('missing_vitals'), unavailableSent: ev?.payload_json?.spo2_unavailable === true, spo2: ev?.payload_json?.spo2 };
+  }, id);
+  assert(!full.chip, `"אין מד סטורציה" + the other four completes the set (got ${JSON.stringify(full)})`);
+  assert(full.unavailableSent && full.spo2 == null, `the server is told there was no oximeter, with no SpO₂ value (got ${JSON.stringify(full)})`);
+
+  // A confirmed SpO₂ value is recorded as measured.
+  await page.evaluate((id) => { openQuickVitals(id); toggleModalSpo2(); }, id);
+  await page.click('#mv-spo2');
+  const confirmed = await page.evaluate(async (id) => {
+    await saveModalVitals();
+    return getOutbox().filter((e) => e.type === 'VITALS_RECORDED').pop()?.payload_json?.spo2;
+  }, id);
+  assert(confirmed === 98, `a tapped (confirmed) SpO₂ is recorded (got ${confirmed})`);
   assert(!errors.length, `page errors: ${errors.join(' | ')}`);
   await context.close();
 }
@@ -167,6 +198,41 @@ async function patientFlows(browser) {
   assert(full.fv.pulse === null && full.fv.rr === null, `untouched flow counters record nothing (got ${JSON.stringify(full.fv)})`);
   assert(full.sentVitals === 0, `a patient flow with nothing measured must not send VITALS_RECORDED (got ${full.sentVitals})`);
   assert(full.chip && full.pulse === null && full.rr === null, `nothing measured: no values, chip stays (got ${JSON.stringify(full)})`);
+
+  // Range buttons record the range, never a stand-in number; triage uses the band; not a count.
+  const ranges = await page.evaluate(() => {
+    startNewPatient('extended');
+    selectFlowMode(document.querySelector('#flow-mode-grid .tap-btn') || document.createElement('button'), 'extended');
+    goTo('step4');
+    setVitalRR(document.querySelector('#rr-bracket-grid .tap-btn:nth-child(3)'), 16);
+    setVitalPulseBracket(document.querySelector('#pulse-bracket-grid .tap-btn:nth-child(2)'), 80);
+    const fv = { ...flowVitals };
+    const rateShown = document.getElementById('v-rr-rate').textContent;
+    selectAVPU(document.querySelector('#avpu-grid .avpu-btn'), 'A');
+    selectBP(document.querySelector('#bp-grid .bp-btn'), 'radial_strong');
+    const triageRr = triageVitalsFromFlow().rr;
+    state.triage = 'yellow'; state.trapStatus = 'not_trapped'; state.injury = 'שבר';
+    projectPatientStatus('observing', 'VITALS_RECORDED');
+    const before = getOutbox().length;
+    savePatient();
+    const p = patients[patients.length - 1];
+    const ev = getOutbox().slice(before).find((e) => e.type === 'VITALS_RECORDED' && e.patient_id === p.id);
+    // Exact count afterwards replaces the range.
+    startNewPatient('extended');
+    setVitalRR(document.querySelector('#rr-bracket-grid .tap-btn:nth-child(3)'), 16);
+    changeCount('rr30', 1);
+    const afterCount = { rr: flowVitals.rr, range: flowVitals.rr_range || null };
+    return { fv, rateShown, triageRr, chip: assessmentDebtList(p).includes('missing_vitals'), mist: mistTextForPatient(p),
+      sentRr: ev?.payload_json?.rr, sentRange: ev?.payload_json?.rr_range, afterCount };
+  });
+  assert(ranges.fv.rr === null && ranges.fv.rr_range === '10-30', `"10-30" must record the range, not 16 (got ${JSON.stringify(ranges.fv)})`);
+  assert(ranges.fv.pulse === null && ranges.fv.pulse_range === '60-100', `"60-100" must record the range, not 80 (got ${JSON.stringify(ranges.fv)})`);
+  assert(ranges.rateShown === '10-30', `the screen shows the range (got ${ranges.rateShown})`);
+  assert(ranges.triageRr === 16, `triage still uses the range's band (got ${ranges.triageRr})`);
+  assert(ranges.sentRr == null && ranges.sentRange === '10-30', `the server gets the range, no number (got rr ${ranges.sentRr}, range ${ranges.sentRange})`);
+  assert(ranges.chip, 'a range is not an exact count: "אין מדדים מלאים" stays');
+  assert(ranges.mist.includes('10-30 (טווח, לא נספר)'), `MIST says it was a range (got ${ranges.mist})`);
+  assert(ranges.afterCount.rr === 18 && ranges.afterCount.range === null, `an exact count replaces the range (got ${JSON.stringify(ranges.afterCount)})`);
   assert(!errors.length, `page errors: ${errors.join(' | ')}`);
   await context.close();
 }
