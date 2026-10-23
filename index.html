@@ -270,6 +270,23 @@ body.field-mode .patient-card{padding:16px 15px;margin-top:8px;margin-bottom:8px
 .tq-reminder{display:none;background:rgba(230,57,70,.1);border:1px solid rgba(230,57,70,.7);border-radius:14px;padding:13px 14px;margin-bottom:14px;}
 .tq-reminder-title{font-weight:800;color:var(--red);font-size:14px;margin-bottom:5px;}
 .tq-reminder-body{font-size:12px;color:var(--muted);line-height:1.55;}
+/* Step 7 MARCH-PAWS sections (V2.99.61): documentation order only, never blocks the flow. */
+.march-progress{font-size:13px;font-weight:700;color:var(--muted);margin:-4px 0 12px;}
+.march-section{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px;margin-bottom:12px;}
+.march-section.done{border-color:rgba(52,199,89,.55);}
+.march-section .chip-grid + div{margin-top:12px;}
+.march-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.march-letter{width:40px;height:40px;border-radius:10px;background:var(--accent);color:#fff;font-family:var(--mono);font-weight:900;font-size:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.march-section.paws .march-letter{background:transparent;border:2px solid var(--accent);color:var(--accent);}
+.march-title{font-weight:800;font-size:15px;}
+.march-sub{font-size:11px;color:var(--muted);}
+.march-state{margin-inline-start:auto;font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap;}
+.march-state.treated{color:var(--accent);}
+.march-state.clear{color:var(--green);}
+.march-hint{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;}
+.march-clear{margin-top:10px;width:100%;min-height:56px;background:transparent;border:2px dashed var(--border);border-radius:12px;color:var(--muted);font-size:14px;font-weight:700;cursor:pointer;touch-action:manipulation;}
+.march-clear.selected{border-style:solid;border-color:var(--green);color:var(--green);background:rgba(52,199,89,.12);}
+.march-phase-label{font-size:12px;font-weight:800;color:var(--muted);letter-spacing:.5px;margin:6px 0 10px;}
 
 /* ── VITALS ── */
 .vital-row{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px;margin-bottom:9px;}
@@ -892,7 +909,7 @@ body.field-mode{--bottom-bar-h:100px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9960</div>
+      <div class="demo-kicker">Demo V2.9961</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -989,7 +1006,7 @@ body.field-mode{--bottom-bar-h:100px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9960</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9961</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -999,7 +1016,7 @@ body.field-mode{--bottom-bar-h:100px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9960</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9961</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -1761,7 +1778,7 @@ body.field-mode{--bottom-bar-h:100px;}
 <div id="screen-step7" class="screen">
   <div class="flow-header">
     <button class="btn-back" onclick="goTo('step6')">←</button>
-    <div><div class="flow-step">שלב 7 / 8</div><div class="flow-title">טיפולים שניתנו</div></div>
+    <div><div class="flow-step">שלב 7 / 8</div><div class="flow-title">טיפולים - MARCH-PAWS</div></div>
   </div>
   <div class="progress-bar"><div class="progress-fill" style="width:87.5%"></div></div>
   <div class="flow-content">
@@ -1777,19 +1794,17 @@ body.field-mode{--bottom-bar-h:100px;}
       <div class="stock-panel-title">אזהרות ציוד אישי — לא חוסם טיפול</div>
       <div class="stock-grid" id="tx-stock-grid"></div>
     </div>
-    <div class="field-label">טיפולים שניתנו עכשיו (ניתן לבחור מספר)</div>
-    <div class="chip-grid" style="margin-bottom:16px">
-      <button class="chip" onclick="toggleChip(this,'bandage')"><span class="chip-icon">🩹</span>חבישה</button>
-      <button class="chip" onclick="toggleChip(this,'tourniquet')"><span class="chip-icon">🔴</span>חסם עורקים</button>
-      <button class="chip" onclick="toggleChip(this,'iv')"><span class="chip-icon">💉</span>פתיחת וריד</button>
-      <button class="chip" onclick="toggleChip(this,'morphine')"><span class="chip-icon">💊</span>מורפיום</button>
-      <button class="chip" onclick="toggleChip(this,'fluids')"><span class="chip-icon">🩺</span>נוזלים IV</button>
-      <button class="chip" onclick="toggleChip(this,'airway_mgmt')"><span class="chip-icon">💨</span>פתיחת נ"א</button>
-      <button class="chip" onclick="toggleChip(this,'cpr')"><span class="chip-icon">❤️</span>החייאה</button>
-      <button class="chip" onclick="toggleChip(this,'atq')"><span class="chip-icon">🟠</span>אקטיק</button>
-      <button class="chip" onclick="toggleChip(this,'other_tx')"><span class="chip-icon">➕</span>אחר</button>
-    </div>
-    <div id="tourniquet-wrap" style="display:none;background:var(--surface2);border:1px solid var(--red);border-radius:14px;padding:14px;margin-bottom:14px">
+    <div class="field-label">טיפולים לפי MARCH-PAWS (ניתן לבחור מספר)</div>
+    <div class="march-progress" id="march-progress"></div>
+    <div class="march-section" id="march-sec-m">
+      <div class="march-head"><span class="march-letter">M</span><div><div class="march-title">דימום מסיבי</div><div class="march-sub">Massive hemorrhage</div></div><span class="march-state" id="march-state-m">לא תועד</span></div>
+      <div class="chip-grid">
+        <button class="chip" data-tx="tourniquet" onclick="toggleChip(this,'tourniquet')"><span class="chip-icon">🔴</span>חסם עורקים</button>
+        <button class="chip" data-tx="bandage" onclick="toggleChip(this,'bandage')"><span class="chip-icon">🩹</span>חבישה / חבישה לוחצת</button>
+        <button class="chip" data-tx="hemostatic" onclick="toggleChip(this,'hemostatic')"><span class="chip-icon">🩸</span>גזה המוסטטית</button>
+        <button class="chip" data-tx="junctional_tq" onclick="toggleChip(this,'junctional_tq')"><span class="chip-icon">🟥</span>חסם צומתי</button>
+      </div>
+      <div id="tourniquet-wrap" style="display:none;background:var(--surface2);border:1px solid var(--red);border-radius:14px;padding:14px;margin-bottom:14px">
       <div style="font-weight:700;font-size:14px;color:var(--red);margin-bottom:10px">🔴 פרטי חסם עורקים</div>
       <div class="field-label">שעת הנחה (4 ספרות)</div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
@@ -1805,7 +1820,63 @@ body.field-mode{--bottom-bar-h:100px;}
         <button class="limb-btn" onclick="toggleLimb(this,'rr')">רגל ימין</button>
       </div>
     </div>
-    <div id="morphine-wrap" style="display:none;margin-bottom:12px">
+      <button class="march-clear" id="march-clear-m" onclick="toggleMarchClear(this,'m')">נבדק - לא נדרש טיפול</button>
+    </div>
+    <div class="march-section" id="march-sec-a">
+      <div class="march-head"><span class="march-letter">A</span><div><div class="march-title">נתיב אוויר</div><div class="march-sub">Airway</div></div><span class="march-state" id="march-state-a">לא תועד</span></div>
+      <div class="chip-grid">
+        <button class="chip" data-tx="airway_mgmt" onclick="toggleChip(this,'airway_mgmt')"><span class="chip-icon">💨</span>פתיחת נ"א</button>
+        <button class="chip" data-tx="npa" onclick="toggleChip(this,'npa')"><span class="chip-icon">👃</span>נתיב אוויר אפי (NPA)</button>
+        <button class="chip" data-tx="recovery_position" onclick="toggleChip(this,'recovery_position')"><span class="chip-icon">🛌</span>תנוחת התאוששות</button>
+        <button class="chip" data-tx="cric" onclick="toggleChip(this,'cric')"><span class="chip-icon">🔪</span>קוניוטומיה</button>
+      </div>
+      <button class="march-clear" id="march-clear-a" onclick="toggleMarchClear(this,'a')">נבדק - לא נדרש טיפול</button>
+    </div>
+    <div class="march-section" id="march-sec-r">
+      <div class="march-head"><span class="march-letter">R</span><div><div class="march-title">נשימה</div><div class="march-sub">Respiration</div></div><span class="march-state" id="march-state-r">לא תועד</span></div>
+      <div class="chip-grid">
+        <button class="chip" data-tx="chest_seal" onclick="toggleChip(this,'chest_seal')"><span class="chip-icon">🫁</span>חבישה אוטמת לחזה</button>
+        <button class="chip" data-tx="needle_decompression" onclick="toggleChip(this,'needle_decompression')"><span class="chip-icon">💉</span>ניקור חזה</button>
+        <button class="chip" data-tx="oxygen" onclick="toggleChip(this,'oxygen')"><span class="chip-icon">🫧</span>חמצן</button>
+      </div>
+      <button class="march-clear" id="march-clear-r" onclick="toggleMarchClear(this,'r')">נבדק - לא נדרש טיפול</button>
+    </div>
+    <div class="march-section" id="march-sec-c">
+      <div class="march-head"><span class="march-letter">C</span><div><div class="march-title">מחזור דם</div><div class="march-sub">Circulation</div></div><span class="march-state" id="march-state-c">לא תועד</span></div>
+      <div class="chip-grid">
+        <button class="chip" data-tx="iv" onclick="toggleChip(this,'iv')"><span class="chip-icon">💉</span>פתיחת וריד</button>
+        <button class="chip" data-tx="io" onclick="toggleChip(this,'io')"><span class="chip-icon">🦴</span>עירוי תוך-גרמי (IO)</button>
+        <button class="chip" data-tx="fluids" onclick="toggleChip(this,'fluids')"><span class="chip-icon">🩺</span>נוזלים IV</button>
+        <button class="chip" data-tx="txa" onclick="toggleChip(this,'txa')"><span class="chip-icon">🧪</span>TXA</button>
+        <button class="chip" data-tx="pelvic_binder" onclick="toggleChip(this,'pelvic_binder')"><span class="chip-icon">🩻</span>חגורת אגן</button>
+        <button class="chip" data-tx="cpr" onclick="toggleChip(this,'cpr')"><span class="chip-icon">❤️</span>החייאה</button>
+      </div>
+      <div id="fluids-wrap" style="display:none;margin-bottom:12px">
+      <div class="field-label">נוזלים — כמות (ml)</div>
+      <div class="vital-ctrl">
+        <button class="vital-btn" style="border-radius:10px 0 0 10px" onclick="changeDose('fluids',-50)">−</button>
+        <div class="vital-val" id="dose-fluids" style="min-width:80px">500</div>
+        <button class="vital-btn" style="border-radius:0 10px 10px 0" onclick="changeDose('fluids',50)">+</button>
+      </div>
+    </div>
+      <button class="march-clear" id="march-clear-c" onclick="toggleMarchClear(this,'c')">נבדק - לא נדרש טיפול</button>
+    </div>
+    <div class="march-section" id="march-sec-h">
+      <div class="march-head"><span class="march-letter">H</span><div><div class="march-title">היפותרמיה / פגיעת ראש</div><div class="march-sub">Hypothermia / Head injury</div></div><span class="march-state" id="march-state-h">לא תועד</span></div>
+      <div class="chip-grid">
+        <button class="chip" data-tx="blanket" onclick="toggleChip(this,'blanket')"><span class="chip-icon">🧣</span>מניעת היפותרמיה (שמיכה)</button>
+      </div>
+      <div class="march-hint">פגיעת ראש: רמת הכרה (AVPU) מתועדת בשלב המדדים.</div>
+      <button class="march-clear" id="march-clear-h" onclick="toggleMarchClear(this,'h')">נבדק - לא נדרש טיפול</button>
+    </div>
+    <div class="march-phase-label">PAWS - לאחר ייצוב</div>
+    <div class="march-section paws" id="march-sec-p">
+      <div class="march-head"><span class="march-letter">P</span><div><div class="march-title">כאב</div><div class="march-sub">Pain</div></div><span class="march-state" id="march-state-p">לא תועד</span></div>
+      <div class="chip-grid">
+        <button class="chip" data-tx="morphine" onclick="toggleChip(this,'morphine')"><span class="chip-icon">💊</span>מורפיום</button>
+        <button class="chip" data-tx="atq" onclick="toggleChip(this,'atq')"><span class="chip-icon">🟠</span>אקטיק</button>
+      </div>
+      <div id="morphine-wrap" style="display:none;margin-bottom:12px">
       <div class="field-label">מינון מורפיום (mg)</div>
       <div class="vital-ctrl">
         <button class="vital-btn" style="border-radius:10px 0 0 10px" onclick="changeDose('morphine',-1)">−</button>
@@ -1817,13 +1888,33 @@ body.field-mode{--bottom-bar-h:100px;}
         <div class="risk-panel-body">מינון תרופתי בילד מתחת גיל 8 דורש אישור כפול. האישור נשמר באירוע המקומי ולא חוסם תיעוד.</div>
       </div>
     </div>
-    <div id="fluids-wrap" style="display:none;margin-bottom:12px">
-      <div class="field-label">נוזלים — כמות (ml)</div>
-      <div class="vital-ctrl">
-        <button class="vital-btn" style="border-radius:10px 0 0 10px" onclick="changeDose('fluids',-50)">−</button>
-        <div class="vital-val" id="dose-fluids" style="min-width:80px">500</div>
-        <button class="vital-btn" style="border-radius:0 10px 10px 0" onclick="changeDose('fluids',50)">+</button>
+      <button class="march-clear" id="march-clear-p" onclick="toggleMarchClear(this,'p')">נבדק - לא נדרש טיפול</button>
+    </div>
+    <div class="march-section paws" id="march-sec-ab">
+      <div class="march-head"><span class="march-letter">A</span><div><div class="march-title">אנטיביוטיקה</div><div class="march-sub">Antibiotics</div></div><span class="march-state" id="march-state-ab">לא תועד</span></div>
+      <div class="chip-grid">
+        <button class="chip" data-tx="antibiotics" onclick="toggleChip(this,'antibiotics')"><span class="chip-icon">💊</span>אנטיביוטיקה</button>
       </div>
+      <button class="march-clear" id="march-clear-ab" onclick="toggleMarchClear(this,'ab')">נבדק - לא נדרש טיפול</button>
+    </div>
+    <div class="march-section paws" id="march-sec-w">
+      <div class="march-head"><span class="march-letter">W</span><div><div class="march-title">פצעים</div><div class="march-sub">Wounds</div></div><span class="march-state" id="march-state-w">לא תועד</span></div>
+      <div class="chip-grid">
+        <button class="chip" data-tx="wound_care" onclick="toggleChip(this,'wound_care')"><span class="chip-icon">🩹</span>טיפול בפצעים / כוויות</button>
+        <button class="chip" data-tx="eye_shield" onclick="toggleChip(this,'eye_shield')"><span class="chip-icon">👁️</span>מגן עין</button>
+      </div>
+      <button class="march-clear" id="march-clear-w" onclick="toggleMarchClear(this,'w')">נבדק - לא נדרש טיפול</button>
+    </div>
+    <div class="march-section paws" id="march-sec-s">
+      <div class="march-head"><span class="march-letter">S</span><div><div class="march-title">קיבוע</div><div class="march-sub">Splinting</div></div><span class="march-state" id="march-state-s">לא תועד</span></div>
+      <div class="chip-grid">
+        <button class="chip" data-tx="splint" onclick="toggleChip(this,'splint')"><span class="chip-icon">🦵</span>קיבוע / סד</button>
+      </div>
+      <button class="march-clear" id="march-clear-s" onclick="toggleMarchClear(this,'s')">נבדק - לא נדרש טיפול</button>
+    </div>
+    <div class="field-label">טיפול אחר</div>
+    <div class="chip-grid" style="margin-bottom:16px">
+        <button class="chip" data-tx="other_tx" onclick="toggleChip(this,'other_tx')"><span class="chip-icon">➕</span>אחר</button>
     </div>
     <div id="other-tx-wrap" style="display:none;margin-bottom:12px">
       <div class="field-label">תאר טיפול אחר</div>
@@ -3020,7 +3111,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.60';
+const APP_VERSION = '2.99.61';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3385,7 +3476,26 @@ const AGE_BAND_LABELS = {infant:'תינוק (0-1)', child:'ילד (1-8)', adult:
 const AGE_BAND_TO_GROUP = {infant:'pediatric', child:'pediatric', adult:'adult', elderly:'adult'};
 const AGE_BAND_DEFAULT_AGE = {infant:1, child:7, adult:null, elderly:70};
 function ageBandOf(p={}){ return p.patientAgeBand || (p.patientAgeGroup==='pediatric'?'child':'adult'); }
-const INT_LABELS = {bandage:'חבישה', tourniquet:'חסם עורקים', iv:'פתיחת וריד', morphine:'מורפיום', fluids:'נוזלים IV', airway_mgmt:'פתיחת נ"א', cpr:'החייאה', atq:'אקטיק', other_tx:'אחר'};
+const INT_LABELS = {bandage:'חבישה', tourniquet:'חסם עורקים', iv:'פתיחת וריד', morphine:'מורפיום', fluids:'נוזלים IV', airway_mgmt:'פתיחת נ"א', cpr:'החייאה', atq:'אקטיק', other_tx:'אחר',
+  hemostatic:'גזה המוסטטית', junctional_tq:'חסם צומתי', npa:'נתיב אוויר אפי (NPA)', recovery_position:'תנוחת התאוששות', cric:'קוניוטומיה',
+  chest_seal:'חבישה אוטמת לחזה', needle_decompression:'ניקור חזה', oxygen:'חמצן', io:'עירוי תוך-גרמי (IO)', txa:'TXA', pelvic_binder:'חגורת אגן',
+  blanket:'מניעת היפותרמיה (שמיכה)', antibiotics:'אנטיביוטיקה', wound_care:'טיפול בפצעים / כוויות', eye_shield:'מגן עין', splint:'קיבוע / סד'};
+// Step 7 is ordered by MARCH (TCCC primary survey) then PAWS (after stabilization), V2.99.61.
+// Documentation only: no letter blocks saving, changes triage or raises an alert. Each treatment
+// still travels as its own INTERVENTION_RECORDED / AIRWAY_MANAGED / TOURNIQUET_APPLIED /
+// MEDICATION_ADMINISTERED event; the per-letter review goes in the create event's march_review.
+const MARCH_PAWS_SECTIONS = [
+  {id:'m', letter:'M', label:'דימום מסיבי', phase:'march', keys:['tourniquet','bandage','hemostatic','junctional_tq']},
+  {id:'a', letter:'A', label:'נתיב אוויר', phase:'march', keys:['airway_mgmt','npa','recovery_position','cric']},
+  {id:'r', letter:'R', label:'נשימה', phase:'march', keys:['chest_seal','needle_decompression','oxygen']},
+  {id:'c', letter:'C', label:'מחזור דם', phase:'march', keys:['iv','io','fluids','txa','pelvic_binder','cpr']},
+  {id:'h', letter:'H', label:'היפותרמיה / פגיעת ראש', phase:'march', keys:['blanket']},
+  {id:'p', letter:'P', label:'כאב', phase:'paws', keys:['morphine','atq']},
+  {id:'ab', letter:'A', label:'אנטיביוטיקה', phase:'paws', keys:['antibiotics']},
+  {id:'w', letter:'W', label:'פצעים', phase:'paws', keys:['wound_care','eye_shield']},
+  {id:'s', letter:'S', label:'קיבוע', phase:'paws', keys:['splint']}
+];
+const MARCH_REVIEW_LABELS = {treated:'טופל', clear:'נבדק - ללא טיפול'};
 const MEDICATION_LABELS = {morphine:'Morphine', atq:'Actiq/Fentanyl'};
 const MEDICATION_ROUTES = {morphine:'IV', atq:'PO/BUCCAL'};
 const LIMB_LABELS = {yl:'יד שמאל', yr:'יד ימין', rl:'רגל שמאל', rr:'רגל ימין'};
@@ -4480,7 +4590,7 @@ function freshState(){
     flowMode:'extended', patientAgeGroup:'adult', patientAgeBand:'adult', patientAge:null,
     injury:null, injuryZones:new Set(), patientStatus:'identified',
     rapidWalking:null, rapidMajorBleeding:null, rapidAutoFilled:false,
-    interventions:new Set(), triage:null,
+    interventions:new Set(), marchClear:new Set(), triage:null,
     needsFullAssessment:true, localEvents:[], localStockCache:{...SUPPLY_BASELINE}, supplyMovements:{}, pediatricOverrides:{}, pendingMedicationOverride:null,
     vitalsMedicName:'', txMedicName:''
   };
@@ -4546,6 +4656,7 @@ function serializeActiveDraft(screen=null){
     state:{
       ...state,
       interventions:[...(state.interventions||[])],
+      marchClear:[...(state.marchClear||[])],
       injuryZones:[...(state.injuryZones||[])],
       pendingMedicationOverride:null
     },
@@ -4568,6 +4679,7 @@ function hydrateActiveDraft(snapshot){
   if(!snapshot?.state) return false;
   state={...freshState(), ...snapshot.state};
   state.interventions=new Set(snapshot.state.interventions||[]);
+  state.marchClear=new Set(snapshot.state.marchClear||[]);
   state.injuryZones=new Set(snapshot.state.injuryZones||[]);
   state.localStockCache={...SUPPLY_BASELINE, ...(snapshot.state.localStockCache||{})};
   state.supplyMovements=snapshot.state.supplyMovements||{};
@@ -7630,7 +7742,7 @@ function goTo(screen){
   if(screen==='step3')     { const b=document.querySelector('#screen-step3 .btn-back'); if(b) b.setAttribute('onclick', "goTo('step1')"); }
   if(screen==='step4')     { setVitalsModeView(); setDeviceLabels(); checkStep4(); }
   if(screen==='step5')     showMstartSuggestion();
-  if(screen==='step7')     { renderTourniquetReminder(); renderLocalStockPanel(); updatePediatricTreatmentUi(); setDeviceLabels(); checkStep7(); }
+  if(screen==='step7')     { renderTourniquetReminder(); renderLocalStockPanel(); updatePediatricTreatmentUi(); renderMarchProgress(); setDeviceLabels(); checkStep7(); }
   if(screen==='step8')     renderSummary();
   if(screen==='commander') renderCommander();
   if(screen==='logistics') renderLogisticsOfficer();
@@ -10336,7 +10448,7 @@ function startNewPatient(mode='extended'){
   quickTqData = {applied:false, time:null, limbs:new Set()};
 
   // Reset all UI
-  document.querySelectorAll('.tap-btn,.avpu-btn,.chip,.bp-btn,.limb-btn,.body-hotspot').forEach(b=>b.classList.remove('selected','ok','issue','managed'));
+  document.querySelectorAll('.tap-btn,.avpu-btn,.chip,.bp-btn,.limb-btn,.body-hotspot,.march-clear').forEach(b=>b.classList.remove('selected','ok','issue','managed'));
   const modeBtn=document.querySelector(`#flow-mode-grid .tap-btn[onclick*="'${mode}'"]`) || document.querySelector('#flow-mode-grid .tap-btn:nth-child(2)');
   if(modeBtn) modeBtn.classList.add('selected');
   const adultBtn=document.querySelector('#age-grid .tap-btn');
@@ -10701,6 +10813,8 @@ function toggleChip(btn, key){
   } else {
     state.interventions.add(key);
     reconcileSupplyForIntervention(key);
+    const sec=marchSectionForKey(key);
+    if(sec) state.marchClear?.delete(sec.id);
   }
   if(key==='tourniquet' && state.interventions.has(key)) haptic([120,60,120]);
   document.getElementById('tourniquet-wrap').style.display=state.interventions.has('tourniquet')?'block':'none';
@@ -10714,7 +10828,58 @@ function toggleChip(btn, key){
   if(['morphine','atq'].includes(key)) maybeWarnHighRiskMedication(key);
   updatePediatricTreatmentUi();
   renderLocalStockPanel();
+  renderMarchProgress();
   saveActiveRecoveryState('step7');
+}
+function marchSectionForKey(key){
+  return MARCH_PAWS_SECTIONS.find(sec=>sec.keys.includes(key)) || null;
+}
+// 'treated' (a treatment in this letter, or the step 3 immediate tourniquet for M), 'clear' (the
+// medic checked it and nothing was needed) or null (not documented: shown as such, never hidden).
+function marchSectionStatus(sec){
+  if(sec.keys.some(k=>state.interventions.has(k)) || (sec.id==='m' && quickTqData.applied)) return 'treated';
+  if(state.marchClear?.has(sec.id)) return 'clear';
+  return null;
+}
+function marchReviewFromState(){
+  return Object.fromEntries(MARCH_PAWS_SECTIONS.map(sec=>[sec.id, marchSectionStatus(sec)]));
+}
+function toggleMarchClear(btn, id){
+  const sec=MARCH_PAWS_SECTIONS.find(s=>s.id===id);
+  if(!sec) return;
+  if(!state.marchClear) state.marchClear=new Set();
+  if(marchSectionStatus(sec)==='treated'){
+    toast('כבר נבחר טיפול בסעיף זה');
+    return;
+  }
+  if(state.marchClear.has(id)) state.marchClear.delete(id); else state.marchClear.add(id);
+  renderMarchProgress();
+  saveActiveRecoveryState('step7');
+}
+function renderMarchProgress(){
+  const root=document.getElementById('screen-step7');
+  if(!root) return;
+  // Chips follow state, so a restored draft shows what was already selected.
+  root.querySelectorAll('.chip[data-tx]').forEach(chip=>chip.classList.toggle('selected', state.interventions.has(chip.dataset.tx)));
+  const counts={march:[0,0], paws:[0,0]};
+  MARCH_PAWS_SECTIONS.forEach(sec=>{
+    const status=marchSectionStatus(sec);
+    counts[sec.phase][1]++;
+    if(status) counts[sec.phase][0]++;
+    const label=document.getElementById('march-state-'+sec.id);
+    if(label){ label.textContent=MARCH_REVIEW_LABELS[status]||'לא תועד'; label.className='march-state'+(status?' '+status:''); }
+    document.getElementById('march-sec-'+sec.id)?.classList.toggle('done', !!status);
+    document.getElementById('march-clear-'+sec.id)?.classList.toggle('selected', status==='clear');
+  });
+  const progress=document.getElementById('march-progress');
+  if(progress) progress.textContent=`תועדו: MARCH ${counts.march[0]}/${counts.march[1]} · PAWS ${counts.paws[0]}/${counts.paws[1]}`;
+}
+function marchReviewSummaryHtml(review){
+  return MARCH_PAWS_SECTIONS.map(sec=>{
+    const status=review?.[sec.id]||null;
+    const color=status==='treated'?'var(--accent)':status==='clear'?'var(--green)':'var(--muted)';
+    return `<span style="color:${color};white-space:nowrap">${sec.letter} ${sec.label}: ${MARCH_REVIEW_LABELS[status]||'לא תועד'}</span>`;
+  }).join('<br>');
 }
 function changeDose(key, delta){
   const lim={morphine:{min:1,max:30},fluids:{min:50,max:2000}}[key];
@@ -10961,13 +11126,14 @@ function queueIntakeClinicalEventsAtSave(patientId){
   });
   [...state.interventions].forEach(key=>{
     const label=key==='other_tx' ? ((document.getElementById('other-tx-text')?.value||'').trim()||'אחר') : (INT_LABELS[key]||key);
-    queueTreatmentEvent(patientId, key, label, {source:'patient_flow'});
+    const sec=marchSectionForKey(key);
+    queueTreatmentEvent(patientId, key, label, {source:'patient_flow', ...(sec?{march_section:sec.id}:{})});
   });
 }
 
 function queueInventoryBeforeSave(patientId){
   reconcileSupplySource('quick:tq', 'tourniquets', quickTqData.applied ? 1 : 0, patientId);
-  ['tourniquet','bandage','morphine','atq','fluids'].forEach(key=>reconcileSupplyForIntervention(key, state.interventions.has(key)?null:0, patientId));
+  ['tourniquet','bandage','hemostatic','blanket','morphine','atq','fluids'].forEach(key=>reconcileSupplyForIntervention(key, state.interventions.has(key)?null:0, patientId));
 }
 
 function buildLocStr(){
@@ -11044,6 +11210,7 @@ function renderSummary(){
     <div class="summary-row"><span class="summary-key">פציעה</span><span class="summary-val">${state.injury||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">מצב</span><span class="summary-val">${STATUS_LABELS[state.patientStatus]||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">טיפולים שניתנו</span><span class="summary-val">${intStr||'ללא'}</span></div>
+    ${state.flowMode!=='quick' && state.triage!=='black'?`<div class="summary-row" style="align-items:flex-start"><span class="summary-key">MARCH-PAWS</span><span class="summary-val" style="font-size:12px;line-height:1.7">${marchReviewSummaryHtml(marchReviewFromState())}</span></div>`:''}
     <div class="summary-row"><span class="summary-key">מלאי אישי</span><span class="summary-val"><button class="demo-mini-btn" style="padding:7px 10px;margin:0" onclick="showOwnInventory()">הצג מלאי שלי</button></span></div>
     <div class="summary-row" style="align-items:flex-start"><span class="summary-key">העברה לא מקוונת</span><span class="summary-val"><textarea id="offline-transport-payload" readonly style="height:68px;direction:ltr;font-family:var(--mono);font-size:10px;margin-bottom:8px">${lastTacticalPayload}</textarea><button class="demo-mini-btn" style="padding:7px 10px;margin:0" onclick="copyTacticalDataString()">העתק payload</button></span></div>
     <div class="summary-row"><span class="summary-key">חתימת טיפול</span><span class="summary-val device-id">${deviceId}</span></div>
@@ -11121,6 +11288,7 @@ function savePatient(){
     vitalsHistory:[{t:Date.now(),pulse:flowVitals.pulse,spo2:flowVitals.spo2,rr:flowVitals.rr,avpu:flowVitals.avpu,bp_estimate:flowVitals.bp_estimate}],
     tourniquet:tqRecord,
     tourniquets:tqEntries,
+    marchReview:marchReviewFromState(),
     medic:deviceId,
     siteId:'SITE_A',
     events:[
@@ -11140,7 +11308,9 @@ function savePatient(){
   saveLocalEvent({type:quickCapture?'QUICK_PATIENT_CREATED':'PATIENT_CREATED',detail:`${newId} נפתח — ${quickCapture?'מסלול מהיר, יש לקחת מדדים':'הערכה מלאה'}`,warn:false,patient_id:patientUuid,
     payload_json:{visual_id:newId,triage:state.triage,needs_full_assessment:quickCapture,capture_mode:state.flowMode,
       // Injury zones are projected into patients.injury_zones from the create event (WP-3).
-      injury_zones:[...(state.injuryZones||[])], injury_mechanism:effectiveInjury}});
+      injury_zones:[...(state.injuryZones||[])], injury_mechanism:effectiveInjury,
+      // Kept in the event log for audit/AAR; the server projects no column from it (V2.99.61).
+      ...(state.flowMode!=='quick' && state.triage!=='black' ? {march_review:marchReviewFromState()} : {})}});
   // Vitals taken in the full flow: the server sets last_vitals_at (and clears
   // needs_full_assessment) from this event, so other devices do not show the patient as
   // vitals overdue. Never sent for a quick capture, which must stay flagged for assessment.
@@ -13012,9 +13182,11 @@ const FLOW_EVENTS_SENT_AT_SAVE = new Set(['TOURNIQUET_APPLIED','VITALS_RECORDED'
 // IMMEDIATE_INTERVENTION_RECORDED, LIFE_SAVING_TREATMENT_RECORDED) and never left the phone.
 // Tourniquets and medications have their own events and are skipped here.
 const TREATMENT_SYNC_SKIP = new Set(['tourniquet','morphine','atq']);
+// Every treatment under MARCH's A is an airway action (V2.99.61).
+const AIRWAY_TREATMENT_TYPES = new Set(['airway','airway_mgmt','npa','recovery_position','cric']);
 function queueTreatmentEvent(patientId, treatmentType, label, extra={}){
   if(!patientId || !treatmentType || TREATMENT_SYNC_SKIP.has(treatmentType)) return;
-  const airway=treatmentType==='airway' || treatmentType==='airway_mgmt';
+  const airway=AIRWAY_TREATMENT_TYPES.has(treatmentType);
   saveLocalEvent({type:airway?'AIRWAY_MANAGED':'INTERVENTION_RECORDED', detail:label, warn:false, patient_id:patientId,
     payload_json:{treatment_type:treatmentType, treatment_label:label, ...extra}});
 }
@@ -15634,6 +15806,7 @@ function cancelPediatricOverride(){
     if(chip) chip.classList.remove('selected');
     if(pending.key==='morphine') document.getElementById('morphine-wrap').style.display='none';
     renderLocalStockPanel();
+    renderMarchProgress();
   }
   closePediatricRisk();
 }

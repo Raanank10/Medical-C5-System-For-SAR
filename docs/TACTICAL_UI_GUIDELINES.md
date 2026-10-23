@@ -52,6 +52,8 @@ The app should offer two entry paths:
 - Quick Patient: 10-15 second casualty creation with location/access/triage and all other fields treated as optional debt.
 - Extended Patient: full vitals, body map, interventions, and treatment detail.
 
+Extended Patient's treatment step is ordered by MARCH-PAWS (V2.99.61): M massive hemorrhage, A airway, R respiration, C circulation, H hypothermia / head injury, then P pain, A antibiotics, W wounds, S splinting. Each letter shows "טופל" (a treatment in it, or for M the step 3 immediate tourniquet), "נבדק - ללא טיפול" (the medic marked it checked) or "לא תועד". It is documentation only: no letter blocks saving, changes triage or raises an alert, and undocumented letters are shown as such on the summary, never hidden. Choosing a treatment withdraws that letter's "no treatment needed"; "no treatment needed" cannot be set on a letter that has a treatment. Each treatment is sent as its own event (A's as `AIRWAY_MANAGED`, the rest as `INTERVENTION_RECORDED`, tourniquets and pain medications on their existing events) with `march_section`, and the create event carries `march_review`. TXA and antibiotics are recorded as given, without a dose: the app computes no dose for them.
+
 Quick Patient records must create `needs_full_assessment = true` and a commander-visible incomplete-assessment alert.
 
 Extraction status should be asked late, after vitals/triage, and should be binary:
