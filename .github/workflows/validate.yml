@@ -46,8 +46,17 @@ jobs:
       - name: Install dev dependencies
         run: npm ci
 
-      - name: Install Chromium for Playwright
-        run: npx playwright install --with-deps chromium
+      # The tests launch Playwright's default headless shell, so only that is installed, and
+      # cached by Playwright version. No --with-deps: GitHub's Ubuntu runner already has
+      # Chrome's system libraries, and the apt-get step it ran took 11-13 minutes on most runs.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Chromium headless shell for Playwright
+        run: npx playwright install --only-shell chromium
 
       - name: Run browser, other and smoke tests
         run: npm test
