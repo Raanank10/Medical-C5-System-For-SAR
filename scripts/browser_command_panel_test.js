@@ -182,10 +182,11 @@ async function checkFile(browser, file) {
     goTo('demo'); startRoleDashboard('cc');
     const action = document.querySelector('[data-cmd-panel="action"]').textContent;
     const overview = document.querySelector('[data-cmd-panel="overview"]').textContent;
-    return { onScene: split.onScene.map((p) => p.visualId).sort(), atPoint: split.atPoint.map((p) => p.visualId), action, overview };
+    return { onScene: split.onScene.map((p) => p.visualId).sort(), atPoint: split.atPoint.map((p) => p.visualId), action, overview, queue: DecisionSupportEngine.forCc().operationalPressure.components.evacQueue };
   });
   assert(evac.onScene.join() === 'P001,P002,P003,P005' && evac.atPoint.join() === 'P007', `${rel}: open evacuations split by stage (got ${JSON.stringify({ onScene: evac.onScene, atPoint: evac.atPoint })})`);
   assert(evac.action.includes('5 אדום/צהוב ללא פינוי סגור: 4 באתר החילוץ · 1 ממתינים למד״א'), `${rel}: the CC evacuation bottleneck card must show the split`);
+  assert(evac.queue === 5, `${rel}: the pressure gauge's evacuation queue must include patients waiting for MDA (got ${evac.queue})`);
   assert(evac.overview.includes('פינוי לא סגור · באתר החילוץ') && evac.overview.includes('פינוי לא סגור · ממתינים למד״א'), `${rel}: the CC metrics must show both parts`);
 
   assert(!errors.length, `${rel}: page errors: ${errors.join(' | ')}`);
