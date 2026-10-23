@@ -8,7 +8,7 @@
 //   another phone, stays there across pull cycles, and arrives without markup.
 // It proves client behavior only; the server side was checked live (database/063, rolled back).
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_sweep_sync_test.js
 const fs = require('fs');
 const path = require('path');

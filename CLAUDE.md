@@ -21,6 +21,7 @@ python scripts/check_repo.py
 
 # Domain rule unit tests (required when triage/vitals/alert/timing rules change)
 node tests/domain-rules.test.js
+node tests/debt-labels.test.js         # every missing-data key index.html emits has a Hebrew label (no raw stale_vitals on screen)
 
 # Manual smoke tests against the built HTML (string-assertion checks, run individually as needed)
 node scripts/smoke_v2_991_medic_cc.js
@@ -30,7 +31,7 @@ node scripts/smoke_v2_992_decision_support.js
 for f in scripts/smoke_*.js; do node "$f" || echo "FAILED: $f"; done
 
 # Real-browser smoke test (Playwright, headless Chromium) — loads index.html and
-# checks it actually renders, not just that the HTML text contains expected strings. Manual-only, not wired into CI, requires `npm install` once.
+# checks it actually renders, not just that the HTML text contains expected strings. All of them run in CI (WP-13); locally `npm test` runs every browser, other and smoke test after `npm install` once.
 npm install
 npm run test:browser-smoke            # or: node scripts/browser_smoke_test.js
 node scripts/browser_incident_lifecycle_test.js   # logged-in incident picker/open flow (no drafts since D10) + close guard, stubbed Supabase client
@@ -61,7 +62,9 @@ node scripts/browser_incident_close_report_test.js   # D9: close ends patient ac
 node scripts/browser_external_report_link_test.js   # WP-16 PR B: PC and CC link / unlink an external report to a patient from the report card across phones (pending until sent), MDA beside triage, medic not offered
 node scripts/browser_remote_vitals_test.js         # N6: another phone's newest vitals values shown on the patient card with source and age, range-checked, never older than this phone's own
 node scripts/browser_sync_rejection_close_test.js  # N7: command closes a sync rejection from the panel (reason, note for "not recoverable", overnight-deletion warning); a resent and accepted record closes its rejection by itself
+node scripts/browser_server_watchdog_test.js      # WP-12: open server watchdog alerts (tourniquet 45/60/120 min, red/yellow vitals overdue) listed for command and the medic, marked "(שרת)", only when the phone does not raise the same alert itself
 node scripts/browser_patient_number_test.js        # patient numbers: sweep markers count up, ids carry the registrant's initials (P004-DK, Latin only), a clash on the server is renamed instead of losing the patient, the phone shows the new id
+node scripts/browser_mobile_layout_test.js        # phone layout at 375x812 / 412x915: no overlaps, nothing past the viewport or clipped by a card, nothing left under the FAB/bottom bar, header <= 64px, no raw keys
 node scripts/test_outbox_eviction.js              # F1: persistOutbox() never evicts an unsynced event, even past the 500 cap (docs/FAILURE_MODE_REVIEW.md)
 
 # Analytics package
@@ -74,11 +77,11 @@ python -m pytest                  # pytest suite for db.py/kpis.py/charts.py/rep
 python -c "from db import DB; from kpis import KPIEngine; from report import ReportGenerator; db=DB('rescue_demo_v1_1.db'); kpi=KPIEngine(db); ReportGenerator(kpi).save('aar_report_v1_1.html')"
 ```
 
-CI (`.github/workflows/validate.yml`) runs exactly two things on every PR and push to `main`: `python scripts/check_repo.py` and `node tests/domain-rules.test.js`. The smoke scripts under `scripts/smoke_*.js`, `scripts/browser_smoke_test.js` (Playwright), and the analytics package's `pytest` suite are not wired into CI — they're run manually (string-assertion smoke scripts and the Playwright smoke test against `index.html`; pytest requires the analytics venv/dependencies CI doesn't install).
+CI (`.github/workflows/validate.yml`) runs two jobs on every PR and push to `main`: `repo-check` (`python scripts/check_repo.py`, `node tests/domain-rules.test.js` and `node tests/debt-labels.test.js`, fast) and, since WP-13, `browser-and-smoke-tests` (`npm ci`, Playwright's Chromium, then `npm test` = `scripts/run_tests.js`: every `scripts/browser_*.js`, the other `scripts/test_*.js` and every `scripts/smoke_*.js`, one after the other, about 4 minutes). The analytics package's `pytest` suite is still not in CI (it needs the analytics venv/dependencies).
 
 `scripts/check_repo.py` enforces (stdlib only, no deps):
 - a fixed list of required paths exist (`REQUIRED_PATHS` in the script — update it when adding/renaming core docs, schema files, or archive folders)
-- `index.html` has a doctype and closing `</html>`, and its three visible version labels ("Demo V2.9958", "ROLE // V2.9958", "Role-Based Medical Command System V2.9958") match `APP_VERSION`
+- `index.html` has a doctype and closing `</html>`, and its three visible version labels ("Demo V2.9960", "ROLE // V2.9960", "Role-Based Medical Command System V2.9960") match `APP_VERSION`
 - every relative markdown link across the repo resolves to a real file (no broken/external-repo links)
 - the domain-rules module inlined in `index.html` hasn't drifted from `src/domain/rules.js`
 - `database/*.sql` structural sanity: balanced parens/`$$` dollar-quoted blocks, and every `references table(...)` target resolves to a real `create table` — see docs/DEVELOPMENT.md's "Validating SQL Drafts" for what this does and doesn't catch (it's not a real SQL parser; a Postgres instance is still the only full validation)
@@ -92,7 +95,7 @@ CI (`.github/workflows/validate.yml`) runs exactly two things on every PR and pu
 `index.html` is the whole prototype, and the file GitHub Pages serves as the live demo. It used to have a byte-identical copy, `demo/rescue-app.html`; that copy was removed (decision D5 in `docs/GAP_CLOSURE_PLAN.md`), so there is only one file to edit. It is ~14,200 lines of self-contained HTML/CSS/JS, with no bundler and no framework. Its one external script is the pinned supabase-js build from jsDelivr (real auth and sync; bump the pinned version deliberately, never float `@2`). Next to it, `sw.js` + `manifest.webmanifest` + `icon.svg` (WP-10) keep the page and that exact supabase-js build cached for an offline cold start; `check_repo.py` fails if the pinned URL in `sw.js` differs from `index.html`'s. The `src/domain/rules.js` logic is inlined directly into the HTML (the standalone `src/domain/rules.js` module is a separately extracted, testable copy of that logic, see below).
 
 Inside the HTML, look for:
-- `const APP_VERSION = '2.99.58';` — bump this and the three visible label strings ("Demo V2.9958", "ROLE // V2.9958", "Role-Based Medical Command System V2.9958") together when shipping a version; `scripts/check_repo.py` fails CI if they disagree.
+- `const APP_VERSION = '2.99.60';` — bump this and the three visible label strings ("Demo V2.9960", "ROLE // V2.9960", "Role-Based Medical Command System V2.9960") together when shipping a version; `scripts/check_repo.py` fails CI if they disagree.
 - `const ROLE_LABELS` / `const ROLE_DEFS` — defines the role-based views. Ten roles exist in the live `user_role` enum: `medic`, `paramedic` and `physician` (added in `database/019`/`020`), `pc` (חוג"ד — platoon commander), `cc` (מ״פ רפואה — company/command medical), `logistics_officer` (mapped to the client-side `logistics` key via `SERVER_ROLE_TO_CLIENT_ROLE`), `chamal` (command system), `rpc`/`rcc` (rescue-chain platoon/company commander — site-authority actions per `docs/ROLE_COMMAND_MODEL_v2.8.md`, added in `database/006`/`007`), and `admin`. New users are invited by an admin from the in-app "ניהול משתמשים" screen (`supabase/functions/admin-users/index.ts`, `database/042`), or with the fallback CLI `scripts/invite_user.js`; never the Supabase dashboard button, which can't set a role. Both keep a `VALID_ROLES` list that must match this enum.
 - `render*` functions (e.g. `renderDashboard`, `renderCommander`, `renderMstartSweep`, `renderAar`, `renderCcHeroDashboard`, `renderLogisticsOfficer`) — each is a self-contained view renderer for one role/screen. Grep for `^function render` to find the current screen inventory before adding a new one.
 - A legacy step-based New Patient flow (`screen-step1`..`screen-step8`, guarded by a `LEGACY_FULL_ASSESSMENT_DO_NOT_DELETE_WITHOUT_TESTS` comment) coexists with the newer Quick/Extended patient flows — don't delete it without checking what still depends on it (smoke scripts assert on its presence).
@@ -123,7 +126,7 @@ Invalid/dependency-blocked sync events go to `sync_ingestion_errors` (a blocked 
 
 `/sync/log` (`docs/API_SURFACE_v1.2.md`) is implemented as a Supabase Edge Function, `supabase/functions/sync-log/index.ts` — not a literal HTTP path, deployed as `https://btvvjmuwdzirjyauyijx.supabase.co/functions/v1/sync-log` (POST = push, GET = pull). The Command Dashboard read side has one real slice, `get_incident_command_state()`, a `SECURITY DEFINER` RPC (`database/014_command_dashboard_state_rpc.sql`) rather than a literal `GET /command/...` endpoint. Command Actions and most of the AAR API (`docs/API_SURFACE_v1.2.md` sections 5-7) are still unbuilt. See `docs/ARCHITECTURE.md`'s "Backend Deployment Status" for the full account, including real gaps found only by deploying and testing against live accounts (RLS bypassed by views until fixed, missing `SECURITY DEFINER` on trigger functions, no `profiles` row auto-created on signup, an invite-link flow that silently logged people in without ever setting a password).
 
-`database/001_postgresql_schema_v1.2.sql` is the base schema (`create table if not exists`, no migration framework yet — Phase 4 plans to convert to real Supabase CLI migrations, see `docs/PHASE_4_PLAN.md` 4C). `002_seed_demo_data_v1.2.sql` is matching synthetic seed data, `003_mci_ui_alignment.sql` a small delta on top, and `004` through `071` are the incremental fixes and features applied directly against the live project (not every file is applied live, and live migration names do not always match the repo numbers - see `docs/GAP_CLOSURE_PLAN.md`), starting with deployment/RLS-audit work (RLS gaps, `rpc`/`rcc` roles and their site-authority RLS, auto-create-profile-on-signup, new rescue-chain event types, the command-dashboard RPC, incident-scoping the sync-error read policy, locking out inactive profiles, etc. — each file's name says what it fixes). Older `_v1.1` files and `archive/v0.6`, `archive/v0.7` are kept for history — don't edit them; add a new numbered file instead.
+`database/001_postgresql_schema_v1.2.sql` is the base schema (`create table if not exists`, no migration framework yet — Phase 4 plans to convert to real Supabase CLI migrations, see `docs/PHASE_4_PLAN.md` 4C). `002_seed_demo_data_v1.2.sql` is matching synthetic seed data, `003_mci_ui_alignment.sql` a small delta on top, and `004` through `072` are the incremental fixes and features applied directly against the live project (not every file is applied live, and live migration names do not always match the repo numbers - see `docs/GAP_CLOSURE_PLAN.md`), starting with deployment/RLS-audit work (RLS gaps, `rpc`/`rcc` roles and their site-authority RLS, auto-create-profile-on-signup, new rescue-chain event types, the command-dashboard RPC, incident-scoping the sync-error read policy, locking out inactive profiles, etc. — each file's name says what it fixes). Older `_v1.1` files and `archive/v0.6`, `archive/v0.7` are kept for history — don't edit them; add a new numbered file instead.
 
 ### Analytics package (`analytics/c5_sentinel_sar_analytics_v1_1/`)
 
@@ -151,5 +154,5 @@ This repo's actual product/API/data contracts live in `docs/`, not in code comme
 
 - Branch names: `feature/...`, `fix/...`, `docs/...`, `analytics/...` (short, descriptive).
 - UI strings are in Hebrew (RTL); the app is field-tested in Hebrew, so keep new UI copy consistent with existing terminology rather than introducing English strings.
-- No new production dependencies until there's a clear module boundary (per `docs/DEVELOPMENT.md`); the prototype and its core tests are meant to run with nothing beyond Python stdlib, Node stdlib (`node:assert/strict`), and a browser. The one deliberate, scoped exception is the root `package.json`'s Playwright dev dependency, used only by `scripts/browser_smoke_test.js` — it's manual-only, not wired into CI, and not required to open or use the prototype.
+- No new production dependencies until there's a clear module boundary (per `docs/DEVELOPMENT.md`); the prototype and its core tests are meant to run with nothing beyond Python stdlib, Node stdlib (`node:assert/strict`), and a browser. The one deliberate, scoped exception is the root `package.json`'s Playwright dev dependency, used only by the browser test scripts (`scripts/browser_*.js`) — dev-only, run in CI by the `browser-and-smoke-tests` job, and not required to open or use the prototype.
 - Preserve historical versions under `archive/` rather than deleting superseded docs/schema.

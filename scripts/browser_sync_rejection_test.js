@@ -13,7 +13,7 @@
 // The Supabase client and the sync-log endpoint are stubbed in the page; this proves client
 // behavior only, not the server side (verified separately against the live project).
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_sync_rejection_test.js
 const fs = require('fs');
 const path = require('path');
@@ -33,6 +33,9 @@ function assert(condition, message) {
 async function checkFile(browser, file) {
   const rel = path.relative(root, file);
   const page = await browser.newPage();
+  // No backend in this test: serve an empty supabase-js instead of waiting on the CDN, which
+  // otherwise holds DOMContentLoaded (a slow jsDelivr response timed page.goto out in CI).
+  await page.route('**/supabase-js@*/**', (r) => r.fulfill({ contentType: 'application/javascript', body: '' }));
   const pageErrors = [];
   page.on('pageerror', (err) => pageErrors.push(String(err)));
   await page.goto('file://' + file, { waitUntil: 'domcontentloaded' });

@@ -11,7 +11,7 @@
 // - profiles: command roles read all; a medic reads only itself
 // It proves client behavior only, not the server; the server side was checked separately.
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_medic_assignment_test.js
 const fs = require('fs');
 const path = require('path');

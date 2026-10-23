@@ -24,10 +24,11 @@ start index.html
 
 ## Browser Smoke Test
 
-`scripts/browser_smoke_test.js` loads `index.html` in headless Chromium via Playwright and checks the app actually renders and initializes (no uncaught page errors, `window.C5DomainRules` loads with its expected functions, `APP_VERSION` is set, exactly one `.screen.active` element and it's `screen-login` on a fresh load). This is a deeper check than the string-assertion `scripts/smoke_*.js` scripts, which only grep the HTML text. Manual-only, not wired into CI, and the only place in the repo with an npm dependency:
+`scripts/browser_smoke_test.js` loads `index.html` in headless Chromium via Playwright and checks the app actually renders and initializes (no uncaught page errors, `window.C5DomainRules` loads with its expected functions, `APP_VERSION` is set, exactly one `.screen.active` element and it's `screen-login` on a fresh load). This is a deeper check than the string-assertion `scripts/smoke_*.js` scripts, which only grep the HTML text. Playwright is the only npm dependency in the repo (dev-only). Since WP-13 every browser test, the other `scripts/test_*.js` scripts and the smoke scripts run in CI in a separate `browser-and-smoke-tests` job (`.github/workflows/validate.yml`, through `scripts/run_tests.js`); locally `npm test` runs the same set (`npm run test:browser` or `npm run test:smoke` for one group):
 
 ```bash
 npm install
+npm test                              # all browser, other and smoke tests (scripts/run_tests.js)
 npm run test:browser-smoke            # or: node scripts/browser_smoke_test.js
 ```
 

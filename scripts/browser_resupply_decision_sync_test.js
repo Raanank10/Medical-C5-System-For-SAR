@@ -10,7 +10,7 @@
 // - get_supply_request_queue(): every member of the incident reads every row.
 // It proves client behavior only; database/059 itself is exercised against real Postgres.
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_resupply_decision_sync_test.js
 const fs = require('fs');
 const path = require('path');

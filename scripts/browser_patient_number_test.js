@@ -13,7 +13,7 @@
 // - local demo (signed out) keeps plain ids and still counts up.
 // It proves client behavior and the rule the fake server copies; sync-log itself runs on Deno.
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_patient_number_test.js
 const fs = require('fs');
 const path = require('path');

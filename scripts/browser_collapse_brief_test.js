@@ -5,7 +5,7 @@
 // V2.99.57: the building section opens by itself only for a missile strike; other types ask
 // "מבנה נפגע / לכודים במבנה?" first ("yes" opens it, "no" clears the collapse) and get their own
 // optional questions (shooting, road accident, explosion) with safety warnings.
-// Manual-only, not wired into CI. Run: npm install && node scripts/browser_collapse_brief_test.js
+// Runs in CI through scripts/run_tests.js (WP-13). Run: npm install && node scripts/browser_collapse_brief_test.js
 const path = require('path');
 const fs = require('fs');
 const { chromium } = require('playwright');
@@ -19,6 +19,9 @@ async function checkFile(browser, file) {
   const rel = path.relative(root, file);
   const context = await browser.newContext();
   const page = await context.newPage();
+  // No backend in this test: serve an empty supabase-js instead of waiting on the CDN, which
+  // otherwise holds DOMContentLoaded (a slow jsDelivr response timed page.goto out in CI).
+  await page.route('**/supabase-js@*/**', (r) => r.fulfill({ contentType: 'application/javascript', body: '' }));
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('file://' + file, { waitUntil: 'domcontentloaded' });

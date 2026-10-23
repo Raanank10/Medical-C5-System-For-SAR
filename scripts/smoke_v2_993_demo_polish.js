@@ -51,7 +51,8 @@ for (const rel of files) {
   assert(html.includes("p.mstart.breathing='assumed_yes'"), `${rel}: AVPU A/V should use assumed breathing, not overwrite yes`);
   assert(html.includes("p.mstart.breathing==='no'") && html.includes('סתירה: AVPU'), `${rel}: AVPU vs breathing=no contradiction warning missing`);
 
-  assert(html.includes('bottom:148px') && html.includes("fab.textContent='+ פצוע | אותו אזור'"), `${rel}: same-zone FAB must sit above sticky actions with fixed label`);
+  // Since 2026-10-23 the FAB is positioned in CSS from the bottom bar's height, not a fixed 148px.
+  assert(html.includes('.same-zone-fab{position:fixed;') && html.includes('bottom:calc(var(--bottom-bar-h) + 12px') && html.includes("fab.textContent='+ פצוע | אותו אזור'"), `${rel}: same-zone FAB must sit above sticky actions with fixed label`);
   assert(html.includes("if(activeRoleDashboard!=='medic' || activeScreenId()!=='sweep') return;"), `${rel}: same-zone FAB must be sweep/medic scoped`);
   assert(!tqWithLimb.includes('reconcileSupplySource'), `${rel}: recordSweepTourniquetWithLimb must not double-count tourniquet supply`);
 

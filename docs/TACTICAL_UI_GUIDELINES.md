@@ -10,8 +10,22 @@ These guidelines capture the design intent for C5 Sentinel-SAR as a development 
 - Keep critical controls at least 56px by 56px. Since V2.99.56 (owner, 2026-10-22) the main field buttons (tap choices, primary and secondary actions, vitals steppers, AVPU, blood pressure) are 60-64px tall, every other field control is at least 56px, and small toggles, filters and links at least 44px; the body-map injury hotspots are about 49x44px.
 - Show the current clinical clock when time changes the risk.
 - Never communicate triage by color alone; pair color with text.
+- A selected tap choice must be unmistakable at a glance, not a faint tint: since V2.99.59 (owner, 2026-10-22, AVPU on the MSTART card) a selected button gets a solid fill, an outer ring and a white check mark, so the choice reads without comparing colors.
+- Nothing in a field screen may need sideways scrolling. The pulse and breathing count steppers (-5/-1/+1/+5) take the full row width and share it, with "ספירה:" and the multiplier on a small line above (V2.99.59): at least 56px per button on a 360px-wide phone.
 - Treat stale data, missing data, and pending triage as first-class states.
 - Do not block forward movement for optional or incomplete fields; save the record and surface missing data as a background alert.
+
+## Phone Layout (owner, 2026-10-23)
+
+Checked by `scripts/browser_mobile_layout_test.js` at 375x812 and 412x915, RTL, field mode on.
+
+- One top nav, 60px tall: "ראשי", "מצב שטח" and an account menu ("חשבון": user management for admins, bug report, sign out), equal-size buttons with a one-line label. Nothing else floats over the top of a screen; each screen's own sticky header sits under the nav.
+- Signed in, the nav shows the role and the email. "לא מקוון" (saved offline profile) comes first and is never cut short; only the email is.
+- At most one floating control above a screen's bottom bar (the sweep's "+ פצוע | אותו אזור"), placed from the bar's height, and the screen reserves room for both so no content ends up under them.
+- Inside a casualty card nothing is positioned out of flow and nothing is wider than the card. Below 480px the ID takes its own line and the triage banner stacks its text above its source pill. Mixed Hebrew/Latin labels ("אדום / RED") are isolated per direction.
+- One red frame per card: the triage banner inside a card has no border of its own, and an unacknowledged alert pulses as a ring on the card's outline, without a blur around it.
+- Missing-data chips have three tiers: red only for what changes care of a red casualty now (full or missing vitals, stale vitals, evacuation status, no reassessment), orange for a clock that is late or cannot run (stale vitals, tourniquet time or limb unknown), a neutral outline for the rest. All of them stay visible.
+- No internal key (such as `stale_vitals`) is ever shown: every missing-data key has a Hebrew label in `DEBT_LABELS` (`tests/debt-labels.test.js`).
 
 ## New Patient Flow
 
@@ -100,7 +114,7 @@ When Black is selected:
 
 For children under age 8, the UI must not require exact weight before treatment. Use age group or age estimate locally, warn on adult-range doses, require double confirmation, and write override metadata into the event payload. The save action still completes locally; risk is escalated through watchdog alerts and AAR review.
 
-## Patient Detail Order (V2.99.58)
+## Patient Detail Order (V2.99.60)
 
 Owner request: vital signs come first. The patient detail screen ("פרטי פצוע") reads top to bottom in the order a medic needs it in the field, following the monitor convention of large color-coded numbers plus how fresh they are:
 
@@ -127,6 +141,8 @@ The timer must stay visible in:
 The timer is not passive history. It is an active risk clock.
 
 The phone alerts on its own clock (D1, repo owner, 2026-10-20), with or without a server connection: at 45, 60 and 120 minutes from application, once per level per tourniquet, it vibrates (where the browser supports it) and shows a banner that stays until tapped and opens the patient (`checkTourniquetTimeAlerts`, rule `tourniquetAlertToRaise` in `src/domain/rules.js`). It does not wait for the server's reassessment watchdog. Limits of a web page: iOS Safari has no vibration API, and a locked phone or a backgrounded browser pauses the page, so the alert fires when the app is opened again (only the current level, not every level missed).
+
+Since V2.99.58 the server raises the same levels too (`database/072`, WP-12), every minute, with no phone needed, into `watchdog_alerts`, along with red/yellow vitals overdue. A phone lists a server alert only when it does not already raise the same one from its own data, and marks it "(שרת)"; it never replaces the phone's own alert or its timer.
 
 ## Logistics Resupply Queue
 
