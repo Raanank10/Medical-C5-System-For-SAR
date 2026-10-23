@@ -21,7 +21,9 @@ for (const file of files) {
   assert(taskBoard < pcBoard && loadBoard < pcBoard, `${rel}: PC helpers must be defined before responsibility board`);
   assert(html.includes('משימות חוג״ד עכשיו'), `${rel}: missing PC task-board title`);
   assert(html.includes("renderCollapsibleSection('pc-medic-load','עומס חובשים'"), `${rel}: missing PC medic-load title`);
-  assert(html.includes('renderPcNowTaskBoard(myPts)}${renderPcMedicLoadBoard(myPts)}${renderDedicatedPcCommandBoard(myPts)'), `${rel}: PC hero boards are not first`);
+  // V2.99.62: the PC panel is tabbed; the task board leads the פעולה tab, medic load leads כוחות.
+  assert(html.includes('action:`${renderPcNowTaskBoard(myPts)}'), `${rel}: PC task board must lead the action tab`);
+  assert(html.includes('forces:`${myPlatoonRow()}${renderPcMedicLoadBoard(myPts)}'), `${rel}: PC medic-load board must lead the forces tab`);
   assert(html.includes('function startNewPatient('), `${rel}: legacy patient fallback removed`);
   assert(html.includes('function createDeathCertificationRequest('), `${rel}: death certification removed`);
   assert(html.includes('silentPopup:true,silentWarnings:true,suppressAutoResupply:true'), `${rel}: silent MSTART logistics behavior changed`);

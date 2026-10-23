@@ -227,6 +227,23 @@ async function checkFile(browser, file) {
   await m.page.evaluate((pid) => acknowledgeAlert(pid), PATIENT);
   assert((await m.page.evaluate((pid) => patients.find((x) => x.id === pid).unsyncedEvents || 0, PATIENT)) === 0, `${rel}: the old never-clearing counter must not be bumped`);
   await syncAll(m.page);
+  // V2.99.62: the sync pills and the command strip show the last real answer from the sync
+  // function, not this phone's own saves; with the sync function unreachable, contact goes stale.
+  const contact = await m.page.evaluate(async () => {
+    lastServerContactAt = null;
+    await syncPull(SITE_TO_INCIDENT_ID.SITE_A);
+    const afterPull = { at: lastServerContactAt, label: serverContactLabel() };
+    lastServerContactAt = null;
+    const realFetch = window.fetch;
+    window.fetch = (url, opts) => (String(url).includes('/functions/v1/sync-log') ? Promise.reject(new TypeError('Failed to fetch')) : realFetch(url, opts));
+    await syncPull(SITE_TO_INCIDENT_ID.SITE_A);
+    window.fetch = realFetch;
+    const offline = { at: lastServerContactAt, label: serverContactLabel() };
+    await syncPull(SITE_TO_INCIDENT_ID.SITE_A);
+    return { afterPull, offline };
+  });
+  assert(contact.afterPull.at && contact.afterPull.label.startsWith('מחובר לשרת'), `${rel}: a successful sync pull must record server contact (got ${JSON.stringify(contact.afterPull)})`);
+  assert(!contact.offline.at && contact.offline.label.startsWith('אין קשר לשרת'), `${rel}: a failed sync pull must not count as server contact (got ${JSON.stringify(contact.offline)})`);
   const row = SERVER.patients[0];
   assert(row.alert_acknowledged_by === MEDIC && row.alert_acknowledged_at, `${rel}: the acknowledgment must reach the server (got ${JSON.stringify(row)})`);
   assert(SERVER.events.filter((e) => e.type === 'WATCHDOG_ACKNOWLEDGED' && e.patient_id === PATIENT).length === 1, `${rel}: exactly one patient-scoped WATCHDOG_ACKNOWLEDGED`);
