@@ -1,4 +1,4 @@
--- Clinical data stays with the medical roles (V2.99.60). Decided with the repo owner 2026-10-23:
+-- Clinical data stays with the medical roles (V2.99.63). Decided with the repo owner 2026-10-23:
 --
 -- 1. Logistics officer (logistics_officer): the medics' bags and the supply chain only - which
 --    bag, which item, how many, when, the count left, supply requests. No patient, no patient

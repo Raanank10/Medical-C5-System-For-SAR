@@ -1,5 +1,5 @@
--- Rolled-back RLS test for database/073 (docs/RLS_AUDIT_v1.md, 073 follow-up). Run in the
--- Supabase SQL editor after 073 is applied. It ends with an error on purpose so nothing persists;
+-- Rolled-back RLS test for database/074 (docs/RLS_AUDIT_v1.md, 074 follow-up). Run in the
+-- Supabase SQL editor after 074 is applied. It ends with an error on purpose so nothing persists;
 -- the error text is the result. Every item should start with "ok" or show the expected value.
 -- Uses the synthetic test accounts of the live project, looked up by role; every unit, site,
 -- patient, event and ledger row it needs is created inside the block and rolled back.
@@ -29,22 +29,22 @@ begin
   select platoon_id, company_id into m1_pl, m1_co from profiles where id = M1;
 
   -- Fixtures as the SQL editor (auth.uid() null)
-  insert into companies(name, kind) values ('TEST73-CO-A', 'rescue') returning id into CA;
-  insert into companies(name, kind) values ('TEST73-CO-B', 'rescue') returning id into CB;
+  insert into companies(name, kind) values ('TEST74-CO-A', 'rescue') returning id into CA;
+  insert into companies(name, kind) values ('TEST74-CO-B', 'rescue') returning id into CB;
   insert into platoons(company_id, name) values (CA, 'A1') returning id into A1;
   insert into platoons(company_id, name) values (CB, 'B1') returning id into B1;
   update profiles set company_id = CA, platoon_id = null where id in (PC, RCC);
   update profiles set platoon_id = A1, company_id = null where id in (RPC, M1);
   insert into incidents (id, visual_id, t_zero, t_injury_default, location_name, status, opened_at, company_id, platoon_id)
-    values (X, 'TEST73-X', now(), now(), 'TEST73 X', 'active', now(), CA, A1),
-           (Y, 'TEST73-Y', now(), now(), 'TEST73 Y', 'active', now(), CB, B1);
+    values (X, 'TEST74-X', now(), now(), 'TEST74 X', 'active', now(), CA, A1),
+           (Y, 'TEST74-Y', now(), now(), 'TEST74 Y', 'active', now(), CB, B1);
   insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by) values (X, M1, 'medic', CC);
   insert into patients (id, incident_id, visual_id, t_injury, current_triage, current_status, access_status, pulse_present, breathing_present, created_by)
-    values (P_RED,  X, 'T73-RED',  now(), 'red',     'identified', 'trapped', true, true, M1),
-           (P_TQ,   X, 'T73-TQ',   now(), 'green',   'identified', 'free',    true, true, M1),
-           (P_PEND, X, 'T73-PEND', now(), 'pending', 'identified', 'free',    null, null, M1),
-           (P_DEAD, X, 'T73-DEAD', now(), 'black',   'deceased',   'free',    null, null, M1),
-           (P_Y,    Y, 'T73-Y',    now(), 'red',     'identified', 'free',    true, true, M1);
+    values (P_RED,  X, 'T74-RED',  now(), 'red',     'identified', 'trapped', true, true, M1),
+           (P_TQ,   X, 'T74-TQ',   now(), 'green',   'identified', 'free',    true, true, M1),
+           (P_PEND, X, 'T74-PEND', now(), 'pending', 'identified', 'free',    null, null, M1),
+           (P_DEAD, X, 'T74-DEAD', now(), 'black',   'deceased',   'free',    null, null, M1),
+           (P_Y,    Y, 'T74-Y',    now(), 'red',     'identified', 'free',    true, true, M1);
   insert into tourniquets (incident_id, patient_id, limb, applied_at) values (X, P_TQ, 'left_arm', now() - interval '90 minutes'),
     (X, P_DEAD, 'right_leg', now() - interval '110 minutes');
   insert into events (incident_id, patient_id, actor_id, actor_role, type, payload_json, device_id, local_event_id, local_timestamp) values
@@ -83,7 +83,7 @@ begin
   select count(*) into n from vw_patient_latest_vitals where patient_id in (P_RED, P_TQ, P_PEND); r := r || 'rpc vitals view X=' || n || ' (want 0); ';
   select count(*) into n from get_rescue_patient_board(X); r := r || 'rpc board X=' || n || ' (want 4); ';
   select string_agg(visual_id || ':' || priority || ':' || evac_order, ',' order by evac_order) into s from get_rescue_patient_board(X);
-  r := r || 'rpc board order=' || s || ' (want T73-TQ:urgent:1,T73-RED:urgent:2,T73-PEND:pending:3,T73-DEAD:not_urgent:4); ';
+  r := r || 'rpc board order=' || s || ' (want T74-TQ:urgent:1,T74-RED:urgent:2,T74-PEND:pending:3,T74-DEAD:not_urgent:4); ';
   begin perform get_rescue_patient_board(Y); r := r || 'FAIL rpc read site Y board; ';
   exception when others then r := r || 'ok rpc board Y refused; '; end;
   begin perform get_incident_command_state(X); r := r || 'FAIL rpc read command state; ';
@@ -133,6 +133,6 @@ begin
   update profiles set company_id = rcc_co where id = RCC;
   update profiles set platoon_id = rpc_pl where id = RPC;
   update profiles set platoon_id = m1_pl, company_id = m1_co where id = M1;
-  raise exception 'TEST73 RESULT: %', r;
+  raise exception 'TEST74 RESULT: %', r;
 end
 $test$;

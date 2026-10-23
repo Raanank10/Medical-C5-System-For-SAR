@@ -8,7 +8,7 @@
 //   phone's time; medic bag rows only from medic/paramedic/pc/physician/admin, PC truck rows only
 //   from pc/cc/logistics_officer/admin; one row per (device, local event id)
 // - inventory_ledger_v12 RLS: incident members read every row, except the logistics officer
-//   (database/073), who reads get_incident_stock_movements(): the same rows without the patient.
+//   (database/074), who reads get_incident_stock_movements(): the same rows without the patient.
 // Checks: logistics sees the burn rate of both medics together, each medic bag's and the PC
 // truck's current stock, nothing counted twice (server + unsent on the same phone), and the PC
 // truck's issue on an approved request reaching logistics, and no patient reaching logistics.
@@ -145,7 +145,7 @@ function handle(server, req) {
       return { data: clone(server.supply_requests.filter((r) => r.incident_id === inc.id).reverse()), error: null };
     }
     if (req.name === 'get_incident_stock_movements') {
-      // database/073: incident members; every ledger column except patient_id.
+      // database/074: incident members; every ledger column except patient_id.
       const inc = server.incidents.find((i) => i.id === p.p_incident_id);
       if (!inc || !canSee(inc)) return { data: null, error: { message: 'access denied' } };
       server.stockRpcCalls = (server.stockRpcCalls || 0) + 1;
@@ -154,7 +154,7 @@ function handle(server, req) {
     return { data: null, error: null };
   }
   if (req.table === 'inventory_ledger_v12') {
-    // inventory_ledger_v12_read: incident members, not the logistics officer (database/073).
+    // inventory_ledger_v12_read: incident members, not the logistics officer (database/074).
     if (u.role === 'logistics_officer') return { data: [], error: null };
     const rows = server.ledger.filter((r) => { const inc = server.incidents.find((i) => i.id === r.incident_id); return inc && canSee(inc); }).filter(match)
       .slice(); // oldest first, the reverse of what the client asks for: it must sort by time and stock_seq itself
@@ -298,7 +298,7 @@ async function checkFile(browser, file) {
   const bag = (id) => holders.find((h) => h.owner === 'medic_bag' && h.actor === id);
   assert(bag(MEDIC)?.stock === 1 && bag(MEDIC2)?.stock === 0, `${rel}: each medic bag's latest count must reach logistics (got ${JSON.stringify(holders)})`);
   const board = await logo.page.evaluate(() => { goTo('logistics'); renderLogisticsOfficer(); return document.getElementById('logistics-consumption-feed')?.innerText || ''; });
-  // database/073: logistics reads the bags through get_incident_stock_movements(), never the
+  // database/074: logistics reads the bags through get_incident_stock_movements(), never the
   // patient each item was used on.
   assert(SERVER.stockRpcCalls > 0, `${rel}: logistics must read the stock through get_incident_stock_movements()`);
   const logoRows = await logo.page.evaluate(() => _incidentInventory[activeInventoryIncidentId()] || []);

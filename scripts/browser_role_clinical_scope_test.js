@@ -1,7 +1,7 @@
-// Real-browser test of the clinical scope per role (V2.99.60, database/073, owner decisions
+// Real-browser test of the clinical scope per role (V2.99.63, database/074, owner decisions
 // 2026-10-23). A medic and an RPC (two browser contexts, so two devices) share one fake backend in
 // this Node process, the same harness as scripts/browser_rescue_site_authority_test.js. The fake
-// mirrors what the real server does after database/073:
+// mirrors what the real server does after database/074:
 // - patients / tourniquets RLS (app.can_read_incident_clinical): the rescue chain reads no row
 // - get_rescue_patient_board(): rpc / rcc only; identity, location, access, evacuation state,
 //   priority (urgent / pending / not_urgent) and the place in the evacuation order
@@ -12,7 +12,7 @@
 //   server's evacuation order, and no evacuated patient in that order
 // - the medical evacuation order puts deceased patients last, even with an active tourniquet
 // The logistics side (bags without patients) is in scripts/browser_inventory_sync_test.js.
-// It proves client behavior only; database/073 itself is exercised against real Postgres.
+// It proves client behavior only; database/074 itself is exercised against real Postgres.
 //
 // Runs in CI through scripts/run_tests.js; also runs on its own.
 // Run: npm install && node scripts/browser_role_clinical_scope_test.js
@@ -92,7 +92,7 @@ function handle(server, req) {
     return { data: null, error: null };
   }
   if (req.table === 'patients' || req.table === 'tourniquets' || req.table === 'vw_patient_treatment_history' || req.table === 'watchdog_alerts') {
-    // app.can_read_incident_clinical (database/073): nothing for the rescue chain.
+    // app.can_read_incident_clinical (database/074): nothing for the rescue chain.
     if (rescue) { server.clinicalReadsByRescue += 1; return { data: [], error: null }; }
     if (req.table !== 'patients') return { data: [], error: null };
     return { data: clone(server.patients.filter(match).map(({ tq, ...rest }) => rest)), error: null };

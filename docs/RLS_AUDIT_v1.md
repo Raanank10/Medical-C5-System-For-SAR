@@ -445,7 +445,7 @@ Verified live 2026-10-22 in a rolled-back block: a resent event closed its rejec
 
 `get_advisors` (security) after applying: `resolve_sync_ingestion_error()` appears only under the usual `authenticated_security_definer_function_executable` notice, like the other command RPCs.
 
-## Follow-up: clinical read scope per role (`database/073`, V2.99.60)
+## Follow-up: clinical read scope per role (`database/074`, V2.99.63)
 
 Owner decisions 2026-10-23: logistics sees the medics' bags, not patients; the rescue chain (rpc, rcc) sees no clinical data, only an evacuation priority (urgent / not urgent / not yet sorted) and the evacuation order. Medics are unchanged. Detail: `docs/ROLE_COMMAND_MODEL_v2.8.md` "Clinical data stays with the medical roles" and `docs/AUTH_AND_ROLE_MODEL.md` "Clinical read scope".
 
@@ -461,6 +461,6 @@ Measured live before the change (read-only, 2026-10-23, each role's synthetic ac
 | `get_rescue_patient_board(id)` | New `SECURITY DEFINER`, rpc / rcc / admin only, gated by `app.can_read_incident_patients`; tactical fields, priority and the place in the evacuation order (the score is not returned: it would show minutes on a tourniquet). |
 | `get_incident_command_state(id)` | Refuses `logistics_officer`, `rpc`, `rcc`. |
 
-Verified before applying on a local PostgreSQL 16 built from every `database/*.sql` file in order (only the two `pg_cron` schedule lines in `028` and `072` skipped), with Supabase-like `authenticated` / `auth.uid()`: `073` applies, and applies again as a no-op; `scripts/rls_test_073_role_clinical_scope.sql` passes all 31 checks (medic and pc of the site unchanged; rpc / rcc read 0 patient, tourniquet and clinical-event rows and get the board in the expected order, a deceased patient with an active tourniquet last; another unit's board refused; logistics joins, reads 0 patient / clinical / patient-linked rows and 0 ledger rows directly, gets the stock movements without a patient column, and is refused the board and the command snapshot; cc unchanged).
+Verified before applying on a local PostgreSQL 16 built from every `database/*.sql` file in order (only the two `pg_cron` schedule lines in `028` and `072` skipped), with Supabase-like `authenticated` / `auth.uid()`: `074` applies, and applies again as a no-op; `scripts/rls_test_074_role_clinical_scope.sql` passes all 31 checks (medic and pc of the site unchanged; rpc / rcc read 0 patient, tourniquet and clinical-event rows and get the board in the expected order, a deceased patient with an active tourniquet last; another unit's board refused; logistics joins, reads 0 patient / clinical / patient-linked rows and 0 ledger rows directly, gets the stock movements without a patient column, and is refused the board and the command snapshot; cc unchanged).
 
-**Not applied live yet.** Apply, then run `scripts/rls_test_073_role_clinical_scope.sql` in the SQL editor against the real accounts.
+**Not applied live yet.** Apply, then run `scripts/rls_test_074_role_clinical_scope.sql` in the SQL editor against the real accounts.

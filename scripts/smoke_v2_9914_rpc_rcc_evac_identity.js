@@ -43,7 +43,7 @@ for (const rel of files) {
 
   // Evacuation-order panel: same order PC/CC use (the server's get_rescue_patient_board() order
   // signed in, otherwise the shared sortedPatientsByEvacPriority), so rescue-chain and medical
-  // command never disagree about evacuation sequence. Since database/073 (owner, 2026-10-23) the
+  // command never disagree about evacuation sequence. Since database/074 (owner, 2026-10-23) the
   // rescue chain sees no clinical data: only urgent / not urgent, no colour, no tourniquet reason.
   assert(evacPanelFn.includes('rescueSortedForEvac('), `${rel}: renderRescueEvacOrderPanel must use the shared rescue evac order`);
   assert(html.includes('return [...ranked, ...sortedPatientsByEvacPriority(pts.filter(p=>!Number.isFinite(p.rescueEvacOrder)))];'), `${rel}: patients the server has not ranked must fall back to the shared evac-priority sort`);
@@ -59,7 +59,7 @@ for (const rel of files) {
   assert(roleDashboardFn.includes("role==='rcc'?renderRescueEvacOrderPanel(pts,'סדר פינוי מומלץ — כלל הפלוגה')"), `${rel}: rcc must render the evac-order panel scoped to the whole company`);
   assert(roleDashboardFn.includes('${rescueEvacOrderPanel}'), `${rel}: rescueEvacOrderPanel must be spliced into the rendered sections`);
 
-  // Section titles: identity is shown, clinical data is not (database/073).
+  // Section titles: identity is shown, clinical data is not (database/074).
   assert(roleDashboardFn.includes('תמונה טקטית — מחלקה שלי (ללא מידע קליני)'), `${rel}: rpc tactical section title must say no clinical data`);
   assert(roleDashboardFn.includes('תמונה טקטית מרוכזת — פלוגה שלי (ללא מידע קליני)'), `${rel}: rcc tactical section title must say no clinical data`);
   assert(!roleDashboardFn.includes('ללא מדדים / זהות'), `${rel}: no rpc/rcc section title should still claim identity is excluded`);
