@@ -173,6 +173,21 @@ async function checkFile(browser, file) {
   assert(await page.evaluate(() => document.getElementById('screen-commander').classList.contains('active') && cmdPanelOpen.quarantine), `${rel}: the blocked-events chip must open the command screen's blocked-events panel`);
   await page.evaluate(() => { currentUser = null; });
 
+  // 9. Option A (owner, 2026-10-23): open evacuations are split by where the patient waits. A yellow
+  // at the evacuation point is still waiting for MDA, so it counts as not evacuated, in its own part.
+  const evac = await page.evaluate(() => {
+    patients.push({ events: [], id: 'cp-y2', visualId: 'P007', triage: 'yellow', injury: 'שבר', vitals: { pulse: 98, spo2: 97, rr: 18, avpu: 'A' },
+      location: 'חצר', locDetail: 'חצר', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', patientStatus: 'evacuating', trapStatus: 'not_trapped', lastVitalsAt: Date.now() - 4 * 60000 });
+    const split = openEvacuationSplit(patients);
+    goTo('demo'); startRoleDashboard('cc');
+    const action = document.querySelector('[data-cmd-panel="action"]').textContent;
+    const overview = document.querySelector('[data-cmd-panel="overview"]').textContent;
+    return { onScene: split.onScene.map((p) => p.visualId).sort(), atPoint: split.atPoint.map((p) => p.visualId), action, overview };
+  });
+  assert(evac.onScene.join() === 'P001,P002,P003,P005' && evac.atPoint.join() === 'P007', `${rel}: open evacuations split by stage (got ${JSON.stringify({ onScene: evac.onScene, atPoint: evac.atPoint })})`);
+  assert(evac.action.includes('5 אדום/צהוב ללא פינוי סגור: 4 באתר החילוץ · 1 ממתינים למד״א'), `${rel}: the CC evacuation bottleneck card must show the split`);
+  assert(evac.overview.includes('פינוי לא סגור · באתר החילוץ') && evac.overview.includes('פינוי לא סגור · ממתינים למד״א'), `${rel}: the CC metrics must show both parts`);
+
   assert(!errors.length, `${rel}: page errors: ${errors.join(' | ')}`);
   await context.close();
   console.log(`${rel}: command panel strip + tabs browser test passed`);

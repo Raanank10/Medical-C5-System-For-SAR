@@ -6554,7 +6554,8 @@ const DecisionSupportEngine=(()=>{
   }
   function evaluateEvacuation(ctx=defaultContext()){
     const recs=[];
-    const delayed=(ctx.patients||[]).filter(p=>['red','yellow'].includes(p.triage)&&!['evacuating','evacuated','handed_over','deceased'].includes(p.patientStatus));
+    const split=openEvacuationSplit(ctx.patients||[]);
+    const delayed=split.open;
     if(delayed.length){
       const red=delayed.filter(p=>p.triage==='red');
       recs.push(createRecommendation({
@@ -6562,7 +6563,7 @@ const DecisionSupportEngine=(()=>{
         category:'Evacuation Bottlenecks',
         priority:red.length?'HIGH':'MEDIUM',
         title:'צוואר בקבוק פינוי',
-        explanation:`${delayed.length} אדום/צהוב ללא פינוי סגור · ${red.length} אדומים.`,
+        explanation:`${delayed.length} אדום/צהוב ללא פינוי סגור: ${openEvacuationLabel(split)} · ${red.length} אדומים.`,
         suggestedAction:'הסלם פינוי, תעדף אדומים וחסם/לכוד, בדוק אמצעי הובלה',
         responsibleRole:'CC',
         affectedSector:siteData.name||'כלל המוקד',
@@ -7142,7 +7143,7 @@ function renderCompanyResourceCenter(openReqs, doctorReqs, deathReqs, blockedEva
   const resourceRows=[
     roleRow('חובשים זמינים', `${activeMedics} פעילים · ${overloaded} מחלקות עמוסות`),
     roleRow('רופא / פראמדיק', `${doctorReqs.length} בקשות פתוחות · ${deathReqs.length} בקשות קביעת מוות`),
-    roleRow('פינוי פלוגתי', `${blockedEvac} פצועים אדום/צהוב ללא פינוי סגור`),
+    roleRow('פינוי פלוגתי', `${blockedEvac} פצועים אדום/צהוב ללא פינוי סגור: ${openEvacuationLabel(openEvacuationSplit(patients))}`),
     roleRow('בקשות חוג״ד', `${openReqs.length} פתוחות · מ״פ מאשר / מנתב / משייך משאב`)
   ].join('');
   return `
@@ -7239,6 +7240,7 @@ function renderCcHeroDashboard(ctx={}){
   const activeTqTotal=totalActiveTourniquets(patients);
   const ineffectiveCount=(ctx.ineffectiveTqs||[]).length;
   const lowTruck=logisticsCompanies().flatMap(c=>c.lowItems.map(i=>`${c.name}: ${SUPPLY_LABELS[i.item]||i.item} ${i.qty}`)).slice(0,2);
+  const evacSplit=openEvacuationSplit(patients);
   const cards=[
     {
       title: overloadedPl&&availablePl&&overloadedPl.platoonId!==availablePl.platoonId ? `העבר חובש מ${availablePl.name} ל${overloadedPl.name}` : 'בדוק עומס מחלקות',
@@ -7256,10 +7258,10 @@ function renderCcHeroDashboard(ctx={}){
     },
     {
       title:'צוואר בקבוק פינוי',
-      reason:`${ctx.blockedEvac||0} אדום/צהוב ללא פינוי סגור · ${patients.filter(p=>p.triage==='red'&&normalizeTrapStatus(p)==='trapped').length} אדום לכוד`,
+      reason:`${evacSplit.open.length} אדום/צהוב ללא פינוי סגור: ${openEvacuationLabel(evacSplit)} · ${patients.filter(p=>p.triage==='red'&&normalizeTrapStatus(p)==='trapped').length} אדום לכוד`,
       action:'הסלם פינוי',
       onclick:"openReinforcementRequest({resourceType:'urgent_evac'})",
-      focus:{role:'cc',type:'cc_decision',id:'evacuation-bottleneck',label:'צוואר בקבוק פינוי',patientIds:patients.filter(p=>['red','yellow'].includes(p.triage)&&!['evacuating','evacuated','handed_over','deceased'].includes(p.patientStatus)).map(p=>p.id)}
+      focus:{role:'cc',type:'cc_decision',id:'evacuation-bottleneck',label:'צוואר בקבוק פינוי',patientIds:evacSplit.open.map(p=>p.id)}
     },
     {
       title:'ציוד שמשפיע על טיפול',
@@ -7306,7 +7308,8 @@ function renderCcCommandBoard(){
   const tqPatients=patients.filter(p=>activeTourniquets(p).length);
   const ineffectiveTqs=tqPatients.flatMap(p=>activeTourniquets(p)).filter(t=>t.status==='ineffective' || t.effectiveness==='bleeding_continues');
   const tqAwaitingEvac=tqPatients.filter(p=>!['evacuating','evacuated','handed_over'].includes(p.patientStatus));
-  const blockedEvac=patients.filter(p=>['red','yellow'].includes(p.triage) && !['evacuating','evacuated','handed_over'].includes(p.patientStatus)).length;
+  const evacSplit=openEvacuationSplit(patients);
+  const blockedEvac=evacSplit.open.length;
   const overloaded=commandPlatoons().filter(pl=>patients.filter(p=>patientPlatoonId(p)===pl.platoonId).length>=3).length;
   const platoonRows=commandPlatoons().map(pl=>{
     const pts=patients.filter(p=>patientPlatoonId(p)===pl.platoonId);
@@ -7335,7 +7338,8 @@ function renderCcCommandBoard(){
     roleMetric(doctorReqs.length,'רופא / פראמדיק'),
     roleMetric(deathReqs.length,'קביעת מוות'),
     roleMetric(overloaded,'מחלקות עמוסות'),
-    roleMetric(blockedEvac,'פינוי לא סגור'),
+    roleMetric(evacSplit.onScene.length,'פינוי לא סגור · באתר החילוץ'),
+    roleMetric(evacSplit.atPoint.length,'פינוי לא סגור · ממתינים למד״א'),
     roleMetric(patients.filter(p=>p.triage==='red'&&p.tourniquet).length,'אדום + חסם'),
     roleMetric(totalActiveTourniquets(patients),'חסמים פעילים'),
     roleMetric(ineffectiveTqs.length,'חסמים לא יעילים'),
@@ -7374,7 +7378,7 @@ function renderCcCommandBoard(){
   ));
   if(blockedEvac>=2) suggestions.push(roleRow(
     'צוואר בקבוק פינוי',
-    `${blockedEvac} פצועים ללא סטטוס פינוי סגור · שקול בקשת אמבולנס נוסף`
+    `${blockedEvac} פצועים ללא סטטוס פינוי סגור (${openEvacuationLabel(evacSplit)}) · שקול בקשת אמבולנס נוסף`
   ));
   const suggestionsHtml=suggestions.length?suggestions.join(''):roleRow('אין המלצות כרגע','תמונת המצב תקינה');
   const focusedPts=focusFilteredList(patients, focusMatchesPatient);
@@ -7384,7 +7388,7 @@ function renderCcCommandBoard(){
     ${renderCcEvacuationFunnel()}
     ${renderCollapsibleSection('cc-evac-priority','תעדוף פינוי פלוגתי', companyEvacuationPriorityRows(focusedPts), focusedPts.length, {criticalCount:patients.filter(p=>p.triage==='red'&&!['evacuated','handed_over','deceased'].includes(p.patientStatus)).length, emptyMessage:'אין פצועים במיקוד הנוכחי'})}
     ${renderExtractedCounterBoard()}
-    ${renderCollapsibleSection('cc-company-metrics','מדדים פלוגתיים', `<div class="role-top-grid">${snapshot}</div>`, 14)}`,
+    ${renderCollapsibleSection('cc-company-metrics','מדדים פלוגתיים', `<div class="role-top-grid">${snapshot}</div>`, 15)}`,
     action:`${renderCcHeroDashboard({openReqs,doctorReqs,deathReqs,blockedEvac,overloaded,ineffectiveTqs,tqPatients})}
     ${renderCcQuickActions()}
     ${renderCollapsibleSection('cc-resource-requests','בקשות משאב רפואי פתוחות', reqQueue || renderOperationalEmptyState('אין בקשות במיקוד הנוכחי'), focusedOpenReqs.length, {criticalCount:focusedOpenReqs.filter(isCriticalRequestForFocus).length, emptyMessage:'אין בקשות במיקוד הנוכחי'})}
@@ -13259,6 +13263,14 @@ function renderCmdContent(){
 // point (status evacuating) is waiting there for an ambulance, still the PC's responsibility, and
 // is no longer counted with the patients who have left the site.
 const LOCATION_BOARD_EVACUATED_STATUSES = new Set(['handed_over','self_evacuated','evacuated','closed']);
+// Open evacuations for command counts (owner, 2026-10-23, option A): red/yellow patients whose
+// evacuation is not done, split by where they wait, so command sees which stage is stuck: still at
+// the extraction site (the rescuers move them), or at the evacuation point waiting for MDA.
+function openEvacuationSplit(pts=patients){
+  const open=pts.filter(p=>['red','yellow'].includes(p.triage) && !['evacuated','handed_over','deceased','closed','self_evacuated'].includes(p.patientStatus));
+  return {open, onScene:open.filter(p=>p.patientStatus!=='evacuating'), atPoint:open.filter(p=>p.patientStatus==='evacuating')};
+}
+function openEvacuationLabel(split){ return `${split.onScene.length} באתר החילוץ · ${split.atPoint.length} ממתינים למד״א`; }
 function evacuationStage(p){
   if(p.patientStatus==='evacuating') return 'evac_point';
   return LOCATION_BOARD_EVACUATED_STATUSES.has(p.patientStatus) ? 'evacuated' : 'on_scene';
