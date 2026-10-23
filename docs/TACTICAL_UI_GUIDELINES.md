@@ -115,6 +115,8 @@ The timer is not passive history. It is an active risk clock.
 
 The phone alerts on its own clock (D1, repo owner, 2026-10-20), with or without a server connection: at 45, 60 and 120 minutes from application, once per level per tourniquet, it vibrates (where the browser supports it) and shows a banner that stays until tapped and opens the patient (`checkTourniquetTimeAlerts`, rule `tourniquetAlertToRaise` in `src/domain/rules.js`). It does not wait for the server's reassessment watchdog. Limits of a web page: iOS Safari has no vibration API, and a locked phone or a backgrounded browser pauses the page, so the alert fires when the app is opened again (only the current level, not every level missed).
 
+Since V2.99.58 the server raises the same levels too (`database/072`, WP-12), every minute, with no phone needed, into `watchdog_alerts`, along with red/yellow vitals overdue. A phone lists a server alert only when it does not already raise the same one from its own data, and marks it "(שרת)"; it never replaces the phone's own alert or its timer.
+
 ## Logistics Resupply Queue
 
 The resupply queue (`supply_requests`, real and cross-device — `docs/API_SURFACE_v1.2.md`'s "Logistics Resupply Queue API") is the one place a logistics officer sees a request from a medic or PC on a different device. It must stay a genuine cross-device queue, not silently fall back to the local-only demo state (`reinforcementRequests`) it replaced — the whole point of building it was that the old board only ever showed the current device's own local copy.

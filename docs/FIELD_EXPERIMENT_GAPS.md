@@ -12,7 +12,7 @@ This repo is a development prototype, not a field-ready shared system. This regi
 | Synthetic data | Option A: people play medics and enter casualties live. Option B: `scripts/inject_scenario.js` has virtual medics push a synthetic timeline (`scenarios/`) through the real `/sync/log`, tagged `synthetic_source='injector'` so the AAR can separate it. | A live run of the injector during a field session. |
 | Phone field testing | Not certified. Browser smoke tests cover the page itself. | Real iOS/Android testing: one-handed, glove mode, sunlight, lock screen, poor network. |
 | Role separation | Real Supabase Auth; role comes from the server profile; RLS audited (`docs/RLS_AUDIT_v1.md`). | Unit scoping is real (`database/045`, `053`): pc and rcc reach their own company's sites, rpc its platoon's, medics only assigned or drafted ones; the rescue chain reads no clinical events. Three rescue companies, three platoons each, plus the ambulance team. `logistics_officer` can still list and join any open incident. `053` is live since 2026-10-20, but no companies or platoons are set up yet, so pc/rcc/rpc see only incidents they are members of until company command places them. |
-| Watchdog timers | Browser-derived for visibility; server-side `watchdog_alerts` exist for some rules. | Durable backend watchdog worker with idempotent alert dedupe. |
+| Watchdog timers | Browser-derived on each phone, and since `database/072` (WP-12) also a server job every minute: tourniquet time (45/60/120 min) and red/yellow vitals overdue in `watchdog_alerts`, idempotent, resolved when they no longer apply; phones show a server alert only when they do not raise the same one. | Dead Man's Switch escalation as a server job; an outside channel when no phone is open (B1). |
 
 ## Before Testing With an Admin Account
 
@@ -31,5 +31,5 @@ This is intentionally recorded late in the flow, after vitals and triage, so the
 
 - Run Field Usability Sessions 1-4 with synthetic data and record the results.
 - Mobile device QA with browser lock/unlock, refresh, and airplane-mode sync recovery.
-- Move watchdog execution to backend jobs and verify idempotent alert dedupe.
+- ~~Move watchdog execution to backend jobs and verify idempotent alert dedupe.~~ Done for tourniquet time and vitals overdue (`database/072`, WP-12, verified live 2026-10-22); the Dead Man's Switch escalation is still phone-side.
 - Backup/incident-response plan and clinical/legal governance sign-off (`docs/OPERATIONS_SAFETY.md`).

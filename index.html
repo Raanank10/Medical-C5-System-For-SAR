@@ -818,7 +818,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9957</div>
+      <div class="demo-kicker">Demo V2.9958</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -915,7 +915,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9957</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9958</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -925,7 +925,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9957</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9958</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2947,7 +2947,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.57';
+const APP_VERSION = '2.99.58';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -8708,6 +8708,7 @@ function buildAlertObjects(pts=patients){
       }
     }
   });
+  serverWatchdogAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
   duplicateCandidates(pts).forEach(([a,b],idx)=>pushAlert(alerts,{id:`dup-${a.id}-${b.id}`,type:'DUPLICATE_SUSPECTED',severity:'medium',owner:'pc',audience:['pc','chamal'],escalatesTo:null,actionRequired:'merge_duplicate',scope:'site',category:'integrity',siteId:a.siteId||b.siteId||'SITE_A',patientId:a.id,title:`חשד לכפילות ${a.id} ↔ ${b.id}`,detail:'בדיקה ידנית בלבד; אין מיזוג הרסני של אירועים'}));
   const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id)):siteExternalReports(cmdActiveSite);
   const typeReport=siteData.medicIncidentTypeReport;
@@ -14170,7 +14171,7 @@ function applyServerTourniquets(rows, incidentId){
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
 function pullProjectedPatientStateAll(){
-  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); pullAlertAcknowledgments(id); pullRemoteTreatments(id); pullRemoteVitals(id); });
+  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); pullAlertAcknowledgments(id); pullRemoteTreatments(id); pullRemoteVitals(id); pullServerWatchdogAlerts(id); });
 }
 // ── Pre-evacuation report pull (V2.99.36, database/050) ──
 // incident_pre_evacuations is the server's verdict on who owns the report (first medical
@@ -14340,6 +14341,58 @@ function applyRemoteVitals(rows){
     changed=true;
   });
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
+}
+// WP-12: open alerts raised by the server watchdog (database/072, every minute, with or without a
+// phone open): tourniquet time 45/60/120 min and red/yellow vitals overdue. This phone already
+// raises the same things from its own data, so a server alert is listed only when the phone does
+// not: the patient's tourniquet is not known here or its own timer has not reached that level, or
+// the vitals are not overdue here and this phone has no newer vitals than the server's. Command and
+// the medic see them (owner decision 2026-10-22), marked as from the server.
+const serverWatchdogAlertsByIncident={};
+const SERVER_WATCHDOG_TYPES=['TOURNIQUET_TIME_NOTICE','TOURNIQUET_TIME_WARNING','TOURNIQUET_TIME_CRITICAL','VITALS_OVERDUE'];
+async function pullServerWatchdogAlerts(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let r;
+  try{ r=await client.from('watchdog_alerts').select('id,patient_id,alert_type,severity,triggered_at,payload_json').eq('incident_id', incidentId).is('resolved_at', null).in('alert_type', SERVER_WATCHDOG_TYPES).limit(500); }
+  catch(e){ return; }
+  if(r.error || !Array.isArray(r.data)) return;
+  const rows=r.data.filter(a=>a && a.patient_id && SERVER_WATCHDOG_TYPES.includes(a.alert_type) && a.payload_json?.source==='server_watchdog');
+  const before=JSON.stringify(serverWatchdogAlertsByIncident[incidentId]||[]);
+  serverWatchdogAlertsByIncident[incidentId]=rows;
+  if(JSON.stringify(rows)!==before) refreshActiveScreenData();
+}
+const SERVER_TQ_LEVEL_RANK={TOURNIQUET_TIME_NOTICE:1, TOURNIQUET_TIME_WARNING:2, TOURNIQUET_TIME_CRITICAL:3};
+function localTourniquetRank(p, nowMs=Date.now()){
+  return activeTourniquets(p).reduce((max,tq)=>{
+    const timer=C5Rules.tourniquetTimer({tourniquet:tq}, nowMs);
+    return Math.max(max, timer ? (TQ_ALERT_RANK[timer.cls]||0) : 0);
+  },0);
+}
+function serverWatchdogAlertObjects(pts=patients, nowMs=Date.now()){
+  const out=[];
+  Object.values(serverWatchdogAlertsByIncident).flat().forEach(a=>{
+    const p=pts.find(x=>x.id===a.patient_id);
+    if(!p) return;
+    const payload=a.payload_json||{};
+    const minutes=Number.isFinite(Number(payload.minutes)) ? Math.max(0, Math.round(Number(payload.minutes))) : null;
+    const severity=a.severity==='critical'?'critical':a.severity==='warning'?'high':'medium';
+    const base={patientId:p.id, siteId:p.siteId||'SITE_A', createdAt:a.triggered_at||new Date().toISOString(), owner:'medic', audience:['medic','pc','cc','chamal'], escalatesTo:null, escalateAfterMin:null, actionRequired:'update_vitals', scope:'patient', source:'server'};
+    if(a.alert_type==='VITALS_OVERDUE'){
+      if(isVitalsOverdue(p, nowMs)) return;
+      const baseline=Date.parse(payload.baseline_at||'');
+      if(Number.isFinite(baseline) && (p.lastVitalsAt||0)>baseline) return;
+      out.push({...base, id:`server-vitals-${a.id}`, type:'SERVER_VITALS_OVERDUE', severity, category:'data', title:`${p.visualId||p.id} — מדדים באיחור (שרת)`, detail:`לפי השרת${minutes!=null?` · ${minutes} דק׳ מאז מדדים`:''}`});
+      return;
+    }
+    const rank=SERVER_TQ_LEVEL_RANK[a.alert_type];
+    if(!rank || localTourniquetRank(p, nowMs)>=rank) return;
+    const label=rank===3?'קריטי':rank===2?'אזהרה':'45 דקות';
+    const limb=sanitizeRemoteText(payload.limb, 30);
+    out.push({...base, id:`server-tq-${a.id}`, type:'SERVER_TOURNIQUET_TIME', severity, category:'urgent', title:`${p.visualId||p.id} — חסם עורקים ${label} (שרת)`, detail:`${limb?tourniquetLimbMeta(limb).label+' · ':''}${minutes!=null?`${minutes} דק׳ · `:''}לפי השרת`});
+  });
+  return out;
 }
 const REMOTE_VITALS_ROLE_LABELS={medic:'חובש', paramedic:'פראמדיק', physician:'רופא', pc:'חוג״ד', admin:'מנהל מערכת'};
 function remoteVitalsSourceLine(p){
