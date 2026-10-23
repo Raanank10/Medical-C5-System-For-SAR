@@ -227,7 +227,7 @@ async function checkFile(browser, file) {
   await m.page.evaluate((pid) => acknowledgeAlert(pid), PATIENT);
   assert((await m.page.evaluate((pid) => patients.find((x) => x.id === pid).unsyncedEvents || 0, PATIENT)) === 0, `${rel}: the old never-clearing counter must not be bumped`);
   await syncAll(m.page);
-  // V2.99.61: the sync pills and the command strip show the last real answer from the sync
+  // V2.99.62: the sync pills and the command strip show the last real answer from the sync
   // function, not this phone's own saves; with the sync function unreachable, contact goes stale.
   const contact = await m.page.evaluate(async () => {
     lastServerContactAt = null;

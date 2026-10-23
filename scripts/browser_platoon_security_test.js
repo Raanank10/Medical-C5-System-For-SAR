@@ -280,7 +280,7 @@ async function checkFile(browser, file) {
   await cc.page.evaluate((id) => enterIncidentFromPicker(id), INC1);
   await cc.page.waitForTimeout(300);
   await cc.page.evaluate(() => startRoleDashboard('cc'));
-  // V2.99.61: the roster is on the CC panel's כוחות tab.
+  // V2.99.62: the roster is on the CC panel's כוחות tab.
   await cc.page.click('[data-cmd-tab="forces"]');
   await cc.page.waitForSelector('[data-roster-member]', { timeout: 5000 });
   assert(await cc.page.inputValue(`[data-incident-unit="${INC1}"]`) === `p:${A1}`, `${rel}: the roster panel must show the site's platoon`);
@@ -332,7 +332,7 @@ async function checkFile(browser, file) {
   assert(!(await pc1.page.evaluate(() => canManagePlatoonRoster())), `${rel}: a PC must not be offered the roster panel`);
   await pc1.page.evaluate(() => startRoleDashboard('pc'));
   assert(await pc1.page.locator('#platoon-roster-panel').count() === 0, `${rel}: no roster panel on the PC dashboard`);
-  await pc1.page.click('[data-cmd-tab="forces"]'); // V2.99.61: "הפלוגה שלי" is on the כוחות tab
+  await pc1.page.click('[data-cmd-tab="forces"]'); // V2.99.62: "הפלוגה שלי" is on the כוחות tab
   assert((await bodyRowAfter(pc1.page, 'הפלוגה שלי')).includes('פלוגה א'), `${rel}: the PC dashboard must name its company`);
 
   const errors = [...pc2.errors, ...rpc1.errors, ...rcc1.errors, ...cc.errors, ...pc1.errors];

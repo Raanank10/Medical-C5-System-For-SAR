@@ -59,7 +59,7 @@ for (const rel of files) {
   assert(!tqWithLimb.includes('reconcileSupplySource'), `${rel}: recordSweepTourniquetWithLimb must not double-count tourniquet supply`);
 
   // V2.99.35 appended the pre-evacuation board after the CC board; the CC board still leads.
-  // V2.99.61: PC/CC render through the tabbed command panel; the CC hero leads the פעולה tab.
+  // V2.99.62: PC/CC render through the tabbed command panel; the CC hero leads the פעולה tab.
   assert(roleDashboard.includes('renderCommandPanel(role,') && commandPanel.includes('renderCcCommandBoard()'), `${rel}: CC must render through the command panel`);
   assert(html.includes('action:`${renderCcHeroDashboard({openReqs,'), `${rel}: CC hero must lead the action tab`);
   assert(roleDashboard.includes('${dashboardFocusBanner()}') && commandPanel.includes('${dashboardFocusBanner()}'), `${rel}: dashboard focus banner missing from role dashboard`);
