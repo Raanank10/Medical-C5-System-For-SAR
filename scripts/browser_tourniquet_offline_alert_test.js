@@ -76,7 +76,7 @@ async function checkFile(browser, file) {
   const crit = await page.evaluate(() => ({ n: window.__vibrations.length, level: document.getElementById('tq-time-alert')?.dataset.level, banner: document.getElementById('tq-time-alert')?.textContent || '' }));
   assert(crit.n === 2 && crit.level === 'critical' && crit.banner.includes('120'), `${rel}: crossing 120 minutes must raise a critical alert (got ${JSON.stringify(crit)})`);
   await page.click('#tq-time-alert');
-  assert(await page.evaluate(() => !document.getElementById('tq-time-alert') && document.getElementById('detail-pid')?.textContent === 'eeeeeeee-0000-4000-8000-000000000001'), `${rel}: tapping the banner opens the patient`);
+  assert(await page.evaluate(() => !document.getElementById('tq-time-alert') && document.getElementById('detail-pid')?.textContent === 'P-TQ-OFF'), `${rel}: tapping the banner opens the patient`);
 
   // 3. A remote tourniquet refreshed from the server keeps its alert level.
   const remote = await page.evaluate(() => {
