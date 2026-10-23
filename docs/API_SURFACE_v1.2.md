@@ -359,7 +359,7 @@ Server projection rules:
 | `stabilizing` | Care is ongoing at the treatment site, such as tourniquet, medication, or airway management. |
 | `observing` | Care milestone completed; patient waits for extraction or reassessment. |
 | `extricating` | Casualty is being physically moved through the structure or ruins. |
-| `evacuating` | Moved by the rescuers from the extraction site to the site's evacuation point (נקודת פינוי, where the PC truck stands), waiting for an MDA ambulance, still under the platoon commander's supervision - not yet formally handed to MDA. The stored payload keeps `destination: 'company_collection_point'` (renamed in the UI only, V2.99.59). Set via `PATIENT_STATUS_UPDATED` (`payload_json.status = 'evacuating'`), an optional intermediate step before `handed_over`. |
+| `evacuating` | Moved by the rescuers from the extraction site to the site's evacuation point (נקודת פינוי, where the PC truck stands), waiting for an MDA ambulance, still under the platoon commander's supervision - not yet formally handed to MDA. The stored payload keeps `destination: 'company_collection_point'` (renamed in the UI only, V2.99.61). Set via `PATIENT_STATUS_UPDATED` (`payload_json.status = 'evacuating'`), an optional intermediate step before `handed_over`. |
 | `handed_over` | Transferred to MDA / evacuation force through `מסירת מצב רפואי לפינוי` (MIST) or secure QR. Final custody state. |
 | `deceased` | Black triage fast-path or casualty expired during care. |
 

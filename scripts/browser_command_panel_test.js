@@ -1,4 +1,4 @@
-// Real-browser test of the PC / CC command panel layout (V2.99.59): a sticky status strip above
+// Real-browser test of the PC / CC command panel layout (V2.99.61): a sticky status strip above
 // four tap-only tabs (תמונת מצב / פעולה / כוחות / ציוד, right to left), per-tab badges counted in
 // patients from the existing alert pipeline (roleAlertRows), every routed alert listed in the strip
 // so none is visible only inside a tab, entry always on תמונת מצב while re-renders keep the tab,

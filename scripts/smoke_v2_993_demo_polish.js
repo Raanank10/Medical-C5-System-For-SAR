@@ -52,12 +52,14 @@ for (const rel of files) {
   assert(html.includes("p.mstart.breathing='assumed_yes'"), `${rel}: AVPU A/V should use assumed breathing, not overwrite yes`);
   assert(html.includes("p.mstart.breathing==='no'") && html.includes('סתירה: AVPU'), `${rel}: AVPU vs breathing=no contradiction warning missing`);
 
-  assert(html.includes('bottom:148px') && html.includes("fab.textContent='+ פצוע | אותו אזור'"), `${rel}: same-zone FAB must sit above sticky actions with fixed label`);
-  assert(html.includes("if(activeRoleDashboard!=='medic' || activeScreenId()!=='sweep') return;"), `${rel}: same-zone FAB must be sweep/medic scoped`);
+  // Since 2026-10-23 the FAB is positioned in CSS from the bottom bar's height, not a fixed 148px.
+  assert(html.includes('.same-zone-fab{position:fixed;') && html.includes('bottom:calc(var(--bottom-bar-h) + 12px') && html.includes("fab.textContent='+ פצוע | אותו אזור'"), `${rel}: same-zone FAB must sit above sticky actions with fixed label`);
+  // Since 2026-10-23 the FAB is the sweep screen's one add-casualty button for any role running the sweep.
+  assert(html.includes("if(activeScreenId()!=='sweep') return;"), `${rel}: same-zone FAB must be sweep scoped`);
   assert(!tqWithLimb.includes('reconcileSupplySource'), `${rel}: recordSweepTourniquetWithLimb must not double-count tourniquet supply`);
 
   // V2.99.35 appended the pre-evacuation board after the CC board; the CC board still leads.
-  // V2.99.59: PC/CC render through the tabbed command panel; the CC hero leads the פעולה tab.
+  // V2.99.61: PC/CC render through the tabbed command panel; the CC hero leads the פעולה tab.
   assert(roleDashboard.includes('renderCommandPanel(role,') && commandPanel.includes('renderCcCommandBoard()'), `${rel}: CC must render through the command panel`);
   assert(html.includes('action:`${renderCcHeroDashboard({openReqs,'), `${rel}: CC hero must lead the action tab`);
   assert(roleDashboard.includes('${dashboardFocusBanner()}') && commandPanel.includes('${dashboardFocusBanner()}'), `${rel}: dashboard focus banner missing from role dashboard`);

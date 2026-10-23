@@ -797,7 +797,7 @@ Action:
 - Writes a `PATIENT_STATUS_UPDATED` event with `payload_json.status = 'evacuating'`
 - Sets patient status to `evacuating`
 - Represents the rescuers having moved the patient from the extraction site to the site's evacuation point (נקודת פינוי): each site has one, where rescued patients wait for an MDA ambulance and where the PC truck and its supplies stand (the company's own ambulance carries the doctor between sites, not patients). Still under the platoon commander's supervision, not yet formally handed to MDA
-- The payload keeps `destination: 'company_collection_point'` for continuity; only the wording changed (V2.99.59, was "נקודת איסוף פלוגתית")
+- The payload keeps `destination: 'company_collection_point'` for continuity; only the wording changed (V2.99.61, was "נקודת איסוף פלוגתית")
 - Command views show three separate stages per site: at the extraction site, at the evacuation point, evacuated by MDA / handed over
 - Only shown while the patient is not already `evacuating` or in a terminal status
 

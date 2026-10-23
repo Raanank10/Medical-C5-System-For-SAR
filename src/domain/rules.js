@@ -24,7 +24,7 @@
   const TOURNIQUET_WARN_MS = 60 * 60 * 1000;
   const TOURNIQUET_CRITICAL_MS = 120 * 60 * 1000;
   const DEVICE_SILENCE_MS = 10 * 60 * 1000;
-  // Server contact freshness for the command status strip (repo owner, V2.99.59). The phone
+  // Server contact freshness for the command status strip (repo owner, V2.99.61). The phone
   // syncs every 45 seconds, so under 2 minutes since the last successful server response
   // (one missed cycle) still reads as connected; up to 5 minutes is stale; beyond that, or
   // when the device reports no network, or no server response yet, it is offline.

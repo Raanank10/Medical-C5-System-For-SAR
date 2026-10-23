@@ -10,8 +10,25 @@ These guidelines capture the design intent for C5 Sentinel-SAR as a development 
 - Keep critical controls at least 56px by 56px. Since V2.99.56 (owner, 2026-10-22) the main field buttons (tap choices, primary and secondary actions, vitals steppers, AVPU, blood pressure) are 60-64px tall, every other field control is at least 56px, and small toggles, filters and links at least 44px; the body-map injury hotspots are about 49x44px.
 - Show the current clinical clock when time changes the risk.
 - Never communicate triage by color alone; pair color with text.
+- A selected tap choice must be unmistakable at a glance, not a faint tint: since V2.99.59 (owner, 2026-10-22, AVPU on the MSTART card) a selected button gets a solid fill, an outer ring and a white check mark, so the choice reads without comparing colors.
+- Nothing in a field screen may need sideways scrolling. The pulse and breathing count steppers (-5/-1/+1/+5) take the full row width and share it, with "ספירה:" and the multiplier on a small line above (V2.99.59): at least 56px per button on a 360px-wide phone.
 - Treat stale data, missing data, and pending triage as first-class states.
 - Do not block forward movement for optional or incomplete fields; save the record and surface missing data as a background alert.
+
+## Phone Layout (owner, 2026-10-23)
+
+Checked by `scripts/browser_mobile_layout_test.js` at 375x812 and 412x915, RTL, field mode on.
+
+- One top nav, 60px tall: "ראשי", "מצב שטח" and an account menu ("חשבון": user management for admins, bug report, sign out), equal-size buttons with a one-line label. Nothing else floats over the top of a screen; each screen's own sticky header sits under the nav.
+- Signed in, the nav shows the role and the email. "לא מקוון" (saved offline profile) comes first and is never cut short; only the email is.
+- At most one floating control above a screen's bottom bar (the sweep's "+ פצוע | אותו אזור"), placed from the bar's height, and the screen reserves room for both so no content ends up under them.
+- One control per action on a screen (owner, 2026-10-23): the sweep screen's only "add casualty" control is that floating button. It is always up on the sweep screen, for whoever runs the sweep (a חוג״ד can too), and never shown on any other screen.
+- Inside a casualty card nothing is positioned out of flow and nothing is wider than the card. Below 480px the ID takes its own line and the triage banner stacks its text above its source pill. Mixed Hebrew/Latin labels ("אדום / RED") are isolated per direction.
+- One red frame per card: the triage banner inside a card has no border of its own, and an unacknowledged alert pulses as a ring on the card's outline, without a blur around it.
+- Missing-data chips have three tiers: red only for what changes care of a red casualty now (no measured vitals, stale vitals, evacuation status, no reassessment, tourniquet time unknown), orange for a clock that is late or cannot run (stale vitals, tourniquet time or limb unknown, on any casualty that is not red), a neutral outline for the rest. All of them stay visible.
+- "No vitals" is one key, `missing_vitals` ("אין מדדים מלאים", owner 2026-10-23): no measured vitals set yet, on any phone. MSTART answers are not vitals and never clear it; a vitals save on any phone (or the server's `last_vitals_at`, set only by `VITALS_RECORDED`) does. It replaces `full_vitals`, which no code ever cleared, and `missing_treatment` is no longer shown (it flagged every casualty who needed no treatment).
+- A recorded tourniquet's limb can be corrected, or an entry recorded by mistake cancelled, from the patient screen as well as from the sweep card. Cancelling asks first, because it stops that tourniquet's 45/60/120-minute alerts. Only roles that may write clinical events get these controls.
+- No internal key (such as `stale_vitals`) is ever shown: every missing-data key has a Hebrew label in `DEBT_LABELS` (`tests/debt-labels.test.js`).
 
 ## New Patient Flow
 
@@ -139,11 +156,11 @@ UI expectations:
 - no blocking spinner for primary capture
 - failed or delayed sync shown as status, not as user failure
 
-Sync freshness means the last answer from the server, not the last local save (V2.99.59). Signed in, every sync pill and the command strip show it: under 2 minutes "מחובר לשרת" (green), up to 5 minutes "עדכון אחרון מהשרת" (orange), beyond that, with no network or with no answer yet "אין קשר לשרת" (red), plus the number of events still waiting to be sent. The limits live in `serverContactFreshness` in `src/domain/rules.js`. Local demo mode says "מצב דמו · ללא שרת" and never claims a connection.
+Sync freshness means the last answer from the server, not the last local save (V2.99.61). Signed in, every sync pill and the command strip show it: under 2 minutes "מחובר לשרת" (green), up to 5 minutes "עדכון אחרון מהשרת" (orange), beyond that, with no network or with no answer yet "אין קשר לשרת" (red), plus the number of events still waiting to be sent. The limits live in `serverContactFreshness` in `src/domain/rules.js`. Local demo mode says "מצב דמו · ללא שרת" and never claims a connection.
 
 ## PC / CC Command Panel
 
-Since V2.99.59 the PC (חוג"ד) and CC (מ״פ רפואה) panels are a sticky status strip above four tabs instead of one long scroll.
+Since V2.99.61 the PC (חוג"ד) and CC (מ״פ רפואה) panels are a sticky status strip above four tabs instead of one long scroll.
 
 - Tabs, right to left: תמונת מצב, פעולה, כוחות, ציוד. Tap only, no swipe. Entering the panel always opens תמונת מצב; automatic re-renders (sync, acknowledgements) keep the tab the commander is on.
 - תמונת מצב: per site, how many patients by triage colour (red, yellow, green, black, trapped), split into three stages that must never be merged: still at the extraction site, at the site's evacuation point (נקודת פינוי) waiting for an MDA ambulance, and evacuated by MDA / handed over. The company's own ambulance carries the doctor between the company's sites and is not a patient evacuation resource. The evacuation point is where the PC truck stands; the PC's own site shows the truck stock there. Then the evacuation funnel and the evacuation priority list (platoon for PC, company for CC), which is the evacuation-to-hospital list: it keeps patients at the evacuation point (marked "בנקודת פינוי") until MDA takes them, next to ranked patients still at the extraction site ("באתר החילוץ").

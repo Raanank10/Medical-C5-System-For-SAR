@@ -300,7 +300,7 @@ assert.equal(rules.tourniquetAlertToRaise("critical", null), "critical");
 // Never alerts downwards (e.g. a clock correction).
 assert.equal(rules.tourniquetAlertToRaise("warn", "critical"), null);
 
-// Command status strip: server contact freshness (V2.99.59).
+// Command status strip: server contact freshness (V2.99.61).
 {
   const now = 10_000_000;
   assert.deepEqual(rules.serverContactFreshness(now - 20_000, now), { level: "fresh", ageMs: 20_000 });

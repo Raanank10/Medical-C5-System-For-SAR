@@ -35,7 +35,7 @@ for (const rel of files) {
   assert(/saveLocalEvent\(\{type:'EXTERNAL_REPORT_CREATED'[\s\S]{0,900}?linked_patient_id/.test(html), `${rel}: reports must sync, with the patient link kept out of events.patient_id`);
 
   // Board by location on the PC and CC dashboards and the command screen.
-  // V2.99.59: the board is on the תמונת מצב tab of both command panels.
+  // V2.99.61: the board is on the תמונת מצב tab of both command panels.
   assert(html.includes("roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds('pc'), {truckSiteId:pcPlatoonSite()}))")
     && html.includes("roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds('cc')))"), `${rel}: PC and CC role dashboards must show the location board`);
   assert(html.includes('id="cmd-location-board"') && html.includes('locations:true'), `${rel}: command screen must have the location board panel`);
