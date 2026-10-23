@@ -263,7 +263,7 @@ One PR each, or grouped if small:
 
 Add a CI job running `npm ci`, then every `scripts/browser_*.js` with the pre-installed or `npx playwright install chromium` browser, and the 34 `scripts/smoke_*.js` scripts. Keep the existing two checks as a separate fast job.
 
-**Done (2026-10-22).** `browser-and-smoke-tests` job in `.github/workflows/validate.yml`: `npm ci`, `npx playwright install --with-deps chromium`, `npm test` (`scripts/run_tests.js`: 30 browser tests, 2 other test scripts, 34 smoke scripts, each in its own process with a 5-minute limit; prints a summary and fails if any fails). `repo-check` unchanged. Branch protection (requiring the job before merge) is a GitHub setting for the owner. The analytics `pytest` suite is not in this job.
+**Done (2026-10-22).** `browser-and-smoke-tests` job in `.github/workflows/validate.yml`: `npm ci`, `npx playwright install --with-deps chromium`, `npm test` (`scripts/run_tests.js`: 30 browser tests, 2 other test scripts, 34 smoke scripts, each in its own process with a 5-minute limit; prints a summary and fails if any fails). `repo-check` unchanged. Branch protection (requiring the job before merge) is a GitHub setting for the owner. The analytics `pytest` suite is not in this job. Since 2026-10-23 it installs only the headless shell the tests launch (`npx playwright install --only-shell chromium`, browsers cached by Playwright version) instead of `--with-deps`, whose apt-get step took 11-13 minutes on most runs.
 
 ---
 
