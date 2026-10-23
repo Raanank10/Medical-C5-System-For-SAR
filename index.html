@@ -82,10 +82,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .patient-card.black::before{background:var(--triage-black-border);width:8px;}
 .patient-card.pending{border-style:dashed;background:linear-gradient(90deg,rgba(180,180,200,.05),rgba(180,180,200,.12));}
 .patient-card.pending::before{background:transparent;border-right:4px dashed var(--muted);}
-.patient-card.active-alert,.cmd-row.active-alert{box-shadow:0 0 0 2px var(--red),0 0 16px rgba(255,59,48,0.35);animation:alertGlow 2s ease-in-out infinite;}
+.patient-card.active-alert,.cmd-row.active-alert{box-shadow:0 0 0 2px var(--red);animation:alertGlow 2s ease-in-out infinite;}
+/* Unacknowledged alert: a pulsing ring flush with the card's own outline, no blur spilling past it
+   (owner, 2026-10-23: the blurred glow plus the red border plus the band border read as three frames). */
 @keyframes alertGlow{
-  0%,100%{box-shadow:0 0 0 2px var(--red),0 0 16px rgba(255,59,48,0.35);}
-  50%{box-shadow:0 0 0 2px var(--red),0 0 28px rgba(255,59,48,0.6);}
+  0%,100%{box-shadow:0 0 0 2px var(--red);}
+  50%{box-shadow:0 0 0 4px rgba(255,59,48,0.55);}
 }
 .patient-id{font-family:var(--mono);font-weight:700;font-size:16px;min-width:46px;}
 .patient-info{flex:1;}
@@ -180,8 +182,7 @@ body.field-mode .btn-primary{min-height:72px;font-size:16px;}
 body.field-mode .field-label{font-size:14px;color:var(--text);font-weight:800;}
 body.field-mode .role-row-sub, body.field-mode .demo-strip-sub, body.field-mode .cmd-matrix-sub, body.field-mode .aar-note-body{color:#d6d6e4;}
 body.field-mode .patient-card{padding:16px 15px;margin-top:8px;margin-bottom:8px;}
-.field-mode-toggle{position:fixed;left:14px;bottom:86px;z-index:120;background:var(--surface);border:1px solid var(--border);box-shadow:0 12px 40px rgba(0,0,0,.35);border-radius:999px;color:var(--text);padding:10px 13px;font-weight:900;font-size:12px;}
-.field-mode-toggle.active{background:var(--orange);border-color:var(--orange);color:#fff;}
+.field-mode-toggle.active{background:var(--orange)!important;border-color:var(--orange)!important;color:#fff!important;}
 .autofill-chip{display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(76,201,240,.45);background:rgba(76,201,240,.1);color:var(--accent);border-radius:999px;padding:5px 8px;font-size:11px;font-weight:800;margin:3px;}
 .sweep-warning{background:rgba(255,107,53,.12);border:1px solid var(--orange);border-radius:12px;padding:10px 12px;color:var(--text);font-size:12px;line-height:1.45;margin-bottom:12px;}
 .supply-sheet{border-color:var(--accent);box-shadow:0 -16px 60px rgba(76,201,240,.18);}
@@ -345,15 +346,21 @@ body.field-mode .patient-card{padding:16px 15px;margin-top:8px;margin-bottom:8px
 .ticket-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0;}
 .ticket-meta{background:rgba(255,255,255,.035);border:1px solid var(--border);border-radius:9px;padding:7px 8px;font-size:11px;color:var(--muted);}
 .ticket-meta strong{display:block;color:var(--text);font-size:12px;margin-top:2px;}
-.debt-chip{display:inline-block;border:1px solid var(--yellow);background:rgba(255,204,0,.11);color:var(--yellow);border-radius:999px;padding:4px 8px;font-size:11px;font-weight:900;margin:2px;}
-.debt-chip.overdue{border-color:var(--orange);background:rgba(255,107,53,.12);color:var(--orange);}
-.debt-chip.critical{border-color:var(--red);background:rgba(255,59,48,.12);color:var(--red);}
+/* Missing-data chips in three tiers (owner, 2026-10-23), so the urgent ones stand out instead of
+   every chip shouting: critical (red) = data that changes care for a red casualty right now;
+   overdue (orange) = a running clock is late or cannot run (stale vitals, tourniquet time/limb);
+   everything else is a neutral outline - still shown, never hidden (CLAUDE.md safety policy). */
+.debt-chip{display:inline-block;border:1px solid rgba(255,255,255,.32);background:rgba(255,255,255,.04);color:var(--text);border-radius:999px;padding:4px 8px;font-size:11px;font-weight:900;margin:2px;max-width:100%;}
+.debt-chip.overdue{border-color:var(--orange);background:rgba(255,107,53,.14);color:var(--orange);}
+.debt-chip.critical{border-color:var(--red);background:rgba(255,59,48,.16);color:#ff6b62;}
 .next-action-box{background:rgba(67,97,238,.1);border:1px solid rgba(67,97,238,.45);border-radius:12px;padding:10px 12px;font-size:13px;font-weight:900;margin-top:10px;color:var(--text);}
 .next-action-box .next-label{color:#b9c4ff;font-size:11px;display:block;margin-bottom:3px;}
 body.field-mode .ticket-triage-label{font-size:21px;}
 body.field-mode .ticket-triage-band{min-height:74px;padding:16px 14px;background-image:none;}
 body.field-mode .ticket-id-line{font-size:22px;}
 body.field-mode .next-action-box{position:sticky;bottom:86px;z-index:15;min-height:56px;display:flex;flex-direction:column;justify-content:center;border-width:2px;background:rgba(67,97,238,.18);}
+/* Inside a list card the box must stay in flow: sticky there floated it over the card's own chips. */
+body.field-mode .patient-card .next-action-box{position:static;}
 body.field-mode .debt-chip{font-size:12px;padding:6px 9px;}
 body.field-mode .ticket-meta{color:#d6d6e4;}
 
@@ -371,8 +378,8 @@ body.field-mode .ticket-meta{color:#d6d6e4;}
 
 /* ── BOTTOM BAR ── */
 .bottom-bar{position:fixed;bottom:0;left:0;right:0;padding:14px 16px;background:rgba(10,10,15,0.97);border-top:1px solid var(--border);backdrop-filter:blur(8px);}
-.home-btn{position:fixed;top:12px;left:12px;z-index:180;background:var(--surface2);border:1px solid var(--border);color:var(--text);min-width:56px;height:44px;border-radius:12px;font-family:var(--sans);font-size:13px;font-weight:900;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.25);display:none;align-items:center;justify-content:center;gap:6px;}
-.home-btn.visible{display:flex;}
+.home-btn{display:none!important;}
+.home-btn.visible{display:flex!important;}
 .btn-primary{width:100%;padding:17px;background:var(--accent);border:none;border-radius:14px;color:white;font-family:var(--sans);font-size:17px;font-weight:700;cursor:pointer;transition:opacity 0.1s;min-height:56px;touch-action:manipulation;}
 .btn-primary:active{opacity:0.85;}
 .btn-primary:disabled{background:var(--surface2);color:var(--muted);}
@@ -581,8 +588,22 @@ input[type=text],input[type=email],input[type=password],input[type=number],texta
 input[type=text]:focus,input[type=email]:focus,input[type=password]:focus,textarea:focus{border-color:var(--accent);}
 textarea{resize:vertical;min-height:70px;}
 /* ── AUTH ── */
-.auth-status-strip{display:none;align-items:center;justify-content:space-between;gap:8px;background:var(--surface2);border-bottom:1px solid var(--border);padding:8px 16px;font-size:12px;color:var(--muted);position:sticky;top:0;z-index:101;}
-.auth-status-strip button{background:none;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer;}
+.auth-status-strip{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--surface2);border-bottom:1px solid var(--border);padding:0 12px;height:var(--top-nav-h);box-sizing:border-box;font-size:12px;color:var(--muted);position:sticky;top:0;z-index:101;}
+.auth-status-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;line-height:1.3;}
+.auth-status-role{color:var(--text);font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.auth-status-offline{color:var(--orange);font-weight:900;}
+.auth-status-email{direction:ltr;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;}
+.top-nav{display:flex;gap:6px;flex:0 0 auto;align-items:center;}
+/* Equal-size nav buttons: icon above a one-line label, 48px tall (>= 44px, docs/TACTICAL_UI_GUIDELINES.md). */
+.top-nav-btn{width:64px;height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--sans);font-size:11px;font-weight:900;white-space:nowrap;cursor:pointer;padding:0 4px;list-style:none;}
+.top-nav-btn::-webkit-details-marker{display:none;}
+.top-nav-icon{font-size:16px;line-height:1;}
+.top-nav-menu{position:relative;}
+.top-nav-menu[open] > summary{border-color:var(--accent);}
+.top-nav-menu-list{position:absolute;top:calc(100% + 6px);left:0;z-index:200;min-width:190px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:6px;display:flex;flex-direction:column;gap:6px;box-shadow:0 12px 40px rgba(0,0,0,.45);}
+.top-nav-menu-list button{min-height:48px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-weight:800;text-align:right;padding:0 12px;cursor:pointer;}
+/* Each screen's own sticky header sits under the top nav instead of sliding beneath it. */
+.header{top:var(--top-nav-h);}
 .login-error{color:var(--red);font-size:13px;min-height:18px;margin-top:4px;}
 .admin-badge{display:inline-block;border:1px solid var(--border);border-radius:6px;padding:1px 7px;font-size:11px;font-weight:800;margin-inline-start:6px;vertical-align:middle;}
 .admin-badge.active{color:var(--green);border-color:var(--green);}
@@ -648,11 +669,7 @@ textarea{resize:vertical;min-height:70px;}
 .action-btn{min-height:64px;}
 .demo-mini-btn{min-height:56px;font-size:14px;padding:12px 10px;}
 .count-timer button{min-height:56px;font-size:14px;}
-.field-mode-toggle{min-height:48px;padding:13px 16px;font-size:13px;}
-.home-btn{height:52px;min-width:64px;font-size:14px;}
-/* The fixed "ראשי" button sits over the header's left edge; leave it room so the clock and the
-   header's own close button are not hidden under it (they were partly hidden before). */
-.header{padding-left:88px;}
+/* "ראשי" and "מצב שטח" now live in the top nav (owner, 2026-10-23), not over the screen headers. */
 .alert-slice{min-height:44px;padding:11px 14px;font-size:13px;}
 .briefing-trigger{min-height:44px;padding:10px 14px;font-size:13px;}
 .icon-close-btn{width:48px!important;height:48px!important;}
@@ -663,20 +680,50 @@ textarea{resize:vertical;min-height:70px;}
 .body-map{zoom:1.45;}
 .body-hotspot{height:31px;}
 .toggle-pill-btn{min-height:44px;padding:10px 16px!important;}
+/* ── Phone layout: casualty card, triage banner, floating controls (owner, 2026-10-23) ──
+   Checked by scripts/browser_mobile_layout_test.js at 375x812 and 412x915. */
+:root{--top-nav-h:60px;--bottom-bar-h:92px;--fab-h:60px;}
+body.field-mode{--bottom-bar-h:100px;}
+/* Card body: flex children may shrink, long words wrap, nothing grows past the card. */
+.patient-id{white-space:nowrap;flex:0 0 auto;}
+.patient-info{min-width:0;overflow-wrap:anywhere;}
+.patient-card .chip-row{overflow:visible;gap:4px;}
+.patient-card .ticket-triage-band{margin:0 0 10px;border:0;}
+.role-list > .patient-card{margin:0;}
+.ticket-triage-source{white-space:normal;text-align:center;}
+@media (max-width:480px){
+  /* The ID gets its own line instead of a narrow column beside the card's content. */
+  .patient-card:has(.ticket-triage-band){flex-direction:column;align-items:stretch;gap:8px;}
+  /* Banner text above its source pill, so the text keeps the card's full width. */
+  .ticket-triage-band{flex-direction:column;align-items:stretch;}
+  .ticket-triage-source{align-self:flex-start;}
+}
+/* "+ פצוע | אותו אזור": just above the bottom bar, and the screen reserves room for both. */
+.same-zone-fab{position:fixed;right:16px;bottom:calc(var(--bottom-bar-h) + 12px + env(safe-area-inset-bottom));height:var(--fab-h);background:var(--red);color:#fff;border:none;border-radius:14px;padding:0 20px;font-size:16px;font-weight:900;z-index:150;cursor:pointer;direction:rtl;touch-action:manipulation;box-shadow:0 4px 14px rgba(0,0,0,0.45);}
+#screen-sweep{padding-bottom:calc(var(--bottom-bar-h) + var(--fab-h) + 24px + env(safe-area-inset-bottom));}
+#screen-sweep .flow-content{padding-bottom:18px;}
+.bottom-bar{padding-bottom:calc(14px + env(safe-area-inset-bottom));}
 </style>
 </head>
 <body>
 <!-- Pinned version: bump deliberately, never float @2, since this loads on field devices. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.min.js"></script>
-<button class="field-mode-toggle" id="field-mode-toggle" onclick="toggleFieldMode()">מצב שטח</button>
-<button id="global-home-btn" class="home-btn" onclick="goHome()">ראשי</button>
+<!-- Top nav (owner, 2026-10-23): "ראשי" and "מצב שטח" used to float over every screen and hid the
+     sign-out button; they now sit here with the account actions, always one line, 60px tall. -->
 <div id="auth-status-strip" class="auth-status-strip">
-  <span class="auth-status-text"></span>
-  <div style="display:flex;gap:6px">
-    <button id="auth-admin-users-btn" style="display:none" onclick="openAdminUsers()">👥 ניהול משתמשים</button>
-    <button onclick="openFeedbackModal()">🐞 דווח על תקלה</button>
-    <button onclick="signOut()">התנתק</button>
-  </div>
+  <div class="auth-status-text"><span class="auth-status-role">לא מחובר</span><span class="auth-status-email"></span></div>
+  <nav class="top-nav" aria-label="ניווט">
+    <button id="global-home-btn" class="home-btn top-nav-btn" onclick="goHome()"><span class="top-nav-icon" aria-hidden="true">🏠</span><span>ראשי</span></button>
+    <button class="field-mode-toggle top-nav-btn" id="field-mode-toggle" onclick="toggleFieldMode()" aria-pressed="false"><span class="top-nav-icon" aria-hidden="true">🧤</span><span>מצב שטח</span></button>
+    <details id="auth-account-menu" class="top-nav-menu" style="display:none">
+      <summary class="top-nav-btn"><span class="top-nav-icon" aria-hidden="true">👤</span><span>חשבון</span></summary>
+      <div class="top-nav-menu-list">
+        <button id="auth-admin-users-btn" style="display:none" onclick="closeAccountMenu();openAdminUsers()">👥 ניהול משתמשים</button>
+        <button onclick="closeAccountMenu();openFeedbackModal()">🐞 דווח על תקלה</button>
+        <button onclick="closeAccountMenu();signOut()">התנתק</button>
+      </div>
+    </details>
+  </nav>
 </div>
 <div id="incident-context-strip" class="incident-strip">
   <span class="incident-strip-text"></span>
@@ -3457,8 +3504,32 @@ const DEBT_LABELS = {
   access_assessment_needed:'נדרש בירור גישה/חילוץ',
   no_reassessment:'אין מדידה חוזרת',
   no_monitoring_medic:'לא שויך למעקב',
-  pending_handover:'מסירה חסרה'
+  pending_handover:'מסירה חסרה',
+  // Emitted by assessmentDebtForPatient(); used to render as raw keys (owner, 2026-10-23).
+  missing_location:'מיקום חסר',
+  missing_triage:'מיון חסר',
+  missing_vitals:'מדדים חסרים',
+  missing_trap_status:'חסר סטטוס לכידות',
+  missing_treatment:'טיפול לא תועד',
+  stale_vitals:'מדדים באיחור',
+  tourniquet_time_unknown:'שעת חסם לא ידועה',
+  tourniquet_limb:'חסר איבר חסם'
 };
+// Never show a raw key: an unmapped one gets a generic label and a console warning, and
+// scripts/browser_mobile_layout_test.js + tests/debt-labels.test.js fail on it.
+function debtLabel(key){
+  if(DEBT_LABELS[key]) return DEBT_LABELS[key];
+  console.warn('DEBT_LABELS: no label for', key);
+  return 'נתון חסר';
+}
+// Tiers (see the .debt-chip CSS): critical only where it changes care of a red casualty now.
+const DEBT_CRITICAL_FOR_RED = ['full_vitals','missing_vitals','stale_vitals','evacuation_status','no_reassessment'];
+const DEBT_OVERDUE = ['stale_vitals','tourniquet_time_unknown','tourniquet_limb_missing','tourniquet_limb'];
+function debtChipClass(p={}, key){
+  if(p.triage==='red' && DEBT_CRITICAL_FOR_RED.includes(key)) return 'critical';
+  if(DEBT_OVERDUE.includes(key)) return 'overdue';
+  return '';
+}
 function triageSourceInfo(p={}){
   if(p.priorityRecommendation) return {label:'עדכון קדימות', detail:'עודכן בעקבות הידרדרות'};
   if(p.mstart?.overrideReason) return {label:'חריגה', detail:`חריגה: ${p.mstart.overrideReason}`};
@@ -3468,11 +3539,17 @@ function triageSourceInfo(p={}){
   if(p.confirmedClinical===false) return {label:'ידני', detail:'MANUAL — דיווח שדה'};
   return {label:'ידני', detail:'MANUAL — עודכן ידנית'};
 }
+// "אדום / RED" mixes Hebrew and Latin; each part gets its own <bdi> so the slash and the line
+// break never attach to the wrong word in RTL.
+function triageBandLabelHtml(value){
+  const label=TRIAGE_BAND_LABELS[triageKey(value)]||TRIAGE_BAND_LABELS.pending;
+  return label.split(' / ').map(part=>`<bdi>${part}</bdi>`).join(' / ');
+}
 function triageBand(value, p={}){
   const key=triageKey(value);
   const src=triageSourceInfo(p);
   return `<div class="ticket-triage-band ${key}">
-    <div><div class="ticket-triage-label">${TRIAGE_BAND_LABELS[key]}</div><div style="font-size:11px;font-weight:800;opacity:.9;margin-top:2px">${src.detail}</div></div>
+    <div><div class="ticket-triage-label">${triageBandLabelHtml(key)}</div><div style="font-size:11px;font-weight:800;opacity:.9;margin-top:2px">${src.detail}</div></div>
     <div class="ticket-triage-source" title="${src.detail}">${src.label}</div>
   </div>`;
 }
@@ -3483,10 +3560,7 @@ function assessmentDebtList(p={}){
 function assessmentDebtHtml(p={}, compact=false){
   const debt=assessmentDebtList(p);
   if(!debt.length) return compact?'':'<div class="chip-row"><span class="identity-chip">חוב הערכה: אין</span></div>';
-  return `<div class="chip-row" style="margin-top:6px">${debt.map(d=>{
-    const cls=(p.triage==='red' && ['full_vitals','evacuation_status','no_reassessment'].includes(d))?'critical':isVitalsOverdue(p)?'overdue':'';
-    return `<span class="debt-chip ${cls}">${DEBT_LABELS[d]||d}</span>`;
-  }).join('')}</div>`;
+  return `<div class="chip-row" style="margin-top:6px">${debt.map(d=>`<span class="debt-chip ${debtChipClass(p,d)}">${debtLabel(d)}</span>`).join('')}</div>`;
 }
 function lifeSavingSummary(p={}){
   const items=[];
@@ -3543,7 +3617,7 @@ function ticketMetaHtml(p={}, role='medic'){
   const timer=tourniquetTimerLabel(p);
   const last=p.lastVitalsAt ? timeAgoLabel(p.lastVitalsAt) : 'אין מדדים מלאים';
   return `
-    <div class="ticket-id-line">${p.id||'TMP'} · ${TRIAGE_BAND_LABELS[triageKey(p.triage)]}</div>
+    <div class="ticket-id-line"><bdi>${p.id||'TMP'}</bdi> · ${triageBandLabelHtml(p.triage)}</div>
     <div class="ticket-meta-grid">
       <div class="ticket-meta">אזור<strong>${p.zone||p.locDetail||zoneLabel()}</strong></div>
       <div class="ticket-meta">חובש<strong>${displayUser(p.assignedMedicId)||p.medic||currentMedicName()}</strong></div>
@@ -3970,12 +4044,20 @@ async function restoreSession(){
 function renderAuthStatus(){
   const strip=document.getElementById('auth-status-strip');
   if(!strip) return;
+  // The strip is also the top nav, so it stays up signed out; only the account menu needs a user.
+  const roleEl=strip.querySelector('.auth-status-role');
+  const emailEl=strip.querySelector('.auth-status-email');
+  const menu=document.getElementById('auth-account-menu');
   if(currentUser){
-    strip.style.display='flex';
-    const label=strip.querySelector('.auth-status-text');
-    if(label) label.textContent=`מחובר: ${currentUser.email} · ${ROLE_LABELS[mapServerRole(currentUser.role)]||currentUser.role}${currentUser.offlineProfile?' · לא מקוון (פרופיל שמור במכשיר)':''}`;
+    // The offline badge comes first and only the email is ever cut short, so a stale saved
+    // profile is always visible (never hide stale-data states, CLAUDE.md).
+    if(roleEl) roleEl.innerHTML=`${currentUser.offlineProfile?'<span class="auth-status-offline" title="לא מקוון: פרופיל שמור במכשיר">לא מקוון · </span>':''}${escAttr(ROLE_LABELS[mapServerRole(currentUser.role)]||currentUser.role)}`;
+    if(emailEl){ emailEl.textContent=currentUser.email||''; emailEl.title=currentUser.email||''; }
+    if(menu) menu.style.display='';
   }else{
-    strip.style.display='none';
+    if(roleEl) roleEl.textContent='לא מחובר';
+    if(emailEl) emailEl.textContent='';
+    if(menu){ menu.removeAttribute('open'); menu.style.display='none'; }
   }
   const adminBtn=document.getElementById('auth-admin-users-btn');
   if(adminBtn) adminBtn.style.display=isAdminUser()?'':'none';
@@ -4005,6 +4087,12 @@ const ADMIN_ERROR_TEXT = {
 let _adminUsers=[];
 let _adminReturnScreen=null;
 function isAdminUser(){ return !!currentUser && currentUser.role==='admin'; }
+function closeAccountMenu(){ document.getElementById('auth-account-menu')?.removeAttribute('open'); }
+// Tap anywhere outside the account menu closes it.
+document.addEventListener('click', e=>{
+  const menu=document.getElementById('auth-account-menu');
+  if(menu?.open && !menu.contains(e.target)) menu.removeAttribute('open');
+});
 function adminRoleName(role){ return ADMIN_ROLE_NAMES[role]||role||'-'; }
 function adminErrorText(code){ return ADMIN_ERROR_TEXT[code]||('הפעולה נכשלה ('+code+')'); }
 function adminUserLabel(u){ return u.display_name && u.display_name!==u.email ? `${u.display_name} (${u.email})` : (u.email||u.user_id); }
@@ -8410,7 +8498,7 @@ function showSameZoneFab(zoneLabelText){
   if(!fab){
     fab=document.createElement('button');
     fab.id='same-zone-fab';
-    fab.style.cssText='position:fixed;bottom:148px;right:16px;background:var(--red);color:#fff;border:none;border-radius:14px;padding:16px 20px;font-size:16px;font-weight:900;z-index:150;cursor:pointer;direction:rtl;min-height:60px;touch-action:manipulation;box-shadow:0 4px 20px rgba(255,59,48,0.4);';
+    fab.className='same-zone-fab'; // position and size in CSS, sized with the bottom bar it sits on
     fab.onclick=()=>{
       if(activeRoleDashboard!=='medic' || activeScreenId()!=='sweep'){
         fab.style.display='none';
@@ -8507,7 +8595,7 @@ function renderMstartSweep(){
   if(!p){
     const rows=sweepPatientsForCurrentZone().slice(0,6).map(x=>`
       <div class="patient-card ${triageKey(x.triage)} ${x.alert&&!x.alertAcknowledgedAt?'active-alert':''}" onclick="activeSweepPatientId='${x.id}';renderMstartSweep()">
-        <div class="patient-id">${x.visualId||x.id}</div>
+        <div class="patient-id"><bdi>${x.visualId||x.id}</bdi></div>
         <div class="patient-info">
           ${triageBand(x.triage,x)}
           <div style="font-weight:800">${x.zone}</div>
@@ -8604,7 +8692,7 @@ function renderMstartSweep(){
   card.innerHTML=`
     <div class="summary-card" style="border-color:var(--accent)">
       ${triageBand(p.triage,p)}
-      <div class="ticket-id-line">${p.visualId||p.id} · ${TRIAGE_BAND_LABELS[triageKey(p.triage)]||TRIAGE_BAND_LABELS.pending}</div>
+      <div class="ticket-id-line"><bdi>${p.visualId||p.id}</bdi> · ${triageBandLabelHtml(p.triage)}</div>
       <div class="ticket-meta-grid">
         <div class="ticket-meta">אזור<strong>${p.zone||zoneLabel()}</strong></div>
         <div class="ticket-meta">שלב<strong>סריקת MSTART</strong></div>
@@ -8720,7 +8808,7 @@ function buildAlertObjects(pts=patients){
     }
     const debt=assessmentDebtForPatient(p).filter(x=>!['pending_handover'].includes(x));
     if(debt.length && p.triage!=='black'){
-      pushAlert(alerts,{...base,id:`debt-${p.id}`,type:'ASSESSMENT_DEBT',severity:redOrYellow?'medium':'low',owner:'medic',audience:redOrYellow?['medic','pc']:['medic'],escalatesTo:redOrYellow?'pc':null,escalateAfterMin:redOrYellow?8:null,actionRequired:'update_vitals',scope:'patient',category:redOrYellow?'data':'complete',title:`${p.visualId||p.id} — יש לקחת מדדים`,detail:debt.join(' · ')});
+      pushAlert(alerts,{...base,id:`debt-${p.id}`,type:'ASSESSMENT_DEBT',severity:redOrYellow?'medium':'low',owner:'medic',audience:redOrYellow?['medic','pc']:['medic'],escalatesTo:redOrYellow?'pc':null,escalateAfterMin:redOrYellow?8:null,actionRequired:'update_vitals',scope:'patient',category:redOrYellow?'data':'complete',title:`${p.visualId||p.id} — יש לקחת מדדים`,detail:debt.map(debtLabel).join(' · ')});
     }
     if(!normalizeTrapStatus(p) && p.triage!=='black'){
       pushAlert(alerts,{...base,id:`trap-missing-${p.id}`,type:'MISSING_TRAP_STATUS',severity:'medium',owner:'medic',audience:['medic','pc'],escalatesTo:'pc',escalateAfterMin:5,actionRequired:'update_vitals',scope:'patient',category:'rescue',title:`${p.visualId||p.id} — חסר לכוד / לא לכוד`,detail:'סטטוס חילוץ בינארי חסר ומשפיע על תמונת החילוץ'});
@@ -15586,7 +15674,7 @@ function applyFieldMode(enabled){
   fieldModeEnabled=!!enabled;
   document.body.classList.toggle('field-mode', fieldModeEnabled);
   const btn=document.getElementById('field-mode-toggle');
-  if(btn) btn.classList.toggle('active', fieldModeEnabled);
+  if(btn){ btn.classList.toggle('active', fieldModeEnabled); btn.setAttribute('aria-pressed', fieldModeEnabled?'true':'false'); }
   try{ localStorage.setItem('rescue_field_mode', fieldModeEnabled?'1':'0'); }catch(e){}
 }
 function toggleFieldMode(){

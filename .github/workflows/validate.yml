@@ -24,6 +24,9 @@ jobs:
       - name: Run domain rule tests
         run: node tests/domain-rules.test.js
 
+      - name: Check every missing-data key has a Hebrew label
+        run: node tests/debt-labels.test.js
+
   # WP-13 (docs/GAP_CLOSURE_PLAN.md): every browser test (Playwright, headless Chromium), the
   # other test scripts and the smoke scripts, run one after the other by scripts/run_tests.js.
   # Kept separate from repo-check so the fast checks report in seconds.
