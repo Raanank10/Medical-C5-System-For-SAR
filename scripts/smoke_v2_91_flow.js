@@ -38,7 +38,7 @@ function checkFile(file) {
     'screen-dashboard',
     'screen-aar',
     'field-mode-toggle',
-    'פצוע נוסף באזור הזה',
+    '+ פצוע | אותו אזור', // the sweep's one add-casualty button since 2026-10-23
     'מה המחברת הייתה מפספסת?',
     'supply-used-modal',
     'resupply-modal',

@@ -53,7 +53,8 @@ for (const rel of files) {
 
   // Since 2026-10-23 the FAB is positioned in CSS from the bottom bar's height, not a fixed 148px.
   assert(html.includes('.same-zone-fab{position:fixed;') && html.includes('bottom:calc(var(--bottom-bar-h) + 12px') && html.includes("fab.textContent='+ פצוע | אותו אזור'"), `${rel}: same-zone FAB must sit above sticky actions with fixed label`);
-  assert(html.includes("if(activeRoleDashboard!=='medic' || activeScreenId()!=='sweep') return;"), `${rel}: same-zone FAB must be sweep/medic scoped`);
+  // Since 2026-10-23 the FAB is the sweep screen's one add-casualty button for any role running the sweep.
+  assert(html.includes("if(activeScreenId()!=='sweep') return;"), `${rel}: same-zone FAB must be sweep scoped`);
   assert(!tqWithLimb.includes('reconcileSupplySource'), `${rel}: recordSweepTourniquetWithLimb must not double-count tourniquet supply`);
 
   // V2.99.35 appended the pre-evacuation board after the CC board; the CC board still leads.

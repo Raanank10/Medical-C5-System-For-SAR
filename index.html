@@ -892,7 +892,7 @@ body.field-mode{--bottom-bar-h:100px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9959</div>
+      <div class="demo-kicker">Demo V2.9960</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -989,7 +989,7 @@ body.field-mode{--bottom-bar-h:100px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9959</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9960</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -999,7 +999,7 @@ body.field-mode{--bottom-bar-h:100px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9959</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9960</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -1104,7 +1104,6 @@ body.field-mode{--bottom-bar-h:100px;}
     <div id="sweep-stats" class="role-top-grid" style="margin-top:12px"></div>
   </div>
   <div class="flow-content">
-    <button class="btn-primary" onclick="startSweepCasualtyMarker()" style="background:var(--red);margin-bottom:14px">פצוע נוסף באזור הזה</button>
     <div id="sweep-active-card"></div>
     <button class="demo-mini-btn" onclick="openMedicResupplySheet()" style="display:block;margin:14px auto 0;background:transparent;border-color:var(--border);color:var(--muted)">עוד · חסר ציוד</button>
   </div>
@@ -3021,7 +3020,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.59';
+const APP_VERSION = '2.99.60';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3495,7 +3494,6 @@ const TRIAGE_BAND_LABELS = {
   pending:'ממתין סיווג / PENDING'
 };
 const DEBT_LABELS = {
-  full_vitals:'אין מדדים מלאים',
   identity:'זהות לא ידועה',
   evacuation_status:'סטטוס פינוי חסר',
   evacuation_destination:'חסר יעד פינוי',
@@ -3507,10 +3505,12 @@ const DEBT_LABELS = {
   pending_handover:'מסירה חסרה',
   // Emitted by assessmentDebtForPatient(); used to render as raw keys (owner, 2026-10-23).
   missing_location:'מיקום חסר',
-  missing_triage:'מיון חסר',
-  missing_vitals:'מדדים חסרים',
-  missing_trap_status:'חסר סטטוס לכידות',
-  missing_treatment:'טיפול לא תועד',
+  missing_triage:'ממתין סיווג',
+  // The one "no vitals" key (owner, 2026-10-23): no measured vitals set yet, on any phone.
+  // Replaces full_vitals, which was never cleared, and the old missing_vitals, which MSTART
+  // answers alone cleared. See hasMeasuredVitals().
+  missing_vitals:'אין מדדים מלאים',
+  missing_trap_status:'לכידות לא תועדה',
   stale_vitals:'מדדים באיחור',
   tourniquet_time_unknown:'שעת חסם לא ידועה',
   tourniquet_limb:'חסר איבר חסם'
@@ -3523,7 +3523,16 @@ function debtLabel(key){
   return 'נתון חסר';
 }
 // Tiers (see the .debt-chip CSS): critical only where it changes care of a red casualty now.
-const DEBT_CRITICAL_FOR_RED = ['full_vitals','missing_vitals','stale_vitals','evacuation_status','no_reassessment'];
+// Owner 2026-10-23: on a red casualty an unknown tourniquet time is red too, since the 45/60/120
+// minute tourniquet alerts count from it and cannot fire without it.
+const DEBT_CRITICAL_FOR_RED = ['missing_vitals','stale_vitals','evacuation_status','no_reassessment','tourniquet_time_unknown'];
+// Keys no longer emitted (owner, 2026-10-23); dropped if a phone still has them saved.
+const RETIRED_DEBT_KEYS = ['full_vitals','missing_treatment'];
+// A measured vitals set exists: recorded on this phone (vitals sheet or the full patient flow),
+// received from another phone, or reported by the server, whose last_vitals_at only a
+// VITALS_RECORDED event sets. MSTART answers are not vitals, and lastVitalsAt is not used here
+// because some paths stamp it at creation as the reassessment clock's start.
+function hasMeasuredVitals(p={}){ return !!(p.vitalsMeasuredAt || p.vitalsValuesAt); }
 const DEBT_OVERDUE = ['stale_vitals','tourniquet_time_unknown','tourniquet_limb_missing','tourniquet_limb'];
 function debtChipClass(p={}, key){
   if(p.triage==='red' && DEBT_CRITICAL_FOR_RED.includes(key)) return 'critical';
@@ -3554,7 +3563,7 @@ function triageBand(value, p={}){
   </div>`;
 }
 function assessmentDebtList(p={}){
-  const debt=[...(p.assessmentDebt||[]), ...assessmentDebtForPatient(p)].filter(Boolean);
+  const debt=[...(p.assessmentDebt||[]), ...assessmentDebtForPatient(p)].filter(k=>k && !RETIRED_DEBT_KEYS.includes(k));
   return [...new Set(debt)].filter(x=>x!=='pending_handover' || !['deceased','handed_over'].includes(p.patientStatus));
 }
 function assessmentDebtHtml(p={}, compact=false){
@@ -3591,22 +3600,22 @@ function getNextAction(p={}, role='medic'){
     if(p.sweepCompleted && !p.monitoringAssigned) return 'שייך חובש למעקב';
     if(openSupply || p.pendingSupplyRequest) return 'אשר מהרכב / הסלם';
     if(p.tourniquet && elapsedMinutes(p.tourniquet.appliedAt)>=90) return 'בדוק חסם / פינוי';
-    if(p.triage==='red' && debt.includes('full_vitals')) return 'דרש מדדים / הקצה חובש';
+    if(p.triage==='red' && debt.includes('missing_vitals')) return 'דרש מדדים / הקצה חובש';
     if(p.medicOverloaded) return 'שקול הקצאה מחדש';
     if(p.triage==='red' && status==='trapped') return 'בקש פינוי / תגבור';
     if(p.tourniquet) return 'בדוק חסם / בקש פראמדיק';
-    if(debt.includes('full_vitals') || p.needsFullAssessment) return 'שייך חובש למעקב';
+    if(debt.includes('missing_vitals') || p.needsFullAssessment) return 'שייך חובש למעקב';
     if(p.triage==='red' && !['evacuating','evacuated','handed_over'].includes(p.patientStatus)) return 'בקשת פינוי';
     return 'אשר / עדכן קדימות';
   }
   if(p.phase==='mstart_sweep' && triageKey(p.triage)==='pending') return 'השלם MSTART';
-  if(p.tourniquet && debt.includes('full_vitals')) return 'מדדים מלאים אחרי חסם';
-  if(p.triage==='red' && debt.includes('full_vitals')) return 'מדדים מלאים עכשיו';
+  if(p.tourniquet && debt.includes('missing_vitals')) return 'מדדים מלאים אחרי חסם';
+  if(p.triage==='red' && debt.includes('missing_vitals')) return 'מדדים מלאים עכשיו';
   if(status==='trapped' && !['evacuating','evacuated','handed_over','deceased'].includes(p.patientStatus)) return 'עדכן לכוד / פינוי';
   if(stale) return 'מדדים חוזרים';
   if(lowSupply && (p.tourniquet || openSupply)) return 'בקש השלמה מהחוג״ד';
   if(p.identityStatus==='unknown' && p.triage==='green') return 'השלים זיהוי כשאפשר';
-  if(p.needsFullAssessment || debt.includes('full_vitals')) return 'מדדים מלאים עכשיו';
+  if(p.needsFullAssessment || debt.includes('missing_vitals')) return 'מדדים מלאים עכשיו';
   if(p.patientStatus==='deceased' || p.triage==='black') return 'סמן מיקום / עבור לפצוע הבא';
   return p.phase==='mstart_sweep' ? 'פצוע הבא' : 'המשך מעקב';
 }
@@ -3615,7 +3624,7 @@ function nextActionForPatient(p={}, role='medic'){
 }
 function ticketMetaHtml(p={}, role='medic'){
   const timer=tourniquetTimerLabel(p);
-  const last=p.lastVitalsAt ? timeAgoLabel(p.lastVitalsAt) : 'אין מדדים מלאים';
+  const last=hasMeasuredVitals(p) && p.lastVitalsAt ? timeAgoLabel(p.lastVitalsAt) : 'אין מדדים מלאים';
   return `
     <div class="ticket-id-line"><bdi>${p.id||'TMP'}</bdi> · ${triageBandLabelHtml(p.triage)}</div>
     <div class="ticket-meta-grid">
@@ -6479,7 +6488,7 @@ function renderPcNowTaskBoard(myPts){
       pcTaskAction('בקש פינוי',`openReinforcementRequest({resourceType:'urgent_evac'})`),
       pcTaskAction('בקש פראמדיק',`openReinforcementRequest({resourceType:'paramedic'})`)
     ].join('');
-    if(p.triage==='red' && debt.includes('full_vitals')) immediateReasons.push('ללא מדדים מלאים');
+    if(p.triage==='red' && debt.includes('missing_vitals')) immediateReasons.push('ללא מדדים מלאים');
     if(p.tourniquet){
       const tqMin=Math.floor((Date.now()-p.tourniquet.appliedAt)/60000);
       const tqs=activeTourniquets(p);
@@ -6496,7 +6505,7 @@ function renderPcNowTaskBoard(myPts){
     if(debt.includes('tourniquet_limb_missing')) completion.push(renderPcTaskRow({patient:p,detail:'גפת חסם לא תועדה',recommendation:'השלם מיקום חסם',openedAt:p.tourniquet?.appliedAt||p.createdAt}));
   });
   sweepSessionsForBoard().forEach(s=>{
-    const unassigned=myPts.filter(p=>(p.zone||p.locDetail)===s.zone && p.phase==='mstart_sweep' && assessmentDebtList(p).includes('full_vitals'));
+    const unassigned=myPts.filter(p=>(p.zone||p.locDetail)===s.zone && p.phase==='mstart_sweep' && assessmentDebtList(p).includes('missing_vitals'));
     if(!unassigned.length) return;
     operational.push(renderPcTaskRow({
       title:`סריקה הושלמה · ${s.medicName}`,
@@ -6650,16 +6659,16 @@ function renderPcPatientTile(p){
 function renderPcAssessmentDebtBoard(){
   const pts=focusFilteredList(roleScopedPatients('pc'), focusMatchesPatient);
   const rows=[
-    ['MSTART בוצע, אין מדדים מלאים', pts.filter(p=>p.phase==='mstart_sweep' && p.assessmentDebt?.includes('full_vitals'))],
+    ['MSTART בוצע, אין מדדים מלאים', pts.filter(p=>p.phase==='mstart_sweep' && assessmentDebtList(p).includes('missing_vitals'))],
     ['זהות לא ידועה', pts.filter(p=>p.identityStatus==='unknown')],
     ['סטטוס לכוד לא ידוע', pts.filter(p=>normalizeTrapStatus(p)==='unknown' || !normalizeTrapStatus(p))],
     ['אין סטטוס פינוי', pts.filter(p=>!['evacuating','evacuated','handed_over','deceased'].includes(p.patientStatus))],
     ['גפה של חסם לא הושלמה', pts.filter(p=>p.assessmentDebt?.includes('tourniquet_limb_missing'))],
     ['אין הערכה חוזרת אחרי 10 דק׳', pts.filter(p=>['red','yellow'].includes(p.triage) && needsVitals(p) && vitalsAgeMs(p)>=10*60*1000)],
     ['שימוש בציוד לא אושר', pts.filter(p=>(p.events||[]).some(e=>e.type==='SUPPLY_CONSUMED' && !e.confirmed))],
-    ['סריקה הסתיימה, אין שיוך מעקב', pts.filter(p=>p.phase==='mstart_sweep' && p.assessmentDebt?.includes('full_vitals'))]
+    ['סריקה הסתיימה, אין שיוך מעקב', pts.filter(p=>p.phase==='mstart_sweep' && assessmentDebtList(p).includes('missing_vitals'))]
   ].map(([label,list])=>roleRow(label,`${list.length} פצועים`, list.slice(0,5).map(p=>`<span class="identity-chip">${p.visualId||p.id} · ${p.zone||p.locDetail||zoneLabel()}</span>`).join(''))).join('');
-  return renderCollapsibleSection('pc-assessment-debt','חוב הערכה אחרי סריקה', rows || renderOperationalEmptyState('אין פצועים במיקוד הנוכחי'), pts.length, {criticalCount:pts.filter(p=>p.triage==='red'&&assessmentDebtList(p).includes('full_vitals')).length, emptyMessage:'אין פצועים במיקוד הנוכחי'});
+  return renderCollapsibleSection('pc-assessment-debt','חוב הערכה אחרי סריקה', rows || renderOperationalEmptyState('אין פצועים במיקוד הנוכחי'), pts.length, {criticalCount:pts.filter(p=>p.triage==='red'&&assessmentDebtList(p).includes('missing_vitals')).length, emptyMessage:'אין פצועים במיקוד הנוכחי'});
 }
 // Completed MSTART sweeps for the PC boards: this phone's own, plus sweeps other phones finished
 // (MSTART_SWEEP_COMPLETED, WP-11). Read with their own query (pullRemoteSweeps): the sync pull
@@ -6908,7 +6917,7 @@ function renderCcHeroDashboard(ctx={}){
     const red=pts.filter(p=>p.triage==='red').length;
     const trapped=pts.filter(p=>['trapped','access_blocked'].includes(normalizeTrapStatus(p))).length;
     const tqs=pts.reduce((sum,p)=>sum+activeTourniquets(p).length,0);
-    const noVitals=pts.filter(p=>assessmentDebtList(p).includes('full_vitals')).length;
+    const noVitals=pts.filter(p=>assessmentDebtList(p).includes('missing_vitals')).length;
     // Signed in, every loaded request belongs to the active incident, so to its platoon.
     const openReqs=pl.real
       ? (pl.platoonId===activeSiteUnitKey() ? (reinforcementRequests||[]).filter(isRequestOpen).length : 0)
@@ -7026,7 +7035,7 @@ function renderCcCommandBoard(){
     roleMetric(ineffectiveTqs.length,'חסמים לא יעילים'),
     roleMetric(tqAwaitingEvac.length,'חסם ממתין לפינוי'),
     roleMetric(patients.filter(p=>p.triage==='red'&&normalizeTrapStatus(p)==='trapped').length,'אדום לכוד'),
-    roleMetric(patients.filter(p=>p.triage==='red'&&assessmentDebtList(p).includes('full_vitals')).length,'אדום ללא מדדים')
+    roleMetric(patients.filter(p=>p.triage==='red'&&assessmentDebtList(p).includes('missing_vitals')).length,'אדום ללא מדדים')
   ].join('');
   const reqQueue=focusedOpenReqs.slice(0,6).map(r=>roleRow(
     `${r.type==='resupply'?'השלמת ציוד':(REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType)} · ${REINFORCEMENT_URGENCY_LABELS[r.urgency]||r.urgency}`,
@@ -7052,7 +7061,7 @@ function renderCcCommandBoard(){
     'בקשת פראמדיק מתעכבת',
     `בקשה פתוחה ${minutesSinceIso(longOpenReq.createdAt)} דק׳ · ${longOpenReq.targetLocation||'מיקום לא ידוע'}`
   ));
-  const staleFull=patients.filter(p=>assessmentDebtList(p).includes('full_vitals')).length;
+  const staleFull=patients.filter(p=>assessmentDebtList(p).includes('missing_vitals')).length;
   if(staleFull) suggestions.push(roleRow(
     'פצועים ללא מדדים מלאים',
     `${staleFull} פצועים עברו סריקת MSTART ועדיין מחכים למדדים מלאים`
@@ -7238,7 +7247,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
     role==='pc'?`<button class="demo-mini-btn" onclick="demoReassignWithinPlatoon()">הדגם הקצאה בתוך מחלקה</button>`:'',
     role==='cc'?`<button class="demo-mini-btn" onclick="demoReassignBetweenPlatoons()">הדגם הקצאה בין מחלקות</button>`:'',
     role==='physician'?`<button class="demo-mini-btn" onclick="exitEventView()">יציאה מהאירוע</button>`:'',
-    role==='admin'?`<button class="demo-mini-btn" onclick="if(clearDemoScenario())renderRoleDashboard('admin')">נקה דמו</button><button class="demo-mini-btn" onclick="exportExperimentLog()">ייצוא ניסוי</button>`:''
+    role==='admin'?`${isAdminUser()?'<button class="demo-mini-btn" onclick="openAdminUsers()">👥 ניהול משתמשים</button>':''}<button class="demo-mini-btn" onclick="if(clearDemoScenario())renderRoleDashboard('admin')">נקה דמו</button><button class="demo-mini-btn" onclick="exportExperimentLog()">ייצוא ניסוי</button>`:''
   ].filter(Boolean).join('');
   const genericSections=`
     ${roleSection('האחריות שלי', responsibilities)}
@@ -7255,13 +7264,13 @@ function renderRoleDashboard(role=activeRoleDashboard){
     ${role==='pc'?myPlatoonRow():''}
     ${role==='pc'?renderPcResponsibilityBoard():''}
     ${['pc','cc'].includes(role)?roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds(role))):''}
-    ${role==='cc'&&canManagePlatoonRoster()?roleSection('פלוגות ומחלקות — שיבוץ', '<div id="platoon-roster-panel" style="font-size:13px;color:var(--muted)">טוען…</div>'):''}
+    ${ROSTER_PANEL_ROLES.has(role)&&canManagePlatoonRoster()?roleSection('פלוגות ומחלקות — שיבוץ', '<div id="platoon-roster-panel" style="font-size:13px;color:var(--muted)">טוען…</div>'):''}
     ${role==='physician'?renderDoctorLegacyNote():''}
     ${role==='medic'||role==='pc'?'':role==='cc'
       ? `<details style="margin:12px 0 0"><summary style="cursor:pointer;font-weight:900;color:var(--muted);padding:10px 0">פירוט נוסף / אחריות ותורים</summary>${genericSections}</details>`
       : genericSections}
   `;
-  if(role==='cc' && canManagePlatoonRoster()) loadPlatoonRoster();
+  if(ROSTER_PANEL_ROLES.has(role) && canManagePlatoonRoster()) loadPlatoonRoster();
   updateDemoStatus();
 }
 // ── Units and roster (database/053, replaces 045's PC-only roster) ──
@@ -7270,6 +7279,9 @@ function renderRoleDashboard(role=activeRoleDashboard){
 // physician in a company); and sets which unit works the active site. Every change is written to
 // unit_audit on the server.
 function canManagePlatoonRoster(){ return !!currentUser && COMPANY_COMMAND_ROLES.has(currentUser.role); }
+// Dashboards that show the roster panel (owner, 2026-10-23: מ״פ רפואה, חמ״ל and admin place medical
+// staff in the company's platoons). The server already allows them (app.is_unit_manager()).
+const ROSTER_PANEL_ROLES=new Set(['cc','chamal','admin']);
 const UNIT_MEMBER_ROLE_LABELS={pc:'חוג״ד', rpc:'מ״מ', rcc:'מ״פ חילוץ', medic:'חובש', paramedic:'פראמדיק', physician:'רופא'};
 const COMPANY_KIND_LABELS={rescue:'פלוגת חילוץ', ambulance:'צוות אמבולנס'};
 async function loadPlatoonRoster(){
@@ -7452,9 +7464,8 @@ function assessmentDebtForPatient(p){
   const debt=[];
   if(!p.location || p.location==='לא צוין') debt.push('missing_location');
   if(!p.triage || p.triage==='pending') debt.push('missing_triage');
-  if(!p.vitals || p.vitals.rr===null || p.vitals.rr===undefined || !p.vitals.avpu || !p.vitals.bp_estimate) debt.push('missing_vitals');
+  if(!hasMeasuredVitals(p)) debt.push('missing_vitals');
   if(!normalizeTrapStatus(p)) debt.push('missing_trap_status');
-  if(!p.txHistory || !p.txHistory.length) debt.push('missing_treatment');
   if(!['evacuating','evacuated','handed_over'].includes(p.patientStatus)) debt.push('pending_handover');
   if(isVitalsOverdue(p)) debt.push('stale_vitals');
   if(p.tourniquet && !p.tourniquet.timeCode) debt.push('tourniquet_time_unknown');
@@ -7593,7 +7604,7 @@ function projectPatientStatus(nextStatus, eventType, payload={}){
 }
 
 function goTo(screen){
-  if(screen!=='sweep' || activeRoleDashboard!=='medic') hideSameZoneFab();
+  if(screen!=='sweep') hideSameZoneFab();
   Object.keys(vitalCountdowns||{}).forEach(k=>stopCountTimer(k, false));
   if(screen==='step5') projectPatientStatus('observing','VITALS_RECORDED');
   if(screen==='step6') syncComputedStatusDisplay();
@@ -8014,7 +8025,7 @@ function sweepCounts(list=sweepPatientsForCurrentZone()){
     immobile:list.filter(p=>p.mstart?.trapped==='immobile').length,
     tourniquets:totalActiveTourniquets(list),
     airway:list.filter(p=>(p.lifeSavingTreatments||[]).some(t=>t.treatmentType==='airway')).length,
-    missingVitals:list.filter(p=>p.assessmentDebt?.includes('full_vitals')).length,
+    missingVitals:list.filter(p=>assessmentDebtList(p).includes('missing_vitals')).length,
     unknownIdentity:list.filter(p=>p.identityStatus==='unknown').length
   };
 }
@@ -8072,7 +8083,7 @@ function startSweepCasualtyMarker(){
     mstartAuto:[],
     sweepWarning:'',
     lifeSavingTreatments:[],
-    assessmentDebt:['full_vitals','identity','evacuation_status','full_injury_assessment'],
+    assessmentDebt:['identity','evacuation_status','full_injury_assessment'],
     triage:'pending',
     trapStatus:'unknown',
     accessibility:null,
@@ -8348,8 +8359,8 @@ function recordSweepTreatment(type, meta={}){
   renderMstartSweep();
   if(document.getElementById('screen-commander')?.classList.contains('active')) renderCommander();
 }
-function setSweepTourniquetLimb(limb, tourniquetId=pendingTourniquetLimbId){
-  const p=patients.find(x=>x.id===pendingTourniquetLimbPatientId) || activeSweepPatient();
+function setSweepTourniquetLimb(limb, tourniquetId=pendingTourniquetLimbId, patientId=null){
+  const p=patients.find(x=>x.id===(patientId||pendingTourniquetLimbPatientId)) || activeSweepPatient();
   if(!p) return;
   const list=ensureTourniquetArray(p);
   const tq=list.find(x=>x.id===tourniquetId) || list[list.length-1];
@@ -8379,10 +8390,15 @@ function setSweepTourniquetLimb(limb, tourniquetId=pendingTourniquetLimbId){
   pendingTourniquetLimbId=null;
   hideTourniquetLimbModal();
   saveDemoState();
-  renderMstartSweep();
+  rerenderAfterTourniquetFix(p);
 }
-function cancelLastTourniquetEntry(tourniquetId=null){
-  const p=activeSweepPatient(); if(!p) return;
+// After a limb fix or a cancelled entry, refresh whichever screen the medic made it from.
+function rerenderAfterTourniquetFix(p){
+  if(activeScreenId()==='patient' && document.getElementById('detail-pid')?.textContent===p.id) openPatient(p.id);
+  else renderMstartSweep();
+}
+function cancelLastTourniquetEntry(tourniquetId=null, patientId=null){
+  const p=patientId ? patients.find(x=>x.id===patientId) : activeSweepPatient(); if(!p) return;
   const active=activeTourniquets(p);
   const tq=active.find(x=>x.id===tourniquetId) || active[active.length-1];
   if(!tq) return;
@@ -8400,9 +8416,37 @@ function cancelLastTourniquetEntry(tourniquetId=null){
       payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb:tq.serverLimb,reason:'entry_cancelled'}});
   }
   saveDemoState();
-  renderMstartSweep();
+  rerenderAfterTourniquetFix(p);
 }
 function removeLastSweepTourniquet(){ return cancelLastTourniquetEntry(); }
+// Tourniquet limb correction from the patient screen (owner, 2026-10-23): before this, a wrong limb
+// could only be fixed while the casualty was open in the sweep. Same events as the sweep card
+// (TOURNIQUET_LIMB_RECORDED with previous_limb, so the server moves its row; database/057), for the
+// roles sync-log lets write clinical events. Cancelling an entry asks first: it stops that
+// tourniquet's 45/60/120-minute alerts.
+function canCorrectTourniquets(){ return !currentUser || TRIAGE_SYNC_ROLES.has(currentUser.role); }
+function confirmCancelTourniquetEntry(patientId, tourniquetId){
+  if(!confirm('לבטל את רישום החסם?\n\nרק אם החסם נרשם בטעות. ההתראות של חסם זה (45/60/120 דק׳) ייעצרו.')) return;
+  cancelLastTourniquetEntry(tourniquetId, patientId);
+}
+function patientTourniquetFixHtml(p){
+  const active=activeTourniquets(p);
+  if(!active.length) return '';
+  const canFix=canCorrectTourniquets();
+  const rows=active.map(tq=>{
+    const key=tourniquetLimbKey(tq.limb);
+    const limb=tq.limbLabel||tourniquetLimbMeta(tq.limb).label;
+    const fix=canFix?`<details style="margin-top:8px" ${key==='unknown'?'open':''}>
+        <summary class="inline-link-btn" style="cursor:pointer;font-size:13px;font-weight:800">תקן גפה / רישום</summary>
+        <div class="tap-grid tap-grid-2" style="margin-top:8px">
+          ${Object.entries(TOURNIQUET_LIMBS).map(([k,meta])=>`<button class="tap-btn ${key===k?'selected':''}" onclick="setSweepTourniquetLimb('${k}','${tq.id}','${p.id}')">${meta.label}</button>`).join('')}
+          <button class="demo-mini-btn" style="grid-column:1 / -1;border-color:var(--red);color:var(--red)" onclick="confirmCancelTourniquetEntry('${p.id}','${tq.id}')">בטל רישום — נרשם בטעות</button>
+        </div>
+      </details>`:'';
+    return `<div class="sweep-tq-card"><div class="sweep-tq-title"><bdi>${tq.id}</bdi> · ${key==='unknown'?'<span style="color:var(--orange)">גפה לא ידועה</span>':limb} · +${elapsedMinutes(tq.appliedAt)} דק׳</div>${fix}</div>`;
+  }).join('');
+  return `<div class="summary-card"><div class="summary-key" style="margin-bottom:8px">חסמים פעילים</div>${rows}</div>`;
+}
 function markSweepTourniquetEffectiveness(tourniquetId, effectiveness){
   const p=activeSweepPatient(); if(!p) return;
   const tq=ensureTourniquetArray(p).find(x=>x.id===tourniquetId); if(!tq) return;
@@ -8479,7 +8523,7 @@ function renderSweepTourniquetCard(tq){
     <details style="margin-top:8px" ${tourniquetLimbKey(tq.limb)==='unknown'?'open':''}>
       <summary style="cursor:pointer;font-size:12px;font-weight:800">ערוך גפה / תקן רישום</summary>
       <div class="tap-grid tap-grid-2" style="margin-top:8px">
-        ${Object.entries(TOURNIQUET_LIMBS).map(([key,meta])=>`<button class="demo-mini-btn ${tourniquetLimbKey(tq.limb)===key?'selected':''}" onclick="setSweepTourniquetLimb('${key}','${tq.id}')">${meta.label}</button>`).join('')}
+        ${Object.entries(TOURNIQUET_LIMBS).map(([key,meta])=>`<button class="tap-btn ${tourniquetLimbKey(tq.limb)===key?'selected':''}" onclick="setSweepTourniquetLimb('${key}','${tq.id}')">${meta.label}</button>`).join('')}
         <button class="demo-mini-btn" style="grid-column:1 / -1" onclick="cancelLastTourniquetEntry('${tq.id}')">בטל רישום — טעות הקלדה</button>
       </div>
     </details>
@@ -8492,29 +8536,24 @@ function hideSameZoneFab(){
   if(fab) fab.style.display='none';
   clearTimeout(_fabTimer);
 }
+// The sweep screen's one "add casualty" button (owner, 2026-10-23): always up on the sweep screen,
+// for whoever runs the sweep (a pc can too), hidden everywhere else by goTo()/goHome().
 function showSameZoneFab(zoneLabelText){
-  if(activeRoleDashboard!=='medic' || activeScreenId()!=='sweep') return;
+  if(activeScreenId()!=='sweep') return;
   let fab=document.getElementById('same-zone-fab');
   if(!fab){
     fab=document.createElement('button');
     fab.id='same-zone-fab';
     fab.className='same-zone-fab'; // position and size in CSS, sized with the bottom bar it sits on
     fab.onclick=()=>{
-      if(activeRoleDashboard!=='medic' || activeScreenId()!=='sweep'){
-        fab.style.display='none';
-        clearTimeout(_fabTimer);
-        return;
-      }
+      if(activeScreenId()!=='sweep'){ fab.style.display='none'; return; }
       startSweepCasualtyMarker();
-      fab.style.display='none';
-      clearTimeout(_fabTimer);
     };
     document.body.appendChild(fab);
   }
   fab.textContent='+ פצוע | אותו אזור';
   fab.style.display='block';
   clearTimeout(_fabTimer);
-  _fabTimer=setTimeout(()=>{ fab.style.display='none'; },90000);
 }
 function closeSweepMarker(){
   const p=activeSweepPatient();
@@ -8568,15 +8607,15 @@ function completeMstartSweep(){
 }
 function renderMstartSweep(){
   ensureSiteReadiness();
+  showSameZoneFab();
   const clock=document.getElementById('sweep-clock'); if(clock) clock.textContent=nowT();
   const title=document.getElementById('sweep-context-title'); if(title) title.textContent=medicOperationalTopLine();
   const bar=document.getElementById('sweep-zone-bar');
   if(bar) bar.innerHTML=`
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px">
       <div style="font-size:12px;color:var(--muted)">מוקד: ${siteData.address||siteData.name||'לא מוגדר'} · אזור: ${zoneLabel()} · חובש: ${currentMedicName()}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
         <button class="demo-mini-btn" onclick="promptZoneUpdate()">שנה אזור</button>
-        <button class="demo-mini-btn" onclick="startSweepCasualtyMarker()">פצוע נוסף באזור הזה</button>
         <button class="demo-mini-btn" onclick="completeMstartSweep()">סיים סריקה באזור הזה</button>
       </div>
     </div>`;
@@ -8604,7 +8643,7 @@ function renderMstartSweep(){
           <div class="next-action-box">פעולה: ${nextActionForPatient(x,'medic')}</div>
         </div>
       </div>`).join('');
-    card.innerHTML=roleSection('סומנו באזור הזה', rows || roleRow('אין פצועים מסומנים באזור','לחץ "פצוע נוסף באזור הזה" כדי להתחיל. אין צורך בשם, תעודה או מדדים מלאים בשלב הסריקה.'));
+    card.innerHTML=roleSection('סומנו באזור הזה', rows || roleRow('אין פצועים מסומנים באזור','לחץ "+ פצוע | אותו אזור" כדי להתחיל. אין צורך בשם, תעודה או מדדים מלאים בשלב הסריקה.'));
     return;
   }
   const m=p.mstart||{};
@@ -9797,6 +9836,7 @@ function openPatient(id){
       <div class="summary-row"><span class="summary-key">קבוצת גיל</span><span class="summary-val">${AGE_BAND_LABELS[ageBandOf(p)]}</span></div>
       ${tq?`<div class="summary-row"><span class="summary-key">חסם עורקים</span><span class="summary-val"><span class="tq-timer ${tq.cls}">${tq.label}</span></span></div>`:''}
     </div>
+    ${patientTourniquetFixHtml(p)}
     ${ageBandOf(p)==='elderly'?`<div class="summary-card" style="border-color:var(--orange);background:rgba(255,107,53,0.08)"><div style="font-weight:700;font-size:12px;color:var(--orange)">⚠ קשיש</div><div style="font-size:12px;margin-top:3px">מדדים תקינים לא שוללים הלם — פרפוזיה עלולה להיפגע ללא עלייה בדופק (חוסמי בטא, שינויים אוטונומיים). אל תסתמך על דופק/לחץ דם תקינים לבד.</div></div>`:''}
     <div class="summary-card">
       <div style="font-weight:700;font-size:14px;margin-bottom:8px">זיהוי (אופציונלי)</div>
@@ -11109,6 +11149,8 @@ function savePatient(){
       payload_json:{...flowVitals,capture:vitalsCapture,capture_mode:state.flowMode,siteId:'SITE_A'}});
   }
   const savedPatient=patients[patients.length-1];
+  // Same condition as the VITALS_RECORDED event above: a full-flow patient whose vitals were taken.
+  if(!quickCapture && (state.localEvents||[]).some(e=>e.type==='VITALS_RECORDED')) savedPatient.vitalsMeasuredAt=Date.now();
   if(tqEntries.length){
     syncLegacyTourniquetAlias(savedPatient);
     tqEntries.forEach(tq=>queueTourniquetAppliedEvent(savedPatient, tq, {source:'patient_flow'}));
@@ -11338,6 +11380,7 @@ async function saveModalVitals(){
   p.vitalsCapture = vitalsCapturePayload('modal');
   p.lastVitalsAt = Date.now();
   p.vitalsValuesAt = p.lastVitalsAt; // values measured on this phone, now (see applyRemoteVitals)
+  p.vitalsMeasuredAt = p.lastVitalsAt;
   p.vitalsFrom = null;
   p.lastTouchedBy = medicName;
   p.lastModifiedAt = new Date().toISOString();
@@ -11789,7 +11832,7 @@ function patientMatchesBoardFilter(p){
   if(patientBoardFilter==='trapped') return normalizeTrapStatus(p)==='trapped';
   if(patientBoardFilter==='tourniquet') return !!p.tourniquet;
   if(patientBoardFilter==='airway') return (p.lifeSavingTreatments||[]).some(t=>t.treatmentType==='airway') || (p.txHistory||[]).some(t=>String(t.text||'').includes('נתיב'));
-  if(patientBoardFilter==='no_vitals') return p.needsFullAssessment || (p.assessmentDebt||[]).includes('full_vitals');
+  if(patientBoardFilter==='no_vitals') return p.needsFullAssessment || assessmentDebtList(p).includes('missing_vitals');
   if(patientBoardFilter==='stale') return isVitalsOverdue(p);
   if(patientBoardFilter==='unknown_identity') return p.identityStatus==='unknown' || !p.fullName || p.fullName==='לא מזוהה';
   if(patientBoardFilter==='low_supplies') return lowStockEntries(state.localStockCache).length>0;
@@ -12776,7 +12819,7 @@ function renderAar(){
     return tq&&Number.isFinite(ack)?Math.max(0,Math.floor((ack-tq.appliedAt)/60000)):null;
   }).find(Number.isFinite);
   const longestTqMinutes=Math.max(0,...patients.map(p=>longestActiveTourniquet(p)).filter(Boolean).map(t=>elapsedMinutes(t.appliedAt)));
-  const tqMissingVitals=patients.filter(p=>activeTourniquets(p).length && assessmentDebtList(p).includes('full_vitals')).length;
+  const tqMissingVitals=patients.filter(p=>activeTourniquets(p).length && assessmentDebtList(p).includes('missing_vitals')).length;
   const stale=patients.filter(p=>isVitalsOverdue(p)).length;
   const unsynced=patients.reduce((sum,p)=>sum+(p.unsyncedEvents||0),0)+localOutboxCount();
   const perMedic=new Map();
@@ -12864,8 +12907,8 @@ function renderAar(){
   const ccOpenRequests=reinforcementRequests.filter(isRequestOpen).length;
   const logisticsShortages=logisticsCompanies().reduce((sum,c)=>sum+c.lowItems.length,0);
   const insights=[
-    {title:'מה המחברת הייתה מפספסת?', body:`${patients.filter(p=>assessmentDebtList(p).includes('full_vitals')).length} פצועים ללא מדדים מלאים אחרי סריקה · ${activeTqTotal} חסמים פעילים · ${multipleTqPatients} פצועים עם כמה חסמים · ${ineffectiveTqTotal} חסמים לא יעילים · ${Number.isFinite(secondTqAfterFailure)?`חסם שני הונח ${secondTqAfterFailure} דק׳ אחרי דימום ממשיך`:'אין עיכוב חסם שני מתועד'} · ${resupplyOpen} בקשות ציוד ממתינות · ${reinforcementRequests.filter(r=>r.resourceType==='doctor_death_cert'&&isRequestOpen(r)).length} חשד לנפטר ממתין לאישור רופא.`},
-    {title:'מה למדנו לפעם הבאה?', body:`הסריקה הסתיימה מהר, אבל ${patients.filter(p=>assessmentDebtList(p).includes('full_vitals')).length} פצועים עדיין צריכים מדדים מלאים. ${patients.filter(p=>p.tourniquet).length?'חסם הונח ונדרש לוודא פינוי/בדיקה בזמן.':'לא נרשם חסם בסריקה.'} ${resupplyOpen?'בקשת השלמת ציוד עדיין פתוחה — לבדוק אם נפתחה מוקדם מספיק.':'חוסר ציוד זוהה או נסגר ללא בקשה פתוחה.'}`},
+    {title:'מה המחברת הייתה מפספסת?', body:`${patients.filter(p=>assessmentDebtList(p).includes('missing_vitals')).length} פצועים ללא מדדים מלאים אחרי סריקה · ${activeTqTotal} חסמים פעילים · ${multipleTqPatients} פצועים עם כמה חסמים · ${ineffectiveTqTotal} חסמים לא יעילים · ${Number.isFinite(secondTqAfterFailure)?`חסם שני הונח ${secondTqAfterFailure} דק׳ אחרי דימום ממשיך`:'אין עיכוב חסם שני מתועד'} · ${resupplyOpen} בקשות ציוד ממתינות · ${reinforcementRequests.filter(r=>r.resourceType==='doctor_death_cert'&&isRequestOpen(r)).length} חשד לנפטר ממתין לאישור רופא.`},
+    {title:'מה למדנו לפעם הבאה?', body:`הסריקה הסתיימה מהר, אבל ${patients.filter(p=>assessmentDebtList(p).includes('missing_vitals')).length} פצועים עדיין צריכים מדדים מלאים. ${patients.filter(p=>p.tourniquet).length?'חסם הונח ונדרש לוודא פינוי/בדיקה בזמן.':'לא נרשם חסם בסריקה.'} ${resupplyOpen?'בקשת השלמת ציוד עדיין פתוחה — לבדוק אם נפתחה מוקדם מספיק.':'חוסר ציוד זוהה או נסגר ללא בקשה פתוחה.'}`},
     {title:'חובש', body: overdue.length ? `${overdue.length} פצועים עברו את יעד עדכון המדדים; נדרש חזרה למדדים כשאפשר.` : 'כל הפצועים הפעילים בתוך חלון המדדים.'},
     {title:'חוג"ד', body:`${openAlerts} התראות פתוחות דורשות החלטת חוג"ד או חובש. נפתחו ${pcRequests} בקשות תגבור.`},
     {title:'מ״פ רפואה', body:`${ccOpenRequests} בקשות משאב פתוחות ברמת פלוגה; בדוק רופא/פראמדיק וצווארי בקבוק פינוי.`},
@@ -14196,7 +14239,10 @@ function applyProjectedPatientState(rows){
       existing.accessibility=access.accessibility;
       existing.trapStatus=access.trapStatus;
       existing.needsFullAssessment=!!row.needs_full_assessment;
-      if(row.last_vitals_at) existing.lastVitalsAt=Date.parse(row.last_vitals_at)||existing.lastVitalsAt;
+      if(row.last_vitals_at){
+        existing.lastVitalsAt=Date.parse(row.last_vitals_at)||existing.lastVitalsAt;
+        existing.vitalsMeasuredAt=existing.vitalsMeasuredAt||Date.parse(row.last_vitals_at)||null;
+      }
       // Identity is optional and may be null (never identified, or already purged by
       // finalize_incident_aar()) - a null here correctly overwrites any locally-cached name too,
       // so a purge on another device propagates down instead of leaving a stale local copy.
@@ -14229,6 +14275,7 @@ function applyProjectedPatientState(rows){
         confirmedClinical:true, unsyncedEvents:0, locationHistory:[], possibleDuplicate:false,
         time:nowT(), vitals:{...VITALS_NOT_ON_DEVICE}, vitalsCapture:null, txHistory:[],
         alert:false, deterioration:[], lastVitalsAt:row.last_vitals_at?Date.parse(row.last_vitals_at):null,
+        vitalsMeasuredAt:row.last_vitals_at?Date.parse(row.last_vitals_at):null,
         vitalsHistory:[], tourniquet:null, medic:'(remote)', siteId:INCIDENT_ID_TO_SITE[row.incident_id]||'SITE_A',
         _serverVersion:row.version, sourcedFromRemote:true,
         physicianDeathConfirmedAt:row.physician_death_confirmed_at?Date.parse(row.physician_death_confirmed_at):null,
