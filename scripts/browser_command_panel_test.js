@@ -124,10 +124,10 @@ async function checkFile(browser, file) {
     const cut = (from, to) => text.slice(text.indexOf(from), to ? text.indexOf(to, text.indexOf(from)) : undefined);
     return {
       summary: text.includes('בזירה 3 · בנקודת פינוי 1 · פונו 1'),
-      evacPoint: cut('בנקודת פינוי — ממתינים לאמבולנס', 'פונו — לפי יעד'),
+      evacPoint: cut('בנקודת פינוי — ממתינים לפינוי מד״א', 'פונו — לפי יעד'),
       evacuated: cut('פונו — לפי יעד', 'משפך פינוי מחלקתי'),
       funnel: text.includes('משפך פינוי מחלקתי') && text.includes('תעדוף פינוי מחלקתי'),
-      truck: cut('בנקודת פינוי — ממתינים לאמבולנס', 'פונו — לפי יעד').includes('רכב חוג״ד בנקודה'),
+      truck: cut('בנקודת פינוי — ממתינים לפינוי מד״א', 'פונו — לפי יעד').includes('רכב חוג״ד בנקודה'),
     };
   });
   assert(board.summary, `${rel}: the site card must count on scene / at the evacuation point / evacuated separately`);

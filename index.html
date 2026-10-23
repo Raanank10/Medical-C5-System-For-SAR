@@ -7055,8 +7055,9 @@ function renderCcEvacuationFunnel(){
   return renderCommandEvacuationFunnel(patients,'משפך פינוי פלוגתי');
 }
 // Three evacuation stages (repo owner, V2.99.59): still at the extraction site, at the site's
-// evacuation point waiting for an ambulance (status evacuating, moved there by the rescuers), and
-// evacuated by MDA / handed over. Same split as the location board (evacuationStage).
+// evacuation point waiting for an MDA ambulance (status evacuating, moved there by the rescuers),
+// and evacuated by MDA / handed over. The company's own ambulance only carries the doctor between
+// the company's sites; it does not evacuate patients. Same split as the location board (evacuationStage).
 function renderCommandEvacuationFunnel(pts, title){
   const total=pts.length||1;
   const stages=[['on_scene','בזירה'],['evac_point','בנקודת פינוי'],['evacuated','פונו']].map(([key,label])=>{
@@ -9969,14 +9970,14 @@ function markPatientAtCollectionPoint(id){
   const event={
     type:'PATIENT_STATUS_UPDATED',
     time:nowT(),
-    detail:'הועבר מאתר החילוץ לנקודת הפינוי — בפיקוח חוג״ד, ממתין לאמבולנס / מסירה למד״א',
+    detail:'הועבר מאתר החילוץ לנקודת הפינוי — בפיקוח חוג״ד, ממתין לפינוי ומסירה למד״א',
     warn:false,
     payload_json:{status:'evacuating', destination:'company_collection_point', still_under_pc_supervision:true}
   };
   p.events.push(event);
   saveLocalEvent({...event, patient_id:p.id});
   saveDemoState();
-  toast('סומן: בנקודת פינוי · ממתין לאמבולנס / מסירה למד״א');
+  toast('סומן: בנקודת פינוי · ממתין לפינוי מד״א');
   openPatient(id);
 }
 
@@ -12694,7 +12695,7 @@ function renderCasualtyLocationBoard(siteIds, options={}){
     // phone keeps a single truck stock.
     const truckRow=options.truckSiteId===siteId?`<div style="font-size:12px;color:var(--muted);padding-top:6px">רכב חוג״ד בנקודה:</div>${renderPcTruckStockChips()}`:'';
     const evacPointRows=(atEvacPoint.length?`<div style="padding:8px 0;border-top:1px solid var(--border)">
-        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span>🚑 ממתינים לאמבולנס</span><span style="font-family:var(--mono)">${triageCountsLine(atEvacPoint)}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span>🚑 ממתינים לפינוי מד״א</span><span style="font-family:var(--mono)">${triageCountsLine(atEvacPoint)}</span></div>
         <div style="display:flex;flex-wrap:wrap;margin-top:4px">${sortedPatientsByEvacPriority(atEvacPoint).map(p=>locationBoardChip(p)).join('')}</div>
       </div>`:'<div style="font-size:12px;color:var(--muted);padding:6px 0">אין פצועים בנקודת הפינוי</div>')+truckRow;
     const ie=siteId==='SITE_A' ? siteData.initialEvacuation : null;
@@ -12708,7 +12709,7 @@ function renderCasualtyLocationBoard(siteIds, options={}){
       ${siteTriageGridHtml(pts)}
       <div style="font-size:11px;color:var(--muted)">בזירה ${onScene.length} · בנקודת פינוי ${atEvacPoint.length} · פונו ${evacuated.length}</div>
       <div class="section-label" style="padding:10px 0 2px">בזירה — לפי אזור</div>${zoneRows}
-      <div class="section-label" style="padding:10px 0 2px">בנקודת פינוי — ממתינים לאמבולנס</div>${evacPointRows}
+      <div class="section-label" style="padding:10px 0 2px">בנקודת פינוי — ממתינים לפינוי מד״א</div>${evacPointRows}
       <div class="section-label" style="padding:10px 0 2px">פונו — לפי יעד</div>${destRows}
       ${ieRow}${extRow}
     </div>`;
