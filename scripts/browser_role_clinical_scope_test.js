@@ -10,6 +10,7 @@
 //   another phone stays on the list unmarked; the mark survives a reload of the stored state
 // - RPC: sees urgent / not urgent / not sorted, never a triage colour or a tourniquet, in the
 //   server's evacuation order, and no evacuated patient in that order
+// - the medical evacuation order puts deceased patients last, even with an active tourniquet
 // The logistics side (bags without patients) is in scripts/browser_inventory_sync_test.js.
 // It proves client behavior only; database/073 itself is exercised against real Postgres.
 //
@@ -231,6 +232,21 @@ async function checkFile(browser, file) {
     return ids.every((id) => isPatientHandledByMe(patients.find((p) => p.id === id)));
   }, mine);
   assert(kept, `${rel}: the medic's marks must survive a reload of the stored state`);
+
+  // Medical evacuation order (PC/CC tiles, the same ranking the server uses for the rescue chain):
+  // deceased always last, even with an active tourniquet, below a patient not sorted yet.
+  const evacOrder = await medic.page.evaluate(() => {
+    const now = Date.now();
+    const mk = (id, triage, status, tqMin) => ({ id, triage, patientStatus: status, vitals: {}, txHistory: [],
+      tourniquet: tqMin == null ? null : { appliedAt: now - tqMin * 60000 },
+      tourniquets: tqMin == null ? [] : [{ limb: 'leg', status: 'applied', appliedAt: now - tqMin * 60000 }] });
+    const list = [mk('dead-tq', 'black', 'deceased', 110), mk('dead-red', 'red', 'deceased', null), mk('pending', 'pending', 'identified', null),
+      mk('green', 'green', 'identified', null), mk('tq', 'yellow', 'identified', 30)];
+    return { order: sortedPatientsByEvacPriority(list).map((p) => p.id), deadPriority: rescuePriorityOf(list[0]), deadRedPriority: rescuePriorityOf(list[1]) };
+  });
+  assert(JSON.stringify(evacOrder.order.slice(0, 3)) === JSON.stringify(['tq', 'green', 'pending']) && evacOrder.order.slice(3).every((id) => id.startsWith('dead')),
+    `${rel}: deceased patients must be last in the medical evacuation order, even with a tourniquet (got ${JSON.stringify(evacOrder.order)})`);
+  assert(evacOrder.deadPriority === 'not_urgent' && evacOrder.deadRedPriority === 'not_urgent', `${rel}: a deceased patient is never "urgent" for the rescue chain (got ${JSON.stringify(evacOrder)})`);
 
   // 2. RPC: the tactical board only - priority, never the colour or the tourniquet.
   const rpc = await phone();

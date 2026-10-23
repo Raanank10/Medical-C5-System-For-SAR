@@ -5336,6 +5336,7 @@ const RESCUE_PRIORITY_COLORS={urgent:'var(--red)', pending:'var(--accent)', not_
 const RESCUE_EVAC_LABELS={on_site:'באתר', evacuating:'בפינוי', evacuated:'פונה'};
 function rescuePriorityOf(p={}){
   if(RESCUE_PRIORITY_LABELS[p.rescuePriority]) return p.rescuePriority;
+  if(isDeceasedForEvac(p)) return 'not_urgent';
   return C5Rules.rescueEvacPriority(triageKey(p.triage), activeTourniquets(p).length>0);
 }
 function rescueEvacStateOf(p={}){
@@ -6807,7 +6808,12 @@ function showRoleDrilldown(key){
 // the overall triage bucket. Extracted unchanged from the original companyEvacuationPriorityRows
 // so its existing behavior (and the CC "תעדוף פינוי פלוגתי" panel that already ships it) is
 // untouched - only pulled out so PC/CC full patient-list sorting can reuse the same ranking.
+// Deceased (status deceased, or black) always last in the evacuation order, below everyone still
+// in care and below not-yet-sorted, whatever else is recorded (owner, 2026-10-23). The server's
+// get_rescue_patient_board() applies the same rule (database/073).
+function isDeceasedForEvac(p={}){ return p.patientStatus==='deceased' || triageKey(p.triage)==='black'; }
 function evacuationPriorityRank(p){
+  if(isDeceasedForEvac(p)) return {rank:5, reason:'נפטר — אחרון בסדר הפינוי', tqMin:null, tqRemaining:null};
   const tqMin=p.tourniquet?.appliedAt ? Math.floor((Date.now()-p.tourniquet.appliedAt)/60000) : null;
   const tqRemaining=tqMin!==null ? Math.max(0,120-tqMin) : null;
   let rank=4, reason='מעקב רגיל';
@@ -6835,6 +6841,7 @@ function companyEvacuationPriorityRows(pts=patients){
 const EVAC_COLOR_ORDER = {red:0, yellow:1, green:2, black:3, pending:4, unknown:4};
 function evacuationSortScore(p){
   const {rank, tqMin} = evacuationPriorityRank(p);
+  if(rank===5) return 9000;
   if(rank<4) return rank*1000 - (tqMin||0);
   const color = EVAC_COLOR_ORDER[triageKey(p.triage)] ?? 4;
   return 4000 + color;

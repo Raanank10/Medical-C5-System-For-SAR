@@ -15,6 +15,7 @@ declare
   X uuid := gen_random_uuid();   -- site of company A, platoon A1
   Y uuid := gen_random_uuid();   -- site of company B
   P_RED uuid := gen_random_uuid(); P_TQ uuid := gen_random_uuid(); P_PEND uuid := gen_random_uuid(); P_Y uuid := gen_random_uuid();
+  P_DEAD uuid := gen_random_uuid(); -- deceased with an active tourniquet: still last in the order
   CA uuid; CB uuid; A1 uuid; B1 uuid;
   -- Saved so the block can put them back (it rolls back anyway; this keeps the roster intact if
   -- someone ever removes the final raise).
@@ -42,8 +43,10 @@ begin
     values (P_RED,  X, 'T73-RED',  now(), 'red',     'identified', 'trapped', true, true, M1),
            (P_TQ,   X, 'T73-TQ',   now(), 'green',   'identified', 'free',    true, true, M1),
            (P_PEND, X, 'T73-PEND', now(), 'pending', 'identified', 'free',    null, null, M1),
+           (P_DEAD, X, 'T73-DEAD', now(), 'black',   'deceased',   'free',    null, null, M1),
            (P_Y,    Y, 'T73-Y',    now(), 'red',     'identified', 'free',    true, true, M1);
-  insert into tourniquets (incident_id, patient_id, limb, applied_at) values (X, P_TQ, 'left_arm', now() - interval '90 minutes');
+  insert into tourniquets (incident_id, patient_id, limb, applied_at) values (X, P_TQ, 'left_arm', now() - interval '90 minutes'),
+    (X, P_DEAD, 'right_leg', now() - interval '110 minutes');
   insert into events (incident_id, patient_id, actor_id, actor_role, type, payload_json, device_id, local_event_id, local_timestamp) values
     (X, P_RED, M1, 'medic', 'VITALS_RECORDED', '{"avpu":"U","rr":34}', 'test73-dev', 'test73-1', now()),
     (X, P_RED, M1, 'medic', 'PATIENT_LOCATION_UPDATED', '{"location":{"zone":"B2"}}', 'test73-dev', 'test73-2', now()),
@@ -55,15 +58,15 @@ begin
   -- medic of the site: unchanged, reads every patient and the clinical events
   perform set_config('request.jwt.claims', json_build_object('sub', M1, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
-  select count(*) into n from patients where incident_id = X; r := r || 'medic patients X=' || n || ' (want 3); ';
+  select count(*) into n from patients where incident_id = X; r := r || 'medic patients X=' || n || ' (want 4); ';
   select count(*) into n from events where incident_id = X and type = 'VITALS_RECORDED'; r := r || 'medic vitals X=' || n || ' (want 1); ';
-  select count(*) into n from tourniquets where incident_id = X; r := r || 'medic tourniquets X=' || n || ' (want 1); ';
+  select count(*) into n from tourniquets where incident_id = X; r := r || 'medic tourniquets X=' || n || ' (want 2); ';
   execute 'reset role';
 
   -- pc of company A: unchanged
   perform set_config('request.jwt.claims', json_build_object('sub', PC, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
-  select count(*) into n from patients where incident_id = X; r := r || 'pc patients X=' || n || ' (want 3); ';
+  select count(*) into n from patients where incident_id = X; r := r || 'pc patients X=' || n || ' (want 4); ';
   select count(*) into n from patients where incident_id = Y; r := r || 'pc patients Y=' || n || ' (want 0); ';
   begin perform get_rescue_patient_board(X); r := r || 'FAIL pc read the rescue board; ';
   exception when others then r := r || 'ok pc rescue board refused; '; end;
@@ -78,9 +81,9 @@ begin
   select count(*) into n from events where incident_id = X and type::text = any (clin); r := r || 'rpc clinical events X=' || n || ' (want 0); ';
   select count(*) into n from events where incident_id = X and type in ('PATIENT_LOCATION_UPDATED','SUPPLY_REQUEST_CREATED'); r := r || 'rpc location+supply-request events X=' || n || ' (want 2); ';
   select count(*) into n from vw_patient_latest_vitals where patient_id in (P_RED, P_TQ, P_PEND); r := r || 'rpc vitals view X=' || n || ' (want 0); ';
-  select count(*) into n from get_rescue_patient_board(X); r := r || 'rpc board X=' || n || ' (want 3); ';
+  select count(*) into n from get_rescue_patient_board(X); r := r || 'rpc board X=' || n || ' (want 4); ';
   select string_agg(visual_id || ':' || priority || ':' || evac_order, ',' order by evac_order) into s from get_rescue_patient_board(X);
-  r := r || 'rpc board order=' || s || ' (want T73-TQ:urgent:1,T73-RED:urgent:2,T73-PEND:pending:3); ';
+  r := r || 'rpc board order=' || s || ' (want T73-TQ:urgent:1,T73-RED:urgent:2,T73-PEND:pending:3,T73-DEAD:not_urgent:4); ';
   begin perform get_rescue_patient_board(Y); r := r || 'FAIL rpc read site Y board; ';
   exception when others then r := r || 'ok rpc board Y refused; '; end;
   begin perform get_incident_command_state(X); r := r || 'FAIL rpc read command state; ';
@@ -91,7 +94,7 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', RCC, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   select count(*) into n from patients where incident_id = X; r := r || 'rcc patients rows X=' || n || ' (want 0); ';
-  select count(*) into n from get_rescue_patient_board(X); r := r || 'rcc board X=' || n || ' (want 3); ';
+  select count(*) into n from get_rescue_patient_board(X); r := r || 'rcc board X=' || n || ' (want 4); ';
   execute 'reset role';
 
   -- logistics: may join any open site, then reads bags and supply requests only
@@ -122,7 +125,7 @@ begin
   -- cc: unchanged
   perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
-  select count(*) into n from patients where incident_id in (X, Y); r := r || 'cc patients X+Y=' || n || ' (want 4); ';
+  select count(*) into n from patients where incident_id in (X, Y); r := r || 'cc patients X+Y=' || n || ' (want 5); ';
   perform get_incident_command_state(X); r := r || 'ok cc command state; ';
   execute 'reset role';
 

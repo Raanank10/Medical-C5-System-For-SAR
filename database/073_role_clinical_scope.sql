@@ -157,15 +157,19 @@ grant execute on function public.get_incident_stock_movements(uuid) to authentic
 -- Rescue chain: tactical patient board
 -- ---------------------------------------------------------------------------------------------
 -- priority: 'urgent' (red, or an active tourniquet), 'pending' (not sorted yet, never shown as
--- not urgent), 'not_urgent' (yellow, green, black). evac_order: 1, 2, 3... in the order medical
--- command uses (index.html evacuationPriorityRank / evacuationSortScore; keep the two in step). Only
--- the position is returned: the score itself would show minutes on a tourniquet.
+-- not urgent), 'not_urgent' (yellow, green, black, and anyone deceased). evac_order: 1, 2, 3...
+-- in the order medical command uses (index.html evacuationPriorityRank / evacuationSortScore; keep
+-- the two in step). Only the position is returned: the score itself would show minutes on a
+-- tourniquet.
 --   rank 0  active tourniquet with under 45 minutes left of the 120-minute window
 --   rank 1  active tourniquet
 --   rank 2  red with AVPU P/U, respiratory rate over 30 or under 8, or a managed airway
 --   rank 3  yellow, stabilizing or observing
---   rank 4  the rest, by colour (red, yellow, green, black, not sorted)
---   score = rank * 1000 - minutes on the tourniquet, or 4000 + colour order. Lower goes first.
+--   rank 4  the rest, by colour (red, yellow, green, not sorted)
+--   rank 5  deceased (status deceased, or black): always last, whatever else is recorded
+--           (owner, 2026-10-23; index.html isDeceasedForEvac)
+--   score = rank * 1000 - minutes on the tourniquet, 4000 + colour order, or 9000 for rank 5.
+--   Lower goes first.
 -- evac_state: on_site / evacuating / evacuated. Deceased is not told apart (clinical status).
 -- Only rpc / rcc (and admin) may call it: logistics is an incident member too, and must not get
 -- the patient list.
@@ -210,6 +214,7 @@ begin
            case when tq.applied_at is not null
                 then greatest(0, floor(extract(epoch from (now() - tq.applied_at)) / 60))::int end as tq_min,
            case
+             when p.current_status::text = 'deceased' or p.current_triage::text = 'black' then 5
              when tq.applied_at is not null and greatest(0, 120 - floor(extract(epoch from (now() - tq.applied_at)) / 60)) < 45 then 0
              when tq.applied_at is not null then 1
              when p.current_triage::text = 'red' and (vit.avpu in ('P','U') or vit.rr > 30 or vit.rr < 8 or airway.patient_id is not null) then 2
@@ -224,7 +229,8 @@ begin
   ),
   scored as (
     select r.*,
-           case when r.rank_tier < 4 then r.rank_tier * 1000 - coalesce(r.tq_min, 0)
+           case when r.rank_tier = 5 then 9000
+                when r.rank_tier < 4 then r.rank_tier * 1000 - coalesce(r.tq_min, 0)
                 else 4000 + case r.current_triage::text when 'red' then 0 when 'yellow' then 1 when 'green' then 2 when 'black' then 3 else 4 end
            end as score
     from ranked r
@@ -237,6 +243,7 @@ begin
            else 'on_site'
          end,
          case
+           when r.rank_tier = 5 then 'not_urgent'
            when r.current_triage::text = 'red' or r.tq_min is not null then 'urgent'
            when r.current_triage is null or r.current_triage::text not in ('yellow','green','black') then 'pending'
            else 'not_urgent'
