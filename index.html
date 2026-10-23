@@ -207,7 +207,7 @@ body.field-mode .patient-card{padding:16px 15px;margin-top:8px;margin-bottom:8px
 .bp-btn[data-bp="carotid_strong"].selected{border-color:var(--yellow);background:rgba(244,162,97,0.12);}
 .bp-btn[data-bp="carotid_weak"].selected{border-color:var(--orange);background:rgba(255,107,53,0.12);}
 .bp-btn[data-bp="absent"].selected{border-color:var(--red);background:rgba(230,57,70,0.12);}
-/* Same unmistakable selected state as the tap choices (V2.99.57): solid fill, ring, check mark. */
+/* Same unmistakable selected state as the tap choices (V2.99.59): solid fill, ring, check mark. */
 .bp-btn{position:relative;}
 .bp-btn.selected .bp-btn-desc,.bp-btn.selected .bp-btn-value{color:#fff !important;}
 .bp-btn[data-bp="radial"].selected,.bp-btn[data-bp="radial_strong"].selected{background:rgba(52,199,89,0.38);box-shadow:0 0 0 3px var(--green);}
@@ -845,7 +845,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9957</div>
+      <div class="demo-kicker">Demo V2.9959</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -942,7 +942,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9957</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9959</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -952,7 +952,7 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9957</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9959</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -986,13 +986,24 @@ textarea{resize:vertical;min-height:70px;}
       <button class="tap-btn" data-incident-type="explosion" onclick="selectEnrouteIncidentType('explosion')"><span class="icon">💥</span>פיצוץ</button>
     </div>
     <div id="enroute-incident-type-note" style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:14px"></div>
+    <div id="enroute-incident-details"></div>
+    <div id="enroute-building-ask" style="display:none">
+      <div class="field-label">מבנה נפגע / לכודים במבנה?</div>
+      <div class="tap-grid tap-grid-2" id="enroute-building-ask-grid" style="margin-bottom:8px">
+        <button class="tap-btn" data-building-involved="yes" onclick="setEnrouteBuildingInvolved(true)">כן</button>
+        <button class="tap-btn" data-building-involved="no" onclick="setEnrouteBuildingInvolved(false)">לא</button>
+      </div>
+      <div id="enroute-building-ask-note" style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:14px"></div>
+    </div>
+    <div id="enroute-building-section">
     <div class="field-label">סוג מבנה / מצב ראשוני</div>
     <div style="font-size:12px;color:var(--muted);line-height:1.5;margin:-4px 0 8px">קריסה (מלאה, חלקית או מבנה עומד עם לכודים) מוסיפה לכל סוג אירוע את תדריך פציעות המעיכה והלכודים.</div>
     <div class="tap-grid tap-grid-2" id="enroute-type-grid" style="margin-bottom:14px">
-      <button class="tap-btn" onclick="selectEnrouteType(this,'collapse')"><span class="icon">🏚️</span>קריסה מלאה</button>
-      <button class="tap-btn" onclick="selectEnrouteType(this,'partial_collapse')"><span class="icon">⚠</span>קריסה חלקית</button>
-      <button class="tap-btn" onclick="selectEnrouteType(this,'intact_trapped')"><span class="icon">🏢</span>מבנה עומד + לכודים</button>
-      <button class="tap-btn" onclick="selectEnrouteType(this,'unknown')"><span class="icon">📍</span>לא ידוע</button>
+      <button class="tap-btn" data-building-type="collapse" onclick="selectEnrouteType(this,'collapse')"><span class="icon">🏚️</span>קריסה מלאה</button>
+      <button class="tap-btn" data-building-type="partial_collapse" onclick="selectEnrouteType(this,'partial_collapse')"><span class="icon">⚠</span>קריסה חלקית</button>
+      <button class="tap-btn" data-building-type="intact_trapped" onclick="selectEnrouteType(this,'intact_trapped')"><span class="icon">🏢</span>מבנה עומד + לכודים</button>
+      <button class="tap-btn" data-building-type="unknown" onclick="selectEnrouteType(this,'unknown')"><span class="icon">📍</span>לא ידוע</button>
+    </div>
     </div>
     <div class="field-label">כתובת / מוקד ידוע</div>
     <input type="text" id="enroute-address" placeholder="לדוגמה: הרצל 12, בניין 15A" style="margin-bottom:6px;font-size:18px;padding:16px">
@@ -2963,7 +2974,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.57';
+const APP_VERSION = '2.99.59';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -4642,6 +4653,101 @@ function selectEnrouteIncidentType(type){
   renderEnrouteIncidentContext();
   showIncidentTypeBriefModal(type, siteId);
 }
+// Movement screen, below the incident type (V2.99.57). The building-state section opens by itself
+// only for a missile strike. For any other type (or none yet) one question asks whether a building
+// is involved; "yes" opens the same section, so a collapse after an explosion, a shooting or an
+// accident still adds the crush/trapped brief (V2.99.29). Each other type gets its own optional
+// questions, kept per type in siteData.incidentDetails. Device-local, like the building choice.
+const ENROUTE_YES_NO_UNKNOWN=[['yes','כן'],['no','לא'],['unknown','לא ידוע']];
+const INCIDENT_DETAIL_FIELDS={
+  mass_shooting:[
+    {key:'shooterStatus',label:'מצב הירי',options:[['active','ירי פעיל'],['neutralized','מחבל נוטרל'],['unknown','לא ידוע']],
+      warn:{active:'ירי פעיל: אין כניסה לזירה לפני אישור כוחות הביטחון. טיפול בנקודת ריכוז נפגעים בטוחה.'}},
+    {key:'sceneSetting',label:'זירה',options:[['open','שטח פתוח'],['enclosed','מבנה / חלל סגור']]}
+  ],
+  vehicle_accident:[
+    {key:'vehicleCount',label:'מספר כלי רכב',options:[['1','1'],['2','2'],['3plus','3 ומעלה']]},
+    {key:'vehicleKinds',label:'מעורבים (אפשר כמה)',multi:true,options:[['private','רכב פרטי'],['bus','אוטובוס'],['truck','משאית'],['pedestrian','הולך רגל']]},
+    {key:'trappedInVehicle',label:'לכודים ברכב',options:ENROUTE_YES_NO_UNKNOWN,
+      warn:{yes:'לכודים ברכב: נדרש צוות חילוץ. עדכן את חוג"ד.'}},
+    {key:'fireOrFuel',label:'שריפה / דליפת דלק',options:ENROUTE_YES_NO_UNKNOWN,
+      warn:{yes:'שריפה / דליפת דלק: התקרבות רק אחרי אישור כיבוי.'}}
+  ],
+  explosion:[
+    {key:'setting',label:'מקום הפיצוץ',options:[['open','שטח פתוח'],['enclosed','חלל סגור / מבנה']],
+      warn:{enclosed:'פיצוץ בחלל סגור: חבלת פיצוץ ראשונית (ריאות, אוזניים, מעיים) שכיחה יותר - חשוד בה גם ללא פציעה גלויה.'}},
+    {key:'secondaryThreat',label:'חשש לפיצוץ משני',options:ENROUTE_YES_NO_UNKNOWN,
+      warn:{yes:'חשש לפיצוץ משני: שמור מרחק, צמצם זמן שהייה בזירה ופנה מהר לנקודה בטוחה.'}},
+    {key:'hazmat',label:'חשד לחומ"ס',options:ENROUTE_YES_NO_UNKNOWN,
+      warn:{yes:'חשד לחומ"ס: אין כניסה ללא מיגון והנחיית גורם מוסמך. שקול צורך בטיהור לפני טיפול.'}},
+    {key:'activeFire',label:'שריפה פעילה',options:ENROUTE_YES_NO_UNKNOWN,
+      warn:{yes:'שריפה פעילה: התקרבות רק באישור כיבוי. צפו לכוויות ולשאיפת עשן.'}}
+  ]
+};
+function enrouteIncidentDetails(type){
+  if(!siteData.incidentDetails) siteData.incidentDetails={};
+  return siteData.incidentDetails[type] || (siteData.incidentDetails[type]={});
+}
+function setEnrouteIncidentDetail(key, value){
+  const type=ensureSiteStatusFields(currentSiteId()).incidentType;
+  const field=(INCIDENT_DETAIL_FIELDS[type]||[]).find(f=>f.key===key);
+  if(!field) return;
+  const d=enrouteIncidentDetails(type);
+  if(field.multi){
+    const list=Array.isArray(d[key])?d[key]:[];
+    d[key]=list.includes(value)?list.filter(v=>v!==value):[...list,value];
+  }else{
+    d[key]=d[key]===value?null:value; // a second tap clears a wrong pick
+  }
+  saveDemoState();
+  renderEnrouteSiteDetails();
+}
+// Saved state from before V2.99.57 has a building choice but no answer to the question.
+function enrouteBuildingInvolved(){
+  return siteData.buildingInvolved===true || (siteData.buildingInvolved==null && !!siteData.buildingType);
+}
+function setEnrouteBuildingInvolved(involved){
+  siteData.buildingInvolved=!!involved;
+  if(!involved){
+    siteData.buildingType=null;
+    ensureSiteStatusFields(currentSiteId()).buildingCollapse=false;
+  }
+  saveDemoState();
+  renderEnrouteIncidentContext();
+}
+function renderEnrouteSiteDetails(){
+  const siteId=currentSiteId();
+  const s=ensureSiteStatusFields(siteId);
+  const isMissile=s.incidentType==='missile_strike_structural_collapse';
+  const involved=enrouteBuildingInvolved();
+  const ask=document.getElementById('enroute-building-ask');
+  const section=document.getElementById('enroute-building-section');
+  if(ask) ask.style.display=isMissile?'none':'block';
+  if(section) section.style.display=(isMissile||involved)?'block':'none';
+  document.querySelectorAll('#enroute-building-ask-grid .tap-btn').forEach(b=>{
+    b.classList.toggle('selected', b.dataset.buildingInvolved===(involved?'yes':siteData.buildingInvolved===false?'no':''));
+  });
+  document.querySelectorAll('#enroute-type-grid .tap-btn').forEach(b=>{
+    b.classList.toggle('selected', b.dataset.buildingType===siteData.buildingType);
+  });
+  const askNote=document.getElementById('enroute-building-ask-note');
+  if(askNote) askNote.textContent=s.buildingStatus==='progressive_collapse'
+    ? 'חילוץ דיווח "קריסה מתקדמת" - תדריך פציעות המעיכה והלכודים נשאר בתוקף.'
+    : '"כן" פותח את סוג המבנה ומוסיף לתדריך פציעות מעיכה ולכודים.';
+  const wrap=document.getElementById('enroute-incident-details');
+  if(!wrap) return;
+  const fields=INCIDENT_DETAIL_FIELDS[s.incidentType];
+  if(!fields){ wrap.innerHTML=''; return; }
+  const d=enrouteIncidentDetails(s.incidentType);
+  const warnings=[];
+  wrap.innerHTML=fields.map(f=>{
+    const picked=v=>f.multi?(Array.isArray(d[f.key])&&d[f.key].includes(v)):d[f.key]===v;
+    if(!f.multi && f.warn && f.warn[d[f.key]]) warnings.push(f.warn[d[f.key]]);
+    return `<div class="field-label">${escAttr(f.label)}</div>
+      <div class="tap-grid ${f.options.length===3?'tap-grid-3':'tap-grid-2'}" data-incident-detail="${escAttr(f.key)}" style="margin-bottom:10px">${f.options.map(([v,l])=>
+        `<button class="tap-btn${picked(v)?' selected':''}" data-detail-value="${escAttr(v)}" onclick="setEnrouteIncidentDetail('${f.key}','${v}')">${escAttr(l)}</button>`).join('')}</div>`;
+  }).join('') + warnings.map(w=>`<div class="role-row" data-incident-detail-warning style="border-color:var(--red);margin-bottom:10px"><div class="role-row-title" style="color:var(--red)">⚠ ${escAttr(w)}</div></div>`).join('');
+}
 function renderEnrouteIncidentContext(){
   const card=document.getElementById('enroute-assignment-card');
   if(!card) return;
@@ -4686,6 +4792,7 @@ function renderEnrouteIncidentContext(){
       note.textContent=s.incidentType?`${incidentTypeSourceLabel(siteId)}${currentUser?' · נשמר במכשיר שלך בלבד':''} · חילוץ יכול לעדכן את הסוג בהמשך.`:'בחירת סוג אירוע מציגה תבנית פציעות צפויה.';
     }
   }
+  renderEnrouteSiteDetails();
 }
 // Prefill only empty fields (same rule as the existing siteData prefill in goTo('enroute')),
 // so nothing the medic already typed is ever overwritten.
@@ -5140,7 +5247,7 @@ function safeScopedDemoReset({confirmReset=false, preserveFieldMode=true}={}){
   return true;
 }
 function emptySiteData(){
-  return {name:'', address:'', eventType:null, buildingType:null, floorHint:'', apartmentHint:'', eta:'', currentZone:'', lastMechanism:'', likelyMechanisms:[], sweepSessions:[], description:'', externalReports:[], initialEvacuatedGreen:0, initialEvacuation:{green:0,yellow:0,red:0,summary:'',source:null,groups:[],report:null}, expectedCasualties:{trapped:0,immobile:0,missing:0,severe:0}};
+  return {name:'', address:'', eventType:null, buildingType:null, buildingInvolved:null, incidentDetails:{}, floorHint:'', apartmentHint:'', eta:'', currentZone:'', lastMechanism:'', likelyMechanisms:[], sweepSessions:[], description:'', externalReports:[], initialEvacuatedGreen:0, initialEvacuation:{green:0,yellow:0,red:0,summary:'',source:null,groups:[],report:null}, expectedCasualties:{trapped:0,immobile:0,missing:0,severe:0}};
 }
 function clearDemoScenario({confirmReset=true}={}){
   if(blockDemoDataWhileLoggedIn()) return false;
@@ -8628,6 +8735,7 @@ function buildAlertObjects(pts=patients){
       }
     }
   });
+  serverWatchdogAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
   duplicateCandidates(pts).forEach(([a,b],idx)=>pushAlert(alerts,{id:`dup-${a.id}-${b.id}`,type:'DUPLICATE_SUSPECTED',severity:'medium',owner:'pc',audience:['pc','chamal'],escalatesTo:null,actionRequired:'merge_duplicate',scope:'site',category:'integrity',siteId:a.siteId||b.siteId||'SITE_A',patientId:a.id,title:`חשד לכפילות ${a.id} ↔ ${b.id}`,detail:'בדיקה ידנית בלבד; אין מיזוג הרסני של אירועים'}));
   const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id)):siteExternalReports(cmdActiveSite);
   const typeReport=siteData.medicIncidentTypeReport;
@@ -9120,6 +9228,7 @@ function selectEnrouteType(btn,val){
   document.querySelectorAll('#enroute-type-grid .tap-btn').forEach(b=>b.classList.remove('selected'));
   if(btn) btn.classList.add('selected');
   siteData.buildingType=val;
+  siteData.buildingInvolved=true;
   siteData.eventType=val==='collapse'?'collapse':val==='partial_collapse'?'collapse':val==='intact_trapped'?'house_hit':'other';
   if(['collapse','partial_collapse'].includes(val)){
     siteData.likelyMechanisms=['פגיעת לחץ / ריסוק','חשד לפגיעת עמוד שדרה'];
@@ -9314,7 +9423,7 @@ function arriveAtSite(){
     type:'SITE_ARRIVAL_CONFIRMED',
     detail:`חובש הגיע למוקד · ETA ${siteData.eta||'לא צוין'} · אזור ${zoneLabel()} · פינוי ראשוני ${siteData.initialEvacuation.green||0} קלים / ${siteData.initialEvacuation.yellow||0} בינוניים / ${siteData.initialEvacuation.red||0} קשים`,
     warn:false,
-    payload_json:{site_name:siteData.name,address:siteData.address,eta:siteData.eta,zone:siteData.currentZone,floor_hint:siteData.floorHint,apartment_hint:siteData.apartmentHint,building_type:siteData.buildingType,initial_evacuation:siteData.initialEvacuation,expected_casualties:siteData.expectedCasualties,visible_to:['חוג"ד','חמ"ל','מ״פ רפואה']}
+    payload_json:{site_name:siteData.name,address:siteData.address,eta:siteData.eta,zone:siteData.currentZone,floor_hint:siteData.floorHint,apartment_hint:siteData.apartmentHint,building_type:siteData.buildingType,building_involved:enrouteBuildingInvolved(),incident_type:ensureSiteStatusFields(currentSiteId()).incidentType,incident_details:(siteData.incidentDetails||{})[ensureSiteStatusFields(currentSiteId()).incidentType]||null,initial_evacuation:siteData.initialEvacuation,expected_casualties:siteData.expectedCasualties,visible_to:['חוג"ד','חמ"ל','מ״פ רפואה']}
   });
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
   state=freshState();
@@ -14089,7 +14198,7 @@ function applyServerTourniquets(rows, incidentId){
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
 function pullProjectedPatientStateAll(){
-  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); pullAlertAcknowledgments(id); pullRemoteTreatments(id); pullRemoteVitals(id); });
+  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); pullAlertAcknowledgments(id); pullRemoteTreatments(id); pullRemoteVitals(id); pullServerWatchdogAlerts(id); });
 }
 // ── Pre-evacuation report pull (V2.99.36, database/050) ──
 // incident_pre_evacuations is the server's verdict on who owns the report (first medical
@@ -14259,6 +14368,58 @@ function applyRemoteVitals(rows){
     changed=true;
   });
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
+}
+// WP-12: open alerts raised by the server watchdog (database/072, every minute, with or without a
+// phone open): tourniquet time 45/60/120 min and red/yellow vitals overdue. This phone already
+// raises the same things from its own data, so a server alert is listed only when the phone does
+// not: the patient's tourniquet is not known here or its own timer has not reached that level, or
+// the vitals are not overdue here and this phone has no newer vitals than the server's. Command and
+// the medic see them (owner decision 2026-10-22), marked as from the server.
+const serverWatchdogAlertsByIncident={};
+const SERVER_WATCHDOG_TYPES=['TOURNIQUET_TIME_NOTICE','TOURNIQUET_TIME_WARNING','TOURNIQUET_TIME_CRITICAL','VITALS_OVERDUE'];
+async function pullServerWatchdogAlerts(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let r;
+  try{ r=await client.from('watchdog_alerts').select('id,patient_id,alert_type,severity,triggered_at,payload_json').eq('incident_id', incidentId).is('resolved_at', null).in('alert_type', SERVER_WATCHDOG_TYPES).limit(500); }
+  catch(e){ return; }
+  if(r.error || !Array.isArray(r.data)) return;
+  const rows=r.data.filter(a=>a && a.patient_id && SERVER_WATCHDOG_TYPES.includes(a.alert_type) && a.payload_json?.source==='server_watchdog');
+  const before=JSON.stringify(serverWatchdogAlertsByIncident[incidentId]||[]);
+  serverWatchdogAlertsByIncident[incidentId]=rows;
+  if(JSON.stringify(rows)!==before) refreshActiveScreenData();
+}
+const SERVER_TQ_LEVEL_RANK={TOURNIQUET_TIME_NOTICE:1, TOURNIQUET_TIME_WARNING:2, TOURNIQUET_TIME_CRITICAL:3};
+function localTourniquetRank(p, nowMs=Date.now()){
+  return activeTourniquets(p).reduce((max,tq)=>{
+    const timer=C5Rules.tourniquetTimer({tourniquet:tq}, nowMs);
+    return Math.max(max, timer ? (TQ_ALERT_RANK[timer.cls]||0) : 0);
+  },0);
+}
+function serverWatchdogAlertObjects(pts=patients, nowMs=Date.now()){
+  const out=[];
+  Object.values(serverWatchdogAlertsByIncident).flat().forEach(a=>{
+    const p=pts.find(x=>x.id===a.patient_id);
+    if(!p) return;
+    const payload=a.payload_json||{};
+    const minutes=Number.isFinite(Number(payload.minutes)) ? Math.max(0, Math.round(Number(payload.minutes))) : null;
+    const severity=a.severity==='critical'?'critical':a.severity==='warning'?'high':'medium';
+    const base={patientId:p.id, siteId:p.siteId||'SITE_A', createdAt:a.triggered_at||new Date().toISOString(), owner:'medic', audience:['medic','pc','cc','chamal'], escalatesTo:null, escalateAfterMin:null, actionRequired:'update_vitals', scope:'patient', source:'server'};
+    if(a.alert_type==='VITALS_OVERDUE'){
+      if(isVitalsOverdue(p, nowMs)) return;
+      const baseline=Date.parse(payload.baseline_at||'');
+      if(Number.isFinite(baseline) && (p.lastVitalsAt||0)>baseline) return;
+      out.push({...base, id:`server-vitals-${a.id}`, type:'SERVER_VITALS_OVERDUE', severity, category:'data', title:`${p.visualId||p.id} — מדדים באיחור (שרת)`, detail:`לפי השרת${minutes!=null?` · ${minutes} דק׳ מאז מדדים`:''}`});
+      return;
+    }
+    const rank=SERVER_TQ_LEVEL_RANK[a.alert_type];
+    if(!rank || localTourniquetRank(p, nowMs)>=rank) return;
+    const label=rank===3?'קריטי':rank===2?'אזהרה':'45 דקות';
+    const limb=sanitizeRemoteText(payload.limb, 30);
+    out.push({...base, id:`server-tq-${a.id}`, type:'SERVER_TOURNIQUET_TIME', severity, category:'urgent', title:`${p.visualId||p.id} — חסם עורקים ${label} (שרת)`, detail:`${limb?tourniquetLimbMeta(limb).label+' · ':''}${minutes!=null?`${minutes} דק׳ · `:''}לפי השרת`});
+  });
+  return out;
 }
 const REMOTE_VITALS_ROLE_LABELS={medic:'חובש', paramedic:'פראמדיק', physician:'רופא', pc:'חוג״ד', admin:'מנהל מערכת'};
 function remoteVitalsSourceLine(p){

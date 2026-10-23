@@ -3,7 +3,7 @@
 // (docs/ROLE_COMMAND_MODEL_v2.7.md). Local demo mode, which has two sites (SITE_A = PLT-A,
 // SITE_B = PLT-B); signed in there is only the active incident, so nothing narrows further there.
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_command_scope_test.js
 const fs = require('fs');
 const path = require('path');
@@ -21,6 +21,9 @@ async function checkFile(browser, file) {
   const rel = path.relative(root, file);
   const context = await browser.newContext({ viewport: { width: 420, height: 900 } });
   const page = await context.newPage();
+  // No backend in this test: serve an empty supabase-js instead of waiting on the CDN, which
+  // otherwise holds DOMContentLoaded (a slow jsDelivr response timed page.goto out in CI).
+  await page.route('**/supabase-js@*/**', (r) => r.fulfill({ contentType: 'application/javascript', body: '' }));
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('dialog', (d) => d.accept());

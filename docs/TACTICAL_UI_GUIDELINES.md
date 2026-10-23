@@ -10,8 +10,8 @@ These guidelines capture the design intent for C5 Sentinel-SAR as a development 
 - Keep critical controls at least 56px by 56px. Since V2.99.56 (owner, 2026-10-22) the main field buttons (tap choices, primary and secondary actions, vitals steppers, AVPU, blood pressure) are 60-64px tall, every other field control is at least 56px, and small toggles, filters and links at least 44px; the body-map injury hotspots are about 49x44px.
 - Show the current clinical clock when time changes the risk.
 - Never communicate triage by color alone; pair color with text.
-- A selected tap choice must be unmistakable at a glance, not a faint tint: since V2.99.57 (owner, 2026-10-22, AVPU on the MSTART card) a selected button gets a solid fill, an outer ring and a white check mark, so the choice reads without comparing colors.
-- Nothing in a field screen may need sideways scrolling. The pulse and breathing count steppers (-5/-1/+1/+5) take the full row width and share it, with "ספירה:" and the multiplier on a small line above (V2.99.57): at least 56px per button on a 360px-wide phone.
+- A selected tap choice must be unmistakable at a glance, not a faint tint: since V2.99.59 (owner, 2026-10-22, AVPU on the MSTART card) a selected button gets a solid fill, an outer ring and a white check mark, so the choice reads without comparing colors.
+- Nothing in a field screen may need sideways scrolling. The pulse and breathing count steppers (-5/-1/+1/+5) take the full row width and share it, with "ספירה:" and the multiplier on a small line above (V2.99.59): at least 56px per button on a 360px-wide phone.
 - Treat stale data, missing data, and pending triage as first-class states.
 - Do not block forward movement for optional or incomplete fields; save the record and surface missing data as a background alert.
 
@@ -116,6 +116,8 @@ The timer must stay visible in:
 The timer is not passive history. It is an active risk clock.
 
 The phone alerts on its own clock (D1, repo owner, 2026-10-20), with or without a server connection: at 45, 60 and 120 minutes from application, once per level per tourniquet, it vibrates (where the browser supports it) and shows a banner that stays until tapped and opens the patient (`checkTourniquetTimeAlerts`, rule `tourniquetAlertToRaise` in `src/domain/rules.js`). It does not wait for the server's reassessment watchdog. Limits of a web page: iOS Safari has no vibration API, and a locked phone or a backgrounded browser pauses the page, so the alert fires when the app is opened again (only the current level, not every level missed).
+
+Since V2.99.58 the server raises the same levels too (`database/072`, WP-12), every minute, with no phone needed, into `watchdog_alerts`, along with red/yellow vitals overdue. A phone lists a server alert only when it does not already raise the same one from its own data, and marks it "(שרת)"; it never replaces the phone's own alert or its timer.
 
 ## Logistics Resupply Queue
 

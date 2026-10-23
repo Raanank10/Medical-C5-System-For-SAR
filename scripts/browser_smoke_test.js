@@ -1,8 +1,8 @@
 // Real browser smoke test: loads index.html in headless Chromium via
 // Playwright and checks the app actually renders and initializes, not just that the HTML text
-// contains expected strings (see scripts/smoke_*.js for that kind of check). Manual-only, not
-// wired into CI - see the package.json/CLAUDE.md note on why this is the one place in the repo
-// with an npm dependency.
+// contains expected strings (see scripts/smoke_*.js for that kind of check). Runs in CI through
+// scripts/run_tests.js (WP-13); Playwright is the repo's one npm dependency, dev-only (see
+// package.json and CLAUDE.md).
 //
 // Run: npm install && npm run test:browser-smoke   (or: node scripts/browser_smoke_test.js)
 const fs = require('fs');
@@ -21,6 +21,9 @@ function assert(condition, message) {
 async function checkFile(browser, file) {
   const rel = path.relative(root, file);
   const page = await browser.newPage();
+  // No backend in this test: serve an empty supabase-js instead of waiting on the CDN, which
+  // otherwise holds DOMContentLoaded (a slow jsDelivr response timed page.goto out in CI).
+  await page.route('**/supabase-js@*/**', (r) => r.fulfill({ contentType: 'application/javascript', body: '' }));
   const pageErrors = [];
   const consoleErrors = [];
   page.on('pageerror', (err) => pageErrors.push(String(err)));

@@ -9,7 +9,7 @@
 //   never touching triage/status) and database/041's PATIENT_LOCATION_UPDATED branch.
 // It proves client behavior only; database/044 itself was exercised against a real Postgres.
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_evacuation_tracking_test.js
 const fs = require('fs');
 const path = require('path');

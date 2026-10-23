@@ -4,7 +4,7 @@
 // The fake answers vw_patient_treatment_history from the pushed events, with device_id, as 055 does.
 // It proves client behavior only; database/055 itself must be exercised against real Postgres.
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_remote_treatments_test.js
 const fs = require('fs');
 const path = require('path');

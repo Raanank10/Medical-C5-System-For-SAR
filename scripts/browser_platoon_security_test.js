@@ -9,7 +9,7 @@
 // only; set_incident_unit for company-level command and, inside its own company, the rcc. The SQL
 // itself is tested by scripts/rls_test_053_platoons.sql (docs/RLS_AUDIT_v1.md, 053 follow-up).
 //
-// Manual-only, not wired into CI (same as scripts/browser_smoke_test.js).
+// Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_platoon_security_test.js
 const fs = require('fs');
 const path = require('path');
