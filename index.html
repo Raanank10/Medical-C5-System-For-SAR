@@ -953,7 +953,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9962</div>
+      <div class="demo-kicker">Demo V2.9963</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1011,7 +1011,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     </div>
     <div class="demo-panel">
       <div class="demo-strip-title">שרשרת חילוץ — ראשונים בזירה</div>
-      <div class="demo-strip-sub">תמונה טקטית מוגבלת (ללא מדדים) + סדר פינוי מומלץ + סמכות אתר עצמאית: פתיחת אירוע, סטטוס מבנה, אישור אתר נקי — ללא אישור רפואי.</div>
+      <div class="demo-strip-sub">תמונה טקטית מוגבלת (ללא מידע קליני) + סדר פינוי מומלץ + סמכות אתר עצמאית: פתיחת אירוע, סטטוס מבנה, אישור אתר נקי — ללא אישור רפואי.</div>
       <div class="demo-grid" style="margin-top:12px">
         <button class="demo-card" onclick="startRoleDashboard('rpc')">
           <div class="demo-icon">🪖</div>
@@ -1050,7 +1050,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9962</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9963</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1060,7 +1060,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9962</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9963</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -1239,7 +1239,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     <button class="alert-slice" onclick="setAlertFilter('all',this)">הכל <span id="alert-all-count">0</span></button>
   </div>
   <div id="alerts-banner"></div>
-  <div class="section-label">הפצועים שלי — מעקב מדדים</div>
+  <div class="section-label">פצועים באתר — מעקב מדדים (שטיפלתי ראשונים)</div>
   <div class="chip-row" style="padding:0 16px 8px">
     <button class="chip selected" onclick="setPatientBoardFilter('all',this)">הכל</button>
     <button class="chip" onclick="setPatientBoardFilter('red',this)">אדום</button>
@@ -3062,6 +3062,18 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     return totals;
   }
 
+
+  // Evacuation priority for the rescue chain (rpc / rcc, database/074): triage reaches them only
+  // as urgent / not urgent, never as a colour. Urgent: red, or an active tourniquet. Not yet
+  // sorted (pending / unknown) is its own value and is never shown as not urgent. The server
+  // computes the same in get_rescue_patient_board().
+  const RESCUE_PRIORITIES = ["urgent", "pending", "not_urgent"];
+  function rescueEvacPriority(triage, tourniquetActive) {
+    if (triage === "red" || tourniquetActive === true) return "urgent";
+    if (triage === "yellow" || triage === "green" || triage === "black") return "not_urgent";
+    return "pending";
+  }
+
   return {
     AVPU_RANK,
     DEVICE_SILENCE_MS,
@@ -3103,6 +3115,8 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     PRE_EVAC_FIRST_REPORT_ROLES,
     preEvacuationTotals,
     serverContactFreshness,
+    RESCUE_PRIORITIES,
+    rescueEvacPriority,
     suggestedSweepColor,
     suggestMstartTriage,
     supplyBurnAlertLevel,
@@ -3173,7 +3187,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.62';
+const APP_VERSION = '2.99.63';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3576,8 +3590,8 @@ const ROLE_DEFS = [
   {key:'physician', label:'Physician', he:'רופא', desc:'סמכות פיקודית כמו מ״פ רפואה (ניהול אירוע, מכשירים, תמונת מצב, ניגודי עדכון) בתוספת סמכות רישום קליני מלאה: מדדים, טיפול, מיון. אינו פותח פצוע חדש. הדרג הגבוה ביותר בהכרעת ניגודי עדכון בין מכשירים. בעל סמכות אישור מוות קליני.'},
   {key:'paramedic', label:'Paramedic', he:'פראמדיק', desc:'אותה סמכות טיפול שדה כמו חובש: פתיחת פצוע, מדדים, תרופות, מיון, מסירת מצב — כולל אישור חריגת סיכון גבוה. ללא הסמכות הפיקודית של רופא/מ״פ רפואה וללא סמכות אישור מוות קליני.'},
   {key:'chamal', label:'Chamal', he:'חמ״ל', desc:'תמונת מצב מלאה, התראה על אירועים שנפתחו בשטח, ניהול אירוע ברמת חטיבה וסיכום אירוע חי, ללא רישום פצועים.'},
-  {key:'rpc', label:'מ״מ', he:'מפקד מחלקת חילוץ', desc:'פאנל טקטי למחלקה שלו: תג, מיון, אזור, לכוד/נייד, סטטוס פינוי, חובש אחראי (כינוי קריאה). ללא מדדים, טיפול, מנגנון פציעה או זהות. סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא אישור רפואי. יכול לדווח פצוע ראשוני (מיקום/לכוד/חסם בלבד).'},
-  {key:'rcc', label:'מ״פ חילוץ', he:'מפקד פלוגת חילוץ', desc:'פאנל טקטי מרוכז לפי מחלקות עבור הפלוגה שלו, כולל בקשות אספקה פתוחות (לוגיסטיקת פלוגת חילוץ). ללא מדדים, טיפול, מנגנון פציעה או זהות. סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא אישור רפואי. יכול לדווח פצוע ראשוני (מיקום/לכוד/חסם בלבד).'},
+  {key:'rpc', label:'מ״מ', he:'מפקד מחלקת חילוץ', desc:'פאנל טקטי למחלקה שלו: תג, עדיפות פינוי (דחוף / לא דחוף), אזור, לכוד/נייד, סטטוס פינוי, חובש אחראי (כינוי קריאה). ללא צבע מיון, חסם, מדדים, טיפול או מנגנון פציעה. סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא אישור רפואי. יכול לדווח פצוע ראשוני (מיקום/לכוד/חסם בלבד).'},
+  {key:'rcc', label:'מ״פ חילוץ', he:'מפקד פלוגת חילוץ', desc:'פאנל טקטי מרוכז לפי מחלקות עבור הפלוגה שלו (דחוף / לא דחוף, לכודים, פינוי), כולל בקשות אספקה פתוחות (לוגיסטיקת פלוגת חילוץ). ללא צבע מיון, חסם, מדדים, טיפול או מנגנון פציעה. סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא אישור רפואי. יכול לדווח פצוע ראשוני (מיקום/לכוד/חסם בלבד).'},
   {key:'admin', label:'Admin', he:'מנהל מערכת', desc:'גישה טכנית מלאה: כל הנתונים הגולמיים, טעינת/ניקוי תרחישים, ייצוא ניסוי, בדיקת גרסה וסנכרון. תפקיד טכני להרצת דמו/בדיקות, לא תפקיד פיקודי מבצעי.'}
 ];
 const AUTH_MATRIX = [
@@ -4965,6 +4979,21 @@ function closeIncidentTypeBriefModal(e){ if(e.target.id==='incident-type-brief-m
 // MEDIC_ASSIGNED_TO_INCIDENT / INCIDENT_TYPE_MISMATCH_REPORTED / SITE_PREFILL_CORRECTED are
 // deliberately outside SYNC_ELIGIBLE_EVENT_TYPES (like INCIDENT_TYPE_SET), so never pushed.
 let medicIncidentAssignments={}; // medicUserId -> {siteId, assignedById, assignedByName, assignedAt, address, note}
+// Patients each user registered or treated on this phone: userId (or 'local' signed out) -> [patientId].
+// Scope stays the whole site (every medic there still sees every patient); this only marks
+// which ones are this medic's own, so the medic board can show them first.
+let handledPatientIds={};
+const HANDS_ON_EVENT_TYPES=new Set(['PATIENT_CREATED','QUICK_PATIENT_CREATED','VITALS_RECORDED','SABCDE_RECORDED',
+  'INTERVENTION_RECORDED','MEDICATION_ADMINISTERED','AIRWAY_MANAGED','TOURNIQUET_APPLIED','TOURNIQUET_LIMB_RECORDED',
+  'TOURNIQUET_REASSESSMENT','TOURNIQUET_RELEASED','PATIENT_TRIAGE_UPDATED','PATIENT_TRIAGED_EXPECTANT',
+  'MINIMAL_TRIAGE_RECORDED','MSTART_OVERRIDE','PATIENT_INJURY_UPDATED','PATIENT_HANDED_OVER','SUPPLY_CONSUMED']);
+function handlerKey(){ return currentUser?.id || 'local'; }
+function markPatientHandled(patientId){
+  if(!patientId) return;
+  const list=handledPatientIds[handlerKey()] || (handledPatientIds[handlerKey()]=[]);
+  if(!list.includes(patientId)) list.push(patientId);
+}
+function isPatientHandledByMe(p){ return !!p && (handledPatientIds[handlerKey()]||[]).includes(p.id); }
 let enroutePrefill={address:'', note:''}; // values pre-filled from an assignment, compared on arrival
 let pendingMedicAssign={medicId:null, siteId:'SITE_A'};
 function siteAddressFromName(siteId){
@@ -5570,24 +5599,52 @@ function rescueIdentityLine(p={}){
   if(p.temporaryDescription) return p.temporaryDescription;
   return 'לא מזוהה — אין תיאור זמני';
 }
+// Rescue chain (rpc / rcc) screens: triage only as evacuation priority, never a colour, no
+// tourniquet and no clinical status (database/074). Signed in, rescue patients come from
+// get_rescue_patient_board() with rescuePriority / rescueEvacState / rescueEvacOrder already set
+// by the server; in local demo mode (or for a patient this phone reported itself) the same rule
+// is applied here from the phone's own data.
+const RESCUE_PRIORITY_LABELS={urgent:'דחוף', pending:'טרם מוין', not_urgent:'לא דחוף'};
+const RESCUE_PRIORITY_COLORS={urgent:'var(--red)', pending:'var(--accent)', not_urgent:'var(--muted)'};
+const RESCUE_EVAC_LABELS={on_site:'באתר', evacuating:'בפינוי', evacuated:'פונה'};
+function rescuePriorityOf(p={}){
+  if(RESCUE_PRIORITY_LABELS[p.rescuePriority]) return p.rescuePriority;
+  if(isDeceasedForEvac(p)) return 'not_urgent';
+  return C5Rules.rescueEvacPriority(triageKey(p.triage), activeTourniquets(p).length>0);
+}
+function rescueEvacStateOf(p={}){
+  if(RESCUE_EVAC_LABELS[p.rescueEvacState]) return p.rescueEvacState;
+  if(p.patientStatus==='evacuating') return 'evacuating';
+  if(['handed_over','evacuated','self_evacuated','closed'].includes(p.patientStatus)) return 'evacuated';
+  return 'on_site';
+}
+function rescuePriorityCounts(pts){
+  const c={urgent:0,pending:0,not_urgent:0,trapped:0,evacuated:0};
+  pts.forEach(p=>{ c[rescuePriorityOf(p)]++; if(p.trapStatus==='trapped') c.trapped++; if(rescueEvacStateOf(p)==='evacuated') c.evacuated++; });
+  return c;
+}
+// Server order first (rescueEvacOrder), then patients the server has not ranked yet, by the same
+// ranking medical command uses (sortedPatientsByEvacPriority).
+function rescueSortedForEvac(pts){
+  const ranked=pts.filter(p=>Number.isFinite(p.rescueEvacOrder)).sort((a,b)=>a.rescueEvacOrder-b.rescueEvacOrder);
+  return [...ranked, ...sortedPatientsByEvacPriority(pts.filter(p=>!Number.isFinite(p.rescueEvacOrder)))];
+}
 function tacticalPatientRow(p){
   const trap=TRAP_LABELS[p.trapStatus]||'לא תועד';
-  const evac=STATUS_LABELS[p.patientStatus]||p.patientStatus||'—';
+  const evac=RESCUE_EVAC_LABELS[rescueEvacStateOf(p)];
   const medic=medicCallsign(p.assignedMedicId||userIdFromMedic(p.medic||p.lastTouchedBy));
   return roleRow(
-    `${p.visualId||p.id} · ${TRIAGE_LABELS[p.triage]||p.triage} · ${rescueIdentityLine(p)}`,
-    `${p.location||'אזור לא תועד'} · ${trap} · ${evac} · ${p.time||''} מהאיתור`,
+    `${p.visualId||p.id} · ${RESCUE_PRIORITY_LABELS[rescuePriorityOf(p)]} · ${rescueIdentityLine(p)}`,
+    `${p.location||'אזור לא תועד'} · ${trap} · ${evac}${p.time?` · ${p.time} מהאיתור`:''}`,
     `<span class="identity-chip">חובש אחראי: ${medic}</span>`
   );
 }
 function tacticalPlatoonRollup(platoonId){
   const pts=patients.filter(p=>patientPlatoonId(p)===platoonId);
-  const c={red:0,yellow:0,green:0,black:0,trapped:0};
-  pts.forEach(p=>{ if(c[p.triage]!==undefined) c[p.triage]++; if(p.trapStatus==='trapped') c.trapped++; });
-  const evacuated=pts.filter(p=>['handed_over','evacuated'].includes(p.patientStatus)).length;
+  const c=rescuePriorityCounts(pts);
   return roleRow(
     platoonName(platoonId),
-    `${pts.length} פצועים · אדום ${c.red} · צהוב ${c.yellow} · ירוק ${c.green} · שחור ${c.black} · לכודים ${c.trapped} · פונו ${evacuated}`
+    `${pts.length} פצועים · דחוף ${c.urgent} · לא דחוף ${c.not_urgent} · טרם מוין ${c.pending} · לכודים ${c.trapped} · פונו ${c.evacuated}`
   );
 }
 // Demo loaders/clearers are local-demo-mode only. While logged in they would mix invented
@@ -5676,7 +5733,7 @@ function saveDemoState(){
         }
       }
       demoRevision += 1;
-      await secureSetItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:6,appVersion:APP_VERSION,revision:demoRevision,savedAt:new Date().toISOString(),experimentStartedAt,experimentPhase,siteData,patients,reinforcementRequests,pcTruckStock,companyStock,medicIncidentAssignments,demoSyncMode,lastSyncAt}));
+      await secureSetItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:6,appVersion:APP_VERSION,revision:demoRevision,savedAt:new Date().toISOString(),experimentStartedAt,experimentPhase,siteData,patients,reinforcementRequests,pcTruckStock,companyStock,handledPatientIds,medicIncidentAssignments,demoSyncMode,lastSyncAt}));
     }catch(e){}
   });
 }
@@ -5698,6 +5755,7 @@ function loadStoredDemoState(){
       pcTruckStock={...PC_TRUCK_BASELINE, ...(saved.pcTruckStock||{})};
       companyStock={...COMPANY_STOCK_BASELINE, ...(saved.companyStock||{})};
       medicIncidentAssignments=(saved.medicIncidentAssignments && typeof saved.medicIncidentAssignments==='object')?saved.medicIncidentAssignments:{};
+      handledPatientIds=(saved.handledPatientIds && typeof saved.handledPatientIds==='object' && !Array.isArray(saved.handledPatientIds))?saved.handledPatientIds:{};
       patients.forEach(p=>{
         if(!p.lastModifiedAt) p.lastModifiedAt=saved.savedAt||new Date().toISOString();
         if(!p.trapStatus) p.trapStatus=normalizeTrapStatus(p);
@@ -5745,7 +5803,7 @@ function inDemoSandbox(){ return !!_demoSandbox; }
 function snapshotSandboxState(){
   return structuredClone({
     patients, reinforcementRequests, siteData, pcTruckStock, companyStock, siteAuthority,
-    medicIncidentAssignments, activeRoleDashboard, demoSyncMode, lastSyncAt, experimentPhase,
+    medicIncidentAssignments, handledPatientIds, activeRoleDashboard, demoSyncMode, lastSyncAt, experimentPhase,
     rescueActiveSiteId, state,
     externalReports:allSites.map(s=>({id:s.id, reports:s.externalReports||[]}))
   });
@@ -5753,7 +5811,7 @@ function snapshotSandboxState(){
 function restoreSandboxState(snap){
   patients=snap.patients; reinforcementRequests=snap.reinforcementRequests; siteData=snap.siteData;
   pcTruckStock=snap.pcTruckStock; companyStock=snap.companyStock; siteAuthority=snap.siteAuthority;
-  medicIncidentAssignments=snap.medicIncidentAssignments; activeRoleDashboard=snap.activeRoleDashboard;
+  medicIncidentAssignments=snap.medicIncidentAssignments; handledPatientIds=snap.handledPatientIds; activeRoleDashboard=snap.activeRoleDashboard;
   demoSyncMode=snap.demoSyncMode; lastSyncAt=snap.lastSyncAt; experimentPhase=snap.experimentPhase;
   rescueActiveSiteId=snap.rescueActiveSiteId; state=snap.state;
   snap.externalReports.forEach(x=>{ const s=allSites.find(a=>a.id===x.id); if(s) s.externalReports=x.reports; });
@@ -6007,8 +6065,8 @@ function roleConfig(role){
     logistics:{title:'קצין לוגיסטיקה / Log-O', actor:'רס״ם אמיר דגן — Log-O', audience:'logistics', legacy:'logistics', responsibilities:['מלאי ציוד רפואי לפי מחלקה / מוקד','מענה לבקשות ציוד','הקצאת אספקה מחדש','מעקב burn rate','הצפת חוסר המשפיע על טיפול']},
     chamal:{title:'חמ״ל / מפעיל', actor:'חמ״ל — משתמש מחובר', audience:'chamal', legacy:'commander', responsibilities:['תמונת מצב כללית','אמינות נתונים ו-Sync','כפילויות ודיווחים חיצוניים','תמיכה בחוג"ד / מ״פ רפואה','ייצוא סיכום אירוע חי']},
     admin:{title:'מנהל דמו', actor:'מנהל דמו', audience:'chamal', legacy:'roles', responsibilities:['הפעלת תרחיש חתום','ניקוי דמו','ייצוא ניסוי','בדיקת הרשאות','הפרדת דמו מנתוני אמת']},
-    rpc:{title:'מ״מ — תמונת מצב טקטית וסמכות אתר', actor:'מ״מ — משתמש מחובר', audience:'rpc', legacy:'role-dashboard', responsibilities:['צפייה בתג, מיון, אזור, לכוד/נייד וסטטוס פינוי לפצועי המחלקה שלי בלבד','צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע — לזיהוי פיזי בשטח','ראיית חובש אחראי לכל פצוע (כינוי קריאה בלבד, לא שם)','סדר פינוי מומלץ למחלקה שלי, זהה למה שחוג"ד/מ״פ רפואה רואים','ספירות מיון מצטברות למחלקה','ללא גישה למדדים, טיפול או מנגנון פציעה','לא מגיש בקשות תגבור / אספקה','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה']},
-    rcc:{title:'מ״פ חילוץ — תמונת מצב מרוכזת וסמכות אתר', actor:'מ״פ חילוץ — משתמש מחובר', audience:'rcc', legacy:'role-dashboard', responsibilities:['תמונת מצב מרוכזת לפי מחלקות עבור הפלוגה שלי','צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע — לזיהוי פיזי בשטח','ספירות מיון, לכודים וסטטוס פינוי לכל מחלקה','סדר פינוי מומלץ לכלל הפלוגה, זהה למה שמ״פ רפואה רואה','צפייה בבקשות אספקה פתוחות (לוגיסטיקת פלוגת חילוץ)','ללא גישה למדדים, טיפול או מנגנון פציעה','לא מגיש בקשות תגבור רפואי','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה']}
+    rpc:{title:'מ״מ — תמונת מצב טקטית וסמכות אתר', actor:'מ״מ — משתמש מחובר', audience:'rpc', legacy:'role-dashboard', responsibilities:['צפייה בתג, עדיפות פינוי (דחוף / לא דחוף), אזור, לכוד/נייד וסטטוס פינוי לפצועי המחלקה שלי בלבד','צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע — לזיהוי פיזי בשטח','ראיית חובש אחראי לכל פצוע (כינוי קריאה בלבד, לא שם)','סדר פינוי מומלץ למחלקה שלי, זהה למה שחוג"ד/מ״פ רפואה רואים','ספירות דחוף / לא דחוף מצטברות למחלקה','ללא גישה לצבע מיון, חסם, מדדים, טיפול או מנגנון פציעה','לא מגיש בקשות תגבור / אספקה','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה']},
+    rcc:{title:'מ״פ חילוץ — תמונת מצב מרוכזת וסמכות אתר', actor:'מ״פ חילוץ — משתמש מחובר', audience:'rcc', legacy:'role-dashboard', responsibilities:['תמונת מצב מרוכזת לפי מחלקות עבור הפלוגה שלי','צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע — לזיהוי פיזי בשטח','ספירות דחוף / לא דחוף, לכודים וסטטוס פינוי לכל מחלקה','סדר פינוי מומלץ לכלל הפלוגה, זהה למה שמ״פ רפואה רואה','צפייה בבקשות אספקה פתוחות (לוגיסטיקת פלוגת חילוץ)','ללא גישה לצבע מיון, חסם, מדדים, טיפול או מנגנון פציעה','לא מגיש בקשות תגבור רפואי','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה']}
   }[role] || roleConfig('medic');
 }
 function roleMetric(n,l){ return `<div class="role-metric"><div class="role-metric-num">${n}</div><div class="role-metric-label">${l}</div></div>`; }
@@ -7054,7 +7112,12 @@ function showRoleDrilldown(key){
 // the overall triage bucket. Extracted unchanged from the original companyEvacuationPriorityRows
 // so its existing behavior (and the CC "תעדוף פינוי פלוגתי" panel that already ships it) is
 // untouched - only pulled out so PC/CC full patient-list sorting can reuse the same ranking.
+// Deceased (status deceased, or black) always last in the evacuation order, below everyone still
+// in care and below not-yet-sorted, whatever else is recorded (owner, 2026-10-23). The server's
+// get_rescue_patient_board() applies the same rule (database/074).
+function isDeceasedForEvac(p={}){ return p.patientStatus==='deceased' || triageKey(p.triage)==='black'; }
 function evacuationPriorityRank(p){
+  if(isDeceasedForEvac(p)) return {rank:5, reason:'נפטר — אחרון בסדר הפינוי', tqMin:null, tqRemaining:null};
   const tqMin=p.tourniquet?.appliedAt ? Math.floor((Date.now()-p.tourniquet.appliedAt)/60000) : null;
   const tqRemaining=tqMin!==null ? Math.max(0,120-tqMin) : null;
   let rank=4, reason='מעקב רגיל';
@@ -7090,6 +7153,7 @@ function companyEvacuationPriorityRows(pts=patients){
 const EVAC_COLOR_ORDER = {red:0, yellow:1, green:2, black:3, pending:4, unknown:4};
 function evacuationSortScore(p){
   const {rank, tqMin} = evacuationPriorityRank(p);
+  if(rank===5) return 9000;
   if(rank<4) return rank*1000 - (tqMin||0);
   const color = EVAC_COLOR_ORDER[triageKey(p.triage)] ?? 4;
   return 4000 + color;
@@ -7097,26 +7161,18 @@ function evacuationSortScore(p){
 function sortedPatientsByEvacPriority(list=patients){
   return [...list].sort((a,b)=>evacuationSortScore(a)-evacuationSortScore(b) || String(a.id).localeCompare(String(b.id)));
 }
-// rpc/rcc evacuation-order panel: same ranking/order PC/CC already use (sortedPatientsByEvacPriority),
-// so rescue-chain and medical command never disagree about who's evacuated first. The rank-0/1
-// (tourniquet) reason text is kept verbatim since tourniquet status is already something rpc/rcc
-// see and report themselves; rank-2's reason normally cites AVPU/respiratory rate, which is vitals
-// detail outside rpc/rcc's scope, so that one gets replaced with a non-clinical label.
-function rescueEvacReason(rank, reason){
-  if(rank===0 || rank===1) return reason;
-  if(rank===2) return 'אדום — פינוי בעדיפות';
-  if(rank===3) return 'צהוב מיוצב';
-  return 'מעקב רגיל';
-}
+// rpc/rcc evacuation-order panel: same order PC/CC use (signed in, computed by the server in
+// get_rescue_patient_board(); otherwise sortedPatientsByEvacPriority), so rescue-chain and medical
+// command never disagree about who is evacuated first. No reason text: it would name the
+// tourniquet, the colour or the vitals behind the order (database/074). Only the priority shows.
 function renderRescueEvacOrderPanel(pts, title){
-  const ordered=sortedPatientsByEvacPriority(pts);
+  const ordered=rescueSortedForEvac(pts.filter(p=>rescueEvacStateOf(p)!=='evacuated'));
   const rows=ordered.map((p,i)=>{
-    const {rank,reason}=evacuationPriorityRank(p);
-    const triage=triageKey(p.triage);
-    return `<div class="role-row" style="border-color:var(--${triage==='black'?'muted':triage})">
-      <div class="role-row-title"><span style="font-family:var(--mono);color:var(--accent);font-weight:900">#${i+1}</span> · ${p.visualId||p.id} · ${TRIAGE_LABELS[p.triage]||p.triage}</div>
+    const prio=rescuePriorityOf(p);
+    return `<div class="role-row" style="border-color:${RESCUE_PRIORITY_COLORS[prio]}" data-rescue-priority="${prio}">
+      <div class="role-row-title"><span style="font-family:var(--mono);color:var(--accent);font-weight:900">#${i+1}</span> · ${p.visualId||p.id} · ${RESCUE_PRIORITY_LABELS[prio]}</div>
       <div class="role-row-sub">${rescueIdentityLine(p)}</div>
-      <div class="role-row-sub" style="margin-top:2px;color:var(--muted)">${rescueEvacReason(rank,reason)} · ${p.location||'אזור לא תועד'} · ${STATUS_LABELS[p.patientStatus]||''}</div>
+      <div class="role-row-sub" style="margin-top:2px;color:var(--muted)">${p.location||'אזור לא תועד'} · ${TRAP_LABELS[p.trapStatus]||'לא תועד'} · ${RESCUE_EVAC_LABELS[rescueEvacStateOf(p)]}</div>
     </div>`;
   }).join('');
   return roleSection(title, rows || roleRow('אין פצועים ברשימה',''));
@@ -7623,15 +7679,14 @@ function renderRoleDashboard(role=activeRoleDashboard){
   }else if(role==='logistics'){
     objects=[
       roleRow('סוג אירוע', incidentTypeLabel(currentSiteId())),
-      ...logisticsCompanies().map(c=>roleRow(c.name,`${c.lowItems.length} פריטים מתחת לסף · ${c.patients} פצועים מקושרים`))
+      ...logisticsCompanies().map(c=>roleRow(c.name,`${c.lowItems.length} פריטים מתחת לסף · ${c.consumed} שימושים בציוד`))
     ].join('');
   }else if(role==='rpc'){
-    const c={red:0,yellow:0,green:0,black:0,trapped:0};
-    pts.forEach(p=>{ if(c[p.triage]!==undefined) c[p.triage]++; if(p.trapStatus==='trapped') c.trapped++; });
+    const c=rescuePriorityCounts(pts);
     objects=[
       myPlatoonRow(),
-      roleRow('ספירת מיון — מחלקה שלי',`אדום ${c.red} · צהוב ${c.yellow} · ירוק ${c.green} · שחור ${c.black} · לכודים ${c.trapped}`),
-      ...pts.slice(0,10).map(tacticalPatientRow)
+      roleRow('עדיפות פינוי — מחלקה שלי',`דחוף ${c.urgent} · לא דחוף ${c.not_urgent} · טרם מוין ${c.pending} · לכודים ${c.trapped} · פונו ${c.evacuated}`),
+      ...rescueSortedForEvac(pts).slice(0,10).map(tacticalPatientRow)
     ].join('');
   }else if(role==='rcc'){
     const myPlatoonIds=commandPlatoons().filter(pl=>pl.companyId==='COMP-1').map(pl=>pl.platoonId);
@@ -7689,7 +7744,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
     ${rescueAuthorityPanel}
     ${rescueEvacOrderPanel}
     ${roleSection('התראות שדורשות פעולה ממני', alertHtml)}
-    ${roleSection(role==='pc'?'האובייקטים שלי: חובשים / פצועים / מוקדים':role==='cc'?'האובייקטים שלי: מחלקות / מוקדים / משאבים':role==='physician'?'תור סקירה רפואית':role==='logistics'?'מלאי ובקשות ציוד':role==='rpc'?'תמונה טקטית — מחלקה שלי (ללא מדדים)':role==='rcc'?'תמונה טקטית מרוכזת — פלוגה שלי (ללא מדדים)':'האובייקטים שלי', objects)}
+    ${roleSection(role==='pc'?'האובייקטים שלי: חובשים / פצועים / מוקדים':role==='cc'?'האובייקטים שלי: מחלקות / מוקדים / משאבים':role==='physician'?'תור סקירה רפואית':role==='logistics'?'מלאי ובקשות ציוד':role==='rpc'?'תמונה טקטית — מחלקה שלי (ללא מידע קליני)':role==='rcc'?'תמונה טקטית מרוכזת — פלוגה שלי (ללא מידע קליני)':'האובייקטים שלי', objects)}
     ${roleSection('בקשות / הקצאות פתוחות', reqHtml)}
     <div class="demo-actions" style="margin:0;grid-template-columns:1fr 1fr">${actions}</div>`;
   const body=document.getElementById('role-dashboard-body');
@@ -8135,8 +8190,14 @@ function renderDashboard(){
 
   const evacTotal=(siteData.initialEvacuation.green||0)+(siteData.initialEvacuation.yellow||0)+(siteData.initialEvacuation.red||0);
   const evacNote=evacTotal ? `<div class="patient-card green" style="cursor:pointer" onclick="openPreEvacuationSheet()"><div class="patient-id">MASS</div><div class="patient-info"><div style="font-weight:700">פונו לפני הגעת כוח רפואי</div><div style="margin-top:2px">${preEvacSummaryHtml({compact:true})}</div><div class="patient-badges"><span class="triage-pill green">מונה מוקד</span><span class="badge badge-muted">לא רשומת פצוע</span></div></div></div>` : '';
-  const active=sortedPatientsByColorThenUrgency(patients.filter(p=>!['evacuating','evacuated','handed_over'].includes(p.patientStatus)).filter(patientMatchesBoardFilter));
-  document.getElementById('patient-list').innerHTML=evacNote+active.map(p=>{
+  const onSite=patients.filter(p=>!['evacuating','evacuated','handed_over'].includes(p.patientStatus)).filter(patientMatchesBoardFilter);
+  const mine=sortedPatientsByColorThenUrgency(onSite.filter(isPatientHandledByMe));
+  const others=sortedPatientsByColorThenUrgency(onSite.filter(p=>!isPatientHandledByMe(p)));
+  const active=[...mine, ...others];
+  const groupLabel=(text,count,id)=>`<div class="section-label" id="${id}" style="padding-top:6px">${text} (${count})</div>`;
+  document.getElementById('patient-list').innerHTML=evacNote+active.map((p,i)=>{
+    const heading=(mine.length && others.length && i===0) ? groupLabel('טיפלתי',mine.length,'my-patients-label')
+      : (mine.length && others.length && i===mine.length) ? groupLabel('פצועים נוספים באתר',others.length,'other-patients-label') : '';
     const timer=vitalsTimerLabel(p);
     const tq=tourniquetTimerLabel(p);
     const det=p.deterioration&&p.deterioration.length;
@@ -8144,13 +8205,14 @@ function renderDashboard(){
     const triage=triageKey(p.triage);
     const activeAlert=p.alert===true && !p.alertAcknowledgedAt;
     const ageBand=ageBandOf(p);
-    return `<div class="patient-card ${triage} ${activeAlert?'active-alert':''}" onclick="openPatient('${p.id}')">
+    return `${heading}<div class="patient-card ${triage} ${activeAlert?'active-alert':''}" onclick="openPatient('${p.id}')" data-mine="${isPatientHandledByMe(p)?'1':'0'}">
       <div class="patient-id">${p.visualId||p.id}</div>
       <div class="patient-info">
         ${triageBand(p.triage,p)}
         <div style="font-weight:900">${p.location}${p.locDetail?' · '+p.locDetail:''}</div>
         <div style="font-size:12px;color:var(--muted);margin-top:2px">${p.injury} · ${STATUS_LABELS[p.patientStatus]||''}</div>
         <div class="patient-badges">
+          ${isPatientHandledByMe(p)?'<span class="badge badge-accent">✓ טיפלתי</span>':''}
           <span class="badge ${['stabilizing','in_treatment'].includes(p.patientStatus)?'badge-green':['evacuating','evacuated'].includes(p.patientStatus)?'badge-accent':p.patientStatus==='deceased'?'badge-red':'badge-muted'}">${STATUS_LABELS[p.patientStatus]||''}</span>
           <span class="badge badge-muted">${TRAP_LABELS[normalizeTrapStatus(p)]||'לא תועד'}</span>
           ${p.needsFullAssessment?'<span class="badge badge-orange">חסר הערכה</span>':''}
@@ -12327,7 +12389,7 @@ function renderLogisticsTaskBoard(){
   if(truckTq<=tqThreshold.warning || activeBleedingPatients.length || tqPatients.length>=2){
     tasks.push({
       title:'חסמים נמוכים ברכב חוג״ד א׳',
-      detail:`${truckTq} חסמים נותרו · ${activeBleedingPatients.length||tqPatients.length} פצועים עם דימום פעיל/חסם`,
+      detail:`${truckTq} חסמים נותרו`, // no patient detail on the logistics board (database/074)
       reason:'טיפול בדימום מסכן חיים תלוי בזמינות חסמים ברכב חוג״ד.',
       action:`המלצה: העבר ${Math.max(0,(tqThreshold.recommendedMin||12)-truckTq)} חסמים מרכב מחלקה ב׳ / בקש השלמה פלוגתית`,
       urgency:truckTq<=tqThreshold.critical?'CRITICAL':'HIGH',
@@ -12345,7 +12407,7 @@ function renderLogisticsTaskBoard(){
     tasks.push({
       title:`בקשת ציוד פתוחה · ${first?supplyLabel(first):'ציוד רפואי'}`,
       detail:`${r.requestedByName||'חוג״ד'} → ${r.zone||r.targetLocation||siteData.name||'מוקד'} · פתוח ${minutesSinceIso(r.createdAt)} דק׳`,
-      reason:r.linkedPatientId?`מקושר לפצוע ${r.linkedPatientId}`:'בקשה ידנית/מבצעית לציוד',
+      reason:r.linkedPatientId?'בקשה מהשטח לטיפול בפצוע':'בקשה ידנית/מבצעית לציוד',
       action:r.truckAvailability==='available'?'המלצה: שלח מרכב חוג״ד וסמן נשלח':'המלצה: הסלם למ״פ / לוגיסטיקה',
       urgency:minutesSinceIso(r.createdAt)>=4?'HIGH':'MEDIUM',
       itemTypes:(r.items||[]).map(x=>normalizeSupplyItem(x.item)).filter(Boolean),
@@ -12361,7 +12423,7 @@ function renderLogisticsTaskBoard(){
     tasks.push({
       title:`${SUPPLY_LABELS[item.item]||item.item} מתחת לסף · ${company.name}`,
       detail:`${item.qty} נותרו · יעד: רכב חוג״ד / ${company.name}`,
-      reason:`${company.patients} פצועים מקושרים · ${company.consumed} פעולות טיפול`,
+      reason:`${company.consumed} שימושים בציוד`,
       action:'המלצה: נתח burn rate והעבר ציוד ממקור פנוי',
       urgency:item.qty<=0?'CRITICAL':'MEDIUM',
       itemTypes:[item.item],
@@ -12435,13 +12497,13 @@ function renderLogisticsOfficer(){
     const payload=event.payload_json||{};
     const item=payload.item||payload.item_type;
     const qty=Math.abs(Number(payload.quantity_delta)||1);
-    const rawPid=payload.patient_id||payload.linkedPatientId;
-    const patientId=rawPid ? (patients.find(p=>p.id===rawPid)?.visualId||rawPid) : 'ללא פצוע';
+    // Logistics sees the bag, not the patient the item was used on (database/074).
+    const holder=event.remote ? 'תיק חובש (מכשיר אחר)' : 'תיק חובש';
     const time=event.local_timestamp?new Date(event.local_timestamp).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):'--:--';
     return `<div class="cmd-matrix-row">
       <div>
         <div class="cmd-matrix-title">${supplyLabel(item)} · x${qty}</div>
-        <div class="cmd-matrix-sub">${patientId} · ${time}</div>
+        <div class="cmd-matrix-sub">${holder} · ${time}</div>
       </div>
     </div>`;
   }).join(''):renderOperationalEmptyState('אין משימות לוגיסטיקה במיקוד הנוכחי','אין צריכות ציוד רשומות עדיין');
@@ -12468,7 +12530,7 @@ function renderLogisticsOfficer(){
     return `<div class="cmd-matrix-row ${state==='CRITICAL'?'critical':''}">
       <div>
         <div class="cmd-matrix-title">${c.name} · ${c.id}</div>
-        <div class="cmd-matrix-sub">${c.patients} פצועים מקושרים · ${c.consumed} פעולות טיפול · ${state}</div>
+        <div class="cmd-matrix-sub">${c.consumed} שימושים בציוד · ${state}</div>
         <div class="cmd-logistics">${logistics}</div>
       </div>
       <div class="cmd-matrix-counts"><span class="${state==='OK'?'':'low'}">${state}</span></div>
@@ -13720,6 +13782,7 @@ function saveLocalEvent(event){
   // regardless of which convention the caller used.
   entry.patient_id = entry.patient_id || entry.payload_json?.patient_id || entry.payload_json?.patientId || null;
   if(entry.patient_id) entry.payload_json = {...(entry.payload_json||{}), patient_id:entry.patient_id};
+  if(entry.patient_id && HANDS_ON_EVENT_TYPES.has(entry.type)) markPatientHandled(entry.patient_id);
   // Tag which site/incident this event belongs to, resolved at creation time (prefer the
   // relevant patient's own siteId when the caller passed one, else the active site context).
   entry.siteId = entry.siteId || entry.payload_json?.siteId || currentSiteId();
@@ -14979,6 +15042,7 @@ async function pullProjectedPatientState(incidentId){
   if(!currentUser) return;
   const client=getSupabaseClient();
   if(!client) return;
+  if(RESCUE_SERVER_ROLES.has(currentUser.role)) return pullRescuePatientBoard(client, incidentId);
   let result;
   try{ result=await client.from('patients').select(PROJECTED_PATIENT_COLUMNS).eq('incident_id', incidentId); }
   catch(e){ return; } // offline/network failure — next interval retries
@@ -14989,6 +15053,67 @@ async function pullProjectedPatientState(incidentId){
   catch(e){ return; }
   if(tqResult.error || !tqResult.data) return;
   applyServerTourniquets(tqResult.data, incidentId);
+}
+// ── Rescue chain patient board (database/074) ──
+// rpc / rcc cannot read the patients table, the tourniquets table or clinical events. Their
+// patients come from get_rescue_patient_board(): identity, location, access (trapped), evacuation
+// state, priority (urgent / not urgent / not sorted) and the place in the evacuation order, all
+// set by the server. A patient this phone reported itself keeps what it reported (its own data).
+const RESCUE_SERVER_ROLES=new Set(['rpc','rcc']);
+const RESCUE_BOARD_PRIORITIES=new Set(['urgent','pending','not_urgent']);
+const RESCUE_BOARD_EVAC_STATES=new Set(['on_site','evacuating','evacuated']);
+async function pullRescuePatientBoard(client, incidentId){
+  let result;
+  try{ result=await client.rpc('get_rescue_patient_board', {p_incident_id:incidentId}); }
+  catch(e){ return; } // offline/network failure - next interval retries
+  if(result.error || !Array.isArray(result.data)) return;
+  applyRescuePatientBoard(result.data, incidentId);
+}
+function applyRescuePatientBoard(rows, incidentId){
+  const pending=patientsWithPendingLocalEdits();
+  let changed=false;
+  for(const row of rows){
+    if(!row || !row.id) continue;
+    const access=accessibilityFromServerStatus(row.access_status);
+    const priority=RESCUE_BOARD_PRIORITIES.has(row.priority) ? row.priority : 'pending';
+    const evacState=RESCUE_BOARD_EVAC_STATES.has(row.evac_state) ? row.evac_state : 'on_site';
+    const order=Number.isFinite(Number(row.evac_order)) ? Number(row.evac_order) : null;
+    const raw=(row.location_json && typeof row.location_json==='object') ? row.location_json : {};
+    const loc={zone:sanitizeRemoteText(raw.zone), detail:sanitizeRemoteText(raw.detail), label:sanitizeRemoteText(raw.label)};
+    let p=patients.find(x=>x.id===row.id);
+    if(!p){
+      p={
+        id:row.id, visualId:row.visual_id, triage:null, accessibility:access.accessibility, trapStatus:access.trapStatus,
+        location:loc.label||loc.zone||REMOTE_LOCATION_PLACEHOLDER, zone:loc.zone||'', locDetail:loc.detail||'',
+        injury:null, injuryZones:[], patientStatus:'identified', needsFullAssessment:false,
+        fullName:row.optional_name||'לא מזוהה', identityStatus:row.optional_name?'reported':'unknown', temporaryDescription:row.identifying_description||'',
+        assignedMedicId:null, assignedPlatoonId:null, tempPatientId:null, stockSnapshot:{}, lastTouchedBy:'(remote)',
+        lastModifiedAt:new Date().toISOString(), confirmedClinical:true, unsyncedEvents:0, locationHistory:[], possibleDuplicate:false,
+        time:'', vitals:{...VITALS_NOT_ON_DEVICE}, vitalsCapture:null, txHistory:[], alert:false, deterioration:[], lastVitalsAt:null,
+        vitalsHistory:[], tourniquet:null, medic:'(remote)', siteId:INCIDENT_ID_TO_SITE[incidentId]||'SITE_A', sourcedFromRemote:true,
+        rescuePriority:priority, rescueEvacState:evacState, rescueEvacOrder:order, _serverVersion:row.version,
+        events:[{type:'REMOTE_PATIENT_DISCOVERED',time:nowT(),detail:`${row.visual_id} התקבל מהשרת (תמונה טקטית)`}]
+      };
+      patients.push(p);
+      changed=true;
+      continue;
+    }
+    const before=JSON.stringify([p.visualId,p.rescuePriority,p.rescueEvacState,p.rescueEvacOrder,p.trapStatus,p.fullName,p.temporaryDescription,p.location,p.locDetail]);
+    if(row.visual_id) p.visualId=row.visual_id;
+    p.rescuePriority=priority; p.rescueEvacState=evacState; p.rescueEvacOrder=order;
+    if(!pending.has(p.id)){
+      if(access.trapStatus){ p.accessibility=access.accessibility; p.trapStatus=access.trapStatus; }
+      p.fullName=row.optional_name||'לא מזוהה';
+      p.identityStatus=row.optional_name?'reported':'unknown';
+      p.temporaryDescription=row.identifying_description||'';
+      if(loc.zone) p.zone=loc.zone;
+      if(loc.detail) p.locDetail=loc.detail;
+      if(loc.label) p.location=loc.label;
+    }
+    p._serverVersion=row.version;
+    if(before!==JSON.stringify([p.visualId,p.rescuePriority,p.rescueEvacState,p.rescueEvacOrder,p.trapStatus,p.fullName,p.temporaryDescription,p.location,p.locDetail])) changed=true;
+  }
+  if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
 // Active tourniquets from the server (tourniquets table, RLS-scoped by app.can_access_incident).
 // Applied only to patients this device received from another device: a patient created here
@@ -15568,6 +15693,8 @@ function applyServerSupplyDecisionsToOwnRequests(rows){
 // inventory_ledger_v12 rows of the incident, newest first: every medic bag and PC truck movement
 // that reached the server, with the holder's count after it. Read directly (RLS: incident
 // members), as a separate query so the supply queue above is unaffected if it fails.
+// The logistics officer reads the same rows through get_incident_stock_movements(), which leaves
+// out the patient each item was used on (database/074: logistics sees bags, not patients).
 let _incidentInventory={}; // incidentId -> rows
 const INVENTORY_LEDGER_COLUMNS='item_type,movement_type,quantity_delta,stock_owner,stock_after,actor_id,device_id,local_event_id,patient_id,occurred_at,created_at,stock_seq:payload_json->>stock_seq';
 async function pullIncidentInventory(incidentId){
@@ -15575,7 +15702,11 @@ async function pullIncidentInventory(incidentId){
   const client=getSupabaseClient();
   if(!client) return;
   let r;
-  try{ r=await client.from('inventory_ledger_v12').select(INVENTORY_LEDGER_COLUMNS).eq('incident_id',incidentId).order('occurred_at',{ascending:false}).limit(2000); }
+  try{
+    r=currentUser.role==='logistics_officer'
+      ? await client.rpc('get_incident_stock_movements', {p_incident_id:incidentId})
+      : await client.from('inventory_ledger_v12').select(INVENTORY_LEDGER_COLUMNS).eq('incident_id',incidentId).order('occurred_at',{ascending:false}).limit(2000);
+  }
   catch(e){ return; }
   if(r.error || !Array.isArray(r.data)) return;
   // Newest first: the phone's time, then its own sequence for movements in the same millisecond.

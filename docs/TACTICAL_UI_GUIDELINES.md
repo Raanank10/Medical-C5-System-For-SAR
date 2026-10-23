@@ -133,6 +133,8 @@ The timer must stay visible in:
 - commander row
 - AAR / incident summary
 
+The rescue chain (מ״מ, מ״פ חילוץ) does not see it (owner, 2026-10-23, `database/074`): tourniquet status is clinical. A patient with an active tourniquet still shows to them as **urgent** and comes first in their evacuation order, from the same ranking medical command uses.
+
 The timer is not passive history. It is an active risk clock.
 
 The phone alerts on its own clock (D1, repo owner, 2026-10-20), with or without a server connection: at 45, 60 and 120 minutes from application, once per level per tourniquet, it vibrates (where the browser supports it) and shows a banner that stays until tapped and opens the patient (`checkTourniquetTimeAlerts`, rule `tourniquetAlertToRaise` in `src/domain/rules.js`). It does not wait for the server's reassessment watchdog. Limits of a web page: iOS Safari has no vibration API, and a locked phone or a backgrounded browser pauses the page, so the alert fires when the app is opened again (only the current level, not every level missed).

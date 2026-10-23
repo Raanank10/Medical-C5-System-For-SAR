@@ -41,14 +41,15 @@ for (const rel of files) {
   assert(html.includes('function medicCallsign(idOrName){'), `${rel}: medicCallsign missing`);
   assert(html.includes("return user ? user.callsign : 'לא משויך';"), `${rel}: medicCallsign must still redact to callsign only`);
 
-  // Evacuation-order panel: same ranking/order PC/CC already use (sortedPatientsByEvacPriority),
-  // so rescue-chain and medical command never disagree about evacuation sequence. Tourniquet
-  // reason stays verbatim (rpc/rcc already see/report tourniquet status); the vitals-derived
-  // rank-2 reason (AVPU/RR) is redacted to a non-clinical label.
-  assert(evacPanelFn.includes('sortedPatientsByEvacPriority(pts)'), `${rel}: renderRescueEvacOrderPanel must reuse the shared evac-priority sort, not a separate ranking`);
-  assert(html.includes('function rescueEvacReason(rank, reason){'), `${rel}: rescueEvacReason missing`);
-  assert(html.includes("if(rank===0 || rank===1) return reason;"), `${rel}: tourniquet-based reason (rank 0/1) must stay verbatim for rpc/rcc`);
-  assert(html.includes("if(rank===2) return 'אדום — פינוי בעדיפות';"), `${rel}: rank-2 (vitals-derived) reason must be redacted for rpc/rcc`);
+  // Evacuation-order panel: same order PC/CC use (the server's get_rescue_patient_board() order
+  // signed in, otherwise the shared sortedPatientsByEvacPriority), so rescue-chain and medical
+  // command never disagree about evacuation sequence. Since database/074 (owner, 2026-10-23) the
+  // rescue chain sees no clinical data: only urgent / not urgent, no colour, no tourniquet reason.
+  assert(evacPanelFn.includes('rescueSortedForEvac('), `${rel}: renderRescueEvacOrderPanel must use the shared rescue evac order`);
+  assert(html.includes('return [...ranked, ...sortedPatientsByEvacPriority(pts.filter(p=>!Number.isFinite(p.rescueEvacOrder)))];'), `${rel}: patients the server has not ranked must fall back to the shared evac-priority sort`);
+  assert(!html.includes('function rescueEvacReason('), `${rel}: no evacuation reason text for rpc/rcc (it names the tourniquet or the vitals)`);
+  assert(evacPanelFn.includes('RESCUE_PRIORITY_LABELS[prio]') && !evacPanelFn.includes('TRIAGE_LABELS'), `${rel}: evac-order panel shows priority, never the triage colour`);
+  assert(!tacticalFn.includes('TRIAGE_LABELS'), `${rel}: tacticalPatientRow must not show the triage colour`);
   assert(evacPanelFn.includes('rescueIdentityLine(p)'), `${rel}: evac-order panel rows must show patient identity`);
 
   // Wired into renderRoleDashboard for rpc/rcc only, scoped via the existing roleScopedPatients
@@ -58,15 +59,14 @@ for (const rel of files) {
   assert(roleDashboardFn.includes("role==='rcc'?renderRescueEvacOrderPanel(pts,'סדר פינוי מומלץ — כלל הפלוגה')"), `${rel}: rcc must render the evac-order panel scoped to the whole company`);
   assert(roleDashboardFn.includes('${rescueEvacOrderPanel}'), `${rel}: rescueEvacOrderPanel must be spliced into the rendered sections`);
 
-  // The old "(ללא מדדים / זהות)" section title is now stale since identity is shown -
-  // must read "(ללא מדדים)" only.
-  assert(roleDashboardFn.includes('תמונה טקטית — מחלקה שלי (ללא מדדים)'), `${rel}: rpc tactical section title must drop the stale "identity" exclusion claim`);
-  assert(roleDashboardFn.includes('תמונה טקטית מרוכזת — פלוגה שלי (ללא מדדים)'), `${rel}: rcc tactical section title must drop the stale "identity" exclusion claim`);
+  // Section titles: identity is shown, clinical data is not (database/074).
+  assert(roleDashboardFn.includes('תמונה טקטית — מחלקה שלי (ללא מידע קליני)'), `${rel}: rpc tactical section title must say no clinical data`);
+  assert(roleDashboardFn.includes('תמונה טקטית מרוכזת — פלוגה שלי (ללא מידע קליני)'), `${rel}: rcc tactical section title must say no clinical data`);
   assert(!roleDashboardFn.includes('ללא מדדים / זהות'), `${rel}: no rpc/rcc section title should still claim identity is excluded`);
 
   // roleConfig responsibilities text updated to match (identity now owned, not excluded)
   assert(rpcConfig.includes('צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע'), `${rel}: rpc responsibilities must list identity visibility`);
-  assert(rpcConfig.includes('ללא גישה למדדים, טיפול או מנגנון פציעה'), `${rel}: rpc responsibilities must no longer claim identity is excluded`);
+  assert(rpcConfig.includes('ללא גישה לצבע מיון, חסם, מדדים, טיפול או מנגנון פציעה'), `${rel}: rpc responsibilities must exclude colour, tourniquet and clinical data, not identity`);
 
   console.log(`${rel}: Demo V2.9916 rpc/rcc evacuation order + identity visibility static smoke passed`);
 }
