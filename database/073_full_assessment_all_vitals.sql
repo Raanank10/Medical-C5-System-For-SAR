@@ -26,6 +26,10 @@
 -- a casualty that is black, deceased, handed over, closed or self-evacuated: those were cleared on
 -- purpose by the expectant / handover branches and stay as they are.
 -- Existing rows are not recomputed; the rule applies from the next event of each casualty.
+-- Applied live 2026-10-23 by the owner from the SQL editor; checked read-only right after: trigger
+-- enabled, order outbox > patient_state > vitals_completeness > refresh_command_state, neither
+-- function callable by anon/authenticated. Verified before applying on a local Postgres 16 stand-in
+-- (12 scenarios, PR #115); the rolled-back live run could not be executed from the session.
 -- Nothing here raises (same rule as 044/050/052/054/057): a raise in an AFTER INSERT trigger would
 -- roll back the event insert and lose the field record.
 
