@@ -37,6 +37,13 @@ per-table mapping notes below):
   - sectors and local_event_queue are not exported: db.py never queries
     sectors, and local_event_queue represents a device's own *unsynced*
     local queue, which by definition the server never sees.
+  - Tables and columns added live later (gap N10) go to their own SQLite
+    tables, so the original ones keep their shape: incident_details,
+    patient_evacuation (destination, MDA class, trap status), event_origins
+    (merged events), medical_resource_requests, supply_requests,
+    incident_pre_evacuations, incident_site_authority, external_reports,
+    external_patient_links and aar_reports (the report stored on each close).
+    Display names are not copied; actor ids join to profiles.
   - Several tables have columns with no live equivalent (documented inline
     per table below) - those are left as their SQLite column's own default
     or None rather than invented.
@@ -60,11 +67,14 @@ SUPABASE_URL = "https://btvvjmuwdzirjyauyijx.supabase.co"
 PAGE_SIZE = 1000
 
 
-def fetch_table(table: str, service_key: str, incident_id: str | None, incident_column: str = "incident_id") -> list[dict[str, Any]]:
-    """Fetch all rows of `table` via PostgREST, paginating with the Range header."""
+def fetch_table(table: str, service_key: str, incident_id: str | None, incident_column: str = "incident_id", op: str = "eq") -> list[dict[str, Any]]:
+    """Fetch all rows of `table` via PostgREST, paginating with the Range header.
+
+    `op` is the PostgREST operator for the filter: "eq" by default, "in" with a value like
+    "(id1,id2)" for a table with no incident_id of its own (external_patient_links)."""
     rows: list[dict[str, Any]] = []
     offset = 0
-    query = f"select=*" + (f"&{incident_column}=eq.{incident_id}" if incident_id else "")
+    query = f"select=*" + (f"&{incident_column}={op}.{incident_id}" if incident_id else "")
     while True:
         url = f"{SUPABASE_URL}/rest/v1/{table}?{query}"
         req = urllib.request.Request(url, headers={
@@ -190,15 +200,78 @@ def export_incident(incident_id: str, out_path: Path, service_key: str) -> None:
         (r["id"], r["incident_id"], r["actor_id"], r["created_at"], r["note_type"], r["note_text"] or "", r["source_event_id"]) for r in notes
     ])
 
+    export_newer_tables(conn, incident_id, service_key, incidents, patients, events)
+
     conn.commit()
     counts = {
         t: conn.execute(f"select count(*) from {t}").fetchone()[0]
-        for t in ["profiles", "incidents", "patients", "events", "tourniquets", "inventory_ledger", "watchdog_alerts", "device_presence", "device_sync_state", "sync_ingestion_errors", "conflict_log", "aar_context_notes"]
+        for t in ["profiles", "incidents", "patients", "events", "tourniquets", "inventory_ledger", "watchdog_alerts", "device_presence", "device_sync_state", "sync_ingestion_errors", "conflict_log", "aar_context_notes", *NEWER_TABLES]
     }
     conn.close()
     print(f"Exported incident {incident_id} to {out_path.resolve()}")
     for table, count in counts.items():
         print(f"  {table}: {count}")
+
+
+NEWER_TABLES = ["incident_details", "patient_evacuation", "event_origins", "medical_resource_requests", "supply_requests", "incident_pre_evacuations", "incident_site_authority", "external_reports", "external_patient_links", "aar_reports"]
+
+
+def export_newer_tables(conn: sqlite3.Connection, incident_id: str, service_key: str, incidents: list[dict[str, Any]], patients: list[dict[str, Any]], events: list[dict[str, Any]]) -> None:
+    """Tables and columns added live after the original SQLite schema (gap N10): evacuation and
+    MDA class, merge origin, requests, pre-evacuation, site authority, external reports and their
+    links, and the reports stored on each close (database/068). Each goes to its own SQLite table
+    (seed_demo_db.SCHEMA) so the existing ones keep their shape. Display names are not copied:
+    the actor ids join to profiles."""
+    # incidents: type, unit, finalize time and metadata (a merged duplicate keeps merged_into there).
+    insert_rows(conn, "incident_details", ["incident_id", "incident_type", "company_id", "platoon_id", "aar_finalized_at", "metadata_json"], [
+        (r["id"], r.get("incident_type"), r.get("company_id"), r.get("platoon_id"), r.get("aar_finalized_at"), j(r.get("metadata"))) for r in incidents
+    ])
+    # patients: where they were evacuated to and MDA's own classification beside field triage
+    # (database/043, 044), and the trapped / not trapped status.
+    insert_rows(conn, "patient_evacuation", ["patient_id", "incident_id", "evacuation_destination", "mda_classification", "evacuation_updated_at", "trap_status"], [
+        (r["id"], r["incident_id"], r.get("evacuation_destination"), r.get("mda_classification"), r.get("evacuation_updated_at"), r.get("trap_status")) for r in patients
+    ])
+    # events moved here by merge_incident() (D8) keep the incident they were recorded in.
+    insert_rows(conn, "event_origins", ["event_id", "incident_id", "origin_incident_id"], [
+        (r["id"], r["incident_id"], r["origin_incident_id"]) for r in events if r.get("origin_incident_id") and r["origin_incident_id"] != r["incident_id"]
+    ])
+
+    requests = fetch_table("medical_resource_requests", service_key, incident_id)
+    insert_rows(conn, "medical_resource_requests", ["id", "incident_id", "request_kind", "resource_type", "quantity", "urgency", "reason_codes_json", "linked_patient_ids_json", "target_location", "free_text", "auto_generated", "status", "status_history_json", "requested_by", "requested_by_role", "requested_at", "status_updated_by", "status_updated_by_role", "status_updated_at"], [
+        (r["id"], r["incident_id"], r["request_kind"], r["resource_type"], r["quantity"], r["urgency"], json.dumps(r.get("reason_codes") or []), json.dumps(r.get("linked_patient_ids") or []), r["target_location"], r["free_text"], b(r["auto_generated"]), r["status"], json.dumps(r.get("status_history") or []), r["requested_by"], r["requested_by_role"], r["requested_at"], r["status_updated_by"], r["status_updated_by_role"], r["status_updated_at"]) for r in requests
+    ])
+
+    supply = fetch_table("supply_requests", service_key, incident_id)
+    insert_rows(conn, "supply_requests", ["id", "incident_id", "requester_id", "status", "request_level", "approved_by_pc", "items_json", "eta_minutes", "requested_at", "dispatched_at", "in_transit_at", "delivered_at", "updated_at", "notes"], [
+        (r["id"], r["incident_id"], r["requester_id"], r["status"], r["request_level"], r["approved_by_pc"], json.dumps(r.get("items_json") or []), r["eta_minutes"], r["requested_at"], r["dispatched_at"], r["in_transit_at"], r["delivered_at"], r["updated_at"], r["notes"]) for r in supply
+    ])
+
+    pre = fetch_table("incident_pre_evacuations", service_key, incident_id)
+    insert_rows(conn, "incident_pre_evacuations", ["incident_id", "groups_json", "note", "light_count", "moderate_count", "severe_count", "total_count", "reported_by", "reported_by_role", "reported_at", "updated_by", "updated_by_role", "updated_at"], [
+        (r["incident_id"], json.dumps(r.get("groups") or []), r["note"], r["light_count"], r["moderate_count"], r["severe_count"], r["total_count"], r["reported_by"], r["reported_by_role"], r["reported_at"], r["updated_by"], r["updated_by_role"], r["updated_at"]) for r in pre
+    ])
+
+    site = fetch_table("incident_site_authority", service_key, incident_id)
+    insert_rows(conn, "incident_site_authority", ["incident_id", "official_t0", "official_by_role", "official_at", "building_status", "building_status_by_role", "building_status_at", "site_cleared_at", "site_cleared_by_role", "updated_at"], [
+        (r["incident_id"], r["official_t0"], r["official_by_role"], r["official_at"], r["building_status"], r["building_status_by_role"], r["building_status_at"], r["site_cleared_at"], r["site_cleared_by_role"], r["updated_at"]) for r in site
+    ])
+
+    reports = fetch_table("external_reports", service_key, incident_id)
+    insert_rows(conn, "external_reports", ["id", "incident_id", "source", "external_reference", "reported_red", "reported_yellow", "reported_green", "reported_black", "evacuation_destination", "notes", "created_by", "created_at", "updated_at"], [
+        (r["id"], r["incident_id"], r["source"], r["external_reference"], r["reported_red"], r["reported_yellow"], r["reported_green"], r["reported_black"], r["evacuation_destination"], r["notes"], r["created_by"], r["created_at"], r["updated_at"]) for r in reports
+    ])
+    # external_patient_links has no incident_id: fetched by this incident's report ids.
+    if reports:
+        links = fetch_table("external_patient_links", service_key, "(" + ",".join(r["id"] for r in reports) + ")", "external_report_id", op="in")
+        insert_rows(conn, "external_patient_links", ["id", "external_report_id", "patient_id", "match_score", "linked_by", "linked_at"], [
+            (r["id"], r["external_report_id"], r["patient_id"], float(r["match_score"]) if r.get("match_score") is not None else None, r["linked_by"], r["linked_at"]) for r in links
+        ])
+
+    # aar_reports: one locked, statistics-only version per close (database/068).
+    stored = fetch_table("aar_reports", service_key, incident_id)
+    insert_rows(conn, "aar_reports", ["id", "incident_id", "generated_by", "generated_at", "locked", "report_json"], [
+        (r["id"], r["incident_id"], r["generated_by"], r["generated_at"], b(r["locked"]), j(r["report_json"])) for r in stored
+    ])
 
 
 def main() -> int:

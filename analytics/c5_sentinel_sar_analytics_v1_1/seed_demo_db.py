@@ -174,6 +174,19 @@ create table conflict_log(id text primary key, incident_id text not null, patien
 create table incident_command_state(incident_id text primary key, snapshot_at text not null, total_patients integer not null, active_red_patients integer not null, unresolved_alerts integer not null, critical_alerts integer not null, active_medics integer not null, red_patients_per_active_medic real, missing_full_vitals integer not null, negative_stock_items integer not null, stale_devices integer not null);
 create table aar_context_notes(id text primary key, incident_id text not null, actor_id text not null, created_at text not null, note_type text not null, content text not null, related_event_id text);
 create table local_event_queue(id text primary key, device_id text not null, event_type text not null, payload_json text not null, created_at text not null, synced_at text);
+-- Filled by export_live_incident.py only (N10): tables and columns added live after this schema.
+-- Separate tables, not new columns, so the seed scripts' positional inserts keep working.
+-- Display names are left out (ids join to profiles); free text the live table holds is kept.
+create table incident_details(incident_id text primary key, incident_type text, company_id text, platoon_id text, aar_finalized_at text, metadata_json text not null default '{}');
+create table patient_evacuation(patient_id text primary key, incident_id text not null, evacuation_destination text, mda_classification text, evacuation_updated_at text, trap_status text);
+create table event_origins(event_id text primary key, incident_id text not null, origin_incident_id text not null);
+create table medical_resource_requests(id text primary key, incident_id text not null, request_kind text, resource_type text, quantity integer, urgency text, reason_codes_json text not null default '[]', linked_patient_ids_json text not null default '[]', target_location text, free_text text, auto_generated integer, status text, status_history_json text not null default '[]', requested_by text, requested_by_role text, requested_at text, status_updated_by text, status_updated_by_role text, status_updated_at text);
+create table supply_requests(id text primary key, incident_id text not null, requester_id text, status text, request_level text, approved_by_pc text, items_json text not null default '[]', eta_minutes integer, requested_at text, dispatched_at text, in_transit_at text, delivered_at text, updated_at text, notes text);
+create table incident_pre_evacuations(incident_id text primary key, groups_json text not null default '[]', note text, light_count integer, moderate_count integer, severe_count integer, total_count integer, reported_by text, reported_by_role text, reported_at text, updated_by text, updated_by_role text, updated_at text);
+create table incident_site_authority(incident_id text primary key, official_t0 text, official_by_role text, official_at text, building_status text, building_status_by_role text, building_status_at text, site_cleared_at text, site_cleared_by_role text, updated_at text);
+create table external_reports(id text primary key, incident_id text not null, source text, external_reference text, reported_red integer, reported_yellow integer, reported_green integer, reported_black integer, evacuation_destination text, notes text, created_by text, created_at text, updated_at text);
+create table external_patient_links(id text primary key, external_report_id text not null, patient_id text not null, match_score real, linked_by text, linked_at text);
+create table aar_reports(id text primary key, incident_id text not null, generated_by text, generated_at text not null, locked integer, report_json text not null default '{}');
 """
 
 if __name__ == "__main__":
