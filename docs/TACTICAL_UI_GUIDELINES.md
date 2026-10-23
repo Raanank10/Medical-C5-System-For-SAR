@@ -139,6 +139,20 @@ UI expectations:
 - no blocking spinner for primary capture
 - failed or delayed sync shown as status, not as user failure
 
+Sync freshness means the last answer from the server, not the last local save (V2.99.59). Signed in, every sync pill and the command strip show it: under 2 minutes "מחובר לשרת" (green), up to 5 minutes "עדכון אחרון מהשרת" (orange), beyond that, with no network or with no answer yet "אין קשר לשרת" (red), plus the number of events still waiting to be sent. The limits live in `serverContactFreshness` in `src/domain/rules.js`. Local demo mode says "מצב דמו · ללא שרת" and never claims a connection.
+
+## PC / CC Command Panel
+
+Since V2.99.59 the PC (חוג"ד) and CC (מ״פ רפואה) panels are a sticky status strip above four tabs instead of one long scroll.
+
+- Tabs, right to left: תמונת מצב, פעולה, כוחות, ציוד. Tap only, no swipe. Entering the panel always opens תמונת מצב; automatic re-renders (sync, acknowledgements) keep the tab the commander is on.
+- תמונת מצב: per site, how many patients by triage colour (red, yellow, green, black, trapped), split into three stages that must never be merged: still at the extraction site, at the site's evacuation point (נקודת פינוי) waiting for an ambulance, and evacuated by MDA / handed over. The evacuation point is where the PC truck stands; the PC's own site shows the truck stock there. Then the evacuation funnel and the evacuation priority list (platoon for PC, company for CC).
+- The strip, on every tab: server contact, the longest active tourniquet timer, unresolved blocked events (tap opens the full command screen's blocked-events panel), triage totals, and the alerts.
+- No alert may be visible only inside a tab. Every alert routed to the role (the alert pipeline, including server watchdog alerts) is in the strip, one line per patient, coloured by its most severe alert, most severe first. Collapsed, the strip shows the top line and "+N התראות"; tapping opens the rest inside the strip.
+- Tab badges count patients (a site-level alert counts once), from the same alert list; the UI only maps alert types to tabs and adds no rule logic.
+- The full command screen (חפ״ק) is reached from the "מסך בקרה מלא (חפ״ק)" button at the bottom of כוחות.
+- MARCH is not on the command panels: it belongs to the medic's and, when going hands-on, the PC's patient flow (backlog B2 in `GAP_CLOSURE_PLAN.md`).
+
 ## Production Watch Items
 
 Before field pilots, validate:

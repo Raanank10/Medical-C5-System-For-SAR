@@ -326,6 +326,20 @@ Add a CI job running `npm ci`, then every `scripts/browser_*.js` with the pre-in
 
 **Not done.** The 9 patients already lost on 2026-10-20 are still unresolved rows in `sync_ingestion_errors`; their phone can resend them from the patient card after this fix is live.
 
+### WP-18: Evacuation point: moving vs arrived, and how long patients wait (P2, owner 2026-10-23)
+
+**Why.** Owner, 2026-10-23: each site has its own evacuation point (נקודת פינוי), where rescued patients wait for an ambulance and where the PC truck and its supplies stand. Command must tell apart patients still at the extraction site, patients the rescuers are moving to the evacuation point, and patients evacuated by MDA. V2.99.59 shows three stages per site (extraction site / evacuation point / evacuated) from the existing `evacuating` status, and renamed "נקודת איסוף פלוגתית" to "נקודת פינוי" in the UI and docs.
+
+**Gap.**
+1. One status covers both "being moved to the evacuation point" and "waiting there"; there is no "arrived" step.
+2. Nothing records when a patient reached the evacuation point. `lastModifiedAt` changes on every update and local event times are HH:MM on the phone only, so the panel cannot show how long a patient has been waiting for an ambulance (and does not try).
+3. The PC truck stock is one stock per phone (demo) or per platoon (live), not tied to a site's evacuation point.
+4. Question for the owner: `companyEvacuationPriorityRows` leaves out patients at the evacuation point, so the evacuation priority list ranks only patients still at the extraction site. Should patients waiting for an ambulance be ranked for ambulance assignment too?
+
+**Approach (to agree before coding).** Server time of arrival from the event (`PATIENT_STATUS_UPDATED` with an arrival marker, or a new event type through the event contract), projected to `patients`; the panel then shows waiting time per patient and the longest wait on the site card, and a waiting-time alert only if the owner sets a threshold. Touches `sync-log`, the projection and the event contract, so its own PR.
+
+**Verify.** Browser test: a patient moved, then arrived, shows the right stage and waiting time on another phone; an offline phone's late push keeps the original arrival time.
+
 ---
 
 ## Tracks outside this plan's PRs
@@ -343,6 +357,7 @@ These need a decision, people or money rather than a code change in this repo. L
 ### Backlog
 
 - B1 (owner, 2026-10-21): Telegram notifications for critical alerts. Telegram first (free bot API, a server-side function sends the message when an alert is raised); WhatsApp later only if needed (needs Meta's Business API, approved templates, per-message cost). An extra channel only: the phone's own offline alert (D1) stays primary, since Telegram also needs a network. No patient details in the message (only "critical alert, incident X, open the app"), per `OPERATIONS_SAFETY.md` and the privacy review. Open questions for the owner before it starts: which alerts (proposal: 120-minute tourniquet, deterioration to red, death-certification request), and who receives them (role per incident).
+- B2 (owner, 2026-10-23): MARCH for the medic and, when they go hands-on, the PC (never the CC panel). Today the medic's MSTART sweep card labels only its first block "M — דימום מסכן חיים"; there are no A/R/C/H steps, and the treatment list has no chest seal, needle decompression or warming entry. Add those treatments first, then a tested `marchStatus()` in `src/domain/rules.js` (completion criteria need the owner's clinical sign-off), then an accordion on the medic's patient flow with M before A.
 
 ## Status
 
@@ -367,6 +382,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-16 Close ends access + stored AAR | P2 | PR A done (V2.99.52): 068 live (as 068, 068b, 068c), sync-log v12, verified 2026-10-22. PR B done (V2.99.53): 069 live, verified 2026-10-22 | #98, this PR | read policies on every patient table follow `app.can_read_incident_patients()` (closed = admin only); every close stores a statistics-only report (`aar_reports`, versioned); members and command read it via `get_incident_aar_reports()`; late records from offline phones accepted and counted; phones remove a closed incident's patients once all their records are sent; report screen "דוח סיכום"; PR B: an external report is linked to a patient later from its card (`EXTERNAL_REPORT_LINKED`, PC/CC/chamal/physician/admin, unlink too, never changes triage), direct client writes to `external_reports`/`external_patient_links` closed, stored report gains external reports and MDA vs field for linked casualties |
 | WP-15 Unused server tables | P3 | Done 2026-10-22: 070 live, verified | this PR | 9 tables to schema `archive` with their rows (nothing dropped; `aar_reports` stays, WP-16): `device_sync_state`, `experiment_observer_notes`, `high_risk_override_confirmations`, `patient_edit_conflicts`, `sync_event_dependencies`, `supply_request_items`, `treatment_catalog`, `treatment_inventory_items`, `realtime_outbox` (19 rows); outbox writes stopped (`apply_event_projection_and_outbox` keeps its `conflict_log` part, `trg_draft_incident_approval_outbox` disabled, not dropped); `merge_incident()` edited from its live definition to drop its statements on those tables; analytics export no longer fetches `device_sync_state` |
 | WP-17 Lost patients on a duplicate number | P0 | Client done (V2.99.51); `sync-log` deployed live as v13 on 2026-10-22 = the live v12 (D9, `database/068`, in `main` since V2.99.52) plus WP-17. Whoever deploys `sync-log` next must start from a file that has both; live two-phone check pending | this PR | found by the 2026-10-22 feature-map audit from live `sync_ingestion_errors`; ids carry the registrant's initials (owner decision); the server renames a clash instead of dropping the patient |
+| WP-18 Evacuation point arrival | P2 | Not started (owner 2026-10-23) | | V2.99.59 shows the three stages from the existing `evacuating` status; arrival time, moving vs arrived, and the evacuation-priority question are open |
 
 ## Revisions after #73 (2026-10-19)
 

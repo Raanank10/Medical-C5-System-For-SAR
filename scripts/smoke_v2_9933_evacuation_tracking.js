@@ -35,7 +35,9 @@ for (const rel of files) {
   assert(/saveLocalEvent\(\{type:'EXTERNAL_REPORT_CREATED'[\s\S]{0,900}?linked_patient_id/.test(html), `${rel}: reports must sync, with the patient link kept out of events.patient_id`);
 
   // Board by location on the PC and CC dashboards and the command screen.
-  assert(html.includes("${['pc','cc'].includes(role)?roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds(role))):''}"), `${rel}: PC and CC role dashboards must show the location board`);
+  // V2.99.59: the board is on the תמונת מצב tab of both command panels.
+  assert(html.includes("roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds('pc'), {truckSiteId:pcPlatoonSite()}))")
+    && html.includes("roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds('cc')))"), `${rel}: PC and CC role dashboards must show the location board`);
   assert(html.includes('id="cmd-location-board"') && html.includes('locations:true'), `${rel}: command screen must have the location board panel`);
   assert(html.includes("return role==='pc' ? [pcPlatoonSite()] : allSites.filter(s=>s.id!=='ALL').map(s=>s.id);"), `${rel}: board: CC (company) every site, PC (platoon) its own site`);
   assert(html.includes("renderCasualtyLocationBoard(cmdActiveSite==='ALL'?commandVisibleSites().filter(id=>id!=='ALL'):[cmdActiveSite])"), `${rel}: command screen board follows the command scope`);

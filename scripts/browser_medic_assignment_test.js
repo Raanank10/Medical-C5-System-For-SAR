@@ -187,6 +187,8 @@ async function checkFile(browser, file) {
   await pc.page.evaluate((id) => enterIncidentFromPicker(id), INC1);
   await pc.page.waitForTimeout(300);
   await pc.page.evaluate(() => startRoleDashboard('pc'));
+  // V2.99.59: the medic workload panels are on the PC panel's כוחות tab.
+  await pc.page.click('[data-cmd-tab="forces"]');
   await pc.page.waitForTimeout(200);
   await pc.page.locator('button:has-text("שייך חובש לאירוע")').first().click();
   await pc.page.waitForSelector('#medic-assign-real-wrap', { state: 'visible' });

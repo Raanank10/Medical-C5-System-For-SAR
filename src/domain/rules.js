@@ -24,6 +24,12 @@
   const TOURNIQUET_WARN_MS = 60 * 60 * 1000;
   const TOURNIQUET_CRITICAL_MS = 120 * 60 * 1000;
   const DEVICE_SILENCE_MS = 10 * 60 * 1000;
+  // Server contact freshness for the command status strip (repo owner, V2.99.59). The phone
+  // syncs every 45 seconds, so under 2 minutes since the last successful server response
+  // (one missed cycle) still reads as connected; up to 5 minutes is stale; beyond that, or
+  // when the device reports no network, or no server response yet, it is offline.
+  const SERVER_CONTACT_FRESH_MS = 2 * 60 * 1000;
+  const SERVER_CONTACT_STALE_MS = 5 * 60 * 1000;
   // Inventory burn-rate / stock-out risk, matching the KPI definitions in
   // docs/C5_SENTINEL_SAR_MVP_SPEC_v1.2.md ("Supply burn rate: items consumed per 10m",
   // "Stock-out risk: current stock / recent burn rate"). A warning-tier count is flagged well
@@ -132,6 +138,12 @@
 
   function isDeviceSilent(lastSeenMs, nowMs = Date.now()) {
     return !lastSeenMs || nowMs - lastSeenMs > DEVICE_SILENCE_MS;
+  }
+
+  function serverContactFreshness(lastServerOkMs, nowMs = Date.now(), online = true) {
+    const ageMs = Number.isFinite(lastServerOkMs) && lastServerOkMs > 0 ? Math.max(0, nowMs - lastServerOkMs) : null;
+    if (ageMs === null || online === false || ageMs > SERVER_CONTACT_STALE_MS) return { level: "offline", ageMs };
+    return { level: ageMs <= SERVER_CONTACT_FRESH_MS ? "fresh" : "stale", ageMs };
   }
 
   function supplyCriticalThreshold(warningThreshold) {
@@ -263,9 +275,10 @@
   }
 
   // Statuses a patient's record must not be silently overwritten out of once reached.
-  // Deliberately excludes "evacuating": a patient who has left the site for the company
-  // collection point is still under the platoon commander's supervision awaiting final
-  // handover to MDA, so status must still be able to advance from there to "handed_over".
+  // Deliberately excludes "evacuating": a patient the rescuers moved to the site's evacuation
+  // point (נקודת פינוי) is still under the platoon commander's supervision, waiting for an
+  // ambulance and the final handover to MDA, so status must still be able to advance from there
+  // to "handed_over".
   const FINAL_PATIENT_STATUSES = new Set([
     "closed",
     "deceased",
@@ -357,6 +370,8 @@
     AVPU_RANK,
     DEVICE_SILENCE_MS,
     FINAL_PATIENT_STATUSES,
+    SERVER_CONTACT_FRESH_MS,
+    SERVER_CONTACT_STALE_MS,
     SUPPLY_BURN_WINDOW_MS,
     SUPPLY_CRITICAL_RATIO,
     TOURNIQUET_CRITICAL_MS,
@@ -391,6 +406,7 @@
     PRE_EVAC_EVACUATORS,
     PRE_EVAC_FIRST_REPORT_ROLES,
     preEvacuationTotals,
+    serverContactFreshness,
     suggestedSweepColor,
     suggestMstartTriage,
     supplyBurnAlertLevel,

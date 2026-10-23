@@ -21,6 +21,7 @@ for (const rel of files) {
   const html = fs.readFileSync(path.join(root, rel), 'utf8');
   const sweep = sliceBetween(html, 'function renderMstartSweep()', 'function timeCodeToTodayMs', rel);
   const roleDashboard = sliceBetween(html, 'function renderRoleDashboard', 'function reassignPatient', rel);
+  const commandPanel = sliceBetween(html, 'function renderCommandPanel(', 'function renderRoleDashboard', rel);
   const ccHero = sliceBetween(html, 'function renderCcHeroDashboard', 'function renderCcCommandBoard', rel);
   const logistics = sliceBetween(html, 'function renderLogisticsTaskBoard', 'function patientMatchesBoardFilter', rel);
   const tqWithLimb = sliceBetween(html, 'function recordSweepTourniquetWithLimb', 'function renderSweepTourniquetCard', rel);
@@ -56,8 +57,10 @@ for (const rel of files) {
   assert(!tqWithLimb.includes('reconcileSupplySource'), `${rel}: recordSweepTourniquetWithLimb must not double-count tourniquet supply`);
 
   // V2.99.35 appended the pre-evacuation board after the CC board; the CC board still leads.
-  assert(roleDashboard.includes("${role==='cc'?renderCcCommandBoard()+renderExtractedCounterBoard():`<div class=\"role-top-grid\">"), `${rel}: CC hero must render before generic metrics`);
-  assert(roleDashboard.includes('${dashboardFocusBanner()}'), `${rel}: dashboard focus banner missing from role dashboard`);
+  // V2.99.59: PC/CC render through the tabbed command panel; the CC hero leads the פעולה tab.
+  assert(roleDashboard.includes('renderCommandPanel(role,') && commandPanel.includes('renderCcCommandBoard()'), `${rel}: CC must render through the command panel`);
+  assert(html.includes('action:`${renderCcHeroDashboard({openReqs,'), `${rel}: CC hero must lead the action tab`);
+  assert(roleDashboard.includes('${dashboardFocusBanner()}') && commandPanel.includes('${dashboardFocusBanner()}'), `${rel}: dashboard focus banner missing from role dashboard`);
   assert(html.includes('let dashboardCollapsedSections = {}'), `${rel}: collapse state missing`);
   assert(html.includes('function normalizeDashboardFocus'), `${rel}: normalized dashboard focus helper missing`);
   assert(html.includes('function focusMatchesPatient') && html.includes('function focusMatchesRequest') && html.includes('function focusMatchesLogisticsTask'), `${rel}: safe focus matcher helpers missing`);
@@ -67,7 +70,7 @@ for (const rel of files) {
   assert(html.includes('אין פצועים במיקוד הנוכחי'), `${rel}: focused patient empty state missing`);
   assert(html.includes('אין בקשות במיקוד הנוכחי'), `${rel}: focused request empty state missing`);
   assert(html.includes('אין משימות לוגיסטיקה במיקוד הנוכחי'), `${rel}: focused logistics empty state missing`);
-  assert(roleDashboard.includes('פירוט נוסף / אחריות ותורים'), `${rel}: CC generic lower sections must be collapsed`);
+  assert(commandPanel.includes('פירוט נוסף / אחריות ותורים'), `${rel}: CC generic lower sections must be collapsed`);
   assert(ccHero.includes('מ״פ רפואה — החלטות עכשיו'), `${rel}: CC hero title missing`);
   assert(ccHero.includes('מה להזיז, לאן, ולמה'), `${rel}: CC hero subtitle missing`);
   assert(ccHero.includes('חשד לנפטר · ממתין לרופא'), `${rel}: CC death-certification hero card missing`);
