@@ -43,7 +43,9 @@ for (const file of files) {
   assert(updateSweep.includes('סתירה: AVPU') && updateSweep.includes("p.mstart.breathing==='no'"), `${rel}: AVPU vs breathing=no contradiction warning missing`);
   assert(!updateSweep.includes("p.mstart.breathing='yes';"), `${rel}: AVPU handler must not auto-overwrite breathing to plain yes`);
   assert(html.includes('function assignReinforcementRequest(') && html.includes('function fulfillReinforcementRequest('), `${rel}: reinforcement actions must be named functions`);
-  assert(html.includes('function showSameZoneFab(') && html.includes("activeRoleDashboard!=='medic' || activeScreenId()!=='sweep'"), `${rel}: same-zone FAB must be guarded to medic sweep context`);
+  // Since 2026-10-23 the FAB is the sweep screen's one add-casualty button, for any role running
+  // the sweep; it is still never shown off the sweep screen.
+  assert(html.includes('function showSameZoneFab(') && html.includes("if(activeScreenId()!=='sweep') return;") && html.includes("if(screen!=='sweep') hideSameZoneFab();"), `${rel}: same-zone FAB must be guarded to the sweep screen`);
   assert(html.includes("hemorrhageControl:{status:'unknown',lastCheckedAt:null,sourceTourniquetId:null,note:''}"), `${rel}: marker hemorrhage control default missing`);
   assert(html.includes('function ensureHemorrhageControl('), `${rel}: hemorrhage control normalizer missing`);
   assert(html.includes('function refreshHemorrhageControl('), `${rel}: hemorrhage control refresh missing`);

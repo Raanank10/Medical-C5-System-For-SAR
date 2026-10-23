@@ -1,4 +1,4 @@
-// V2.99.60: patient detail leads with a vitals hero card; identity and triage override move down,
+// V2.99.63: patient detail leads with a vitals hero card; identity and triage override move down,
 // and the title shows the patient number, not the UUID. String-assertion smoke, manual-only.
 const fs = require('fs');
 const path = require('path');
@@ -14,6 +14,7 @@ const fn = html.slice(start, html.indexOf('function markPatientAtCollectionPoint
 const at = (needle) => { const i = fn.indexOf(needle); assert(i >= 0, `openPatient missing: ${needle}`); return i; };
 
 assert(fn.includes("textContent=p.visualId||p.id"), 'title must show the patient number');
+assert(fn.includes('dataset.patientId=p.id') && html.includes("getElementById('detail-pid')?.dataset.patientId===p.id"), 'code that checks the open patient must use the internal id, not the title text');
 const order = ['patientSyncRejectionBanner(p)', 'patient-hero', 'renderGaugeArc({value:p.vitals.pulse', 'מגמת מדדים',
   'פציעה ומיקום', 'renderPatientEvacuationCard(p)', 'עקיפת מפקד ידנית', 'זיהוי (אופציונלי)', 'Timeline'];
 order.reduce((prev, needle) => { const i = at(needle); assert(i > prev, `"${needle}" is out of order`); return i; }, -1);

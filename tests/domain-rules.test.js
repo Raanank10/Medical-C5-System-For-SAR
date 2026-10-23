@@ -206,8 +206,8 @@ assert.deepEqual(
 // FINAL_PATIENT_STATUSES / canChangePatientStatus: once a patient reaches deceased,
 // handed_over, evacuated, closed, or self_evacuated, mutation sites (handover, manual
 // triage override, sweep color override) must refuse to overwrite them. "evacuating" is
-// deliberately not final - a patient waiting at the company collection point under the
-// platoon commander's supervision must still be able to reach handed_over.
+// deliberately not final - a patient waiting at the site's evacuation point (נקודת פינוי) under
+// the platoon commander's supervision must still be able to reach handed_over.
 assert.equal(rules.isFinalPatientStatus("deceased"), true);
 assert.equal(rules.isFinalPatientStatus("handed_over"), true);
 assert.equal(rules.isFinalPatientStatus("evacuated"), true);
@@ -299,5 +299,21 @@ assert.equal(rules.tourniquetAlertToRaise("critical", "critical"), null);
 assert.equal(rules.tourniquetAlertToRaise("critical", null), "critical");
 // Never alerts downwards (e.g. a clock correction).
 assert.equal(rules.tourniquetAlertToRaise("warn", "critical"), null);
+
+// Command status strip: server contact freshness (V2.99.62).
+{
+  const now = 10_000_000;
+  assert.deepEqual(rules.serverContactFreshness(now - 20_000, now), { level: "fresh", ageMs: 20_000 });
+  assert.equal(rules.serverContactFreshness(now - 2 * 60_000, now).level, "fresh");
+  assert.equal(rules.serverContactFreshness(now - 2 * 60_000 - 1, now).level, "stale");
+  assert.equal(rules.serverContactFreshness(now - 5 * 60_000, now).level, "stale");
+  assert.equal(rules.serverContactFreshness(now - 5 * 60_000 - 1, now).level, "offline");
+  // No server response yet, or the device says it has no network: offline, never "connected".
+  assert.deepEqual(rules.serverContactFreshness(null, now), { level: "offline", ageMs: null });
+  assert.equal(rules.serverContactFreshness(0, now).level, "offline");
+  assert.equal(rules.serverContactFreshness(now - 1000, now, false).level, "offline");
+  // A clock that went backwards reads as just contacted, not as a negative age.
+  assert.deepEqual(rules.serverContactFreshness(now + 5000, now), { level: "fresh", ageMs: 0 });
+}
 
 console.log("Domain rule tests passed.");

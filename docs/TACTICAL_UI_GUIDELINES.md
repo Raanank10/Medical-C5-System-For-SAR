@@ -22,9 +22,15 @@ Checked by `scripts/browser_mobile_layout_test.js` at 375x812 and 412x915, RTL, 
 - One top nav, 60px tall: "ראשי", "מצב שטח" and an account menu ("חשבון": user management for admins, bug report, sign out), equal-size buttons with a one-line label. Nothing else floats over the top of a screen; each screen's own sticky header sits under the nav.
 - Signed in, the nav shows the role and the email. "לא מקוון" (saved offline profile) comes first and is never cut short; only the email is.
 - At most one floating control above a screen's bottom bar (the sweep's "+ פצוע | אותו אזור"), placed from the bar's height, and the screen reserves room for both so no content ends up under them.
+- One control per action on a screen (owner, 2026-10-23): the sweep screen's only "add casualty" control is that floating button. It is always up on the sweep screen, for whoever runs the sweep (a חוג״ד can too), and never shown on any other screen.
 - Inside a casualty card nothing is positioned out of flow and nothing is wider than the card. Below 480px the ID takes its own line and the triage banner stacks its text above its source pill. Mixed Hebrew/Latin labels ("אדום / RED") are isolated per direction.
 - One red frame per card: the triage banner inside a card has no border of its own, and an unacknowledged alert pulses as a ring on the card's outline, without a blur around it.
-- Missing-data chips have three tiers: red only for what changes care of a red casualty now (full or missing vitals, stale vitals, evacuation status, no reassessment), orange for a clock that is late or cannot run (stale vitals, tourniquet time or limb unknown), a neutral outline for the rest. All of them stay visible.
+- Critical chips are solid white with dark-red text and a "!", overdue chips have a "⏱" (owner, 2026-10-23): a red chip on a red card measured 3.6-4.6:1 and looked almost the same as an orange one. The icons also keep the tier from being shown by colour alone.
+- Missing-data chips have three tiers: red only for what changes care of a red casualty now (no measured vitals, stale vitals, evacuation status, no reassessment, tourniquet time unknown), orange for a clock that is late or cannot run (stale vitals, tourniquet time or limb unknown, on any casualty that is not red), a neutral outline for the rest. All of them stay visible.
+- "No vitals" is one key, `missing_vitals` ("אין מדדים מלאים", owner 2026-10-23): it clears only once all five vital signs were measured, on any phone: an exactly counted pulse and breathing rate (a range button is not enough), SpO₂ or "אין מד סטורציה", AVPU, and blood pressure / perfusion. AVPU and perfusion the medic answered in MSTART count as observed; answers inferred from walking do not. The server's `last_vitals_at` alone does not clear it. The server follows the same rule since `database/073` (live 2026-10-23): `needs_full_assessment` clears only once the casualty's vitals events together hold all five, and a casualty created through the full flow no longer counts as assessed before any vitals. It replaces `full_vitals`, which no code ever cleared, and `missing_treatment` is no longer shown (it flagged every casualty who needed no treatment).
+- Nothing nobody measured is recorded or shown as measured (owner, 2026-10-23). MSTART "breathing yes" leaves the breathing rate empty; the quick flow invents no rate from breathing or AVPU and no pulse rate from a pulse location. SpO₂, once switched on, starts at 98 only as a starting point and records nothing until changed or its number is tapped to confirm; "אין מד סטורציה" records that no oximeter was available. The range buttons on the patient flow's vitals screen ("10-30", "60-100", ...) record the range itself, never a stand-in number (16, 80); triage uses the range's band, and an exact count replaces it. A vitals counter (vitals sheet and patient flow) starts at 20 / 15 s or 8 / 30 s only as a starting point: it shows "לא נספר" and records nothing until the medic changes it, picks a bracket, or taps the number to confirm. A vitals sheet saved with nothing counted or chosen is refused, and a patient flow with nothing measured sends no `VITALS_RECORDED`, because either would restart the reassessment clock and tell the server vitals were taken. A breathing rate that was not counted never triggers a "deterioration" recommendation by itself. The patient screen and MIST say "נושם — לא נספר" and tag values taken from MSTART ("(MSTART)") or inferred from walking ("(נגזר מהליכה)"); the vitals sheet does not pre-select an AVPU or perfusion inferred from walking.
+- The patient screen's bar shows only "עדכן מדדים" and "יצא לנקודת פינוי" (handover once the casualty is at the evacuation point), with the rest under "עוד". Every screen with a bottom bar leaves room equal to the bar's measured height, so nothing at the end of a page stays under it.
+- A recorded tourniquet's limb can be corrected, or an entry recorded by mistake cancelled, from the patient screen as well as from the sweep card. Cancelling asks first, because it stops that tourniquet's 45/60/120-minute alerts. Only roles that may write clinical events get these controls.
 - No internal key (such as `stale_vitals`) is ever shown: every missing-data key has a Hebrew label in `DEBT_LABELS` (`tests/debt-labels.test.js`).
 
 ## New Patient Flow
@@ -48,6 +54,8 @@ The app should offer two entry paths:
 
 - Quick Patient: 10-15 second casualty creation with location/access/triage and all other fields treated as optional debt.
 - Extended Patient: full vitals, body map, interventions, and treatment detail.
+
+Extended Patient's treatment step is ordered by MARCH-PAWS (V2.99.62): M massive hemorrhage, A airway, R respiration, C circulation, H hypothermia / head injury, then P pain, A antibiotics, W wounds, S splinting. Each letter shows "טופל" (a treatment in it, or for M the step 3 immediate tourniquet), "נבדק - ללא טיפול" (the medic marked it checked) or "לא תועד". It is documentation only: no letter blocks saving, changes triage or raises an alert, and undocumented letters are shown as such on the summary, never hidden. Choosing a treatment withdraws that letter's "no treatment needed"; "no treatment needed" cannot be set on a letter that has a treatment. Each treatment is sent as its own event (A's as `AIRWAY_MANAGED`, the rest as `INTERVENTION_RECORDED`, tourniquets and pain medications on their existing events) with `march_section`, and the create event carries `march_review`. TXA and antibiotics are recorded as given, without a dose: the app computes no drug dose (owner 2026-10-23). New treatments do not change patient status (owner 2026-10-23). Cric and needle decompression can be recorded only by a paramedic or a physician (owner 2026-10-23): for any other role the buttons are dimmed, marked "פרמדיק / רופא", and a tap is refused with a toast. This is checked on the phone only; `sync-log` does not enforce it.
 
 Quick Patient records must create `needs_full_assessment = true` and a commander-visible incomplete-assessment alert.
 
@@ -114,13 +122,13 @@ When Black is selected:
 
 For children under age 8, the UI must not require exact weight before treatment. Use age group or age estimate locally, warn on adult-range doses, require double confirmation, and write override metadata into the event payload. The save action still completes locally; risk is escalated through watchdog alerts and AAR review.
 
-## Patient Detail Order (V2.99.60)
+## Patient Detail Order (V2.99.63)
 
 Owner request: vital signs come first. The patient detail screen ("פרטי פצוע") reads top to bottom in the order a medic needs it in the field, following the monitor convention of large color-coded numbers plus how fresh they are:
 
 1. Safety banners (sync rejection, shared "בטיפול" acknowledgment).
 2. Hero card, framed in the triage color (dashed muted frame while triage is pending, never green): triage, status, age band, "עדכן מדדים", how old the vitals are and when the next reassessment is due (red when overdue or missing), the tourniquet clock, then pulse and SpO2 gauges with large colored values, RR, BP and AVPU, and the deterioration / priority recommendation.
-3. Vitals trend.
+3. Active tourniquets with the limb / record correction (when any), then the vitals trend.
 4. Elderly warning, injury and location, treatments (this device and other devices).
 5. Evacuation, late MDA update, manual triage override, optional identity.
 6. Timeline.
@@ -165,6 +173,20 @@ UI expectations:
 - visible sync freshness
 - no blocking spinner for primary capture
 - failed or delayed sync shown as status, not as user failure
+
+Sync freshness means the last answer from the server, not the last local save (V2.99.62). Signed in, every sync pill and the command strip show it: under 2 minutes "מחובר לשרת" (green), up to 5 minutes "עדכון אחרון מהשרת" (orange), beyond that, with no network or with no answer yet "אין קשר לשרת" (red), plus the number of events still waiting to be sent. The limits live in `serverContactFreshness` in `src/domain/rules.js`. Local demo mode says "מצב דמו · ללא שרת" and never claims a connection.
+
+## PC / CC Command Panel
+
+Since V2.99.62 the PC (חוג"ד) and CC (מ״פ רפואה) panels are a sticky status strip above four tabs instead of one long scroll.
+
+- Tabs, right to left: תמונת מצב, פעולה, כוחות, ציוד. Tap only, no swipe. Entering the panel always opens תמונת מצב; automatic re-renders (sync, acknowledgements) keep the tab the commander is on.
+- תמונת מצב: per site, how many patients by triage colour (red, yellow, green, black, trapped), split into three stages that must never be merged: still at the extraction site, at the site's evacuation point (נקודת פינוי) waiting for an MDA ambulance, and evacuated by MDA / handed over. The company's own ambulance carries the doctor between the company's sites and is not a patient evacuation resource. The evacuation point is where the PC truck stands; the PC's own site shows the truck stock there. Then the evacuation funnel and the evacuation priority list (platoon for PC, company for CC), which is the evacuation-to-hospital list: it keeps patients at the evacuation point (marked "בנקודת פינוי") until MDA takes them, next to ranked patients still at the extraction site ("באתר החילוץ").
+- The strip, on every tab: server contact, the longest active tourniquet timer, unresolved blocked events (tap opens the full command screen's blocked-events panel), triage totals, and the alerts.
+- No alert may be visible only inside a tab. Every alert routed to the role (the alert pipeline, including server watchdog alerts) is in the strip, one line per patient, coloured by its most severe alert, most severe first. Collapsed, the strip shows the top line and "+N התראות"; tapping opens the rest inside the strip.
+- Tab badges count patients (a site-level alert counts once), from the same alert list; the UI only maps alert types to tabs and adds no rule logic.
+- The full command screen (חפ״ק) is reached from the "מסך בקרה מלא (חפ״ק)" button at the bottom of כוחות.
+- MARCH is not on the command panels: it belongs to the medic's and, when going hands-on, the PC's patient flow (backlog B2 in `GAP_CLOSURE_PLAN.md`).
 
 ## Production Watch Items
 
