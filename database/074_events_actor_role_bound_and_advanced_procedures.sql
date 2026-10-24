@@ -20,6 +20,16 @@
 --    exception: the owner named the two roles.
 --
 -- Everything else in the policy is the 027 text unchanged.
+--
+-- Applied live 2026-10-24 by the owner from the SQL editor; sync-log v14 deployed the same day.
+-- Checked right after: pg_policies shows this exact text. Then 11 inserts as real accounts
+-- (request.jwt.claims + role authenticated) in one transaction that was rolled back, with a
+-- temporary incident membership for the medic and pc inside it; nothing was left behind:
+--   allowed: medic NOTE_ADDED, medic NPA (AIRWAY_MANAGED), paramedic cric, physician needle
+--            decompression, pc NOTE_ADDED;
+--   refused (42501, row-level security): medic cric, medic needle decompression, pc needle
+--            decompression, a medic claiming physician (NOTE_ADDED), a medic claiming paramedic
+--            (cric), a paramedic claiming physician (PATIENT_DEATH_CONFIRMED).
 
 drop policy if exists events_insert_by_role on events;
 create policy events_insert_by_role on events for insert to authenticated with check (
