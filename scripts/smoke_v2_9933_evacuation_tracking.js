@@ -51,7 +51,7 @@ for (const rel of files) {
 
   // Location now syncs, and new pulls never break the main patient pull.
   assert(/function reconcileLocationSync\(\)\{[\s\S]{0,700}?type:'PATIENT_LOCATION_UPDATED'/.test(html), `${rel}: patient zone must sync`);
-  assert(html.includes('pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullExternalReports(id);'), `${rel}: separate pulls for location, evacuation and reports`);
+  assert(html.includes('pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullEvacPointArrivals(id); pullExternalReports(id);'), `${rel}: separate pulls for location, evacuation and reports`);
   assert(html.includes("const PROJECTED_PATIENT_COLUMNS = 'id,incident_id,visual_id,current_triage,current_status,access_status,needs_full_assessment,is_pediatric,pediatric_age_years,last_vitals_at,version,optional_name,identifying_description,physician_death_confirmed_at,physician_death_confirmed_by';"), `${rel}: the main patient pull must not depend on database/044 columns`);
 
   // database/045 client side: refused self-join explained, CC assigns PCs and owns the roster.
