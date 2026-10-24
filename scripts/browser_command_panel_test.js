@@ -42,7 +42,7 @@ async function checkFile(browser, file) {
       tourniquet: { appliedAt: now - 70 * 60000, limb: 'רגל ימין' }, tourniquets: [{ id: 'TQ1', limb: 'rl', appliedAt: now - 70 * 60000, status: 'active' }], lastVitalsAt: now - 14 * 60000 });
     patients.push({ ...base, id: 'cp-r2', visualId: 'P002', triage: 'red', injury: 'חזה', vitals: { pulse: 118, spo2: 93, rr: 28, avpu: 'A' }, trapStatus: 'trapped', lastVitalsAt: now - 12 * 60000 });
     patients.push({ ...base, id: 'cp-y1', visualId: 'P003', triage: 'yellow', injury: 'אגן', vitals: { pulse: 100, spo2: 96, rr: 20, avpu: 'A' }, lastVitalsAt: now - 25 * 60000 });
-    patients.push({ ...base, id: 'cp-g1', visualId: 'P004', triage: 'green', injury: 'חתכים', vitals: { pulse: 84, spo2: 99, rr: 16, avpu: 'A' }, lastVitalsAt: now - 5 * 60000, patientStatus: 'evacuating', locDetail: 'חצר' });
+    patients.push({ ...base, id: 'cp-g1', visualId: 'P004', triage: 'green', injury: 'חתכים', vitals: { pulse: 84, spo2: 99, rr: 16, avpu: 'A' }, lastVitalsAt: now - 5 * 60000, patientStatus: 'evacuating', evacPointArrivedAt: now - 7 * 60000, locDetail: 'חצר' });
     patients.push({ ...base, id: 'cp-r3', visualId: 'P006', triage: 'red', injury: 'ראש', vitals: { pulse: 110, spo2: 95, rr: 22, avpu: 'A' }, lastVitalsAt: now - 3 * 60000, patientStatus: 'handed_over', evacDestination: 'שיבא' });
     patients.push({ ...base, id: 'cp-b1', visualId: 'P005', triage: 'yellow', injury: 'כוויות', vitals: { pulse: 96, spo2: 97, rr: 18, avpu: 'A' }, siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', lastVitalsAt: now - 8 * 60000 });
     createMedicalResourceRequest({ resourceType: 'paramedic', urgency: 'immediate', siteId: 'SITE_A', targetLocation: 'בניין 3', reasonCodes: ['red_patient'], linkedPatientIds: ['cp-r1'] });
@@ -123,7 +123,7 @@ async function checkFile(browser, file) {
     const text = panel.textContent;
     const cut = (from, to) => text.slice(text.indexOf(from), to ? text.indexOf(to, text.indexOf(from)) : undefined);
     return {
-      summary: text.includes('בזירה 3 · בנקודת פינוי 1 · פונו 1'),
+      summary: text.includes('בזירה 3 · בנקודת פינוי 1 (עד 7 דק׳) · פונו 1'),
       evacPoint: cut('בנקודת פינוי — ממתינים לפינוי מד״א', 'פונו — לפי יעד'),
       evacuated: cut('פונו — לפי יעד', 'משפך פינוי מחלקתי'),
       funnel: text.includes('משפך פינוי מחלקתי') && text.includes('תעדוף פינוי מחלקתי'),
@@ -140,7 +140,9 @@ async function checkFile(browser, file) {
   // patient is not on it.
   assert(/ממתין לפינוי מד״א · P004/.test(board.priority) && board.priority.includes('בנקודת פינוי') && board.priority.includes('P001') && !board.priority.includes('P006'),
     `${rel}: the evacuation priority list must include patients at the evacuation point (got "${board.priority.slice(0, 300)}")`);
-  assert(await page.evaluate(() => STATUS_LABELS.evacuating === 'בנקודת פינוי'), `${rel}: the evacuating status reads "בנקודת פינוי"`);
+  // WP-18: evacuating with no recorded arrival is "on the way"; arrived reads with the wait.
+  assert(await page.evaluate(() => STATUS_LABELS.evacuating === 'בדרך לנקודת פינוי' && patientStatusLabel(patients.find(p => p.id === 'cp-g1')) === 'בנקודת פינוי · ממתין 7 דק׳'),
+    `${rel}: the evacuating status reads "בדרך לנקודת פינוי" until the arrival, then "בנקודת פינוי" with the wait`);
 
   // 7b. "בטיפול" in the strip acknowledges the patient and the strip updates at once.
   await page.click('#command-status-strip [data-alert-group="p:cp-r1"] .ack-btn');
@@ -177,7 +179,7 @@ async function checkFile(browser, file) {
   // at the evacuation point is still waiting for MDA, so it counts as not evacuated, in its own part.
   const evac = await page.evaluate(() => {
     patients.push({ events: [], id: 'cp-y2', visualId: 'P007', triage: 'yellow', injury: 'שבר', vitals: { pulse: 98, spo2: 97, rr: 18, avpu: 'A' },
-      location: 'חצר', locDetail: 'חצר', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', patientStatus: 'evacuating', trapStatus: 'not_trapped', lastVitalsAt: Date.now() - 4 * 60000 });
+      location: 'חצר', locDetail: 'חצר', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', patientStatus: 'evacuating', evacPointArrivedAt: Date.now() - 3 * 60000, trapStatus: 'not_trapped', lastVitalsAt: Date.now() - 4 * 60000 });
     const split = openEvacuationSplit(patients);
     goTo('demo'); startRoleDashboard('cc');
     const action = document.querySelector('[data-cmd-panel="action"]').textContent;
@@ -195,7 +197,7 @@ async function checkFile(browser, file) {
     const text = () => document.querySelector('[data-cmd-panel="action"]').textContent;
     const before = text();
     patients.push({ events: [], id: 'cp-r4', visualId: 'P008', triage: 'red', injury: 'בטן', vitals: { pulse: 120, spo2: 94, rr: 24, avpu: 'A' },
-      location: 'חצר', locDetail: 'חצר', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', patientStatus: 'evacuating', trapStatus: 'not_trapped', lastVitalsAt: Date.now() - 2 * 60000 });
+      location: 'חצר', locDetail: 'חצר', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', patientStatus: 'evacuating', evacPointArrivedAt: Date.now() - 2 * 60000, trapStatus: 'not_trapped', lastVitalsAt: Date.now() - 2 * 60000 });
     renderRoleDashboard('cc');
     const after = text();
     const pcRecIds = DecisionSupportEngine.forPc().recommendations.map((r) => r.id);

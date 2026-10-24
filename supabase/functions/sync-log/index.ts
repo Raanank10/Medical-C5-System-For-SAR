@@ -66,6 +66,9 @@ const CLINICAL_EVENTS = [
   "TOURNIQUET_LIMB_RECORDED",
   // A medic's MSTART sweep summary, read by the PC from pulled events (database/063, WP-11).
   "MSTART_SWEEP_COMPLETED",
+  // Arrival at the site's evacuation point (database/075-076, WP-18): the same roles that set
+  // status 'evacuating'.
+  "PATIENT_EVAC_POINT_ARRIVED",
 ];
 const FIRST_RESPONDER_EVENTS = ["FIRST_RESPONDER_REPORT"];
 // Event types that create a new patients row on first sight (idempotent — see handlePush).
