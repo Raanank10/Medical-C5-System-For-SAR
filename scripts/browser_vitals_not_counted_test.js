@@ -17,6 +17,7 @@
 //
 // Runs in CI through scripts/run_tests.js; also runs on its own.
 // Run: npm install && node scripts/browser_vitals_not_counted_test.js
+const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 
@@ -281,7 +282,8 @@ async function chipsAndPatientBar(browser) {
 }
 
 (async () => {
-  const browser = await chromium.launch();
+  const preinstalled = '/opt/pw-browsers/chromium';
+  const browser = await chromium.launch(fs.existsSync(preinstalled) ? { executablePath: preinstalled } : {});
   try {
     await sweepAndDisplays(browser);
     await vitalsSheet(browser);
