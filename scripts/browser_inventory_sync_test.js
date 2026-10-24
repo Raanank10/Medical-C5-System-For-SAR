@@ -7,10 +7,11 @@
 //   INVENTORY_LEDGER_MOVEMENT (never per SUPPLY_CONSUMED), with stock_owner, stock_after and the
 //   phone's time; medic bag rows only from medic/paramedic/pc/physician/admin, PC truck rows only
 //   from pc/cc/logistics_officer/admin; one row per (device, local event id)
-// - inventory_ledger_v12 RLS: incident members read every row.
+// - inventory_ledger_v12 RLS: incident members read every row, except the logistics officer
+//   (database/074), who reads get_incident_stock_movements(): the same rows without the patient.
 // Checks: logistics sees the burn rate of both medics together, each medic bag's and the PC
 // truck's current stock, nothing counted twice (server + unsent on the same phone), and the PC
-// truck's issue on an approved request reaching logistics.
+// truck's issue on an approved request reaching logistics, and no patient reaching logistics.
 // It proves client behavior only; database/062 itself is exercised against real Postgres.
 //
 // Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
@@ -107,7 +108,7 @@ function projectInventory(server, evt, actorId) {
   const after = Number(p.local_stock_after ?? p.pc_truck_stock_after);
   server.ledger.push({ incident_id: evt.incident_id, actor_id: actorId, item_type: p.item_type, movement_type: MOVES[p.movement_type], quantity_delta: delta,
     stock_owner: owner, stock_after: Number.isInteger(after) ? after : null, device_id: evt.device_id, local_event_id: evt.local_event_id,
-    patient_id: null, occurred_at: evt.local_timestamp, created_at: new Date().toISOString(), stock_seq: p.stock_seq == null ? null : String(p.stock_seq) });
+    patient_id: p.patient_context || p.patient_id || null, occurred_at: evt.local_timestamp, created_at: new Date().toISOString(), stock_seq: p.stock_seq == null ? null : String(p.stock_seq) });
 }
 
 function push(server, userId, body) {
@@ -143,10 +144,18 @@ function handle(server, req) {
       if (!inc || !canSee(inc)) return { data: null, error: { message: 'access denied' } };
       return { data: clone(server.supply_requests.filter((r) => r.incident_id === inc.id).reverse()), error: null };
     }
+    if (req.name === 'get_incident_stock_movements') {
+      // database/074: incident members; every ledger column except patient_id.
+      const inc = server.incidents.find((i) => i.id === p.p_incident_id);
+      if (!inc || !canSee(inc)) return { data: null, error: { message: 'access denied' } };
+      server.stockRpcCalls = (server.stockRpcCalls || 0) + 1;
+      return { data: clone(server.ledger.filter((r) => r.incident_id === inc.id).map(({ patient_id, ...rest }) => rest)), error: null };
+    }
     return { data: null, error: null };
   }
   if (req.table === 'inventory_ledger_v12') {
-    // inventory_ledger_v12_read: incident members; newest first, as the client orders it.
+    // inventory_ledger_v12_read: incident members, not the logistics officer (database/074).
+    if (u.role === 'logistics_officer') return { data: [], error: null };
     const rows = server.ledger.filter((r) => { const inc = server.incidents.find((i) => i.id === r.incident_id); return inc && canSee(inc); }).filter(match)
       .slice(); // oldest first, the reverse of what the client asks for: it must sort by time and stock_seq itself
     return { data: clone(rows), error: null };
@@ -289,6 +298,12 @@ async function checkFile(browser, file) {
   const bag = (id) => holders.find((h) => h.owner === 'medic_bag' && h.actor === id);
   assert(bag(MEDIC)?.stock === 1 && bag(MEDIC2)?.stock === 0, `${rel}: each medic bag's latest count must reach logistics (got ${JSON.stringify(holders)})`);
   const board = await logo.page.evaluate(() => { goTo('logistics'); renderLogisticsOfficer(); return document.getElementById('logistics-consumption-feed')?.innerText || ''; });
+  // database/074: logistics reads the bags through get_incident_stock_movements(), never the
+  // patient each item was used on.
+  assert(SERVER.stockRpcCalls > 0, `${rel}: logistics must read the stock through get_incident_stock_movements()`);
+  const logoRows = await logo.page.evaluate(() => _incidentInventory[activeInventoryIncidentId()] || []);
+  assert(logoRows.length > 0 && logoRows.every((r) => !('patient_id' in r)), `${rel}: no ledger row on the logistics phone may carry a patient (got ${JSON.stringify(logoRows[0])})`);
+  assert(!board.includes('ללא פצוע') && !/P\d{3}/.test(board), `${rel}: the logistics consumption feed must not name a patient`);
   assert(board.includes('מלאי בשטח') && board.includes('ערכת חובש'), `${rel}: the logistics screen must list the field stock from the server`);
   const ctxBurn = await logo.page.evaluate(() => DecisionSupportEngine.forLogistics().recommendations.map((r) => r.source || {}).filter((s) => s.item === 'tourniquets').map((s) => s.burnRate));
   assert(!ctxBurn.length || ctxBurn[0] === 5, `${rel}: the burn prediction must use incident-wide consumption (got ${ctxBurn})`);

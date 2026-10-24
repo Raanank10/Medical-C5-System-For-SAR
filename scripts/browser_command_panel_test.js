@@ -173,6 +173,47 @@ async function checkFile(browser, file) {
   assert(await page.evaluate(() => document.getElementById('screen-commander').classList.contains('active') && cmdPanelOpen.quarantine), `${rel}: the blocked-events chip must open the command screen's blocked-events panel`);
   await page.evaluate(() => { currentUser = null; });
 
+  // 9. Option A (owner, 2026-10-23): open evacuations are split by where the patient waits. A yellow
+  // at the evacuation point is still waiting for MDA, so it counts as not evacuated, in its own part.
+  const evac = await page.evaluate(() => {
+    patients.push({ events: [], id: 'cp-y2', visualId: 'P007', triage: 'yellow', injury: 'שבר', vitals: { pulse: 98, spo2: 97, rr: 18, avpu: 'A' },
+      location: 'חצר', locDetail: 'חצר', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', patientStatus: 'evacuating', trapStatus: 'not_trapped', lastVitalsAt: Date.now() - 4 * 60000 });
+    const split = openEvacuationSplit(patients);
+    goTo('demo'); startRoleDashboard('cc');
+    const action = document.querySelector('[data-cmd-panel="action"]').textContent;
+    const overview = document.querySelector('[data-cmd-panel="overview"]').textContent;
+    return { onScene: split.onScene.map((p) => p.visualId).sort(), atPoint: split.atPoint.map((p) => p.visualId), action, overview, queue: DecisionSupportEngine.forCc().operationalPressure.components.evacQueue };
+  });
+  assert(evac.onScene.join() === 'P001,P002,P003,P005' && evac.atPoint.join() === 'P007', `${rel}: open evacuations split by stage (got ${JSON.stringify({ onScene: evac.onScene, atPoint: evac.atPoint })})`);
+  assert(evac.action.includes('5 אדום/צהוב ללא פינוי סגור: 4 באתר החילוץ · 1 ממתינים למד״א'), `${rel}: the CC evacuation bottleneck card must show the split`);
+  assert(evac.queue === 5, `${rel}: the pressure gauge's evacuation queue must include patients waiting for MDA (got ${evac.queue})`);
+  assert(evac.overview.includes('פינוי לא סגור · באתר החילוץ') && evac.overview.includes('פינוי לא סגור · ממתינים למד״א'), `${rel}: the CC metrics must show both parts`);
+
+  // 10. Owner, 2026-10-24: advice by where patients wait. One yellow at the evacuation point raises no
+  // ambulance request yet; the 4 still at the extraction site raise the extraction-site advice.
+  const advice = await page.evaluate(() => {
+    const text = () => document.querySelector('[data-cmd-panel="action"]').textContent;
+    const before = text();
+    patients.push({ events: [], id: 'cp-r4', visualId: 'P008', triage: 'red', injury: 'בטן', vitals: { pulse: 120, spo2: 94, rr: 24, avpu: 'A' },
+      location: 'חצר', locDetail: 'חצר', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', patientStatus: 'evacuating', trapStatus: 'not_trapped', lastVitalsAt: Date.now() - 2 * 60000 });
+    renderRoleDashboard('cc');
+    const after = text();
+    const pcRecIds = DecisionSupportEngine.forPc().recommendations.map((r) => r.id);
+    const now = Date.now();
+    const base = { events: [], location: 'בניין 3', siteId: 'SITE_A', patientStatus: 'in_treatment', triage: 'red', vitals: { pulse: 120, avpu: 'A', rr: 20 } };
+    const hints = companyEvacuationPriorityRows([
+      { ...base, id: 'h1', visualId: 'H1', trapStatus: 'trapped', tourniquet: { appliedAt: now - 30 * 60000 } },
+      { ...base, id: 'h2', visualId: 'H2', trapStatus: 'not_trapped', tourniquet: { appliedAt: now - 20 * 60000 } },
+    ]);
+    return { before, after, pcRecIds, hints };
+  });
+  assert(!advice.before.includes('ממתינים לאמבולנס בנקודת פינוי') && advice.before.includes('צוואר בקבוק פינוי באתר החילוץ') && advice.before.includes('אמבולנס הרופא'),
+    `${rel}: one yellow waiting raises no ambulance request; the extraction-site advice names medics / the physician's ambulance`);
+  assert(advice.after.includes('ממתינים לאמבולנס בנקודת פינוי') && advice.after.includes('בקש אמבולנסים אזרחיים נוספים'), `${rel}: a red waiting at the evacuation point must raise the civilian-ambulance request`);
+  assert(advice.pcRecIds.includes('REC_EVAC_WAITING_AMBULANCE'), `${rel}: the PC must get the civilian-ambulance recommendation too (got ${advice.pcRecIds})`);
+  assert(advice.hints.includes('טיפול לפני החילוץ') && advice.hints.includes('החילוץ מעביר לנקודת פינוי') && !advice.hints.includes('שייך אמבולנס'),
+    `${rel}: extraction-site hints: treat trapped patients before extraction, rescuers carry free ones; never "assign an ambulance"`);
+
   assert(!errors.length, `${rel}: page errors: ${errors.join(' | ')}`);
   await context.close();
   console.log(`${rel}: command panel strip + tabs browser test passed`);

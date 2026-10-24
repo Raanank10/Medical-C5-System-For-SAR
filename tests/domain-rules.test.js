@@ -316,4 +316,16 @@ assert.equal(rules.tourniquetAlertToRaise("warn", "critical"), null);
   assert.deepEqual(rules.serverContactFreshness(now + 5000, now), { level: "fresh", ageMs: 0 });
 }
 
+// database/074: the rescue chain sees evacuation priority, never the colour.
+assert.equal(rules.rescueEvacPriority("red", false), "urgent");
+assert.equal(rules.rescueEvacPriority("green", true), "urgent"); // active tourniquet
+assert.equal(rules.rescueEvacPriority("yellow", false), "not_urgent");
+assert.equal(rules.rescueEvacPriority("green", false), "not_urgent");
+assert.equal(rules.rescueEvacPriority("black", false), "not_urgent");
+// Not sorted yet is never "not urgent".
+assert.equal(rules.rescueEvacPriority("pending", false), "pending");
+assert.equal(rules.rescueEvacPriority(undefined, false), "pending");
+assert.equal(rules.rescueEvacPriority("pending", true), "urgent");
+assert.deepEqual(rules.RESCUE_PRIORITIES, ["urgent", "pending", "not_urgent"]);
+
 console.log("Domain rule tests passed.");

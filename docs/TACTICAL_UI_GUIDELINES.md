@@ -122,6 +122,19 @@ When Black is selected:
 
 For children under age 8, the UI must not require exact weight before treatment. Use age group or age estimate locally, warn on adult-range doses, require double confirmation, and write override metadata into the event payload. The save action still completes locally; risk is escalated through watchdog alerts and AAR review.
 
+## Patient Detail Order (V2.99.65)
+
+Owner request: vital signs come first. The patient detail screen ("פרטי פצוע") reads top to bottom in the order a medic needs it in the field, following the monitor convention of large color-coded numbers plus how fresh they are:
+
+1. Safety banners (sync rejection, shared "בטיפול" acknowledgment).
+2. Hero card, framed in the triage color (dashed muted frame while triage is pending, never green): triage, status, age band, "עדכן מדדים", how old the vitals are and when the next reassessment is due (red when overdue or missing), the tourniquet clock, then pulse and SpO2 gauges with large colored values, RR, BP and AVPU, and the deterioration / priority recommendation.
+3. Active tourniquets with the limb / record correction (when any), then the vitals trend.
+4. Elderly warning, injury and location, treatments (this device and other devices).
+5. Evacuation, late MDA update, manual triage override, optional identity.
+6. Timeline.
+
+The title shows the patient number (`visualId`, e.g. P004-DK), not the internal UUID.
+
 ## Tourniquet Clock
 
 Once a tourniquet is recorded, it becomes a persistent clinical timer.
@@ -132,6 +145,8 @@ The timer must stay visible in:
 - patient detail view
 - commander row
 - AAR / incident summary
+
+The rescue chain (מ״מ, מ״פ חילוץ) does not see it (owner, 2026-10-23, `database/074`): tourniquet status is clinical. A patient with an active tourniquet still shows to them as **urgent** and comes first in their evacuation order, from the same ranking medical command uses.
 
 The timer is not passive history. It is an active risk clock.
 
@@ -169,6 +184,8 @@ Since V2.99.62 the PC (חוג"ד) and CC (מ״פ רפואה) panels are a sticky
 
 - Tabs, right to left: תמונת מצב, פעולה, כוחות, ציוד. Tap only, no swipe. Entering the panel always opens תמונת מצב; automatic re-renders (sync, acknowledgements) keep the tab the commander is on.
 - תמונת מצב: per site, how many patients by triage colour (red, yellow, green, black, trapped), split into three stages that must never be merged: still at the extraction site, at the site's evacuation point (נקודת פינוי) waiting for an MDA ambulance, and evacuated by MDA / handed over. The company's own ambulance carries the doctor between the company's sites and is not a patient evacuation resource. The evacuation point is where the PC truck stands; the PC's own site shows the truck stock there. Then the evacuation funnel and the evacuation priority list (platoon for PC, company for CC), which is the evacuation-to-hospital list: it keeps patients at the evacuation point (marked "בנקודת פינוי") until MDA takes them, next to ranked patients still at the extraction site ("באתר החילוץ").
+- "Evacuation not closed" counts on the command panels (CC metrics, the bottleneck card and suggestion, the company resource row, the evacuation bottleneck recommendation) count red/yellow patients until MDA takes them, split into two parts: still at the extraction site, and waiting for MDA at the evacuation point (owner, 2026-10-23). A patient at the evacuation point is never counted as evacuated, and the sector risk score and the operational pressure gauge count them the same way.
+- Evacuation advice follows where patients wait (owner, 2026-10-24). At the evacuation point the shortage is civilian ambulances: any red waiting, or two or more patients, raises "ask for more civilian ambulances" for both PC and CC (both can ask). At the extraction site the rescuers carry patients to the evacuation point and medical staff treat them there, trapped patients included; CC can send more medics or the physician's ambulance. The evacuation list's hint for a trapped patient is "treat before extraction, waiting for extraction", for a free one "the rescuers move them to the evacuation point; short of civilian ambulances? ask for more". The app never tells a commander to assign an ambulance: the company ambulance only carries the doctor between sites.
 - The strip, on every tab: server contact, the longest active tourniquet timer, unresolved blocked events (tap opens the full command screen's blocked-events panel), triage totals, and the alerts.
 - No alert may be visible only inside a tab. Every alert routed to the role (the alert pipeline, including server watchdog alerts) is in the strip, one line per patient, coloured by its most severe alert, most severe first. Collapsed, the strip shows the top line and "+N התראות"; tapping opens the rest inside the strip.
 - Tab badges count patients (a site-level alert counts once), from the same alert list; the UI only maps alert types to tabs and adds no rule logic.
