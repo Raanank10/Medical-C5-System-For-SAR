@@ -6554,22 +6554,42 @@ const DecisionSupportEngine=(()=>{
   }
   function evaluateEvacuation(ctx=defaultContext()){
     const recs=[];
+    // Owner, 2026-10-24. Waiting at the evacuation point: civilian ambulances are short; PC and CC
+    // both ask for more (responsibleRole PC reaches both panels). Raised for any red waiting or two
+    // or more patients. Still at the extraction site: the rescuers carry patients to the evacuation
+    // point; medical staff treat them there, trapped ones too; CC can add medics or send the
+    // physician's ambulance (the company ambulance only carries the doctor between sites).
     const split=openEvacuationSplit(ctx.patients||[]);
-    const delayed=split.open;
-    if(delayed.length){
-      const red=delayed.filter(p=>p.triage==='red');
+    const waitingRed=split.atPoint.filter(p=>p.triage==='red');
+    if(waitingRed.length || split.atPoint.length>=2){
+      recs.push(createRecommendation({
+        id:'REC_EVAC_WAITING_AMBULANCE',
+        category:'Evacuation Bottlenecks',
+        priority:waitingRed.length?'HIGH':'MEDIUM',
+        title:'ממתינים לאמבולנס בנקודת פינוי',
+        explanation:`${split.atPoint.length} אדום/צהוב ממתינים בנקודת הפינוי · ${waitingRed.length} אדומים.`,
+        suggestedAction:'בקש אמבולנסים אזרחיים נוספים',
+        responsibleRole:'PC',
+        affectedSector:siteData.name||'כלל המוקד',
+        confidence:0.8,
+        timestamp:new Date().toISOString(),
+        source:{patientIds:split.atPoint.map(p=>p.id)}
+      }));
+    }
+    if(split.onScene.length){
+      const red=split.onScene.filter(p=>p.triage==='red');
       recs.push(createRecommendation({
         id:'REC_EVAC_DELAY',
         category:'Evacuation Bottlenecks',
         priority:red.length?'HIGH':'MEDIUM',
-        title:'צוואר בקבוק פינוי',
-        explanation:`${delayed.length} אדום/צהוב ללא פינוי סגור: ${openEvacuationLabel(split)} · ${red.length} אדומים.`,
-        suggestedAction:'הסלם פינוי, תעדף אדומים וחסם/לכוד, בדוק אמצעי הובלה',
+        title:'צוואר בקבוק פינוי באתר החילוץ',
+        explanation:`${split.onScene.length} אדום/צהוב עדיין באתר החילוץ · ${red.length} אדומים · ${split.onScene.filter(p=>normalizeTrapStatus(p)==='trapped').length} לכודים.`,
+        suggestedAction:'החילוץ מעביר לנקודת פינוי; שקול לשלוח חובשים נוספים או את אמבולנס הרופא',
         responsibleRole:'CC',
         affectedSector:siteData.name||'כלל המוקד',
         confidence:0.8,
         timestamp:new Date().toISOString(),
-        source:{patientIds:delayed.map(p=>p.id)}
+        source:{patientIds:split.onScene.map(p=>p.id)}
       }));
     }
     const longEvacReq=(ctx.reinforcementRequests||[]).find(r=>isRequestOpen(r)&&['urgent_evac','routine_evac','evac_coordination'].includes(r.resourceType)&&minutesSinceIso(r.createdAt)>=6);
@@ -7079,7 +7099,11 @@ function companyEvacuationPriorityRows(pts=patients){
     const atPoint=p.patientStatus==='evacuating';
     const label=p.evacRank===0?'עדיפות עליונה — חסם פחות מ־45 דק׳ לחלון':p.evacRank===1?'עדיפות 1 — חסם פעיל':p.evacRank===2?'עדיפות 2 — אדום הכרה / נשימה':p.evacRank===3?'עדיפות 3 — צהוב מיוצב':'ממתין לפינוי מד״א';
     const reason=p.evacRank===4?'':`${p.evacReason} · `;
-    const action=atPoint?'בנקודת פינוי · ממתין לפינוי מד״א':'פעולה: שייך אמבולנס / אשר עיכוב / העבר למוקד פינוי';
+    // Owner, 2026-10-24: trapped patients are treated before extraction; a free patient is carried
+    // to the evacuation point by the rescuers, and is usually held back by too few civilian ambulances.
+    const action=atPoint?'בנקודת פינוי · ממתין לפינוי מד״א'
+      :normalizeTrapStatus(p)==='trapped'?'פעולה: טיפול לפני החילוץ · ממתין לחילוץ'
+      :'פעולה: החילוץ מעביר לנקודת פינוי · חסרים אמבולנסים אזרחיים? בקש תוספת';
     return roleRow(`${label} · ${p.visualId||p.id}`,`${atPoint?'בנקודת פינוי':'באתר החילוץ'} · ${reason}${p.location} · ${TRIAGE_LABELS[p.triage]||p.triage}`,`<span class="identity-chip">${action}</span>`);
   });
   if(rows.length>8) shown.push(roleRow(`+${rows.length-8} נוספים בתור הפינוי`,'מוצגים 8 הראשונים לפי סדר העדיפות'));
@@ -7377,9 +7401,17 @@ function renderCcCommandBoard(){
     'פצועים ללא מדדים מלאים',
     `${staleFull} פצועים עברו סריקת MSTART ועדיין מחכים למדדים מלאים`
   ));
-  if(blockedEvac>=2) suggestions.push(roleRow(
-    'צוואר בקבוק פינוי',
-    `${blockedEvac} פצועים ללא סטטוס פינוי סגור (${openEvacuationLabel(evacSplit)}) · שקול בקשת אמבולנס נוסף`
+  // Owner, 2026-10-24: patients waiting at the evacuation point need more civilian ambulances (any
+  // red, or two or more); patients still at the extraction site are carried by the rescuers, and CC
+  // can add medics or send the physician's ambulance.
+  const waitingRed=evacSplit.atPoint.filter(p=>p.triage==='red').length;
+  if(waitingRed || evacSplit.atPoint.length>=2) suggestions.push(roleRow(
+    'ממתינים לאמבולנס בנקודת פינוי',
+    `${evacSplit.atPoint.length} פצועים ממתינים לפינוי${waitingRed?` · ${waitingRed} אדומים`:''} · בקש אמבולנסים אזרחיים נוספים`
+  ));
+  if(evacSplit.onScene.length>=2) suggestions.push(roleRow(
+    'צוואר בקבוק פינוי באתר החילוץ',
+    `${evacSplit.onScene.length} פצועים עדיין באתר החילוץ · החילוץ מעביר לנקודת פינוי · שקול לשלוח חובשים נוספים או את אמבולנס הרופא`
   ));
   const suggestionsHtml=suggestions.length?suggestions.join(''):roleRow('אין המלצות כרגע','תמונת המצב תקינה');
   const focusedPts=focusFilteredList(patients, focusMatchesPatient);
