@@ -167,6 +167,18 @@ const ROLE_ALLOWED_EVENT_TYPES: Record<string, string[]> = {
   paramedic: [...CLINICAL_EVENTS, ...FIRST_RESPONDER_EVENTS, "INCIDENT_DRAFT_CREATED", "MEDIC_SITE_CLOSE_REQUESTED", ...MEDIC_SUPPLY_EVENTS, ...PRE_EVACUATION_EVENTS, ...MEDICAL_REQUEST_EVENTS, ...SYSTEM_EVENTS],
 };
 
+// Cric and needle decompression (MARCH-PAWS, V2.99.62): paramedic or physician only, by the
+// owner's rule (2026-10-23), no admin exception. They are not their own event types but a
+// treatment_type on AIRWAY_MANAGED / INTERVENTION_RECORDED, so they are checked here as well as
+// by events_insert_by_role (database/075), which is what holds against a direct insert.
+const ADVANCED_PROCEDURE_TREATMENTS = ["cric", "needle_decompression"];
+const ADVANCED_PROCEDURE_ROLES = ["paramedic", "physician"];
+function isAdvancedProcedureForbidden(role: string, type: string, payload: Record<string, unknown> | undefined): boolean {
+  if (type !== "AIRWAY_MANAGED" && type !== "INTERVENTION_RECORDED") return false;
+  const treatment = payload?.treatment_type;
+  return typeof treatment === "string" && ADVANCED_PROCEDURE_TREATMENTS.includes(treatment) && !ADVANCED_PROCEDURE_ROLES.includes(role);
+}
+
 function isEventTypeAllowed(role: string, type: string): boolean {
   if (role === "admin") return true;
   return (ROLE_ALLOWED_EVENT_TYPES[role] ?? []).includes(type);
@@ -349,6 +361,18 @@ async function handlePush(
         message: `Role '${callerRole}' is not permitted to write event type '${type}'.`,
       });
       await quarantine(evt, "FORBIDDEN_ACTOR_ROLE", `Role '${callerRole}' cannot write '${type}'.`);
+      continue;
+    }
+
+    if (isAdvancedProcedureForbidden(callerRole, type, payload_json)) {
+      const treatment = String(payload_json?.treatment_type);
+      rejected.push({
+        local_event_id,
+        terminal: true,
+        error_code: "FORBIDDEN_ACTOR_ROLE",
+        message: `Role '${callerRole}' cannot record '${treatment}' (paramedic or physician only).`,
+      });
+      await quarantine(evt, "FORBIDDEN_ACTOR_ROLE", `Role '${callerRole}' cannot record '${treatment}'.`);
       continue;
     }
 
