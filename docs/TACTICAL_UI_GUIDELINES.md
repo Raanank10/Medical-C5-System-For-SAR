@@ -55,7 +55,7 @@ The app should offer two entry paths:
 - Quick Patient: 10-15 second casualty creation with location/access/triage and all other fields treated as optional debt.
 - Extended Patient: full vitals, body map, interventions, and treatment detail.
 
-Extended Patient's treatment step is ordered by MARCH-PAWS (V2.99.62): M massive hemorrhage, A airway, R respiration, C circulation, H hypothermia / head injury, then P pain, A antibiotics, W wounds, S splinting. Each letter shows "טופל" (a treatment in it, or for M the step 3 immediate tourniquet), "נבדק - ללא טיפול" (the medic marked it checked) or "לא תועד". It is documentation only: no letter blocks saving, changes triage or raises an alert, and undocumented letters are shown as such on the summary, never hidden. Choosing a treatment withdraws that letter's "no treatment needed"; "no treatment needed" cannot be set on a letter that has a treatment. Each treatment is sent as its own event (A's as `AIRWAY_MANAGED`, the rest as `INTERVENTION_RECORDED`, tourniquets and pain medications on their existing events) with `march_section`, and the create event carries `march_review`. TXA and antibiotics are recorded as given, without a dose: the app computes no drug dose (owner 2026-10-23). New treatments do not change patient status (owner 2026-10-23). Cric and needle decompression can be recorded only by a paramedic or a physician (owner 2026-10-23): for any other role the buttons are dimmed, marked "פרמדיק / רופא", and a tap is refused with a toast. This is checked on the phone only; `sync-log` does not enforce it.
+Extended Patient's treatment step is ordered by MARCH-PAWS (V2.99.62): M massive hemorrhage, A airway, R respiration, C circulation, H hypothermia / head injury, then P pain, A antibiotics, W wounds, S splinting. Each letter shows "טופל" (a treatment in it, or for M the step 3 immediate tourniquet), "נבדק - ללא טיפול" (the medic marked it checked) or "לא תועד". It is documentation only: no letter blocks saving, changes triage or raises an alert, and undocumented letters are shown as such on the summary, never hidden. Choosing a treatment withdraws that letter's "no treatment needed"; "no treatment needed" cannot be set on a letter that has a treatment. Each treatment is sent as its own event (A's as `AIRWAY_MANAGED`, the rest as `INTERVENTION_RECORDED`, tourniquets and pain medications on their existing events) with `march_section`, and the create event carries `march_review`. TXA and antibiotics are recorded as given, without a dose: MARCH-PAWS adds no drug-dose calculation (owner 2026-10-23). The existing morphine and Actiq (fentanyl) handling is kept unchanged (owner 2026-10-24): the medic sets the morphine dose (default 5 mg; 0.5 mg steps for a child), Actiq is a fixed 100 mcg, and for a child the app estimates weight from age (age x 2 + 8 kg, at least 4 kg), shows and pre-fills the suggested pediatric dose, and asks for a double confirmation above it (see the pediatric dosing rule below). New treatments do not change patient status (owner 2026-10-23). Cric and needle decompression can be recorded only by a paramedic or a physician (owner 2026-10-23): for any other role the buttons are dimmed, marked "פרמדיק / רופא", and a tap is refused with a toast. The server enforces it too (owner 2026-10-23): `sync-log` refuses such an event from any other role with `FORBIDDEN_ACTOR_ROLE` (the phone shows a sync rejection), and `events_insert_by_role` refuses a direct insert (`database/075`).
 
 Quick Patient records must create `needs_full_assessment = true` and a commander-visible incomplete-assessment alert.
 
@@ -121,6 +121,19 @@ When Black is selected:
 ## Pediatric Medication Guardrail
 
 For children under age 8, the UI must not require exact weight before treatment. Use age group or age estimate locally, warn on adult-range doses, require double confirmation, and write override metadata into the event payload. The save action still completes locally; risk is escalated through watchdog alerts and AAR review.
+
+## Patient Detail Order (V2.99.65)
+
+Owner request: vital signs come first. The patient detail screen ("פרטי פצוע") reads top to bottom in the order a medic needs it in the field, following the monitor convention of large color-coded numbers plus how fresh they are:
+
+1. Safety banners (sync rejection, shared "בטיפול" acknowledgment).
+2. Hero card, framed in the triage color (dashed muted frame while triage is pending, never green): triage, status, age band, "עדכן מדדים", how old the vitals are and when the next reassessment is due (red when overdue or missing), the tourniquet clock, then pulse and SpO2 gauges with large colored values, RR, BP and AVPU, and the deterioration / priority recommendation.
+3. Active tourniquets with the limb / record correction (when any), then the vitals trend.
+4. Elderly warning, injury and location, treatments (this device and other devices).
+5. Evacuation, late MDA update, manual triage override, optional identity.
+6. Timeline.
+
+The title shows the patient number (`visualId`, e.g. P004-DK), not the internal UUID.
 
 ## Tourniquet Clock
 

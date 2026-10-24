@@ -1,5 +1,5 @@
--- WP-18 (V2.99.65): moving to the evacuation point vs arrived there, and since when.
--- Depends on 075's enum value. Decided with the repo owner 2026-10-24.
+-- WP-18 (V2.99.66): moving to the evacuation point vs arrived there, and since when.
+-- Depends on 076's enum value. Decided with the repo owner 2026-10-24.
 --
 -- Gap (docs/GAP_CLOSURE_PLAN.md WP-18): status 'evacuating' covered both "the rescuers are
 -- moving the patient to the evacuation point" and "waiting there for MDA", and nothing recorded
@@ -38,11 +38,11 @@ alter table patients add column if not exists evac_point_arrived_role text;
 alter table patients add column if not exists evac_point_cleared_at timestamptz;
 
 comment on column patients.evac_point_arrived_at is
-  'When the patient reached the site''s evacuation point (נקודת פינוי), from PATIENT_EVAC_POINT_ARRIVED''s phone time; earliest wins (database/076, WP-18).';
+  'When the patient reached the site''s evacuation point (נקודת פינוי), from PATIENT_EVAC_POINT_ARRIVED''s phone time; earliest wins (database/077, WP-18).';
 comment on column patients.evac_point_arrived_role is
-  'Role of whoever recorded the arrival at the evacuation point (database/076).';
+  'Role of whoever recorded the arrival at the evacuation point (database/077).';
 comment on column patients.evac_point_cleared_at is
-  'Set when the patient was taken back from the evacuation point; arrivals recorded before it are ignored (database/076).';
+  'Set when the patient was taken back from the evacuation point; arrivals recorded before it are ignored (database/077).';
 
 create or replace function public.project_evac_point_arrival()
 returns trigger

@@ -1,9 +1,9 @@
-// Real-browser test of WP-18 (V2.99.65, database/075-076): moving to the site's evacuation point
+// Real-browser test of WP-18 (V2.99.66, database/076-077): moving to the site's evacuation point
 // vs arrived there, and how long patients wait for MDA. Two medics, a PC and a CC (four tabs, one
 // browser context) share one fake backend in this Node process, the same harness as
 // scripts/browser_evacuation_tracking_test.js. The fake answers sync-log with its role gating
 // (PATIENT_EVAC_POINT_ARRIVED is a clinical event: medic/paramedic/physician/pc/admin) and mirrors
-// database/076: arrival from the phone's time, earliest wins, never later than the server clock,
+// database/077: arrival from the phone's time, earliest wins, never later than the server clock,
 // cleared when a later on-scene status takes the patient back. It proves client behavior only.
 //
 // Runs in CI through scripts/run_tests.js; also runs on its own.
@@ -80,14 +80,14 @@ function push(server, userId, body) {
     if (p && e.type === 'PATIENT_HANDED_OVER') { p.current_status = 'handed_over'; p.version++; }
     if (p && e.type === 'PATIENT_STATUS_UPDATED' && pj.status) {
       p.current_status = pj.status; p.version++;
-      // database/076: a later status that is neither evacuating nor final takes the patient back.
+      // database/077: a later status that is neither evacuating nor final takes the patient back.
       if (!['evacuating', 'handed_over', 'deceased', 'closed', 'self_evacuated'].includes(p.current_status)
         && (!p.evac_point_cleared_at || Date.parse(p.evac_point_cleared_at) < ts)) {
         if (p.evac_point_arrived_at && Date.parse(p.evac_point_arrived_at) < ts) { p.evac_point_arrived_at = null; p.evac_point_arrived_role = null; }
         p.evac_point_cleared_at = e.local_timestamp;
       }
     }
-    // database/076: earliest phone time wins, never later than the server clock, ignored if
+    // database/077: earliest phone time wins, never later than the server clock, ignored if
     // recorded before the patient was taken back from the point.
     if (p && e.type === 'PATIENT_EVAC_POINT_ARRIVED') {
       const at = Math.min(ts, Date.now());
