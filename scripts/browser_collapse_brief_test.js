@@ -46,12 +46,14 @@ async function checkFile(browser, file) {
 
   // Explosion: building section closed behind the question, explosion questions shown.
   assert(!(await visible('#enroute-building-section')), `${rel}: building section must be hidden for explosion until "yes"`);
+  assert(!(await visible('#enroute-floor')) && !(await visible('#enroute-apartment')), `${rel}: floor / apartment hidden until a building is involved`);
   assert(await visible('#enroute-building-ask'), `${rel}: explosion must ask whether a building is involved`);
   assert(await visible('#enroute-incident-details [data-incident-detail="hazmat"]'), `${rel}: explosion must ask about hazmat`);
   await page.click('#enroute-incident-details [data-incident-detail="setting"] [data-detail-value="enclosed"]');
   assert((await page.textContent('#enroute-incident-details')).includes('חבלת פיצוץ ראשונית'), `${rel}: enclosed explosion must warn about primary blast injury`);
   await page.click('#enroute-building-ask-grid [data-building-involved="yes"]');
   assert(await visible('#enroute-building-section'), `${rel}: "yes" must open the building section`);
+  assert(await visible('#enroute-floor') && await visible('#enroute-apartment'), `${rel}: "yes" must show floor / apartment`);
 
   // Partial collapse reported: brief pops with the collapse part, label shows it.
   await page.click('#enroute-type-grid .tap-btn:has-text("קריסה חלקית")');
@@ -66,6 +68,7 @@ async function checkFile(browser, file) {
   await page.click('#enroute-incident-type-grid [data-incident-type="missile_strike_structural_collapse"]');
   assert(!(await visible('#enroute-building-ask')), `${rel}: missile must not ask, the building section is always open`);
   assert(await visible('#enroute-building-section'), `${rel}: missile must show the building section`);
+  assert(await visible('#enroute-floor') && await visible('#enroute-apartment'), `${rel}: missile must show floor / apartment`);
   assert((await page.textContent('#enroute-incident-details')).trim() === '', `${rel}: missile has no extra type questions`);
   const missileBrief = await briefText();
   assert((missileBrief.match(/Crush/g) || []).length === 1, `${rel}: missile brief must mention crush once, got ${missileBrief}`);
@@ -92,6 +95,7 @@ async function checkFile(browser, file) {
   assert((await page.evaluate(() => incidentTypeLabel(currentSiteId()))).includes('ירי המוני + קריסת מבנה'), `${rel}: full collapse must add the collapse label`);
   await page.click('#enroute-building-ask-grid [data-building-involved="no"]');
   assert(!(await visible('#enroute-building-section')), `${rel}: "no" must close the building section`);
+  assert(!(await visible('#enroute-floor')), `${rel}: "no" must hide floor / apartment`);
   assert(!(await page.evaluate(() => incidentTypeLabel(currentSiteId()))).includes('קריסת מבנה'), `${rel}: "no" must clear the collapse`);
 
   // Road accident questions, per type: the shooting answers are not mixed in.

@@ -953,7 +953,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9964</div>
+      <div class="demo-kicker">Demo V2.9965</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1050,7 +1050,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9964</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9965</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1060,7 +1060,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9964</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9965</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -1118,7 +1118,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     <div id="enroute-address-source" style="font-size:12px;color:var(--accent);margin-bottom:12px"></div>
     <div class="field-label">הערכת זמן הגעה — אופציונלי</div>
     <input type="text" id="enroute-eta" placeholder="לדוגמה: 7 דקות / 14:35" style="margin-bottom:12px" oninput="siteData.eta=this.value">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+    <div id="enroute-floor-apt" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
       <input type="text" id="enroute-floor" placeholder="קומה / אגף" oninput="siteData.floorHint=this.value">
       <input type="text" id="enroute-apartment" placeholder="דירה / כניסה" oninput="siteData.apartmentHint=this.value">
     </div>
@@ -3187,7 +3187,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.64';
+const APP_VERSION = '2.99.65';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -5096,6 +5096,10 @@ function setEnrouteIncidentDetail(key, value){
 function enrouteBuildingInvolved(){
   return siteData.buildingInvolved===true || (siteData.buildingInvolved==null && !!siteData.buildingType);
 }
+// The building section and the floor / apartment fields (V2.99.63) show together.
+function enrouteBuildingShown(){
+  return ensureSiteStatusFields(currentSiteId()).incidentType==='missile_strike_structural_collapse' || enrouteBuildingInvolved();
+}
 function setEnrouteBuildingInvolved(involved){
   siteData.buildingInvolved=!!involved;
   if(!involved){
@@ -5112,8 +5116,10 @@ function renderEnrouteSiteDetails(){
   const involved=enrouteBuildingInvolved();
   const ask=document.getElementById('enroute-building-ask');
   const section=document.getElementById('enroute-building-section');
+  const floorApt=document.getElementById('enroute-floor-apt');
   if(ask) ask.style.display=isMissile?'none':'block';
-  if(section) section.style.display=(isMissile||involved)?'block':'none';
+  if(section) section.style.display=enrouteBuildingShown()?'block':'none';
+  if(floorApt) floorApt.style.display=enrouteBuildingShown()?'grid':'none';
   document.querySelectorAll('#enroute-building-ask-grid .tap-btn').forEach(b=>{
     b.classList.toggle('selected', b.dataset.buildingInvolved===(involved?'yes':siteData.buildingInvolved===false?'no':''));
   });
@@ -8942,7 +8948,7 @@ function setSweepTourniquetLimb(limb, tourniquetId=pendingTourniquetLimbId, pati
 }
 // After a limb fix or a cancelled entry, refresh whichever screen the medic made it from.
 function rerenderAfterTourniquetFix(p){
-  if(activeScreenId()==='patient' && document.getElementById('detail-pid')?.textContent===p.id) openPatient(p.id);
+  if(activeScreenId()==='patient' && document.getElementById('detail-pid')?.dataset.patientId===p.id) openPatient(p.id);
   else renderMstartSweep();
 }
 function cancelLastTourniquetEntry(tourniquetId=null, patientId=null){
@@ -10082,8 +10088,10 @@ function arriveAtSite(){
   const address=document.getElementById('enroute-address')?.value.trim() || siteData.address || 'מוקד חדש';
   const notes=document.getElementById('enroute-notes')?.value.trim() || '';
   logEnroutePrefillCorrections(document.getElementById('enroute-address')?.value.trim()||'', notes);
-  const floor=document.getElementById('enroute-floor')?.value.trim() || siteData.floorHint || '';
-  const apt=document.getElementById('enroute-apartment')?.value.trim() || siteData.apartmentHint || '';
+  // Hidden floor / apartment (no building involved) are not part of the arrival.
+  const building=enrouteBuildingShown();
+  const floor=building ? (document.getElementById('enroute-floor')?.value.trim() || siteData.floorHint || '') : '';
+  const apt=building ? (document.getElementById('enroute-apartment')?.value.trim() || siteData.apartmentHint || '') : '';
   const eta=document.getElementById('enroute-eta')?.value.trim() || siteData.eta || '';
   const zone=document.getElementById('enroute-zone')?.value.trim() || siteData.currentZone || [floor,apt].filter(Boolean).join(' / ');
   siteData.address=address;
@@ -10348,7 +10356,11 @@ async function savePatientIdentity(id){
 }
 function openPatient(id){
   const p=patients.find(x=>x.id===id); if(!p) return;
-  document.getElementById('detail-pid').textContent=p.id;
+  // The title shows the patient number; the internal id stays on the element for code that
+  // needs to know which patient is open (rerenderAfterTourniquetFix).
+  const pidEl=document.getElementById('detail-pid');
+  pidEl.textContent=p.visualId||p.id;
+  pidEl.dataset.patientId=p.id;
   const sCol=s=>!s?'var(--muted)':s<94?'var(--red)':s<97?'var(--yellow)':'var(--green)';
   // Mirrors the lowBP/weakBP/hasPerfusion categories inside computeMstartTriage
   // (src/domain/rules.js) - display-only reuse of the same triage-relevant grouping,
@@ -10374,28 +10386,65 @@ function openPatient(id){
     return pulsePediatric ? (v<70?'var(--yellow)':v>140?'var(--red)':'var(--green)') : (v<60?'var(--yellow)':v>100?'var(--red)':'var(--green)');
   };
   const tq=tourniquetTimerLabel(p);
+  // Hero card (V2.99.63): vitals first, framed in the triage color, with how old they are.
+  const heroColor={red:'var(--red)',yellow:'var(--yellow)',green:'var(--green)',black:'var(--black)'}[triageKey(p.triage)]||'var(--muted)';
+  const vt=C5Rules.vitalsTimer(p);
+  const vAgeMin=Math.floor((vitalsAgeMs(p)||0)/60000);
+  const hasVitals=p.vitals && (p.vitals.pulse!=null || p.vitals.spo2!=null || p.vitals.rr!=null || p.vitals.avpu || p.vitals.bp_estimate);
+  const vitalsAgeText=!hasVitals ? 'אין מדדים עדיין'
+    : vt?.cls==='overdue' ? `מדדים באיחור · נמדדו לפני ${vt.minutes} דק׳`
+    : vt ? `נמדדו לפני ${vt.minutes} דק׳ · הבא בעוד ${vt.remainingMinutes} דק׳`
+    : p.lastVitalsAt ? `נמדדו לפני ${vAgeMin} דק׳` : 'מועד המדידה לא ידוע';
+  const vitalsAgeColor=!hasVitals||vt?.cls==='overdue' ? 'var(--red)' : vt?.cls==='warn' ? 'var(--yellow)' : 'var(--muted)';
   document.getElementById('detail-body').innerHTML=`
     ${patientSyncRejectionBanner(p)}
     ${alertAcknowledgmentLine(p)}
+    <div class="summary-card patient-hero" style="border:2px ${triageKey(p.triage)==='pending'?'dashed':'solid'} ${heroColor};border-top-width:8px;padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${triagePill(p.triage)}<span style="font-weight:700;font-size:14px">${STATUS_LABELS[p.patientStatus]||''}</span><span style="font-size:12px;color:var(--muted)">${AGE_BAND_LABELS[ageBandOf(p)]}</span></div>
+        <button onclick="openQuickVitals('${p.id}')" style="background:var(--accent);border:none;color:white;border-radius:20px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;min-height:44px">עדכן מדדים</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <span class="patient-hero-vitals-age" style="font-size:12px;font-weight:700;padding:5px 10px;border-radius:20px;border:1px solid ${vitalsAgeColor};color:${vitalsAgeColor}">${vitalsAgeText}</span>
+        ${tq?`<span class="tq-timer ${tq.cls}">${tq.label}</span>`:''}
+      </div>
+      ${remoteVitalsSourceLine(p)}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div style="background:var(--surface2);border-radius:12px;padding:6px 8px 10px">${renderGaugeArc({value:p.vitals.pulse,min:40,max:180,needleColor:pulseCol(p.vitals.pulse),zones:pulseZones,label:'דופק bpm',size:130,valueSize:34,valueColor:pulseCol(p.vitals.pulse)})}</div>
+        <div style="background:var(--surface2);border-radius:12px;padding:6px 8px 10px">${renderGaugeArc({value:p.vitals.spo2||null,min:80,max:100,valueLabel:p.vitals.spo2?`${p.vitals.spo2}%`:null,needleColor:sCol(p.vitals.spo2),zones:[{from:80,to:94,color:'var(--red)'},{from:94,to:97,color:'var(--yellow)'},{from:97,to:100,color:'var(--green)'}],label:'SpO₂',size:130,valueSize:34,valueColor:sCol(p.vitals.spo2)})}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:8px;margin-bottom:10px">
+        <div style="background:var(--surface2);border-radius:12px;padding:10px 6px;text-align:center"><div style="font-family:var(--mono);font-size:${vitalObserved(p,'rr')||p.vitals.rr===0?'30px':'15px'};font-weight:800;line-height:1.1;color:#f4a261">${rrDisplay(p)}</div><div style="font-size:11px;color:var(--muted)">נשימות / דקה</div></div>
+        <div style="background:var(--surface2);border-radius:12px;padding:10px 6px;text-align:center;display:flex;flex-direction:column;justify-content:center"><div style="font-family:var(--mono);font-size:15px;font-weight:800;line-height:1.3;color:${bpCol(p.vitals.bp_estimate)}">${BP_LABELS[p.vitals.bp_estimate]||'—'}</div><div style="font-size:11px;color:var(--muted)">לחץ דם${vitalSourceTag(p,'bp_estimate')}</div></div>
+        <div style="background:var(--surface2);border-radius:12px;padding:10px 6px;text-align:center"><div style="font-family:var(--mono);font-size:30px;font-weight:800;line-height:1.1;color:${p.vitals.avpu==='A'?'var(--green)':p.vitals.avpu==='U'?'var(--red)':'var(--yellow)'}">${p.vitals.avpu||'—'}</div><div style="font-size:11px;color:var(--muted)">AVPU${vitalSourceTag(p,'avpu')}</div></div>
+      </div>
+      ${p.deterioration&&p.deterioration.length?`<div style="background:rgba(230,57,70,0.1);border:1px solid var(--red);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:700;font-size:12px;color:var(--red);margin-bottom:3px">⚠ הידרדרות זוהתה</div><div style="font-size:12px">${p.deterioration.join(' · ')}</div></div>`:''}
+      ${p.priorityRecommendation?`<div style="background:rgba(255,107,53,0.12);border:1px solid var(--orange);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:800;font-size:12px;color:var(--orange);margin-bottom:5px">הידרדרות במדדים — מומלץ לשקול שינוי קדימות</div><div style="font-size:12px;margin-bottom:8px">${TRIAGE_LABELS[p.priorityRecommendation.current]||p.priorityRecommendation.current} → ${TRIAGE_LABELS[p.priorityRecommendation.suggested]||p.priorityRecommendation.suggested}</div><div class="tap-grid tap-grid-2"><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','update')">עדכן קדימות</button><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','keep')">השאר קדימות</button><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','pc_review')">בקש חוג"ד</button><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','doctor')">בקש פראמדיק/רופא</button></div></div>`:''}
+    </div>
+    ${patientTourniquetFixHtml(p)}
     <div class="summary-card">
-      <div class="summary-row"><span class="summary-key">מיון</span><span class="summary-val">${triagePill(p.triage)}</span></div>
+      <div style="font-weight:700;font-size:14px;margin-bottom:12px">מגמת מדדים</div>
+      ${buildTrendChart(p.vitalsHistory)}
+    </div>
+    ${ageBandOf(p)==='elderly'?`<div class="summary-card" style="border-color:var(--orange);background:rgba(255,107,53,0.08)"><div style="font-weight:700;font-size:12px;color:var(--orange)">⚠ קשיש</div><div style="font-size:12px;margin-top:3px">מדדים תקינים לא שוללים הלם — פרפוזיה עלולה להיפגע ללא עלייה בדופק (חוסמי בטא, שינויים אוטונומיים). אל תסתמך על דופק/לחץ דם תקינים לבד.</div></div>`:''}
+    <div class="summary-card">
+      <div style="font-weight:700;font-size:14px;margin-bottom:6px">פציעה ומיקום</div>
       <div class="summary-row"><span class="summary-key">מיקום</span><span class="summary-val">${p.location}${p.locDetail?' · '+p.locDetail:''}</span></div>
       <div class="summary-row"><span class="summary-key">חילוץ</span><span class="summary-val">${TRAP_LABELS[normalizeTrapStatus(p)]||'לא תועד'}</span></div>
       <div class="summary-row"><span class="summary-key">פציעה</span><span class="summary-val">${p.injury}</span></div>
-      <div class="summary-row"><span class="summary-key">מצב</span><span class="summary-val">${STATUS_LABELS[p.patientStatus]||''}</span></div>
-      <div class="summary-row"><span class="summary-key">קבוצת גיל</span><span class="summary-val">${AGE_BAND_LABELS[ageBandOf(p)]}</span></div>
-      ${tq?`<div class="summary-row"><span class="summary-key">חסם עורקים</span><span class="summary-val"><span class="tq-timer ${tq.cls}">${tq.label}</span></span></div>`:''}
     </div>
-    ${patientTourniquetFixHtml(p)}
-    ${ageBandOf(p)==='elderly'?`<div class="summary-card" style="border-color:var(--orange);background:rgba(255,107,53,0.08)"><div style="font-weight:700;font-size:12px;color:var(--orange)">⚠ קשיש</div><div style="font-size:12px;margin-top:3px">מדדים תקינים לא שוללים הלם — פרפוזיה עלולה להיפגע ללא עלייה בדופק (חוסמי בטא, שינויים אוטונומיים). אל תסתמך על דופק/לחץ דם תקינים לבד.</div></div>`:''}
-    <div class="summary-card">
-      <div style="font-weight:700;font-size:14px;margin-bottom:8px">זיהוי (אופציונלי)</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">לא חובה למלא. ניתן להשלים בכל שלב, כשיש זמן.</div>
-      <input type="text" id="identity-name-input" placeholder="שם (אם ידוע)" value="${escAttr(p.fullName&&p.fullName!=='לא מזוהה'?p.fullName:'')}" style="margin-bottom:8px">
-      <input type="text" id="identity-desc-input" placeholder="תיאור זיהוי / לבוש (אם ידוע)" value="${escAttr(p.temporaryDescription||'')}" style="margin-bottom:10px">
-      <button class="btn-secondary" onclick="savePatientIdentity('${p.id}')">שמור זיהוי</button>
-    </div>
+    ${p.txHistory&&p.txHistory.length?`
+    <div style="margin-bottom:4px"><div class="section-label" style="padding:0 0 8px">היסטוריית טיפולים (${p.txHistory.length})</div>
+    ${p.txHistory.map(tx=>`<div class="tx-history-item"><div class="tx-history-time">${tx.time}</div><div class="tx-history-text">${tx.text}</div><div class="tx-history-medic">חובש: ${tx.medic}</div></div>`).join('')}
+    </div>`:''}
+    ${remoteTreatmentsSection(p)}
     ${renderPatientEvacuationCard(p)}
+    ${['evacuating','evacuated','handed_over'].includes(p.patientStatus)?`
+    <div class="summary-card">
+      <div style="font-weight:700;font-size:14px;margin-bottom:8px">עדכון מאוחר ממד״א / גורם חיצוני</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px">ניתן להוסיף מידע גם אחרי חילוץ. הדיווח יכלול את שם האירוע והפלוגה המטפלת.</div>
+      <button class="btn-secondary" onclick="openLateExternalPatientUpdate('${p.id}')">הוסף עדכון לפצוע מחולץ</button>
+    </div>`:''}
     <div class="summary-card">
       <div style="font-weight:700;font-size:14px;margin-bottom:10px">סיווג פינוי — עקיפת מפקד ידנית</div>
       <div class="tap-grid tap-grid-4">
@@ -10406,36 +10455,12 @@ function openPatient(id){
       </div>
     </div>
     <div class="summary-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div style="font-weight:700;font-size:14px">מדדים נוכחיים</div>
-        <button onclick="openQuickVitals('${p.id}')" style="background:var(--accent);border:none;color:white;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">עדכן מדדים</button>
-      </div>
-      ${remoteVitalsSourceLine(p)}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        <div style="background:var(--surface2);border-radius:10px;padding:6px 10px 10px">${renderGaugeArc({value:p.vitals.pulse,min:40,max:180,needleColor:pulseCol(p.vitals.pulse),zones:pulseZones,label:'דופק bpm'})}</div>
-        <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:${vitalObserved(p,'rr')||p.vitals.rr===0?'22px':'14px'};font-weight:700;color:#f4a261">${rrDisplay(p)}</div><div style="font-size:11px;color:var(--muted)">נשימות / דקה</div></div>
-        <div style="background:var(--surface2);border-radius:10px;padding:6px 10px 10px">${renderGaugeArc({value:p.vitals.spo2||null,min:80,max:100,valueLabel:p.vitals.spo2?`${p.vitals.spo2}%`:null,needleColor:sCol(p.vitals.spo2),zones:[{from:80,to:94,color:'var(--red)'},{from:94,to:97,color:'var(--yellow)'},{from:97,to:100,color:'var(--green)'}],label:'SpO₂'})}</div>
-        <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:13px;font-weight:700;color:${bpCol(p.vitals.bp_estimate)}">${BP_LABELS[p.vitals.bp_estimate]||'—'}</div><div style="font-size:11px;color:var(--muted)">לחץ דם${vitalSourceTag(p,'bp_estimate')}</div></div>
-        <div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:${p.vitals.avpu==='A'?'var(--green)':p.vitals.avpu==='U'?'var(--red)':'var(--yellow)'}">${p.vitals.avpu||'—'}</div><div style="font-size:11px;color:var(--muted)">AVPU${vitalSourceTag(p,'avpu')}</div></div>
-      </div>
-      ${p.deterioration&&p.deterioration.length?`<div style="background:rgba(230,57,70,0.1);border:1px solid var(--red);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:700;font-size:12px;color:var(--red);margin-bottom:3px">⚠ הידרדרות זוהתה</div><div style="font-size:12px">${p.deterioration.join(' · ')}</div></div>`:''}
-      ${p.priorityRecommendation?`<div style="background:rgba(255,107,53,0.12);border:1px solid var(--orange);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:800;font-size:12px;color:var(--orange);margin-bottom:5px">הידרדרות במדדים — מומלץ לשקול שינוי קדימות</div><div style="font-size:12px;margin-bottom:8px">${TRIAGE_LABELS[p.priorityRecommendation.current]||p.priorityRecommendation.current} → ${TRIAGE_LABELS[p.priorityRecommendation.suggested]||p.priorityRecommendation.suggested}</div><div class="tap-grid tap-grid-2"><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','update')">עדכן קדימות</button><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','keep')">השאר קדימות</button><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','pc_review')">בקש חוג"ד</button><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','doctor')">בקש פראמדיק/רופא</button></div></div>`:''}
+      <div style="font-weight:700;font-size:14px;margin-bottom:8px">זיהוי (אופציונלי)</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">לא חובה למלא. ניתן להשלים בכל שלב, כשיש זמן.</div>
+      <input type="text" id="identity-name-input" placeholder="שם (אם ידוע)" value="${escAttr(p.fullName&&p.fullName!=='לא מזוהה'?p.fullName:'')}" style="margin-bottom:8px">
+      <input type="text" id="identity-desc-input" placeholder="תיאור זיהוי / לבוש (אם ידוע)" value="${escAttr(p.temporaryDescription||'')}" style="margin-bottom:10px">
+      <button class="btn-secondary" onclick="savePatientIdentity('${p.id}')">שמור זיהוי</button>
     </div>
-    ${['evacuating','evacuated','handed_over'].includes(p.patientStatus)?`
-    <div class="summary-card">
-      <div style="font-weight:700;font-size:14px;margin-bottom:8px">עדכון מאוחר ממד״א / גורם חיצוני</div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px">ניתן להוסיף מידע גם אחרי חילוץ. הדיווח יכלול את שם האירוע והפלוגה המטפלת.</div>
-      <button class="btn-secondary" onclick="openLateExternalPatientUpdate('${p.id}')">הוסף עדכון לפצוע מחולץ</button>
-    </div>`:''}
-    <div class="summary-card">
-      <div style="font-weight:700;font-size:14px;margin-bottom:12px">מגמת מדדים</div>
-      ${buildTrendChart(p.vitalsHistory)}
-    </div>
-    ${p.txHistory&&p.txHistory.length?`
-    <div style="margin-bottom:4px"><div class="section-label" style="padding:0 0 8px">היסטוריית טיפולים (${p.txHistory.length})</div>
-    ${p.txHistory.map(tx=>`<div class="tx-history-item"><div class="tx-history-time">${tx.time}</div><div class="tx-history-text">${tx.text}</div><div class="tx-history-medic">חובש: ${tx.medic}</div></div>`).join('')}
-    </div>`:''}
-    ${remoteTreatmentsSection(p)}
     <div class="section-label" style="padding:0 0 8px">Timeline</div>
     ${p.events.map((e,i)=>`
       <div class="timeline-entry">
@@ -10778,7 +10803,7 @@ function manualTriageOverride(id, triage){
 // existing threshold already used elsewhere in the app (e.g. SpO2's <94/<97 split, or OPI's
 // score bands) - this renderer does not define new clinical/operational thresholds itself,
 // callers must pass zones derived from logic that already exists.
-function renderGaugeArc({value, min, max, zones, needleColor, size=92, label, valueLabel}={}){
+function renderGaugeArc({value, min, max, zones, needleColor, size=92, label, valueLabel, valueSize=16, valueColor}={}){
   if(value==null || !isFinite(value)){
     return `<div style="font-size:20px;font-weight:700;color:var(--muted);text-align:center;padding:14px 0">—</div>${label?`<div style="font-size:11px;color:var(--muted);text-align:center">${label}</div>`:''}`;
   }
@@ -10804,8 +10829,8 @@ function renderGaugeArc({value, min, max, zones, needleColor, size=92, label, va
       <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${nColor}" stroke-width="2.5" stroke-linecap="round"/>
       <circle cx="${cx}" cy="${cy}" r="3.5" fill="${nColor}"/>
     </svg>
-    <div style="font-family:var(--mono);font-size:16px;font-weight:800;margin-top:-2px">${displayVal}</div>
-    ${label?`<div style="font-size:10px;color:var(--muted)">${label}</div>`:''}
+    <div style="font-family:var(--mono);font-size:${valueSize}px;font-weight:800;line-height:1.1;margin-top:-2px${valueColor?`;color:${valueColor}`:''}">${displayVal}</div>
+    ${label?`<div style="font-size:${valueSize>16?12:10}px;color:var(--muted)">${label}</div>`:''}
   </div>`;
 }
 function buildTrendChart(history){
