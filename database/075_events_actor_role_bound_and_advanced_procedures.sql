@@ -21,7 +21,10 @@
 --
 -- Everything else in the policy is the 027 text unchanged.
 --
--- Applied live 2026-10-24 by the owner from the SQL editor; sync-log v14 deployed the same day.
+-- Written as 074, renumbered 075 after main's 074_role_clinical_scope (which changes the events
+-- read policy, not this insert policy).
+-- Applied live 2026-10-24 by the owner from the SQL editor; sync-log v14 deployed the same day
+-- (v15 right after: the same code, only its comment renumbered to 075).
 -- Checked right after: pg_policies shows this exact text. Then 11 inserts as real accounts
 -- (request.jwt.claims + role authenticated) in one transaction that was rolled back, with a
 -- temporary incident membership for the medic and pc inside it; nothing was left behind:

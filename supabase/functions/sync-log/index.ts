@@ -170,7 +170,7 @@ const ROLE_ALLOWED_EVENT_TYPES: Record<string, string[]> = {
 // Cric and needle decompression (MARCH-PAWS, V2.99.62): paramedic or physician only, by the
 // owner's rule (2026-10-23), no admin exception. They are not their own event types but a
 // treatment_type on AIRWAY_MANAGED / INTERVENTION_RECORDED, so they are checked here as well as
-// by events_insert_by_role (database/074), which is what holds against a direct insert.
+// by events_insert_by_role (database/075), which is what holds against a direct insert.
 const ADVANCED_PROCEDURE_TREATMENTS = ["cric", "needle_decompression"];
 const ADVANCED_PROCEDURE_ROLES = ["paramedic", "physician"];
 function isAdvancedProcedureForbidden(role: string, type: string, payload: Record<string, unknown> | undefined): boolean {
