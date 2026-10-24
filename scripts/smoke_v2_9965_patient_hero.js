@@ -1,4 +1,4 @@
-// V2.99.63: patient detail leads with a vitals hero card; identity and triage override move down,
+// V2.99.65: patient detail leads with a vitals hero card; identity and triage override move down,
 // and the title shows the patient number, not the UUID. String-assertion smoke, manual-only.
 const fs = require('fs');
 const path = require('path');

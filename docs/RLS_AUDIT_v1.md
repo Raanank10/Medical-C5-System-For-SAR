@@ -444,3 +444,23 @@ Verified live 2026-10-22: a rolled-back dry run (an `MSTART_OVERRIDE` still writ
 Verified live 2026-10-22 in a rolled-back block: a resent event closed its rejection and linked `reconciled_event_id`; a medic and a medic who is not a member were refused; `not_recoverable` with a blank note and an unknown reason were refused; the PC closed one (`resolved_by` set, `resolution_notes` = reason), a second close returned `changed: false`; a direct `update` as the PC changed 0 rows; a rejection with no incident was refused for the PC; the CC closed one with a note.
 
 `get_advisors` (security) after applying: `resolve_sync_ingestion_error()` appears only under the usual `authenticated_security_definer_function_executable` notice, like the other command RPCs.
+
+## Follow-up: clinical read scope per role (`database/074`, V2.99.63)
+
+Owner decisions 2026-10-23: logistics sees the medics' bags, not patients; the rescue chain (rpc, rcc) sees no clinical data, only an evacuation priority (urgent / not urgent / not yet sorted) and the evacuation order. Medics are unchanged. Detail: `docs/ROLE_COMMAND_MODEL_v2.8.md` "Clinical data stays with the medical roles" and `docs/AUTH_AND_ROLE_MODEL.md` "Clinical read scope".
+
+Measured live before the change (read-only, 2026-10-23, each role's synthetic account with row security applied): cc, physician and paramedic read all 55 events of the active site (19 clinical); pc, rcc, rpc, medics of other units and logistics read nothing outside their scope. From the definitions: `join_incident()` lets `logistics_officer` join any open site and then read every patient and clinical event; rpc / rcc read every `patients` column (including `current_triage`, `pulse_present`, `breathing_present`, `injury_zones`, `mda_classification`), `tourniquets`, `watchdog_alerts`, external and pre-evacuation reports and the colour / tourniquet / evacuation events.
+
+| Object | Change |
+|---|---|
+| `app.can_read_incident_clinical(id)` | New: `app.can_read_incident_patients(id)` and role not `logistics_officer` / `rpc` / `rcc`. |
+| `patients`, `tourniquets`, `watchdog_alerts`, `external_reports`, `external_patient_links`, `incident_pre_evacuations` | Read policy uses the new helper. |
+| `events` | rpc / rcc and logistics read an allowlist plus their own events. Rescue: incident and site lifecycle, identity, location, access, supply requests. Logistics: incident lifecycle, supply requests, stock moves between holders (not `SUPPLY_CONSUMED`, `INVENTORY_LEDGER_MOVEMENT`, `RESUPPLY_*`, which carry the patient). |
+| `inventory_ledger_v12` | Read policy excludes `logistics_officer`. |
+| `get_incident_stock_movements(id)` | New `SECURITY DEFINER`, gated by `app.can_read_incident_patients`; the ledger rows without `patient_id` / `payload_json`. |
+| `get_rescue_patient_board(id)` | New `SECURITY DEFINER`, rpc / rcc / admin only, gated by `app.can_read_incident_patients`; tactical fields, priority and the place in the evacuation order (the score is not returned: it would show minutes on a tourniquet). |
+| `get_incident_command_state(id)` | Refuses `logistics_officer`, `rpc`, `rcc`. |
+
+Verified before applying on a local PostgreSQL 16 built from every `database/*.sql` file in order (only the two `pg_cron` schedule lines in `028` and `072` skipped), with Supabase-like `authenticated` / `auth.uid()`: `074` applies, and applies again as a no-op; `scripts/rls_test_074_role_clinical_scope.sql` passes all 31 checks (medic and pc of the site unchanged; rpc / rcc read 0 patient, tourniquet and clinical-event rows and get the board in the expected order, a deceased patient with an active tourniquet last; another unit's board refused; logistics joins, reads 0 patient / clinical / patient-linked rows and 0 ledger rows directly, gets the stock movements without a patient column, and is refused the board and the command snapshot; cc unchanged).
+
+**Applied live 2026-10-23** (through the SQL editor, so it is not in the migration history; it was written as `073` and renumbered `074` because main's `073_full_assessment_all_vitals` landed first). Verified live the same day: `scripts/rls_test_074_role_clinical_scope.sql`, run against the real synthetic accounts in one rolled-back block, passed all 31 checks, and afterwards no test incident, company, patient, event or logistics membership remained.
