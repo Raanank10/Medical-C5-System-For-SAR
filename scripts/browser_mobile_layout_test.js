@@ -185,7 +185,8 @@ async function checkViewport(browser, vp) {
 
 (async () => {
   if (shotsDir) fs.mkdirSync(shotsDir, { recursive: true });
-  const browser = await chromium.launch();
+  const preinstalled = '/opt/pw-browsers/chromium';
+  const browser = await chromium.launch(fs.existsSync(preinstalled) ? { executablePath: preinstalled } : {});
   let problems = [];
   try {
     for (const vp of VIEWPORTS) problems = problems.concat(await checkViewport(browser, vp));

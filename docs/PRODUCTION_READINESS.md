@@ -23,9 +23,9 @@ This is enough for workflow validation and engineering iteration. It is not enou
 ### Engineering
 
 - [ ] Split prototype into app/service packages — `docs/ROADMAP.md` Phase 4, not started; this is the next major undertaking, not something folded into Phase 3.
-- [~] Add automated browser tests for New Patient, command dashboard, and AAR flows — `scripts/browser_smoke_test.js` (Playwright) verifies the app actually loads and initializes in a real browser, but only checks startup state (login screen, `C5DomainRules` loaded), not full interaction through any of these three flows.
+- [~] Add automated browser tests for New Patient, command dashboard, and AAR flows — 38 Playwright tests (`scripts/browser_*.js`), all run in CI since WP-13. New Patient is covered end to end (e.g. `browser_intake_clinical_sync_test.js`, `browser_march_paws_test.js`, `browser_vitals_not_counted_test.js`), and so is the command dashboard (`browser_command_panel_test.js`, `browser_command_scope_test.js`). AAR is covered only through the stored report shown at incident close (`browser_incident_close_report_test.js`); the AAR screen itself has no interaction test.
 - [~] Add unit tests for all domain rules — `tests/domain-rules.test.js` covers triage, vitals, tourniquet, device-silence, patient-status guards, and inventory burn-rate rules substantially, but "all" is a stronger claim than has been verified; new rules added to `src/domain/rules.js` need matching tests, not an automatic guarantee.
-- [ ] Add executable database migrations — still versioned draft SQL files applied by hand (`database/001_...sql` through `055_...sql`), no migration framework or `up`/`down` tooling.
+- [ ] Add executable database migrations — still versioned draft SQL files applied by hand (`database/001_...sql` through `078_...sql`), no migration framework or `up`/`down` tooling.
 - [x] Implement real local persistence — `index.html`'s `patients[]`/`state.localEvents` in `localStorage`.
 - [x] Implement sync push/pull with conflict and poison-event handling — real, deployed `supabase/functions/sync-log` Edge Function; poison events land in `sync_ingestion_errors` and are now visible in a dedicated command review panel, not just a numeric count.
 - [x] Enforce idempotent sync by `device_id + local_event_id` at the database layer — `unique (device_id, local_event_id)` on `events`.
