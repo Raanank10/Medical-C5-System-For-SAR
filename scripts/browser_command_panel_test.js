@@ -216,6 +216,39 @@ async function checkFile(browser, file) {
   assert(advice.hints.includes('טיפול לפני החילוץ') && advice.hints.includes('החילוץ מעביר לנקודת פינוי') && !advice.hints.includes('שייך אמבולנס'),
     `${rel}: extraction-site hints: treat trapped patients before extraction, rescuers carry free ones; never "assign an ambulance"`);
 
+  // 11. CC overview: every open incident's patients by triage colour in one table (owner, 2026-10-25).
+  const table = await page.evaluate(async () => {
+    const rowsOf = () => [...document.querySelectorAll('[data-cmd-panel="overview"] [data-incident-triage-table] tr')]
+      .map((tr) => [...tr.children].map((c) => c.textContent.trim()));
+    goTo('demo'); startRoleDashboard('cc');
+    const demo = rowsOf();
+    const demoExpected = ['SITE_A', 'SITE_B'].map((id) => getSitePatients(id).length);
+    // Signed in (stubbed): other incidents come from one patients query; the active one from this phone.
+    const fakeClient = { from: (t) => ({ select: () => ({ in: async (_c, ids) => ({ error: null, data: t !== 'patients' ? [] : [
+      { incident_id: 'inc-b', current_triage: 'red' }, { incident_id: 'inc-b', current_triage: 'red' },
+      { incident_id: 'inc-b', current_triage: 'yellow' }, { incident_id: 'inc-b', current_triage: 'unknown' },
+      { incident_id: 'inc-x', current_triage: 'red' },
+    ].filter((r) => ids.includes(r.incident_id)) }) }) }) };
+    currentUser = { id: 'stub-cc', email: 'cc@test', role: 'cc' };
+    _openIncidents = [{ id: 'inc-a', visual_id: 'INC-1', location_name: 'אתר א' }, { id: 'inc-b', visual_id: 'INC-2', location_name: 'אתר ב' }];
+    activeIncident = { id: 'inc-a', visual_id: 'INC-1' };
+    await pullAllIncidentTriage(fakeClient);
+    renderRoleDashboard('cc');
+    const live = rowsOf();
+    const ownLocal = getSitePatients('SITE_A').length;
+    currentUser = null; activeIncident = null; _openIncidents = []; _allIncidentTriage = {};
+    return { demo, demoExpected, live, ownLocal };
+  });
+  const head = table.demo[0];
+  assert(head.join('|') === 'אירוע|אדום|צהוב|ירוק|שחור|ממתין|סה״כ', `${rel}: triage table columns (got ${head})`);
+  assert(table.demo.length === 4 && Number(table.demo[1][6]) === table.demoExpected[0] && Number(table.demo[2][6]) === table.demoExpected[1]
+    && Number(table.demo[3][6]) === table.demoExpected[0] + table.demoExpected[1], `${rel}: demo table has one row per site plus a total (got ${JSON.stringify(table.demo)})`);
+  const incB = table.live.find((r) => r[0].startsWith('INC-2'));
+  const incA = table.live.find((r) => r[0].startsWith('INC-1'));
+  assert(incB && incB.slice(1).join(',') === '2,1,0,0,1,4', `${rel}: another incident's counts come from the server query, unknown as pending (got ${incB})`);
+  assert(incA && incA[0].includes('שלי') && Number(incA[6]) === table.ownLocal, `${rel}: the active incident is counted from this phone (got ${incA})`);
+  assert(!table.live.some((r) => r[0].startsWith('inc-x')), `${rel}: only open incidents are listed`);
+
   assert(!errors.length, `${rel}: page errors: ${errors.join(' | ')}`);
   await context.close();
   console.log(`${rel}: command panel strip + tabs browser test passed`);

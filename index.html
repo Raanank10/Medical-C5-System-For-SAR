@@ -573,6 +573,13 @@ input[type=range]{width:100%;accent-color:var(--orange);}
 .cmd-tab.active{color:var(--text);border-bottom-color:var(--accent);}
 .cmd-tab-badge{display:inline-block;min-width:18px;padding:1px 5px;margin-inline-start:4px;border-radius:999px;background:var(--red);color:#fff;font-size:11px;}
 .cmd-tab-panel[hidden]{display:none !important;}
+.incident-triage-table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;}
+.incident-triage-table th,.incident-triage-table td{padding:7px 3px;border-bottom:1px solid var(--border);text-align:center;font-family:var(--mono);font-weight:800;}
+.incident-triage-table thead th{font-family:inherit;font-size:11px;color:var(--muted);}
+.incident-triage-table tbody th,.incident-triage-table tfoot th{text-align:right;font-family:inherit;overflow-wrap:anywhere;}
+.incident-triage-table thead th:first-child{text-align:right;}
+.incident-triage-table tr.mine{background:rgba(67,97,238,.10);}
+.incident-triage-table tfoot th,.incident-triage-table tfoot td{border-top:2px solid var(--border);border-bottom:none;}
 .role-top-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
 .role-metric{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 8px;text-align:center;}
 .role-metric-num{font-family:var(--mono);font-size:22px;font-weight:900;}
@@ -953,7 +960,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9966</div>
+      <div class="demo-kicker">Demo V2.9967</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1050,7 +1057,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9966</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9967</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1060,7 +1067,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9966</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9967</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3187,7 +3194,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.66';
+const APP_VERSION = '2.99.67';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -7485,7 +7492,8 @@ function renderCcCommandBoard(){
   const focusedPts=focusFilteredList(patients, focusMatchesPatient);
   // One string per command-panel tab (V2.99.62).
   return {
-    overview:`${roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds('cc')))}
+    overview:`${roleSection('כל האירועים — פצועים לפי מיון', renderAllIncidentsTriageTable())}
+    ${roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds('cc')))}
     ${renderCcEvacuationFunnel()}
     ${renderCollapsibleSection('cc-evac-priority','תעדוף פינוי פלוגתי', companyEvacuationPriorityRows(focusedPts), focusedPts.length, {criticalCount:patients.filter(p=>p.triage==='red'&&!['evacuated','handed_over','deceased'].includes(p.patientStatus)).length, emptyMessage:'אין פצועים במיקוד הנוכחי'})}
     ${renderExtractedCounterBoard()}
@@ -13429,6 +13437,31 @@ const LOCATION_BOARD_EVACUATED_STATUSES = new Set(['handed_over','self_evacuated
 // the extraction site (the rescuers move them), or at the evacuation point waiting for MDA.
 // WP-18: moving (status evacuating, no arrival yet) is told apart from waiting at the point;
 // awaitingMda is both, as atPoint was before V2.99.66, so the ambulance advice is unchanged.
+function renderAllIncidentsTriageTable(){
+  const localCounts=list=>{ const c=emptyTriageCounts(); list.forEach(p=>addTriageCount(c, p.triage)); return c; };
+  let rows, footer;
+  if(currentUser){
+    rows=_openIncidents.map(inc=>{
+      const mine=activeIncident?.id===inc.id;
+      return {name:`${inc.visual_id||''} · ${inc.location_name||''}`, mine, counts:mine?localCounts(getSitePatients('SITE_A')):(_allIncidentTriage[inc.id]||null)};
+    });
+    footer=_allIncidentTriageAt?`שאר האירועים מהשרת · עודכן ${timeAgoLabel(_allIncidentTriageAt)} · האירוע שלי מהטלפון`:'טרם התקבלו נתונים מהשרת';
+  }else{
+    rows=allSites.filter(s=>s.id!=='ALL').map(s=>({name:siteNameById(s.id), mine:false, counts:localCounts(getSitePatients(s.id))}));
+    footer='מצב דמו · נתונים מקומיים';
+  }
+  if(!rows.length) return renderOperationalEmptyState('אין אירועים פתוחים');
+  const total=emptyTriageCounts();
+  rows.forEach(r=>{ if(r.counts) Object.keys(total).forEach(k=>{ total[k]+=r.counts[k]; }); });
+  const cols=[['red','אדום','var(--red)'],['yellow','צהוב','var(--yellow)'],['green','ירוק','var(--green)'],['black','שחור','var(--muted)'],['pending','ממתין','var(--muted)'],['total','סה״כ','var(--text)']];
+  const cells=c=>cols.map(([k,,color])=>`<td style="color:${c&&c[k]?color:'var(--muted)'}">${c?c[k]:'—'}</td>`).join('');
+  return `<table class="incident-triage-table" data-incident-triage-table>
+    <colgroup><col style="width:34%">${cols.map(()=>'<col style="width:11%">').join('')}</colgroup>
+    <thead><tr><th>אירוע</th>${cols.map(([,label])=>`<th>${label}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r=>`<tr${r.mine?' class="mine"':''}><th>${escAttr(r.name)}${r.mine?' <span class="identity-chip">שלי</span>':''}</th>${cells(r.counts)}</tr>`).join('')}</tbody>
+    <tfoot><tr><th>סה״כ</th>${cells(total)}</tr></tfoot>
+  </table><div class="role-row-sub" style="margin-top:6px">${footer} · כל הפצועים הרשומים, כולל מפונים</div>`;
+}
 function openEvacuationSplit(pts=patients){
   const open=pts.filter(p=>['red','yellow'].includes(p.triage) && !['evacuated','handed_over','deceased','closed','self_evacuated'].includes(p.patientStatus));
   const awaitingMda=open.filter(p=>p.patientStatus==='evacuating');
@@ -14096,8 +14129,33 @@ async function refreshOpenIncidents(){
         if(!r.error && r.data) _incidentOverviewState[inc.id]=r.data;
       }catch(e){}
     }));
+    await pullAllIncidentTriage(client);
+    if(currentUser.role==='cc' && document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard(activeRoleDashboard);
   }
   return true;
+}
+// CC: every open incident's patients by triage colour in one table (owner, 2026-10-25). The CC may
+// read every open incident's patients (app.can_access_incident), so one patients query covers them
+// all; refreshed with the incident list every 45 s. The active incident is counted from this
+// phone instead (renderAllIncidentsTriageTable), so its unsent patients are not missed.
+let _allIncidentTriage={}, _allIncidentTriageAt=null;
+function emptyTriageCounts(){ return {red:0,yellow:0,green:0,black:0,pending:0,total:0}; }
+function addTriageCount(counts, triage){
+  counts[['red','yellow','green','black'].includes(triage)?triage:'pending']++;
+  counts.total++;
+}
+async function pullAllIncidentTriage(client){
+  const ids=_openIncidents.map(i=>i.id);
+  if(!ids.length){ _allIncidentTriage={}; _allIncidentTriageAt=Date.now(); return; }
+  try{
+    const r=await client.from('patients').select('incident_id,current_triage').in('incident_id',ids);
+    if(r.error || !Array.isArray(r.data)) return;
+    const out={};
+    ids.forEach(id=>{ out[id]=emptyTriageCounts(); });
+    r.data.forEach(row=>{ if(out[row.incident_id]) addTriageCount(out[row.incident_id], row.current_triage); });
+    _allIncidentTriage=out;
+    _allIncidentTriageAt=Date.now();
+  }catch(e){}
 }
 async function enterIncidentContextAfterLogin(){
   pollIncidentOpenAlerts(); // D10: command sees incidents opened in the field right after sign-in
