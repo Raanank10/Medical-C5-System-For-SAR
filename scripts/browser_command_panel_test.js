@@ -216,38 +216,49 @@ async function checkFile(browser, file) {
   assert(advice.hints.includes('טיפול לפני החילוץ') && advice.hints.includes('החילוץ מעביר לנקודת פינוי') && !advice.hints.includes('שייך אמבולנס'),
     `${rel}: extraction-site hints: treat trapped patients before extraction, rescuers carry free ones; never "assign an ambulance"`);
 
-  // 11. CC overview: every open incident's patients by triage colour in one table (owner, 2026-10-25).
+  // 11. CC overview (owner, 2026-10-25): every open incident by triage colour in two tables, still at
+  // the site (extraction site + evacuation point) and evacuated; tapping another incident opens it.
   const table = await page.evaluate(async () => {
-    const rowsOf = () => [...document.querySelectorAll('[data-cmd-panel="overview"] [data-incident-triage-table] tr')]
+    const rowsOf = (part) => [...document.querySelectorAll(`[data-cmd-panel="overview"] [data-incident-triage-table="${part}"] tr`)]
       .map((tr) => [...tr.children].map((c) => c.textContent.trim()));
     goTo('demo'); startRoleDashboard('cc');
-    const demo = rowsOf();
-    const demoExpected = ['SITE_A', 'SITE_B'].map((id) => getSitePatients(id).length);
-    // Signed in (stubbed): other incidents come from one patients query; the active one from this phone.
+    const stageCount = (id, evac) => getSitePatients(id).filter((p) => (evacuationStage(p) === 'evacuated') === evac).length;
+    const demo = { onSite: rowsOf('onSite'), evacuated: rowsOf('evacuated'),
+      expected: { aOn: stageCount('SITE_A', false), aEv: stageCount('SITE_A', true), bOn: stageCount('SITE_B', false) } };
+    // Signed in (stubbed): other incidents from one patients read; the active one from this phone.
     const fakeClient = { from: (t) => ({ select: () => ({ in: async (_c, ids) => ({ error: null, data: t !== 'patients' ? [] : [
-      { incident_id: 'inc-b', current_triage: 'red' }, { incident_id: 'inc-b', current_triage: 'red' },
-      { incident_id: 'inc-b', current_triage: 'yellow' }, { incident_id: 'inc-b', current_triage: 'unknown' },
-      { incident_id: 'inc-x', current_triage: 'red' },
+      { incident_id: 'inc-b', current_triage: 'red', current_status: 'in_treatment' },
+      { incident_id: 'inc-b', current_triage: 'red', current_status: 'evacuating' },
+      { incident_id: 'inc-b', current_triage: 'yellow', current_status: 'handed_over' },
+      { incident_id: 'inc-b', current_triage: 'unknown', current_status: 'identified' },
+      { incident_id: 'inc-x', current_triage: 'red', current_status: 'identified' },
     ].filter((r) => ids.includes(r.incident_id)) }) }) }) };
     currentUser = { id: 'stub-cc', email: 'cc@test', role: 'cc' };
     _openIncidents = [{ id: 'inc-a', visual_id: 'INC-1', location_name: 'אתר א' }, { id: 'inc-b', visual_id: 'INC-2', location_name: 'אתר ב' }];
     activeIncident = { id: 'inc-a', visual_id: 'INC-1' };
     await pullAllIncidentTriage(fakeClient);
     renderRoleDashboard('cc');
-    const live = rowsOf();
-    const ownLocal = getSitePatients('SITE_A').length;
+    const live = { onSite: rowsOf('onSite'), evacuated: rowsOf('evacuated') };
+    const ownOnSite = getSitePatients('SITE_A').filter((p) => evacuationStage(p) !== 'evacuated').length;
+    const rowB = document.querySelector('[data-incident-triage-table="onSite"] tr.tappable');
+    const tapTarget = rowB ? rowB.getAttribute('onclick') : '';
+    const mineTappable = !!document.querySelector('[data-incident-triage-table="onSite"] tr.mine.tappable, [data-incident-triage-table="onSite"] tr.mine[onclick]');
     currentUser = null; activeIncident = null; _openIncidents = []; _allIncidentTriage = {};
-    return { demo, demoExpected, live, ownLocal };
+    return { demo, live, ownOnSite, tapTarget, mineTappable };
   });
-  const head = table.demo[0];
-  assert(head.join('|') === 'אירוע|אדום|צהוב|ירוק|שחור|ממתין|סה״כ', `${rel}: triage table columns (got ${head})`);
-  assert(table.demo.length === 4 && Number(table.demo[1][6]) === table.demoExpected[0] && Number(table.demo[2][6]) === table.demoExpected[1]
-    && Number(table.demo[3][6]) === table.demoExpected[0] + table.demoExpected[1], `${rel}: demo table has one row per site plus a total (got ${JSON.stringify(table.demo)})`);
-  const incB = table.live.find((r) => r[0].startsWith('INC-2'));
-  const incA = table.live.find((r) => r[0].startsWith('INC-1'));
-  assert(incB && incB.slice(1).join(',') === '2,1,0,0,1,4', `${rel}: another incident's counts come from the server query, unknown as pending (got ${incB})`);
-  assert(incA && incA[0].includes('שלי') && Number(incA[6]) === table.ownLocal, `${rel}: the active incident is counted from this phone (got ${incA})`);
-  assert(!table.live.some((r) => r[0].startsWith('inc-x')), `${rel}: only open incidents are listed`);
+  const d = table.demo;
+  assert(d.onSite[0].join('|') === 'אירוע|אדום|צהוב|ירוק|שחור|ממתין|סה״כ' && d.evacuated[0].join('|') === d.onSite[0].join('|'), `${rel}: both tables have the triage columns`);
+  assert(Number(d.onSite[1][6]) === d.expected.aOn && Number(d.evacuated[1][6]) === d.expected.aEv && Number(d.onSite[2][6]) === d.expected.bOn,
+    `${rel}: demo rows split by stage (got ${JSON.stringify({ on: d.onSite, ev: d.evacuated, exp: d.expected })})`);
+  assert(d.expected.aEv >= 1, `${rel}: the scenario has an evacuated patient on SITE_A`);
+  const onB = table.live.onSite.find((r) => r[0].startsWith('INC-2'));
+  const evB = table.live.evacuated.find((r) => r[0].startsWith('INC-2'));
+  assert(onB && onB.slice(1).join(',') === '2,0,0,0,1,3', `${rel}: still at the site counts the evacuation point too, unknown as pending (got ${onB})`);
+  assert(evB && evB.slice(1).join(',') === '0,1,0,0,0,1', `${rel}: evacuated table (got ${evB})`);
+  const onA = table.live.onSite.find((r) => r[0].startsWith('INC-1'));
+  assert(onA && onA[0].includes('שלי') && Number(onA[6]) === table.ownOnSite, `${rel}: the active incident is counted from this phone (got ${onA})`);
+  assert(!table.live.onSite.some((r) => r[0].startsWith('inc-x')), `${rel}: only open incidents are listed`);
+  assert(table.tapTarget === "enterIncidentFromPicker('inc-b')" && !table.mineTappable, `${rel}: another incident's row opens it; the CC's own row does nothing (got ${table.tapTarget})`);
 
   assert(!errors.length, `${rel}: page errors: ${errors.join(' | ')}`);
   await context.close();

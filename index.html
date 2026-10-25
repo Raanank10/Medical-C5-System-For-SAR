@@ -579,6 +579,8 @@ input[type=range]{width:100%;accent-color:var(--orange);}
 .incident-triage-table tbody th,.incident-triage-table tfoot th{text-align:right;font-family:inherit;overflow-wrap:anywhere;}
 .incident-triage-table thead th:first-child{text-align:right;}
 .incident-triage-table tr.mine{background:rgba(67,97,238,.10);}
+.incident-triage-table tr.tappable{cursor:pointer;}
+.incident-triage-table tr.tappable:active{background:rgba(67,97,238,.18);}
 .incident-triage-table tfoot th,.incident-triage-table tfoot td{border-top:2px solid var(--border);border-bottom:none;}
 .role-top-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
 .role-metric{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 8px;text-align:center;}
@@ -13437,30 +13439,46 @@ const LOCATION_BOARD_EVACUATED_STATUSES = new Set(['handed_over','self_evacuated
 // the extraction site (the rescuers move them), or at the evacuation point waiting for MDA.
 // WP-18: moving (status evacuating, no arrival yet) is told apart from waiting at the point;
 // awaitingMda is both, as atPoint was before V2.99.66, so the ambulance advice is unchanged.
+// Two tables (owner, 2026-10-25): patients still at the site (extraction site and evacuation point)
+// and patients evacuated. Tapping another incident's row opens that incident.
 function renderAllIncidentsTriageTable(){
-  const localCounts=list=>{ const c=emptyTriageCounts(); list.forEach(p=>addTriageCount(c, p.triage)); return c; };
+  const localCounts=list=>{
+    const c={onSite:emptyTriageCounts(), evacuated:emptyTriageCounts()};
+    list.forEach(p=>addTriageCount(evacuationStage(p)==='evacuated'?c.evacuated:c.onSite, p.triage));
+    return c;
+  };
   let rows, footer;
   if(currentUser){
     rows=_openIncidents.map(inc=>{
       const mine=activeIncident?.id===inc.id;
-      return {name:`${inc.visual_id||''} · ${inc.location_name||''}`, mine, counts:mine?localCounts(getSitePatients('SITE_A')):(_allIncidentTriage[inc.id]||null)};
+      return {id:inc.id, name:`${inc.visual_id||''} · ${inc.location_name||''}`, mine, counts:mine?localCounts(getSitePatients('SITE_A')):(_allIncidentTriage[inc.id]||null)};
     });
-    footer=_allIncidentTriageAt?`שאר האירועים מהשרת · עודכן ${timeAgoLabel(_allIncidentTriageAt)} · האירוע שלי מהטלפון`:'טרם התקבלו נתונים מהשרת';
+    footer=_allIncidentTriageAt?`שאר האירועים מהשרת · עודכן ${timeAgoLabel(_allIncidentTriageAt)}${activeIncident?' · האירוע שלי מהטלפון':''} · הקש על אירוע כדי לפתוח אותו`:'טרם התקבלו נתונים מהשרת';
   }else{
-    rows=allSites.filter(s=>s.id!=='ALL').map(s=>({name:siteNameById(s.id), mine:false, counts:localCounts(getSitePatients(s.id))}));
+    rows=allSites.filter(s=>s.id!=='ALL').map(s=>({id:null, name:siteNameById(s.id), mine:false, counts:localCounts(getSitePatients(s.id))}));
     footer='מצב דמו · נתונים מקומיים';
   }
   if(!rows.length) return renderOperationalEmptyState('אין אירועים פתוחים');
-  const total=emptyTriageCounts();
-  rows.forEach(r=>{ if(r.counts) Object.keys(total).forEach(k=>{ total[k]+=r.counts[k]; }); });
   const cols=[['red','אדום','var(--red)'],['yellow','צהוב','var(--yellow)'],['green','ירוק','var(--green)'],['black','שחור','var(--muted)'],['pending','ממתין','var(--muted)'],['total','סה״כ','var(--text)']];
   const cells=c=>cols.map(([k,,color])=>`<td style="color:${c&&c[k]?color:'var(--muted)'}">${c?c[k]:'—'}</td>`).join('');
-  return `<table class="incident-triage-table" data-incident-triage-table>
-    <colgroup><col style="width:34%">${cols.map(()=>'<col style="width:11%">').join('')}</colgroup>
-    <thead><tr><th>אירוע</th>${cols.map(([,label])=>`<th>${label}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map(r=>`<tr${r.mine?' class="mine"':''}><th>${escAttr(r.name)}${r.mine?' <span class="identity-chip">שלי</span>':''}</th>${cells(r.counts)}</tr>`).join('')}</tbody>
-    <tfoot><tr><th>סה״כ</th>${cells(total)}</tr></tfoot>
-  </table><div class="role-row-sub" style="margin-top:6px">${footer} · כל הפצועים הרשומים, כולל מפונים</div>`;
+  const table=(part,title)=>{
+    const total=emptyTriageCounts();
+    rows.forEach(r=>{ if(r.counts) Object.keys(total).forEach(k=>{ total[k]+=r.counts[part][k]; }); });
+    return `<div style="font-weight:900;font-size:14px;color:var(--text);padding:4px 0 6px">${title}</div>
+    <table class="incident-triage-table" data-incident-triage-table="${part}">
+      <colgroup><col style="width:34%">${cols.map(()=>'<col style="width:11%">').join('')}</colgroup>
+      <thead><tr><th>אירוע</th>${cols.map(([,label])=>`<th>${label}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map(r=>{
+        const open=r.id && !r.mine;
+        return `<tr${r.mine?' class="mine"':''}${open?` class="tappable" onclick="enterIncidentFromPicker('${escAttr(r.id)}')"`:''}><th>${escAttr(r.name)}${r.mine?' <span class="identity-chip">שלי</span>':open?' ‹':''}</th>${cells(r.counts&&r.counts[part])}</tr>`;
+      }).join('')}</tbody>
+      <tfoot><tr><th>סה״כ</th>${cells(total)}</tr></tfoot>
+    </table>`;
+  };
+  return `${table('onSite','באתר — אתר החילוץ ונקודת הפינוי')}
+    <div style="height:14px"></div>
+    ${table('evacuated','פונו')}
+    <div class="role-row-sub" style="margin-top:6px">${footer}</div>`;
 }
 function openEvacuationSplit(pts=patients){
   const open=pts.filter(p=>['red','yellow'].includes(p.triage) && !['evacuated','handed_over','deceased','closed','self_evacuated'].includes(p.patientStatus));
@@ -14138,7 +14156,7 @@ async function refreshOpenIncidents(){
 // read every open incident's patients (app.can_access_incident), so one patients query covers them
 // all; refreshed with the incident list every 45 s. The active incident is counted from this
 // phone instead (renderAllIncidentsTriageTable), so its unsent patients are not missed.
-let _allIncidentTriage={}, _allIncidentTriageAt=null;
+let _allIncidentTriage={}, _allIncidentTriageAt=null; // incidentId -> {onSite, evacuated} triage counts
 function emptyTriageCounts(){ return {red:0,yellow:0,green:0,black:0,pending:0,total:0}; }
 function addTriageCount(counts, triage){
   counts[['red','yellow','green','black'].includes(triage)?triage:'pending']++;
@@ -14148,11 +14166,14 @@ async function pullAllIncidentTriage(client){
   const ids=_openIncidents.map(i=>i.id);
   if(!ids.length){ _allIncidentTriage={}; _allIncidentTriageAt=Date.now(); return; }
   try{
-    const r=await client.from('patients').select('incident_id,current_triage').in('incident_id',ids);
+    const r=await client.from('patients').select('incident_id,current_triage,current_status').in('incident_id',ids);
     if(r.error || !Array.isArray(r.data)) return;
     const out={};
-    ids.forEach(id=>{ out[id]=emptyTriageCounts(); });
-    r.data.forEach(row=>{ if(out[row.incident_id]) addTriageCount(out[row.incident_id], row.current_triage); });
+    ids.forEach(id=>{ out[id]={onSite:emptyTriageCounts(), evacuated:emptyTriageCounts()}; });
+    r.data.forEach(row=>{
+      const c=out[row.incident_id]; if(!c) return;
+      addTriageCount(LOCATION_BOARD_EVACUATED_STATUSES.has(row.current_status)?c.evacuated:c.onSite, row.current_triage);
+    });
     _allIncidentTriage=out;
     _allIncidentTriageAt=Date.now();
   }catch(e){}
