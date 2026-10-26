@@ -85,19 +85,30 @@ assert.equal(rules.isVitalsOverdue(patient({ triage: "black" }), baseTime + 60 *
 // Tourniquet review: notice (heads-up) at 45m, yellow/warn at 60m, red/critical at 120m.
 assert.deepEqual(
   rules.tourniquetTimer(patient({ tourniquet: { limb: "right leg", appliedAt: baseTime } }), baseTime + 30 * 60 * 1000),
-  { cls: "", minutes: 30, limb: "right leg" },
+  { cls: "", stage: "", minutes: 30, limb: "right leg" },
 );
 assert.deepEqual(
   rules.tourniquetTimer(patient({ tourniquet: { limb: "right leg", appliedAt: baseTime } }), baseTime + 45 * 60 * 1000),
-  { cls: "notice", minutes: 45, limb: "right leg" },
+  { cls: "notice", stage: "notice", minutes: 45, limb: "right leg" },
 );
 assert.deepEqual(
   rules.tourniquetTimer(patient({ tourniquet: { limb: "right leg", appliedAt: baseTime } }), baseTime + 61 * 60 * 1000),
-  { cls: "warn", minutes: 61, limb: "right leg" },
+  { cls: "warn", stage: "warn", minutes: 61, limb: "right leg" },
+);
+// 100 minutes (owner, 2026-10-26): a decision point before the medic's 120-minute release window
+// closes. Same orange colour (cls), its own alert stage.
+assert.deepEqual(
+  rules.tourniquetTimer(patient({ tourniquet: { limb: "right leg", appliedAt: baseTime } }), baseTime + 99 * 60 * 1000),
+  { cls: "warn", stage: "warn", minutes: 99, limb: "right leg" },
 );
 assert.deepEqual(
+  rules.tourniquetTimer(patient({ tourniquet: { limb: "right leg", appliedAt: baseTime } }), baseTime + 100 * 60 * 1000),
+  { cls: "warn", stage: "decision", minutes: 100, limb: "right leg" },
+);
+assert.equal(rules.TOURNIQUET_DECISION_MS, 100 * 60 * 1000);
+assert.deepEqual(
   rules.tourniquetTimer(patient({ tourniquet: { limb: "right leg", appliedAt: baseTime } }), baseTime + 121 * 60 * 1000),
-  { cls: "critical", minutes: 121, limb: "right leg" },
+  { cls: "critical", stage: "critical", minutes: 121, limb: "right leg" },
 );
 
 // Device silence: one canonical 10-minute threshold shared across the medic load board,
@@ -299,6 +310,22 @@ assert.equal(rules.tourniquetAlertToRaise("critical", "critical"), null);
 assert.equal(rules.tourniquetAlertToRaise("critical", null), "critical");
 // Never alerts downwards (e.g. a clock correction).
 assert.equal(rules.tourniquetAlertToRaise("warn", "critical"), null);
+// The 100-minute decision level sits between warn and critical.
+assert.equal(rules.tourniquetAlertToRaise("decision", "warn"), "decision");
+assert.equal(rules.tourniquetAlertToRaise("decision", "decision"), null);
+assert.equal(rules.tourniquetAlertToRaise("critical", "decision"), "critical");
+assert.equal(rules.tourniquetAlertToRaise("warn", "decision"), null);
+
+// "Remind me later" on tourniquet alerts (owner, 2026-10-26): delay length and count per level;
+// the last allowed delay escalates to command; then no more delays.
+assert.deepEqual(rules.tourniquetSnoozeOption("notice", 0), { minutes: 5, used: 1, max: 2, escalates: false });
+assert.deepEqual(rules.tourniquetSnoozeOption("warn", 1), { minutes: 5, used: 2, max: 2, escalates: true });
+assert.equal(rules.tourniquetSnoozeOption("warn", 2), null);
+assert.deepEqual(rules.tourniquetSnoozeOption("decision", 0), { minutes: 2, used: 1, max: 1, escalates: true });
+assert.equal(rules.tourniquetSnoozeOption("decision", 1), null);
+assert.deepEqual(rules.tourniquetSnoozeOption("critical", undefined), { minutes: 1, used: 1, max: 1, escalates: true });
+assert.equal(rules.tourniquetSnoozeOption("critical", 1), null);
+assert.equal(rules.tourniquetSnoozeOption("", 0), null);
 
 // Command status strip: server contact freshness (V2.99.62).
 {

@@ -22,6 +22,10 @@
   // the medic, well before the 60-minute review point actually arrives.
   const TOURNIQUET_NOTICE_MS = 45 * 60 * 1000;
   const TOURNIQUET_WARN_MS = 60 * 60 * 1000;
+  // Repo owner, 2026-10-26: a medic may release a tourniquet (convert to direct pressure) only up
+  // to 120 minutes after it went on; past that only a physician may, up to 6 hours. The 100-minute
+  // alert gives the medic 20 minutes to decide (convert / evacuate) before that window closes.
+  const TOURNIQUET_DECISION_MS = 100 * 60 * 1000;
   const TOURNIQUET_CRITICAL_MS = 120 * 60 * 1000;
   const DEVICE_SILENCE_MS = 10 * 60 * 1000;
   // Server contact freshness for the command status strip (repo owner, V2.99.62). The phone
@@ -122,18 +126,38 @@
       : elapsedMs >= TOURNIQUET_WARN_MS ? "warn"
       : elapsedMs >= TOURNIQUET_NOTICE_MS ? "notice"
       : "";
-    return { cls, minutes, limb: tourniquet.limb || "לא צוין" };
+    // stage is the alert level: cls (the colour) plus the 100-minute decision point, which keeps
+    // the orange "warn" colour everywhere a timer is shown.
+    const stage = cls === "warn" && elapsedMs >= TOURNIQUET_DECISION_MS ? "decision" : cls;
+    return { cls, stage, minutes, limb: tourniquet.limb || "לא צוין" };
   }
 
   // D1 (repo owner, 2026-10-20): the phone raises tourniquet time alerts itself, from its own clock,
-  // with or without a server connection. Given the timer level now (tourniquetTimer().cls) and the
+  // with or without a server connection. Given the timer level now (tourniquetTimer().stage) and the
   // level this tourniquet was last alerted at, returns the level to alert now, or null. Each level
   // alerts once; a level skipped while the app was closed is not replayed, only the current one.
-  const TOURNIQUET_ALERT_RANK = { "": 0, notice: 1, warn: 2, critical: 3 };
-  function tourniquetAlertToRaise(timerCls, lastAlertedCls) {
-    const now = TOURNIQUET_ALERT_RANK[timerCls || ""] || 0;
-    const last = TOURNIQUET_ALERT_RANK[lastAlertedCls || ""] || 0;
-    return now > last ? timerCls : null;
+  const TOURNIQUET_ALERT_RANK = { "": 0, notice: 1, warn: 2, decision: 3, critical: 4 };
+  function tourniquetAlertToRaise(timerStage, lastAlertedStage) {
+    const now = TOURNIQUET_ALERT_RANK[timerStage || ""] || 0;
+    const last = TOURNIQUET_ALERT_RANK[lastAlertedStage || ""] || 0;
+    return now > last ? timerStage : null;
+  }
+
+  // "Remind me later" on a tourniquet time alert (repo owner, 2026-10-26). Per level: how long one
+  // delay lasts and how many delays a tourniquet gets at that level. A delay never hides the alert:
+  // it shrinks to a chip and comes back when the time is up, and a new level cancels it. Using the
+  // last allowed delay tells command (escalates); after that the only way out is to open the patient.
+  const TOURNIQUET_SNOOZE_POLICY = {
+    notice: { minutes: 5, max: 2 },
+    warn: { minutes: 5, max: 2 },
+    decision: { minutes: 2, max: 1 },
+    critical: { minutes: 1, max: 1 },
+  };
+  function tourniquetSnoozeOption(stage, usedAtStage) {
+    const policy = TOURNIQUET_SNOOZE_POLICY[stage || ""];
+    const used = Math.max(0, Number(usedAtStage) || 0);
+    if (!policy || used >= policy.max) return null;
+    return { minutes: policy.minutes, used: used + 1, max: policy.max, escalates: used + 1 >= policy.max };
   }
 
   function isDeviceSilent(lastSeenMs, nowMs = Date.now()) {
@@ -387,7 +411,9 @@
     SUPPLY_BURN_WINDOW_MS,
     SUPPLY_CRITICAL_RATIO,
     TOURNIQUET_CRITICAL_MS,
+    TOURNIQUET_DECISION_MS,
     TOURNIQUET_NOTICE_MS,
+    TOURNIQUET_SNOOZE_POLICY,
     TOURNIQUET_WARN_MS,
     VITALS_INTERVAL_MS_BY_TRIAGE,
     VITALS_WARN_BUFFER_MS,
@@ -429,6 +455,7 @@
     supplyRiskTier,
     timeCodeToTodayMs,
     tourniquetAlertToRaise,
+    tourniquetSnoozeOption,
     tourniquetTimer,
     vitalsAgeMs,
     vitalsIntervalMsFor,

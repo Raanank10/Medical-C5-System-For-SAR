@@ -109,6 +109,11 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .tq-timer.notice{border-color:var(--muted);color:var(--muted);background:rgba(180,180,200,0.08);}
 .tq-timer.warn{border-color:var(--orange);color:var(--orange);background:rgba(255,107,53,0.08);}
 .tq-timer.critical{border-color:var(--red);color:var(--red);background:rgba(230,57,70,0.16);animation:blink 1.5s infinite;}
+.tq-alert-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.tq-alert-btn{flex:1 1 140px;min-height:44px;border-radius:10px;border:2px solid #111;background:rgba(255,255,255,0.55);color:#111;font-weight:900;font-size:14px;font-family:inherit;cursor:pointer;}
+.tq-alert-btn.primary{background:#111;color:#fff;}
+.tq-alert-nomore{flex:1 1 140px;align-self:center;font-size:12px;}
+#tq-snooze-chip{position:fixed;top:68px;left:50%;transform:translateX(-50%);z-index:590;max-width:calc(100vw - 32px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--surface2);color:var(--text);border:2px solid var(--orange);border-radius:20px;padding:6px 12px;font-weight:800;font-size:12px;font-family:inherit;box-shadow:0 6px 18px rgba(0,0,0,0.35);cursor:pointer;}
 .sweep-tq-card{border:1px solid var(--border);border-right:4px solid var(--red);border-radius:10px;padding:10px;margin-bottom:8px;background:var(--surface2);}
 .sweep-tq-card.ineffective{border-color:var(--red);background:rgba(230,57,70,.12);}
 .sweep-tq-card.removed-error{opacity:.7;border-right-color:var(--muted);}
@@ -953,7 +958,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9966</div>
+      <div class="demo-kicker">Demo V2.9967</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1050,7 +1055,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9966</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9967</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1060,7 +1065,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9966</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9967</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2718,6 +2723,10 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   // the medic, well before the 60-minute review point actually arrives.
   const TOURNIQUET_NOTICE_MS = 45 * 60 * 1000;
   const TOURNIQUET_WARN_MS = 60 * 60 * 1000;
+  // Repo owner, 2026-10-26: a medic may release a tourniquet (convert to direct pressure) only up
+  // to 120 minutes after it went on; past that only a physician may, up to 6 hours. The 100-minute
+  // alert gives the medic 20 minutes to decide (convert / evacuate) before that window closes.
+  const TOURNIQUET_DECISION_MS = 100 * 60 * 1000;
   const TOURNIQUET_CRITICAL_MS = 120 * 60 * 1000;
   const DEVICE_SILENCE_MS = 10 * 60 * 1000;
   // Server contact freshness for the command status strip (repo owner, V2.99.62). The phone
@@ -2818,18 +2827,38 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
       : elapsedMs >= TOURNIQUET_WARN_MS ? "warn"
       : elapsedMs >= TOURNIQUET_NOTICE_MS ? "notice"
       : "";
-    return { cls, minutes, limb: tourniquet.limb || "לא צוין" };
+    // stage is the alert level: cls (the colour) plus the 100-minute decision point, which keeps
+    // the orange "warn" colour everywhere a timer is shown.
+    const stage = cls === "warn" && elapsedMs >= TOURNIQUET_DECISION_MS ? "decision" : cls;
+    return { cls, stage, minutes, limb: tourniquet.limb || "לא צוין" };
   }
 
   // D1 (repo owner, 2026-10-20): the phone raises tourniquet time alerts itself, from its own clock,
-  // with or without a server connection. Given the timer level now (tourniquetTimer().cls) and the
+  // with or without a server connection. Given the timer level now (tourniquetTimer().stage) and the
   // level this tourniquet was last alerted at, returns the level to alert now, or null. Each level
   // alerts once; a level skipped while the app was closed is not replayed, only the current one.
-  const TOURNIQUET_ALERT_RANK = { "": 0, notice: 1, warn: 2, critical: 3 };
-  function tourniquetAlertToRaise(timerCls, lastAlertedCls) {
-    const now = TOURNIQUET_ALERT_RANK[timerCls || ""] || 0;
-    const last = TOURNIQUET_ALERT_RANK[lastAlertedCls || ""] || 0;
-    return now > last ? timerCls : null;
+  const TOURNIQUET_ALERT_RANK = { "": 0, notice: 1, warn: 2, decision: 3, critical: 4 };
+  function tourniquetAlertToRaise(timerStage, lastAlertedStage) {
+    const now = TOURNIQUET_ALERT_RANK[timerStage || ""] || 0;
+    const last = TOURNIQUET_ALERT_RANK[lastAlertedStage || ""] || 0;
+    return now > last ? timerStage : null;
+  }
+
+  // "Remind me later" on a tourniquet time alert (repo owner, 2026-10-26). Per level: how long one
+  // delay lasts and how many delays a tourniquet gets at that level. A delay never hides the alert:
+  // it shrinks to a chip and comes back when the time is up, and a new level cancels it. Using the
+  // last allowed delay tells command (escalates); after that the only way out is to open the patient.
+  const TOURNIQUET_SNOOZE_POLICY = {
+    notice: { minutes: 5, max: 2 },
+    warn: { minutes: 5, max: 2 },
+    decision: { minutes: 2, max: 1 },
+    critical: { minutes: 1, max: 1 },
+  };
+  function tourniquetSnoozeOption(stage, usedAtStage) {
+    const policy = TOURNIQUET_SNOOZE_POLICY[stage || ""];
+    const used = Math.max(0, Number(usedAtStage) || 0);
+    if (!policy || used >= policy.max) return null;
+    return { minutes: policy.minutes, used: used + 1, max: policy.max, escalates: used + 1 >= policy.max };
   }
 
   function isDeviceSilent(lastSeenMs, nowMs = Date.now()) {
@@ -3083,7 +3112,9 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     SUPPLY_BURN_WINDOW_MS,
     SUPPLY_CRITICAL_RATIO,
     TOURNIQUET_CRITICAL_MS,
+    TOURNIQUET_DECISION_MS,
     TOURNIQUET_NOTICE_MS,
+    TOURNIQUET_SNOOZE_POLICY,
     TOURNIQUET_WARN_MS,
     VITALS_INTERVAL_MS_BY_TRIAGE,
     VITALS_WARN_BUFFER_MS,
@@ -3125,6 +3156,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     supplyRiskTier,
     timeCodeToTodayMs,
     tourniquetAlertToRaise,
+    tourniquetSnoozeOption,
     tourniquetTimer,
     vitalsAgeMs,
     vitalsIntervalMsFor,
@@ -3187,7 +3219,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.66';
+const APP_VERSION = '2.99.67';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -9417,15 +9449,16 @@ function buildAlertObjects(pts=patients){
     if(normalizeTrapStatus(p)==='trapped' && vitalsAgeMs(p)>=10*60*1000){
       pushAlert(alerts,{...base,id:`trapped-silent-${p.id}`,type:'TRAPPED_NO_MEDIC_CONTACT',severity:'high',owner:'pc',audience:['pc','cc'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'assign_medic',scope:'patient',category:'rescue',title:`${p.visualId||p.id} — לכוד ללא קשר חובש`,detail:`${p.location} · ${timeAgoLabel(p.lastVitalsAt||patientClockStart(p))}`});
     }
-    // Levels from the rules module (60 min warn / 120 min critical); the 45-minute notice stays a
-    // timer and phone banner only, not a routed alert.
+    // Levels from the rules module (60 min warn, 100 min decision, 120 min critical); the
+    // 45-minute notice stays a timer and phone banner only, not a routed alert.
     const tqTimer=C5Rules.tourniquetTimer(p);
     if(tqTimer && ['warn','critical'].includes(tqTimer.cls)){
       const crit=tqTimer.cls==='critical', tqMin=tqTimer.minutes;
-      pushAlert(alerts,{...base,id:`tq-${p.id}`,type:crit?'TOURNIQUET_CRITICAL':'TOURNIQUET_WARNING',severity:crit?'critical':'high',owner:'medic',audience:crit?['medic','pc','cc']:['medic','pc'],escalatesTo:crit?'cc':'pc',escalateAfterMin:crit?0:10,actionRequired:'update_vitals',scope:'patient',category:'urgent',title:`${p.visualId||p.id} — חסם עורקים ${crit?'קריטי':'אזהרה'}`,detail:`${p.tourniquet.limb||'גפה לא צוינה'} · ${tqMin} דק׳`});
+      pushAlert(alerts,{...base,id:`tq-${p.id}`,type:crit?'TOURNIQUET_CRITICAL':'TOURNIQUET_WARNING',severity:crit?'critical':'high',owner:'medic',audience:crit?['medic','pc','cc']:['medic','pc'],escalatesTo:crit?'cc':'pc',escalateAfterMin:crit?0:10,actionRequired:'update_vitals',scope:'patient',category:'urgent',title:`${p.visualId||p.id} — חסם עורקים ${crit?'קריטי':tqTimer.stage==='decision'?'20 דק׳ ל-120':'אזהרה'}`,detail:`${p.tourniquet.limb||'גפה לא צוינה'} · ${tqMin} דק׳`});
     }
   });
   serverWatchdogAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
+  tourniquetSnoozeAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
   duplicateCandidates(pts).forEach(([a,b],idx)=>pushAlert(alerts,{id:`dup-${a.id}-${b.id}`,type:'DUPLICATE_SUSPECTED',severity:'medium',owner:'pc',audience:['pc','chamal'],escalatesTo:null,actionRequired:'merge_duplicate',scope:'site',category:'integrity',siteId:a.siteId||b.siteId||'SITE_A',patientId:a.id,title:`חשד לכפילות ${a.id} ↔ ${b.id}`,detail:'בדיקה ידנית בלבד; אין מיזוג הרסני של אירועים'}));
   const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id)):siteExternalReports(cmdActiveSite);
   const typeReport=siteData.medicIncidentTypeReport;
@@ -9494,46 +9527,176 @@ function renderAlerts(){
 // whether or not it can reach the server. Before this, crossing 45/60/120 minutes only changed a
 // color in the lists, which a medic with the phone in a pocket never sees. Now each level alerts
 // once per tourniquet: vibration (where the phone supports it) and a banner that stays until it is
-// tapped. Runs with the 30-second alert refresh and right after load; nothing here touches the
+// answered. Runs with the 30-second alert refresh and right after load; nothing here touches the
 // network. Remote tourniquets (another device's, from the server) alert too, from their server
 // application time. Patients handed over or deceased do not alert.
-const TQ_ALERT_RANK={notice:1, warn:2, critical:3};
+// Levels (repo owner, 2026-10-26): 45, 60, 100 ("decision": 20 minutes before the medic's
+// 120-minute release window closes) and 120 minutes.
+// "Remind me later" (repo owner, 2026-10-26): tapping the banner used to open the patient at once,
+// which pulled the medic out of whatever they were doing (registering a new patient). The banner
+// now offers "open patient" and, within the per-level limits of C5Rules.tourniquetSnoozeOption,
+// "remind me in N minutes": it shrinks to a chip that stays on screen and comes back, vibrating,
+// when the time is up. A new level cancels a running delay. Each delay is sent as WATCHDOG_ALERT
+// (payload reason 'tourniquet_snoozed') so command sees who put it off and until when; the last
+// allowed delay is marked escalated and alerts the PC / CC phones. Opening the patient after a
+// delay sends reason 'tourniquet_alert_opened', which clears that line on the command phones.
+// State kept on each tourniquet (and across server refreshes, applyServerTourniquets):
+//   timeAlertedLevel  the highest level raised so far (each level alerts once)
+//   timeAlertOpen     the level whose banner is still unanswered; null once the patient is opened
+//   timeAlertSnooze   {level, used, until, returned}: delays used at that level
+const TQ_ALERT_RANK={notice:1, warn:2, decision:3, critical:4};
+const TQ_ALERT_TITLES={
+  notice:'חסם עורקים: 45 דקות',
+  warn:'חסם עורקים: עברה שעה',
+  decision:'חסם עורקים: 20 דקות ל-120 - הכן החלטה (המרה / פינוי)',
+  critical:'חסם עורקים: עברו 120 דקות',
+};
+// Past 120 minutes only a physician may release a tourniquet, up to 6 hours (owner, 2026-10-26).
+const TQ_ALERT_NOTES={critical:'שחרור חסם אחרי 120 דק׳: רופא בלבד (עד 6 שעות)'};
+const TQ_ALERT_HAPTICS={notice:150, warn:[250,100,250], decision:[300,100,300,100,300], critical:[400,150,400,150,400]};
+const TQ_ALERT_COLORS={notice:'var(--yellow)', warn:'var(--orange)', decision:'var(--orange)', critical:'var(--red)'};
+let _tqSnoozeTimer=null;
+function tqAlertEscalationTarget(){
+  const role=currentUser?.role||activeRoleDashboard;
+  return ['medic','paramedic'].includes(role) ? 'חוג״ד' : role==='pc' ? 'מ״פ רפואה' : 'הפיקוד';
+}
+function tourniquetAlertEntries(nowMs=Date.now()){
+  const out=[];
+  (patients||[]).forEach(p=>{
+    if(['handed_over','deceased'].includes(p.patientStatus)) return;
+    activeTourniquets(p).forEach(tq=>{
+      if(!TQ_ALERT_RANK[tq.timeAlertOpen]) return;
+      const timer=C5Rules.tourniquetTimer({tourniquet:tq}, nowMs);
+      if(!timer) return;
+      const snooze=tq.timeAlertSnooze && tq.timeAlertSnooze.level===tq.timeAlertOpen ? tq.timeAlertSnooze : null;
+      out.push({p, tq, level:tq.timeAlertOpen, minutes:timer.minutes, used:snooze?snooze.used:0, snoozedUntil:snooze && snooze.until>nowMs ? snooze.until : null});
+    });
+  });
+  return out.sort((a,b)=>TQ_ALERT_RANK[b.level]-TQ_ALERT_RANK[a.level] || (a.tq.appliedAt||0)-(b.tq.appliedAt||0));
+}
 function checkTourniquetTimeAlerts(nowMs=Date.now()){
-  let top=null, changed=false;
+  let top=null, back=null, changed=false;
   (patients||[]).forEach(p=>{
     if(['handed_over','deceased'].includes(p.patientStatus)) return;
     activeTourniquets(p).forEach(tq=>{
       const timer=C5Rules.tourniquetTimer({tourniquet:tq}, nowMs);
       if(!timer) return;
-      const level=C5Rules.tourniquetAlertToRaise(timer.cls, tq.timeAlertedLevel||null);
-      if(!level) return;
-      tq.timeAlertedLevel=level;
-      changed=true;
-      p.events=p.events||[];
-      p.events.unshift({type:'TOURNIQUET_TIME_ALERT',time:nowT(),detail:`${tq.id} · ${tq.limbLabel||tourniquetLimbMeta(tq.limb).label} · +${timer.minutes} דק׳`,warn:level!=='notice'});
-      if(!top || TQ_ALERT_RANK[level]>TQ_ALERT_RANK[top.level]) top={level, p, tq, minutes:timer.minutes};
+      const level=C5Rules.tourniquetAlertToRaise(timer.stage, tq.timeAlertedLevel||null);
+      if(level){
+        tq.timeAlertedLevel=level;
+        tq.timeAlertOpen=level;
+        tq.timeAlertSnooze=null; // a new level cancels a running delay
+        changed=true;
+        p.events=p.events||[];
+        p.events.unshift({type:'TOURNIQUET_TIME_ALERT',time:nowT(),detail:`${tq.id} · ${tq.limbLabel||tourniquetLimbMeta(tq.limb).label} · +${timer.minutes} דק׳`,warn:level!=='notice'});
+        if(!top || TQ_ALERT_RANK[level]>TQ_ALERT_RANK[top]) top=level;
+        return;
+      }
+      // A delay ran out: the banner comes back, vibrating again.
+      const s=tq.timeAlertSnooze;
+      if(s && s.level===tq.timeAlertOpen && !s.returned && s.until<=nowMs){
+        s.returned=true;
+        changed=true;
+        if(!back || TQ_ALERT_RANK[s.level]>TQ_ALERT_RANK[back]) back=s.level;
+      }
     });
   });
   if(changed) saveDemoState();
-  if(top) showTourniquetTimeAlert(top);
-  return top ? top.level : null;
+  const buzz=top && (!back || TQ_ALERT_RANK[top]>=TQ_ALERT_RANK[back]) ? top : back;
+  if(buzz) haptic(TQ_ALERT_HAPTICS[buzz]);
+  renderTourniquetTimeAlert(nowMs);
+  return top;
 }
-function showTourniquetTimeAlert({level, p, tq, minutes}){
-  haptic(level==='critical' ? [400,150,400,150,400] : level==='warn' ? [250,100,250] : 150);
+function renderTourniquetTimeAlert(nowMs=Date.now()){
+  const entries=tourniquetAlertEntries(nowMs);
+  const showing=entries.filter(e=>!e.snoozedUntil);
+  const waiting=entries.filter(e=>e.snoozedUntil).sort((a,b)=>a.snoozedUntil-b.snoozedUntil);
   let el=document.getElementById('tq-time-alert');
-  if(!el){
-    el=document.createElement('div');
-    el.id='tq-time-alert';
-    el.setAttribute('role','alert');
-    document.body.appendChild(el);
+  if(!showing.length){
+    if(el) el.remove();
+  }else{
+    const {p, tq, level, minutes, used}=showing[0];
+    if(!el){
+      el=document.createElement('div');
+      el.id='tq-time-alert';
+      el.setAttribute('role','alert');
+      document.body.appendChild(el);
+    }
+    el.style.cssText=`position:fixed;top:12px;left:12px;right:12px;z-index:600;background:${TQ_ALERT_COLORS[level]};color:#111;padding:14px 16px;border-radius:14px;font-weight:900;box-shadow:0 10px 30px rgba(0,0,0,0.45)`;
+    el.dataset.level=level;
+    el.dataset.patientId=p.id;
+    const opt=C5Rules.tourniquetSnoozeOption(level, used);
+    const pid=escAttr(p.id), tid=escAttr(tq.id);
+    const more=showing.length>1 ? ` · +${showing.length-1} התראות חסם נוספות` : '';
+    const snoozeBtn=opt
+      ? `<button class="tq-alert-btn" data-tq-action="snooze" onclick="snoozeTourniquetAlert('${pid}','${tid}')">הזכר לי בעוד ${opt.minutes} דק׳${opt.escalates?` (יעדכן ${tqAlertEscalationTarget()})`:''}</button>`
+      : `<span class="tq-alert-nomore">אין דחיות נוספות · ${tqAlertEscalationTarget()} עודכן</span>`;
+    el.innerHTML=`<div style="font-size:16px">${TQ_ALERT_TITLES[level]}</div>
+      <div style="font-size:13px;margin-top:4px">${escAttr(p.visualId||p.id)} · ${escAttr(tq.limbLabel||tourniquetLimbMeta(tq.limb).label)} · +${minutes} דק׳${more}</div>
+      ${TQ_ALERT_NOTES[level]?`<div style="font-size:12px;margin-top:4px">${TQ_ALERT_NOTES[level]}</div>`:''}
+      <div class="tq-alert-actions"><button class="tq-alert-btn primary" data-tq-action="open" onclick="openTourniquetAlert('${pid}','${tid}')">פתח מטופל</button>${snoozeBtn}</div>`;
   }
-  const color=level==='critical'?'var(--red)':level==='warn'?'var(--orange)':'var(--yellow)';
-  const title=level==='critical'?'חסם עורקים: עברו 120 דקות':level==='warn'?'חסם עורקים: עברה שעה':'חסם עורקים: 45 דקות';
-  el.style.cssText=`position:fixed;top:12px;left:12px;right:12px;z-index:600;background:${color};color:#111;padding:14px 16px;border-radius:14px;font-weight:900;box-shadow:0 10px 30px rgba(0,0,0,0.45);cursor:pointer`;
-  el.dataset.level=level;
-  el.dataset.patientId=p.id;
-  el.innerHTML=`<div style="font-size:16px">${title}</div><div style="font-size:13px;margin-top:4px">${p.visualId||p.id} · ${tq.limbLabel||tourniquetLimbMeta(tq.limb).label} · +${minutes} דק׳ · הקש לפתיחה</div>`;
-  el.onclick=()=>{ el.remove(); openPatient(p.id); };
+  let chip=document.getElementById('tq-snooze-chip');
+  if(!waiting.length){
+    if(chip) chip.remove();
+  }else{
+    const {p, tq, level, minutes, snoozedUntil}=waiting[0];
+    if(!chip){
+      chip=document.createElement('button');
+      chip.id='tq-snooze-chip';
+      chip.type='button';
+      document.body.appendChild(chip);
+    }
+    chip.style.borderColor=TQ_ALERT_COLORS[level];
+    chip.dataset.patientId=p.id;
+    const at=new Date(snoozedUntil).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+    chip.textContent=`⏱ חסם ${p.visualId||p.id} · +${minutes} דק׳ · תזכורת ${at}${waiting.length>1?` · +${waiting.length-1}`:''}`;
+    chip.onclick=()=>openTourniquetAlert(p.id, tq.id);
+  }
+  // Bring a delayed alert back on time, not only on the next 30-second refresh.
+  clearTimeout(_tqSnoozeTimer);
+  if(waiting.length) _tqSnoozeTimer=setTimeout(()=>checkTourniquetTimeAlerts(), Math.max(0, waiting[0].snoozedUntil-Date.now())+250);
+}
+function tourniquetForAlert(patientId, tqId){
+  const p=patients.find(x=>x.id===patientId);
+  const tq=p ? activeTourniquets(p).find(t=>t.id===tqId) : null;
+  return {p, tq};
+}
+function sendTourniquetAlertEvent(p, tq, reason, extra={}){
+  const timer=C5Rules.tourniquetTimer({tourniquet:tq});
+  const limb=tq.limbLabel||tourniquetLimbMeta(tq.limb).label;
+  const detail=reason==='tourniquet_snoozed'
+    ? `${p.visualId||p.id} · חסם ${limb} +${timer?.minutes??'?'} דק׳ · תזכורת בעוד ${extra.snooze_minutes} דק׳${extra.escalated?` · ${tqAlertEscalationTarget()} עודכן`:''}`
+    : `${p.visualId||p.id} · חסם ${limb} · התראה נפתחה`;
+  saveLocalEvent({type:'WATCHDOG_ALERT', patient_id:p.id, detail, warn:!!extra.escalated,
+    payload_json:{patient_id:p.id, reason, tourniquet_id:tq.id, limb:tq.limb||null, minutes_on_limb:timer?.minutes??null, by_name:_myDisplayName||null, siteId:p.siteId, ...extra}});
+  p.events=p.events||[];
+  p.events.unshift({type:'WATCHDOG_ALERT', time:nowT(), detail, warn:!!extra.escalated});
+}
+function snoozeTourniquetAlert(patientId, tqId){
+  const {p, tq}=tourniquetForAlert(patientId, tqId);
+  if(!p || !tq || !TQ_ALERT_RANK[tq.timeAlertOpen]) return;
+  const level=tq.timeAlertOpen;
+  const used=tq.timeAlertSnooze && tq.timeAlertSnooze.level===level ? tq.timeAlertSnooze.used : 0;
+  const opt=C5Rules.tourniquetSnoozeOption(level, used);
+  if(!opt){ toast('אין דחיות נוספות להתראה זו'); renderTourniquetTimeAlert(); return; }
+  const until=Date.now()+opt.minutes*60000;
+  tq.timeAlertSnooze={level, used:opt.used, until, returned:false};
+  sendTourniquetAlertEvent(p, tq, 'tourniquet_snoozed', {level, snooze_minutes:opt.minutes, snoozed_until:new Date(until).toISOString(), used:opt.used, max:opt.max, escalated:opt.escalates});
+  saveDemoState();
+  renderTourniquetTimeAlert();
+  toast(opt.escalates ? `תזכורת בעוד ${opt.minutes} דק׳ · ${tqAlertEscalationTarget()} עודכן` : `תזכורת בעוד ${opt.minutes} דק׳`);
+}
+function openTourniquetAlert(patientId, tqId){
+  const {p, tq}=tourniquetForAlert(patientId, tqId);
+  if(tq){
+    if(tq.timeAlertSnooze && tq.timeAlertSnooze.level===tq.timeAlertOpen) sendTourniquetAlertEvent(p, tq, 'tourniquet_alert_opened', {level:tq.timeAlertOpen});
+    tq.timeAlertOpen=null;
+    tq.timeAlertSnooze=null;
+    saveDemoState();
+  }
+  renderTourniquetTimeAlert();
+  if(p) openPatient(p.id);
 }
 setInterval(()=>{ renderAlerts(); renderDashboard(); checkTourniquetTimeAlerts(); updateDemoStatus(); },30000);
 
@@ -15281,7 +15444,7 @@ function applyServerTourniquets(rows, incidentId){
     // Clear the legacy p.tourniquet alias first: ensureTourniquetArray() rebuilds an empty
     // list from it, which would bring back a tourniquet the server has released.
     // Keep each tourniquet's last time alert, so a refreshed server row does not alert again.
-    next.forEach(t=>{ const prev=(p.tourniquets||[]).find(x=>x.id===t.id); if(prev?.timeAlertedLevel) t.timeAlertedLevel=prev.timeAlertedLevel; });
+    next.forEach(t=>{ const prev=(p.tourniquets||[]).find(x=>x.id===t.id); if(!prev) return; ['timeAlertedLevel','timeAlertOpen','timeAlertSnooze'].forEach(k=>{ if(prev[k]!=null) t[k]=prev[k]; }); });
     p.tourniquet=null;
     p.tourniquets=next;
     syncLegacyTourniquetAlias(p);
@@ -15290,7 +15453,7 @@ function applyServerTourniquets(rows, incidentId){
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
 function pullProjectedPatientStateAll(){
-  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullEvacPointArrivals(id); pullExternalReports(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); pullAlertAcknowledgments(id); pullRemoteTreatments(id); pullRemoteVitals(id); pullServerWatchdogAlerts(id); });
+  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullEvacPointArrivals(id); pullExternalReports(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); pullAlertAcknowledgments(id); pullRemoteTreatments(id); pullRemoteVitals(id); pullServerWatchdogAlerts(id); pullTourniquetSnoozes(id); });
 }
 // ── Pre-evacuation report pull (V2.99.36, database/050) ──
 // incident_pre_evacuations is the server's verdict on who owns the report (first medical
@@ -15463,13 +15626,13 @@ function applyRemoteVitals(rows){
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
 // WP-12: open alerts raised by the server watchdog (database/072, every minute, with or without a
-// phone open): tourniquet time 45/60/120 min and red/yellow vitals overdue. This phone already
+// phone open): tourniquet time 45/60/100/120 min and red/yellow vitals overdue. This phone already
 // raises the same things from its own data, so a server alert is listed only when the phone does
 // not: the patient's tourniquet is not known here or its own timer has not reached that level, or
 // the vitals are not overdue here and this phone has no newer vitals than the server's. Command and
 // the medic see them (owner decision 2026-10-22), marked as from the server.
 const serverWatchdogAlertsByIncident={};
-const SERVER_WATCHDOG_TYPES=['TOURNIQUET_TIME_NOTICE','TOURNIQUET_TIME_WARNING','TOURNIQUET_TIME_CRITICAL','VITALS_OVERDUE'];
+const SERVER_WATCHDOG_TYPES=['TOURNIQUET_TIME_NOTICE','TOURNIQUET_TIME_WARNING','TOURNIQUET_TIME_DECISION','TOURNIQUET_TIME_CRITICAL','VITALS_OVERDUE'];
 async function pullServerWatchdogAlerts(incidentId){
   if(!currentUser) return;
   const client=getSupabaseClient();
@@ -15483,11 +15646,12 @@ async function pullServerWatchdogAlerts(incidentId){
   serverWatchdogAlertsByIncident[incidentId]=rows;
   if(JSON.stringify(rows)!==before) refreshActiveScreenData();
 }
-const SERVER_TQ_LEVEL_RANK={TOURNIQUET_TIME_NOTICE:1, TOURNIQUET_TIME_WARNING:2, TOURNIQUET_TIME_CRITICAL:3};
+// Same ranks as TQ_ALERT_RANK; TOURNIQUET_TIME_DECISION (100 min) comes from database/079.
+const SERVER_TQ_LEVEL_RANK={TOURNIQUET_TIME_NOTICE:1, TOURNIQUET_TIME_WARNING:2, TOURNIQUET_TIME_DECISION:3, TOURNIQUET_TIME_CRITICAL:4};
 function localTourniquetRank(p, nowMs=Date.now()){
   return activeTourniquets(p).reduce((max,tq)=>{
     const timer=C5Rules.tourniquetTimer({tourniquet:tq}, nowMs);
-    return Math.max(max, timer ? (TQ_ALERT_RANK[timer.cls]||0) : 0);
+    return Math.max(max, timer ? (TQ_ALERT_RANK[timer.stage]||0) : 0);
   },0);
 }
 function serverWatchdogAlertObjects(pts=patients, nowMs=Date.now()){
@@ -15508,11 +15672,118 @@ function serverWatchdogAlertObjects(pts=patients, nowMs=Date.now()){
     }
     const rank=SERVER_TQ_LEVEL_RANK[a.alert_type];
     if(!rank || localTourniquetRank(p, nowMs)>=rank) return;
-    const label=rank===3?'קריטי':rank===2?'אזהרה':'45 דקות';
+    const label=rank===4?'קריטי':rank===3?'100 דקות':rank===2?'אזהרה':'45 דקות';
     const limb=sanitizeRemoteText(payload.limb, 30);
     out.push({...base, id:`server-tq-${a.id}`, type:'SERVER_TOURNIQUET_TIME', severity, category:'urgent', title:`${p.visualId||p.id} — חסם עורקים ${label} (שרת)`, detail:`${limb?tourniquetLimbMeta(limb).label+' · ':''}${minutes!=null?`${minutes} דק׳ · `:''}לפי השרת`});
   });
   return out;
+}
+// ── Tourniquet alert delays from other phones (repo owner, 2026-10-26) ──
+// A medic's "remind me later" on a tourniquet alert is sent as WATCHDOG_ALERT with payload reason
+// 'tourniquet_snoozed' (opening the patient afterwards: 'tourniquet_alert_opened'). Command phones
+// read them back, newest per patient from another device, and list "put off by X until HH:MM" in
+// the alert strip while that tourniquet is still at the level that was put off (a later level
+// alerts on every phone by itself). The last allowed delay is marked escalated: the PC and CC
+// phones then vibrate and show a banner, once per delay. No schema change: WATCHDOG_ALERT is
+// already synced for every role, and only reason 'reescalated' changes server state (054).
+const tourniquetSnoozesByIncident={};
+const TQ_SNOOZE_REASONS=['tourniquet_snoozed','tourniquet_alert_opened'];
+async function pullTourniquetSnoozes(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let r;
+  try{ r=await client.from('events').select('patient_id,device_id,actor_role,local_timestamp,payload_json').eq('incident_id', incidentId).eq('type','WATCHDOG_ALERT').order('local_timestamp',{ascending:false}).limit(500); }
+  catch(e){ return; }
+  if(r.error || !Array.isArray(r.data)) return;
+  applyTourniquetSnoozes(r.data, incidentId);
+}
+function applyTourniquetSnoozes(rows, incidentId){
+  const me=getDeviceId();
+  const latest={};
+  rows.forEach(row=>{
+    const payload=row?.payload_json||{};
+    if(!row || !row.patient_id || row.device_id===me || !TQ_SNOOZE_REASONS.includes(payload.reason)) return;
+    const at=Date.parse(row.local_timestamp);
+    if(!Number.isFinite(at)) return;
+    if(!latest[row.patient_id] || at>latest[row.patient_id].at) latest[row.patient_id]={at, row};
+  });
+  const list=[];
+  Object.values(latest).forEach(({at, row})=>{
+    const payload=row.payload_json||{};
+    if(payload.reason!=='tourniquet_snoozed' || !TQ_ALERT_RANK[payload.level]) return;
+    const until=Date.parse(payload.snoozed_until);
+    list.push({key:`${row.device_id}:${row.local_timestamp}`, patientId:row.patient_id, at, level:payload.level,
+      until:Number.isFinite(until)?until:null, escalated:payload.escalated===true,
+      byName:sanitizeRemoteText(payload.by_name, 40), role:sanitizeRemoteText(row.actor_role, 20),
+      limb:sanitizeRemoteText(payload.limb, 30)});
+  });
+  const before=JSON.stringify(tourniquetSnoozesByIncident[incidentId]||[]);
+  tourniquetSnoozesByIncident[incidentId]=list;
+  if(JSON.stringify(list)!==before){ refreshActiveScreenData(); announceTourniquetSnoozeEscalations(); }
+}
+// A put-off alert still counts only while the patient is in care, a tourniquet is still on, and
+// this phone does not see a later level already.
+function activeTourniquetSnoozes(pts=patients, nowMs=Date.now()){
+  return Object.values(tourniquetSnoozesByIncident).flat().map(s=>{
+    const p=pts.find(x=>x.id===s.patientId);
+    if(!p || ['handed_over','deceased'].includes(p.patientStatus)) return null;
+    const tqs=activeTourniquets(p);
+    if(!tqs.length || localTourniquetRank(p, nowMs)>TQ_ALERT_RANK[s.level]) return null;
+    const minutes=Math.max(...tqs.map(t=>C5Rules.tourniquetTimer({tourniquet:t}, nowMs)?.minutes||0));
+    return {...s, p, minutes};
+  }).filter(Boolean);
+}
+function tourniquetSnoozeWho(s){
+  return s.byName || REMOTE_VITALS_ROLE_LABELS[s.role] || 'מכשיר אחר';
+}
+function tourniquetSnoozeAlertObjects(pts=patients, nowMs=Date.now()){
+  return activeTourniquetSnoozes(pts, nowMs).map(s=>{
+    const at=s.until ? new Date(s.until).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}) : '';
+    return {id:`tq-snooze-${s.p.id}`, type:s.escalated?'TOURNIQUET_ALERT_SNOOZE_LIMIT':'TOURNIQUET_ALERT_SNOOZED', severity:s.escalated?'critical':'high',
+      patientId:s.p.id, siteId:s.p.siteId||'SITE_A', createdAt:new Date(s.at).toISOString(), owner:'pc', audience:['pc','cc','chamal'],
+      escalatesTo:'cc', escalateAfterMin:0, actionRequired:'assign_medic', scope:'patient', category:'urgent', source:'remote',
+      title:`${s.p.visualId||s.p.id} — חסם ${s.minutes} דק׳ · נדחה ע״י ${tourniquetSnoozeWho(s)}`,
+      detail:`${at?`תזכורת עד ${at}`:'נדחה'}${s.escalated?' · נוצלו כל הדחיות':''}`};
+  });
+}
+function seenTourniquetEscalations(){
+  try{ return new Set(JSON.parse(localStorage.getItem('c5_seen_tq_escalations')||'[]')); }catch(e){ return new Set(); }
+}
+function rememberTourniquetEscalations(set){
+  try{ localStorage.setItem('c5_seen_tq_escalations', JSON.stringify([...set].slice(-200))); }catch(e){}
+}
+function announceTourniquetSnoozeEscalations(){
+  const role=currentUser?.role;
+  if(!['pc','cc'].includes(role)) return;
+  const seen=seenTourniquetEscalations();
+  const fresh=activeTourniquetSnoozes().filter(s=>s.escalated && !seen.has(s.key));
+  if(!fresh.length) return;
+  const s=fresh.sort((a,b)=>TQ_ALERT_RANK[b.level]-TQ_ALERT_RANK[a.level])[0];
+  haptic(TQ_ALERT_HAPTICS[s.level]||TQ_ALERT_HAPTICS.warn);
+  let el=document.getElementById('tq-snooze-escalation');
+  if(!el){
+    el=document.createElement('div');
+    el.id='tq-snooze-escalation';
+    el.setAttribute('role','alert');
+    document.body.appendChild(el);
+  }
+  el.dataset.patientId=s.p.id;
+  el.dataset.keys=JSON.stringify(fresh.map(x=>x.key));
+  el.style.cssText=`position:fixed;top:12px;left:12px;right:12px;z-index:601;background:${TQ_ALERT_COLORS[s.level]};color:#111;padding:14px 16px;border-radius:14px;font-weight:900;box-shadow:0 10px 30px rgba(0,0,0,0.45)`;
+  el.innerHTML=`<div style="font-size:16px">חסם עורקים נדחה שוב ושוב</div>
+    <div style="font-size:13px;margin-top:4px">${escAttr(s.p.visualId||s.p.id)} · ${s.minutes} דק׳ · ${escAttr(tourniquetSnoozeWho(s))} ניצל/ה את כל הדחיות${fresh.length>1?` · +${fresh.length-1}`:''}</div>
+    <div class="tq-alert-actions"><button class="tq-alert-btn primary" data-tq-action="open" onclick="closeTourniquetEscalation(true)">פתח מטופל</button><button class="tq-alert-btn" data-tq-action="seen" onclick="closeTourniquetEscalation(false)">ראיתי</button></div>`;
+}
+function closeTourniquetEscalation(open){
+  const el=document.getElementById('tq-snooze-escalation');
+  if(!el) return;
+  const seen=seenTourniquetEscalations();
+  try{ JSON.parse(el.dataset.keys||'[]').forEach(k=>seen.add(k)); }catch(e){}
+  rememberTourniquetEscalations(seen);
+  const pid=el.dataset.patientId;
+  el.remove();
+  if(open && pid && patients.some(p=>p.id===pid)) openPatient(pid);
 }
 const REMOTE_VITALS_ROLE_LABELS={medic:'חובש', paramedic:'פראמדיק', physician:'רופא', pc:'חוג״ד', admin:'מנהל מערכת'};
 function remoteVitalsSourceLine(p){
@@ -15545,7 +15816,7 @@ async function pullAlertAcknowledgments(incidentId){
 }
 function applyAlertAcknowledgments(rows){
   const pending=new Set(getOutbox().filter(e=>!e.synced && !e.syncRejected && e.patient_id
-    && (e.type==='WATCHDOG_ACKNOWLEDGED' || e.type==='WATCHDOG_ALERT')).map(e=>e.patient_id));
+    && (e.type==='WATCHDOG_ACKNOWLEDGED' || (e.type==='WATCHDOG_ALERT' && e.payload_json?.reason==='reescalated'))).map(e=>e.patient_id));
   let changed=false;
   for(const row of rows){
     if(!row || pending.has(row.id)) continue;

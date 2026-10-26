@@ -3,9 +3,11 @@
 // start, the 30-second alert refresh is driven by Playwright's fake clock, and vibration calls are
 // recorded:
 // 1. A tourniquet past 60 minutes alerts once (vibration + banner that stays), not on every tick.
-// 2. Crossing 120 minutes alerts again, as critical.
-// 3. A remote tourniquet refreshed from the server keeps its alert level (no repeat).
-// 4. A handed-over patient's tourniquet does not alert.
+// 2. Crossing 100 minutes alerts again: the decision point (owner, 2026-10-26).
+// 3. Crossing 120 minutes alerts again, as critical; "open patient" opens it.
+// 4. A remote tourniquet refreshed from the server keeps its alert level (no repeat).
+// 5. A handed-over patient's tourniquet does not alert.
+// "Remind me later" is covered by scripts/browser_tourniquet_snooze_test.js.
 //
 // Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_tourniquet_offline_alert_test.js
@@ -71,14 +73,19 @@ async function checkFile(browser, file) {
   assert((await page.evaluate(() => window.__vibrations.length)) === 1, `${rel}: the same level must not alert again on later ticks`);
   assert(await page.evaluate(() => !!document.getElementById('tq-time-alert')), `${rel}: the banner must stay until tapped`);
 
-  // 2. Past 120 minutes: critical.
-  await page.clock.runFor(56 * 60000);
-  const crit = await page.evaluate(() => ({ n: window.__vibrations.length, level: document.getElementById('tq-time-alert')?.dataset.level, banner: document.getElementById('tq-time-alert')?.textContent || '' }));
-  assert(crit.n === 2 && crit.level === 'critical' && crit.banner.includes('120'), `${rel}: crossing 120 minutes must raise a critical alert (got ${JSON.stringify(crit)})`);
-  await page.click('#tq-time-alert');
-  assert(await page.evaluate(() => !document.getElementById('tq-time-alert') && document.getElementById('detail-pid')?.textContent === 'P-TQ-OFF'), `${rel}: tapping the banner opens the patient`);
+  // 2. Past 100 minutes (owner, 2026-10-26): the decision alert, 20 minutes before 120.
+  await page.clock.runFor(35 * 60000);
+  const decision = await page.evaluate(() => ({ n: window.__vibrations.length, level: document.getElementById('tq-time-alert')?.dataset.level, banner: document.getElementById('tq-time-alert')?.textContent || '' }));
+  assert(decision.n === 2 && decision.level === 'decision' && decision.banner.includes('20 דקות ל-120') && decision.banner.includes('הכן החלטה'), `${rel}: crossing 100 minutes must raise the decision alert (got ${JSON.stringify(decision)})`);
 
-  // 3. A remote tourniquet refreshed from the server keeps its alert level.
+  // 3. Past 120 minutes: critical, with the physician-only release note.
+  await page.clock.runFor(20 * 60000);
+  const crit = await page.evaluate(() => ({ n: window.__vibrations.length, level: document.getElementById('tq-time-alert')?.dataset.level, banner: document.getElementById('tq-time-alert')?.textContent || '' }));
+  assert(crit.n === 3 && crit.level === 'critical' && crit.banner.includes('120') && crit.banner.includes('רופא בלבד'), `${rel}: crossing 120 minutes must raise a critical alert (got ${JSON.stringify(crit)})`);
+  await page.click('#tq-time-alert [data-tq-action="open"]');
+  assert(await page.evaluate(() => !document.getElementById('tq-time-alert') && document.getElementById('detail-pid')?.textContent === 'P-TQ-OFF'), `${rel}: "open patient" on the banner opens the patient`);
+
+  // 4. A remote tourniquet refreshed from the server keeps its alert level.
   const remote = await page.evaluate(() => {
     const inc = SITE_TO_INCIDENT_ID.SITE_A;
     const id = 'eeeeeeee-0000-4000-8000-000000000003';
@@ -93,7 +100,7 @@ async function checkFile(browser, file) {
   });
   assert(remote.first === 'warn' && remote.second === null && remote.added === 1, `${rel}: a remote tourniquet alerts once and a server refresh must not repeat it (got ${JSON.stringify(remote)})`);
 
-  // 4. The handed-over patient never alerted.
+  // 5. The handed-over patient never alerted.
   const handed = await page.evaluate(() => patients.find((p) => p.visualId === 'P-HANDED').tourniquets[0].timeAlertedLevel || null);
   assert(handed === null, `${rel}: a handed-over patient's tourniquet must not alert`);
 

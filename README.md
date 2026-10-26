@@ -24,7 +24,7 @@ The current implementation is intentionally lightweight: a standalone HTML proto
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Field/command prototype | Active Demo V2.9966 (`APP_VERSION 2.99.66`) | `index.html` (single file; also the live demo) |
+| Field/command prototype | Active Demo V2.9967 (`APP_VERSION 2.99.67`) | `index.html` (single file; also the live demo) |
 | Product specification | Active V2.8 role/command model | `docs/ROLE_COMMAND_MODEL_v2.8.md`, `docs/ALERT_OWNERSHIP_v1.3.md`, `docs/C5_SENTINEL_SAR_MVP_SPEC_v1.2.md` |
 | API contract | v1.2, sync endpoints implemented | `docs/API_SURFACE_v1.2.md` — `/sync/log` push/pull is a real deployed Edge Function; Command Actions and most of the AAR API are still unbuilt |
 | Data model | Deployed to a live Supabase project, RLS enabled and audited | `database/001_postgresql_schema_v1.2.sql` + incremental files `004`-`078`; see `docs/RLS_AUDIT_v1.md` |
