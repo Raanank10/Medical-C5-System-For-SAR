@@ -267,7 +267,6 @@ async function checkFile(browser, file) {
     _allIncidentTriage = { 'inc-a': { onSite: { red: 1, yellow: 0, green: 2, black: 0, pending: 0, total: 3 }, evacuated: { red: 0, yellow: 0, green: 0, black: 0, pending: 0, total: 0 } },
       'inc-b': { onSite: { red: 2, yellow: 1, green: 0, black: 0, pending: 1, total: 4 }, evacuated: { red: 0, yellow: 1, green: 0, black: 0, pending: 0, total: 1 } } };
     _allIncidentTriageAt = Date.now();
-    _incidentOverviewState = { 'inc-b': { active_watchdog_alerts: 3 } };
     activeIncident = { id: 'inc-a', visual_id: 'INC-1' };
     goTo('demo'); startRoleDashboard('cc');
     const backChip = !!document.querySelector('#command-status-strip [data-cc-all-incidents]');
@@ -275,19 +274,100 @@ async function checkFile(browser, file) {
     const strip = document.getElementById('command-status-strip').textContent;
     const out = {
       backChip, mode: isCcOverviewMode(), active: activeIncident, patientsLeft: patients.length, strip,
-      alertLine: document.querySelector('[data-incident-alerts="inc-b"]')?.getAttribute('onclick') || '',
       tappable: [...document.querySelectorAll('[data-incident-triage-table="onSite"] tr.tappable')].length,
       actionTab: document.querySelector('[data-cmd-panel="action"]').textContent,
       reds: document.querySelector('#command-status-strip .cmd-strip-count b').textContent,
     };
-    currentUser = null; activeIncident = null; _openIncidents = []; _allIncidentTriage = {}; _incidentOverviewState = {};
+    currentUser = null; activeIncident = null; _openIncidents = []; _allIncidentTriage = {};
     return out;
   });
   assert(overview.backChip, `${rel}: inside an incident the CC strip offers "כל האירועים"`);
   assert(overview.mode && overview.active === null && overview.patientsLeft === 0, `${rel}: the all-incidents view leaves no incident open and no incident's patients on screen`);
   assert(overview.reds === '3' && overview.strip.includes('2 פתוחים'), `${rel}: the strip totals every incident (got reds ${overview.reds})`);
-  assert(overview.alertLine === "enterIncidentFromPicker('inc-b')", `${rel}: an incident with open server alerts is listed in the strip and opens on tap`);
   assert(overview.tappable === 2 && overview.actionTab.includes('בחר אירוע'), `${rel}: every incident row opens it; incident tabs ask to choose an incident`);
+
+  // 13. Plan B (owner, 2026-10-26): in the all-incidents view the strip lists the actual alert lines of
+  // every open incident, computed from server rows the same way as inside an incident (CC audience),
+  // each line naming its incident; tap opens it; no "בטיפול"; the working set stays empty.
+  const lines = await page.evaluate(async () => {
+    const now = Date.now(), ago = (min) => new Date(now - min * 60000).toISOString();
+    const tables = {
+      patients: [
+        { id: 'pa1', incident_id: 'inc-a', visual_id: 'P001-AA', current_triage: 'red', current_status: 'identified', access_status: 'free', last_vitals_at: ago(2), created_at: ago(20) },
+        { id: 'pb1', incident_id: 'inc-b', visual_id: 'P001-BB', current_triage: 'yellow', current_status: 'stabilizing', access_status: 'trapped', last_vitals_at: ago(30), created_at: ago(40) },
+        { id: 'pb2', incident_id: 'inc-b', visual_id: 'P002-BB', current_triage: 'green', current_status: 'stabilizing', access_status: 'free', last_vitals_at: ago(5), created_at: ago(130) },
+        { id: 'pb3', incident_id: 'inc-b', visual_id: 'P003-BB', current_triage: 'yellow', current_status: 'stabilizing', access_status: 'free', last_vitals_at: ago(5), created_at: ago(70) },
+        { id: 'pb4', incident_id: 'inc-b', visual_id: 'P004-BB', current_triage: 'green', current_status: 'handed_over', access_status: 'free', last_vitals_at: ago(90), created_at: ago(95) },
+      ],
+      tourniquets: [{ id: 't1', incident_id: 'inc-b', patient_id: 'pb2', limb: 'right_leg', applied_at: ago(125), is_active: true, tourniquet_status: null }],
+      watchdog_alerts: [
+        { id: 'w1', incident_id: 'inc-b', patient_id: 'pb3', alert_type: 'TOURNIQUET_TIME_CRITICAL', severity: 'critical', triggered_at: ago(1), payload_json: { source: 'server_watchdog', minutes: 121, limb: 'left_leg' } },
+        { id: 'w2', incident_id: 'inc-b', patient_id: 'pb3', alert_type: 'TOURNIQUET_TIME_CRITICAL', severity: 'critical', triggered_at: ago(1), payload_json: { source: 'someone_else' } },
+      ],
+      medical_resource_requests: [
+        { id: '11111111-1111-4111-8111-111111111111', incident_id: 'inc-a', request_kind: 'reinforcement', resource_type: 'one_medic', urgency: 'immediate', status: 'pending', reason_codes: ['multiple_patients'], linked_patient_ids: [], target_location: 'קומה 2', requested_at: ago(3) },
+        { id: '22222222-2222-4222-8222-222222222222', incident_id: 'inc-a', request_kind: 'reinforcement', resource_type: 'paramedic', urgency: 'routine', status: 'resolved', reason_codes: [], linked_patient_ids: [], target_location: 'x', requested_at: ago(30) },
+      ],
+    };
+    const supply = { 'inc-b': [
+      { id: 's1', request_level: 'pc_to_logo', status: 'requested', items_json: [{ item: 'tourniquets', quantity: 4 }], requested_at: ago(4) },
+      { id: 's2', request_level: 'medic_to_pc', status: 'requested', items_json: [{ item: 'gauze', quantity: 2 }], requested_at: ago(4) },
+    ], 'inc-a': [] };
+    const selected = {}, failing = new Set();
+    // Chainable stub: every filter returns the chain; awaiting it yields the rows of the open incidents.
+    const chain = (table) => {
+      let ids = null;
+      const q = { select: (cols) => { selected[table] = cols; return q; }, in: (col, vals) => { if (col === 'incident_id') ids = vals; return q; },
+        eq: () => q, is: () => q, order: () => q, limit: () => q,
+        then: (res) => res(failing.has(table) ? { error: { message: 'offline' }, data: null } : { error: null, data: (tables[table] || []).filter((r) => !ids || ids.includes(r.incident_id)) }) };
+      return q;
+    };
+    const fakeClient = { from: chain, rpc: async (fn, args) => ({ error: null, data: fn === 'get_supply_request_queue' ? supply[args.p_incident_id] || [] : [] }) };
+    currentUser = { id: 'stub-cc', email: 'cc@test', role: 'cc' };
+    _openIncidents = [{ id: 'inc-a', visual_id: 'INC-1', location_name: 'אתר א' }, { id: 'inc-b', visual_id: 'INC-2', location_name: 'אתר ב' }];
+    goTo('demo'); startRoleDashboard('cc');
+    enterCcAllIncidentsView();
+    commandStripExpanded = false;
+    await pullAllIncidentTriage(fakeClient);
+    renderRoleDashboard('cc');
+    const lineOf = (el) => ({ id: el.querySelector('.cmd-strip-alert-id').textContent, title: el.querySelector('.cmd-strip-alert-title').textContent,
+      sub: el.querySelector('.cmd-strip-alert-sub').textContent, onclick: el.getAttribute('onclick'), ack: !!el.querySelector('.ack-btn') });
+    const collapsed = [...document.querySelectorAll('#command-status-strip .cmd-strip-alert')].map(lineOf);
+    const more = document.querySelector('#command-status-strip .cmd-strip-more')?.textContent || '';
+    toggleCommandStrip();
+    const expanded = [...document.querySelectorAll('#command-status-strip .cmd-strip-alert')].map(lineOf);
+    const source = document.querySelector('[data-cc-overview-alert-source]')?.textContent || '';
+    // Next refresh: the tourniquet read fails; the last tourniquets stay, so the alert does not vanish.
+    failing.add('tourniquets');
+    await pullAllIncidentTriage(fakeClient);
+    renderRoleDashboard('cc');
+    const afterFailedTq = [...document.querySelectorAll('#command-status-strip .cmd-strip-alert')].map(lineOf).map((l) => l.id);
+    const out = { collapsed, more, expanded, source, selected, afterFailedTq, patientsLeft: patients.length, mode: isCcOverviewMode() };
+    commandStripExpanded = false;
+    currentUser = null; activeIncident = null; _openIncidents = []; _allIncidentTriage = {}; _allIncidentAlertData = {}; _allIncidentAlertsAt = null;
+    return out;
+  });
+  assert(lines.mode && lines.patientsLeft === 0, `${rel}: overview alert data never enters the working set (patients ${lines.patientsLeft})`);
+  assert(!/optional_name|identifying_description/.test(lines.selected.patients || ''), `${rel}: the overview patient read carries no name or identifying description (got ${lines.selected.patients})`);
+  assert(lines.collapsed.length === 1, `${rel}: collapsed, the strip shows one line (got ${lines.collapsed.length})`);
+  const top = lines.collapsed[0];
+  assert(top.title.includes('חסם עורקים') && top.title.includes('קריטי') && top.sub.includes('INC-2') && top.onclick === "enterIncidentFromPicker('inc-b')" && !top.ack,
+    `${rel}: the top line is the most severe alert of any incident, names its incident, opens it, no "בטיפול" (got ${JSON.stringify(top)})`);
+  const ids = lines.expanded.map((l) => l.id);
+  assert(lines.expanded.length === 6 && lines.more.includes('+5'), `${rel}: one line per patient / request across incidents (got ${lines.more} · ${JSON.stringify(ids)})`);
+  ['P001-AA', 'P001-BB', 'P002-BB', 'P003-BB'].forEach((v) => assert(ids.includes(v), `${rel}: ${v} has a line (got ${ids})`));
+  assert(!ids.includes('P004-BB'), `${rel}: a handed-over green patient raises no CC alert`);
+  const byId = (v) => lines.expanded.find((l) => l.id === v);
+  assert(byId('P001-AA').title.includes('אדום') && byId('P001-AA').sub.includes('INC-1') && byId('P001-AA').onclick === "enterIncidentFromPicker('inc-a')", `${rel}: red without evacuation status in incident A (got ${JSON.stringify(byId('P001-AA'))})`);
+  assert(byId('P002-BB').sub.includes('רגל ימין') && byId('P002-BB').sub.includes('125'), `${rel}: the tourniquet line shows the limb label and minutes from the server row (got ${JSON.stringify(byId('P002-BB'))})`);
+  assert(byId('P001-BB').title.includes('לכוד ללא קשר חובש'), `${rel}: trapped without medic contact from access_status + last_vitals_at (got ${JSON.stringify(byId('P001-BB'))})`);
+  assert(byId('P003-BB').title.includes('(שרת)'), `${rel}: the server watchdog tourniquet alert, only from the server watchdog source (got ${JSON.stringify(byId('P003-BB'))})`);
+  const site = lines.expanded.filter((l) => l.id === 'מוקד');
+  assert(site.length === 2 && site.some((l) => l.title.includes('בקשת תגבור') && l.sub.includes('INC-1')) && site.some((l) => l.title.includes('נדרש תגבור פלוגתי') && l.sub.includes('INC-2')),
+    `${rel}: the open reinforcement request and the company-level supply escalation are listed, the resolved request and the PC-level supply request are not (got ${JSON.stringify(site)})`);
+  assert(lines.afterFailedTq.includes('P002-BB') && lines.afterFailedTq.length === 6, `${rel}: a failed tourniquet read keeps the last tourniquets, the alert stays (got ${lines.afterFailedTq})`);
+  assert(lines.expanded.every((l) => !l.ack), `${rel}: no line in the all-incidents view offers "בטיפול"`);
+  assert(lines.source.includes('לפי נתוני השרת') && lines.source.includes('טרם נשלח'), `${rel}: the strip says the lines come from the server and miss what the field has not sent (got ${lines.source})`);
 
   assert(!errors.length, `${rel}: page errors: ${errors.join(' | ')}`);
   await context.close();
