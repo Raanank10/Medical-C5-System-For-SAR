@@ -10,7 +10,9 @@
 //   patient's id, their Hebrew label and march_section; the create event carries march_review
 //   with undocumented letters as null (shown as "לא תועד", never hidden);
 // - hemostatic gauze and the hypothermia blanket come out of the medic's own stock;
-// - a restored draft shows its selected treatments and letter states again.
+// - a restored draft shows its selected treatments and letter states again;
+// - V2.99.69 letter strip: one letter's treatments at a time, every letter's state in the strip,
+//   the strip on the first screen, "no treatment needed" moves on to the next undocumented letter.
 //
 // Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_march_paws_test.js
@@ -75,12 +77,20 @@ async function main() {
     await page.click('#march-sec-m .chip[data-tx="hemostatic"]');
     // Consuming stock opens the existing "supply used" sheet; the medic confirms it.
     await page.click('#supply-used-modal button[onclick="confirmSupplyUsed()"]');
+    // One letter on screen at a time (V2.99.69): a letter's tile opens it.
+    await page.click('#march-tile-r');
     await page.click('#march-sec-r .chip[data-tx="chest_seal"]');
+    await page.click('#march-tile-a');
     await page.click('#march-sec-a .chip[data-tx="npa"]');
+    await page.click('#march-tile-h');
     await page.click('#march-clear-h');
+    await page.click('#march-tile-c');
     await page.click('#march-clear-c');
+    await page.click('#march-tile-c'); // "no treatment" moved on to the next letter; back to C
     await page.click('#march-sec-c .chip[data-tx="txa"]'); // withdraws "no treatment" for C
+    await page.click('#march-tile-m');
     await page.click('#march-clear-m'); // M already has a treatment: refused
+    await page.click('#march-tile-s');
     await page.click('#march-sec-s .chip[data-tx="splint"]');
     const taps = await page.evaluate(() => ({
       review: marchReviewFromState(),
@@ -188,6 +198,84 @@ async function main() {
     }
     const demoParamedic = await scopeFor({ role: 'paramedic' });
     assert(demoParamedic.selected === 'cric,needle_decompression', `demo paramedic must record both, got ${JSON.stringify(demoParamedic)}`);
+
+    // 8. Letter strip (V2.99.69, owner 2026-10-26): one letter's treatments at a time, every
+    // letter's state in the strip, "no treatment needed" moves on to the next undocumented letter.
+    const view = () => page.evaluate(() => ({
+      open: [...document.querySelectorAll('#screen-step7 .march-section')].filter((el) => getComputedStyle(el).display !== 'none').map((el) => el.id.replace('march-sec-', '')).join(),
+      current: [...document.querySelectorAll('#march-strip .march-tile.current')].map((el) => el.id.replace('march-tile-', '')).join(),
+      tiles: Object.fromEntries([...document.querySelectorAll('#march-strip .march-tile')].map((el) => [el.id.replace('march-tile-', ''), el.querySelector('small').textContent])),
+    }));
+    await page.evaluate(() => { startNewPatient('extended'); state.triage = 'red'; goTo('step7'); });
+    let v = await view();
+    assert(v.open === 'm' && v.current === 'm', `step 7 opens on M alone, got open ${v.open} current ${v.current}`);
+    assert(Object.keys(v.tiles).join('') === 'marchpabws' && Object.keys(v.tiles).length === 9, `nine tiles, got ${Object.keys(v.tiles)}`);
+    assert(Object.values(v.tiles).every((t) => t === 'לא תועד'), `every tile starts "לא תועד", got ${JSON.stringify(v.tiles)}`);
+    const fits = await page.evaluate(() => {
+      const bar = document.querySelector('#screen-step7 .bottom-bar').getBoundingClientRect().top;
+      const strip = document.getElementById('march-strip').getBoundingClientRect();
+      return { stripBottom: strip.bottom, bar, tileH: Math.min(...[...document.querySelectorAll('.march-tile')].map((t) => t.getBoundingClientRect().height)) };
+    });
+    assert(fits.stripBottom <= fits.bar, `the whole letter strip is on the first screen, above the bottom bar (${fits.stripBottom} > ${fits.bar})`);
+    assert(fits.tileH >= 56, `letter tiles at least 56px tall, got ${fits.tileH}`);
+    // Tourniquet-only patient: M treated, then one tap per remaining letter.
+    await page.click('#march-sec-m .chip[data-tx="tourniquet"]');
+    await page.click('#supply-used-modal button[onclick="confirmSupplyUsed()"]');
+    v = await view();
+    assert(v.open === 'm' && v.tiles.m === 'טופל', `choosing a treatment keeps its letter open (limb / time), got ${JSON.stringify(v)}`);
+    await page.click('#march-tile-a');
+    for (const id of ['a', 'r', 'c', 'h', 'p', 'ab', 'w']) {
+      v = await view();
+      assert(v.open === id, `auto-advance must reach ${id}, got ${v.open}`);
+      await page.click(`#march-clear-${id}`);
+    }
+    v = await view();
+    assert(v.open === 's' && v.current === 's', `after W the next undocumented letter is S, got ${v.open}`);
+    await page.click('#march-clear-s');
+    v = await view();
+    assert(v.open === 's', `with every letter documented the last one stays open, got ${v.open}`);
+    assert(v.tiles.m === 'טופל' && ['a', 'r', 'c', 'h', 'p', 'ab', 'w', 's'].every((id) => v.tiles[id] === '✓ נבדק'), `tiles after the sweep, got ${JSON.stringify(v.tiles)}`);
+    // Wrap round: an undocumented letter before the current one is reached too.
+    await page.click('#march-tile-a');
+    await page.click('#march-clear-a'); // un-check A
+    await page.click('#march-tile-w');
+    await page.click('#march-clear-w'); // un-check W
+    await page.click('#march-clear-w'); // check W again: next undocumented is A (wraps)
+    v = await view();
+    assert(v.open === 'a', `auto-advance wraps round to A, got ${v.open}`);
+    // Re-entering step 7 opens the first undocumented letter.
+    await page.evaluate(() => { goTo('step8'); goTo('step7'); });
+    v = await view();
+    assert(v.open === 'a', `re-entering opens the first undocumented letter (A), got ${v.open}`);
+
+    // 9. A chosen treatment / limb is unmistakable (solid fill, ring, white check), and the progress
+    // bar follows the step actually shown (step7 is 6 / 8; location, screen step2, is 7 / 8).
+    const look = await page.evaluate(() => {
+      startNewPatient('extended');
+      goTo('step7');
+      const chip = document.querySelector('#march-sec-m .chip[data-tx="bandage"]');
+      chip.style.transition = 'none'; // read the end state, not the 0.12s animation
+      chip.classList.add('selected');
+      const live = getComputedStyle(chip); // live object: copy before the class comes off
+      const cs = { backgroundColor: live.backgroundColor, boxShadow: live.boxShadow };
+      const check = getComputedStyle(chip, '::after').content;
+      const limb = document.querySelector('#limb-grid .limb-btn');
+      limb.classList.add('selected');
+      const limbCheck = getComputedStyle(limb, '::after').content;
+      chip.classList.remove('selected'); limb.classList.remove('selected');
+      const bars = {};
+      for (const sid of ['step3', 'step4', 'step5', 'step6', 'step7', 'step2', 'step8']) {
+        goTo(sid);
+        const root = document.getElementById('screen-' + sid);
+        bars[sid] = [root.querySelector('.flow-step').textContent, parseFloat(root.querySelector('.progress-fill').style.width)];
+      }
+      return { bg: cs.backgroundColor, ring: cs.boxShadow, check, limbCheck, bars };
+    });
+    assert(look.bg === 'rgb(67, 97, 238)' && look.ring.includes('3px') && look.check.includes('✓'), `a selected treatment needs a solid fill, ring and check, got ${JSON.stringify(look)}`);
+    assert(look.limbCheck.includes('✓'), `a selected tourniquet limb needs a check mark, got ${look.limbCheck}`);
+    const order = ['step3', 'step4', 'step5', 'step6', 'step7', 'step2', 'step8'].map((sid) => look.bars[sid]);
+    assert(look.bars.step7[0] === 'שלב 6 / 8' && look.bars.step2[0] === 'שלב 7 / 8', `step labels, got ${JSON.stringify(look.bars)}`);
+    assert(order.every(([, w], i) => i === 0 || w > order[i - 1][1]) && order[order.length - 1][1] === 100, `the progress bar must only grow through the full flow, got ${JSON.stringify(look.bars)}`);
 
     assert(pageErrors.length === 0, `uncaught page error(s): ${pageErrors.join(' | ')}`);
     await page.close();
