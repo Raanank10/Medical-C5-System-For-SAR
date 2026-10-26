@@ -962,7 +962,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9967</div>
+      <div class="demo-kicker">Demo V2.9968</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1059,7 +1059,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9967</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9968</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1069,7 +1069,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9967</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9968</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3196,7 +3196,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.67';
+const APP_VERSION = '2.99.68';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -7571,18 +7571,22 @@ function commandAlertGroups(alerts){
     return g;
   }).sort((x,y)=>x.rank-y.rank || x.oldest-y.oldest);
 }
+// In the CC all-incidents view the group carries its incident and that incident's patient: no
+// "בטיפול" there (the patient is not on this phone), a tap opens the incident.
 function commandAlertLineHtml(group){
-  const p=group.patientId ? patients.find(x=>x.id===group.patientId) : null;
+  const inc=group.incident||null;
+  const p=inc ? group.patient : group.patientId ? patients.find(x=>x.id===group.patientId) : null;
   const prefix=p ? `${p.visualId||p.id} — ` : '';
   const short=a=>String(a.title||'').startsWith(prefix) ? String(a.title).slice(prefix.length) : String(a.title||'');
   const first=group.alerts[0];
   const rest=[...new Set(group.alerts.slice(1).map(short))].filter(t=>t!==short(first)).join(' · ');
   const cls=group.rank===0?'crit':group.rank===1?'high':'med';
-  const open=p?` onclick="openPatientFromAlert('${p.id}')"`:'';
-  const ack=p?`<button class="ack-btn" onclick="event.stopPropagation();acknowledgeAlert('${p.id}')">בטיפול</button>`:'';
-  return `<div class="cmd-strip-alert ${cls}" data-alert-group="${escAttr(group.key)}"${open}>
+  const open=inc?` onclick="enterIncidentFromPicker('${escAttr(inc.id)}')"`:p?` onclick="openPatientFromAlert('${p.id}')"`:'';
+  const ack=p&&!inc?`<button class="ack-btn" onclick="event.stopPropagation();acknowledgeAlert('${p.id}')">בטיפול</button>`:'';
+  const where=inc?`${inc.visual_id||''} · ${inc.location_name||''} · `:'';
+  return `<div class="cmd-strip-alert ${cls}" data-alert-group="${escAttr(group.key)}"${inc?` data-incident-alerts="${escAttr(inc.id)}"`:''}${open}>
     <span class="cmd-strip-alert-id">${p?escAttr(p.visualId||p.id):'מוקד'}</span>
-    <div style="flex:1;min-width:0"><div class="cmd-strip-alert-title">${p?`${escAttr(TRIAGE_LABELS[p.triage]||'')} · `:''}${escAttr(short(first))}</div><div class="cmd-strip-alert-sub">${escAttr(rest||first.detail||'')}</div></div>${ack}
+    <div style="flex:1;min-width:0"><div class="cmd-strip-alert-title">${p?`${escAttr(TRIAGE_LABELS[p.triage]||'')} · `:''}${escAttr(short(first))}</div><div class="cmd-strip-alert-sub">${escAttr(where+(rest||first.detail||''))}</div></div>${ack}
   </div>`;
 }
 function commandLongestTourniquet(pts){
@@ -9400,7 +9404,9 @@ function pushAlert(list, alert){
     ...alert
   });
 }
-function buildAlertObjects(pts=patients){
+// Patient-level alerts only, from the patient fields alone, so the CC all-incidents view can run
+// the same checks on another incident's server rows (ccOverviewAlertGroups).
+function patientAlertObjects(pts){
   const alerts=[];
   pts.forEach(p=>{
     const siteId=p.siteId||'SITE_A';
@@ -9434,9 +9440,13 @@ function buildAlertObjects(pts=patients){
     const tqTimer=C5Rules.tourniquetTimer(p);
     if(tqTimer && ['warn','critical'].includes(tqTimer.cls)){
       const crit=tqTimer.cls==='critical', tqMin=tqTimer.minutes;
-      pushAlert(alerts,{...base,id:`tq-${p.id}`,type:crit?'TOURNIQUET_CRITICAL':'TOURNIQUET_WARNING',severity:crit?'critical':'high',owner:'medic',audience:crit?['medic','pc','cc']:['medic','pc'],escalatesTo:crit?'cc':'pc',escalateAfterMin:crit?0:10,actionRequired:'update_vitals',scope:'patient',category:'urgent',title:`${p.visualId||p.id} — חסם עורקים ${crit?'קריטי':'אזהרה'}`,detail:`${p.tourniquet.limb||'גפה לא צוינה'} · ${tqMin} דק׳`});
+      pushAlert(alerts,{...base,id:`tq-${p.id}`,type:crit?'TOURNIQUET_CRITICAL':'TOURNIQUET_WARNING',severity:crit?'critical':'high',owner:'medic',audience:crit?['medic','pc','cc']:['medic','pc'],escalatesTo:crit?'cc':'pc',escalateAfterMin:crit?0:10,actionRequired:'update_vitals',scope:'patient',category:'urgent',title:`${p.visualId||p.id} — חסם עורקים ${crit?'קריטי':'אזהרה'}`,detail:`${p.tourniquet.limbLabel||p.tourniquet.limb||'גפה לא צוינה'} · ${tqMin} דק׳`});
     }
   });
+  return alerts;
+}
+function buildAlertObjects(pts=patients){
+  const alerts=patientAlertObjects(pts);
   serverWatchdogAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
   duplicateCandidates(pts).forEach(([a,b],idx)=>pushAlert(alerts,{id:`dup-${a.id}-${b.id}`,type:'DUPLICATE_SUSPECTED',severity:'medium',owner:'pc',audience:['pc','chamal'],escalatesTo:null,actionRequired:'merge_duplicate',scope:'site',category:'integrity',siteId:a.siteId||b.siteId||'SITE_A',patientId:a.id,title:`חשד לכפילות ${a.id} ↔ ${b.id}`,detail:'בדיקה ידנית בלבד; אין מיזוג הרסני של אירועים'}));
   const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id)):siteExternalReports(cmdActiveSite);
@@ -9449,7 +9459,12 @@ function buildAlertObjects(pts=patients){
   if(conflicts>0) pushAlert(alerts,{id:`external-conflict-${cmdActiveSite}`,type:'EXTERNAL_REPORT_CONFLICT',severity:conflicts>2?'high':'medium',owner:'chamal',audience:['pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'verify_report',scope:'site',category:'integrity',siteId:cmdActiveSite,title:'פער דיווח חיצוני מול שדה',detail:`${conflicts} פערים בין דיווח חיצוני לספירה מאושרת`});
   const unsynced=pts.reduce((sum,p)=>sum+(p.unsyncedEvents||0),0)+localOutboxCount();
   if(unsynced>0) pushAlert(alerts,{id:`sync-backlog-${cmdActiveSite}`,type:'UNSYNCED_EVENT_BACKLOG',severity:unsynced>5?'high':'low',owner:'chamal',audience:unsynced>5?['pc','cc','chamal']:['medic','pc'],escalatesTo:unsynced>5?'cc':null,escalateAfterMin:unsynced>5?5:null,actionRequired:'review_sync',scope:'system',category:'integrity',siteId:cmdActiveSite,title:'אירועים מקומיים לא מסונכרנים',detail:`${unsynced} אירועים ממתינים בתור המקומי`});
-  reinforcementRequests.filter(isRequestOpen).forEach(r=>{
+  requestAlertObjects(reinforcementRequests.filter(isRequestOpen)).forEach(a=>alerts.push(a));
+  return alerts;
+}
+function requestAlertObjects(reqs){
+  const alerts=[];
+  reqs.forEach(r=>{
     if(r.type==='resupply'){
       const escalated=['escalated_to_cc','unavailable_at_truck'].includes(r.status);
       pushAlert(alerts,{id:`resupply-${r.id}`,type:escalated?'PC_TRUCK_SHORTAGE_ESCALATED':'MEDIC_RESUPPLY_REQUEST',severity:r.urgency==='immediate'||escalated?'high':'medium',owner:escalated?'cc':'pc',audience:escalated?['pc','cc','logistics','chamal']:['pc','logistics'],escalatesTo:escalated?'cc':null,escalateAfterMin:escalated?0:8,actionRequired:'dispatch_supply',scope:escalated?'company':'site',category:'forces',siteId:r.siteId,patientId:r.linkedPatientId,title:`בקשת השלמת ציוד — ${escalated?'נדרש תגבור פלוגתי':'זמינה ברכב חוג״ד'}`,detail:`${r.requestedByName} · ${r.zone||r.targetLocation} · ${resupplyItemsText(r)} · ${REINFORCEMENT_STATUS_LABELS[r.status]||r.status}`});
@@ -13464,24 +13479,26 @@ function ccOverviewTotals(){
   _openIncidents.forEach(inc=>{ const c=_allIncidentTriage[inc.id]; if(c) Object.keys(total).forEach(k=>{ total[k]+=c.onSite[k]; }); });
   return total;
 }
-// Strip in the all-incidents view: no incident's patients are on this phone, so the alert lines
-// are replaced by each incident's open server alert count (get_incident_command_state), tap to open.
+// Strip in the all-incidents view: the alert lines of every open incident (ccOverviewAlertGroups),
+// top line plus "+N" as inside an incident, each line naming its incident; tap opens it.
 function renderCcOverviewStrip(){
   const contact=serverContactState();
   const t=ccOverviewTotals();
   const cell=(n,label,color)=>`<div class="cmd-strip-count" style="border-top-color:${color}"><b>${n}</b>${label}</div>`;
-  const withAlerts=_openIncidents.map(inc=>({inc, n:Number(_incidentOverviewState[inc.id]?.active_watchdog_alerts||0)})).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
-  const lines=withAlerts.map(({inc,n})=>`<div class="cmd-strip-alert high" data-incident-alerts="${escAttr(inc.id)}" onclick="enterIncidentFromPicker('${escAttr(inc.id)}')">
-      <span class="cmd-strip-alert-id">${escAttr(inc.visual_id||'')}</span>
-      <div style="flex:1;min-width:0"><div class="cmd-strip-alert-title">${n} התראות פתוחות · ${escAttr(inc.location_name||'')}</div><div class="cmd-strip-alert-sub">הקש כדי לפתוח את האירוע ולראות את ההתראות</div></div>
-    </div>`).join('');
+  const groups=ccOverviewAlertGroups();
+  const shown=commandStripExpanded ? groups : groups.slice(0,1);
+  const more=groups.length>1 ? `<button class="cmd-strip-chip cmd-strip-more" onclick="toggleCommandStrip()">${commandStripExpanded?'סגור ▴':`+${groups.length-1} התראות ▾`}</button>` : '';
+  const source=_allIncidentAlertsAt
+    ? `<div class="cmd-strip-alert-sub" data-cc-overview-alert-source style="padding:4px 2px 0;white-space:normal;font-size:12px">${groups.length?'':'אין התראות פתוחות באירועים · '}לפי נתוני השרת · עודכן ${escAttr(timeAgoLabel(_allIncidentAlertsAt))} · מה שטרם נשלח מהשטח לא מופיע</div>`
+    : '<div class="cmd-strip-alert-sub" data-cc-overview-alert-source style="padding:6px 2px;font-size:12px">טרם התקבלו התראות מהשרת</div>';
   return `<div class="cmd-strip" id="command-status-strip">
     <div class="cmd-strip-row">
       <span id="role-strip-conn" class="cmd-conn ${contact.level}">${escAttr(serverContactLabel(contact))}</span>
       <span class="cmd-strip-chip">כל האירועים · ${_openIncidents.length} פתוחים</span>
+      ${more}
     </div>
     <div class="cmd-strip-counts">${cell(t.red,'אדום','var(--red)')}${cell(t.yellow,'צהוב','var(--yellow)')}${cell(t.green,'ירוק','var(--green)')}${cell(t.black,'שחור','var(--muted)')}${cell(t.pending,'טרם מוין','var(--muted)')}</div>
-    <div class="cmd-strip-alerts">${lines||'<div class="cmd-strip-alert-sub" style="padding:6px 2px">אין התראות שרת פתוחות באירועים</div>'}</div>
+    <div class="cmd-strip-alerts${commandStripExpanded?' expanded':''}">${shown.map(commandAlertLineHtml).join('')}${source}</div>
   </div>`;
 }
 function renderCcOverviewPanel(){
@@ -14219,21 +14236,91 @@ function addTriageCount(counts, triage){
   counts[['red','yellow','green','black'].includes(triage)?triage:'pending']++;
   counts.total++;
 }
+// No name or identifying description: the overview needs triage, status, trapped and timing only.
+const OVERVIEW_PATIENT_COLUMNS='id,incident_id,visual_id,current_triage,current_status,access_status,needs_full_assessment,last_vitals_at,created_at';
 async function pullAllIncidentTriage(client){
   const ids=_openIncidents.map(i=>i.id);
-  if(!ids.length){ _allIncidentTriage={}; _allIncidentTriageAt=Date.now(); return; }
+  if(!ids.length){ _allIncidentTriage={}; _allIncidentTriageAt=Date.now(); _allIncidentAlertData={}; _allIncidentAlertsAt=Date.now(); return; }
+  let rows=null;
   try{
-    const r=await client.from('patients').select('incident_id,current_triage,current_status').in('incident_id',ids);
-    if(r.error || !Array.isArray(r.data)) return;
-    const out={};
-    ids.forEach(id=>{ out[id]={onSite:emptyTriageCounts(), evacuated:emptyTriageCounts()}; });
-    r.data.forEach(row=>{
-      const c=out[row.incident_id]; if(!c) return;
-      addTriageCount(LOCATION_BOARD_EVACUATED_STATUSES.has(row.current_status)?c.evacuated:c.onSite, row.current_triage);
-    });
-    _allIncidentTriage=out;
-    _allIncidentTriageAt=Date.now();
+    const r=await client.from('patients').select(OVERVIEW_PATIENT_COLUMNS).in('incident_id',ids);
+    if(!r.error && Array.isArray(r.data)) rows=r.data;
   }catch(e){}
+  if(!rows) return;
+  const out={};
+  ids.forEach(id=>{ out[id]={onSite:emptyTriageCounts(), evacuated:emptyTriageCounts()}; });
+  rows.forEach(row=>{
+    const c=out[row.incident_id]; if(!c) return;
+    addTriageCount(LOCATION_BOARD_EVACUATED_STATUSES.has(row.current_status)?c.evacuated:c.onSite, row.current_triage);
+  });
+  _allIncidentTriage=out;
+  _allIncidentTriageAt=Date.now();
+  if(isCcOverviewMode()) await pullAllIncidentAlertData(client, ids, rows);
+}
+// CC all-incidents view, alert lines (owner, 2026-10-26, plan B): every open incident's patients
+// are kept here, read only and apart from the working set (patients), and the same alert checks
+// run on them (patientAlertObjects, serverWatchdogAlertObjects, requestAlertObjects). Server data
+// only: what a field phone has not sent yet is not here, and the site-level alerts that need the
+// incident open on this phone (external report conflict, incident type mismatch) are not shown.
+let _allIncidentAlertData={}, _allIncidentAlertsAt=null; // incidentId -> {patients, watchdog, requests, supply}
+const OVERVIEW_REQUEST_CLOSED_STATUSES=new Set(['arrived','resolved','cancelled','denied','delivered','closed','fulfilled']);
+async function pullAllIncidentAlertData(client, ids, patientRows){
+  const query=async build=>{ try{ const r=await build(); return !r.error && Array.isArray(r.data) ? r.data : null; }catch(e){ return null; } };
+  const [tqRows, wdRows, reqRows, supplyLists]=await Promise.all([
+    query(()=>client.from('tourniquets').select(SERVER_TOURNIQUET_COLUMNS+',incident_id').in('incident_id', ids).eq('is_active', true)),
+    query(()=>client.from('watchdog_alerts').select('id,incident_id,patient_id,alert_type,severity,triggered_at,payload_json').in('incident_id', ids).is('resolved_at', null).in('alert_type', SERVER_WATCHDOG_TYPES).limit(1000)),
+    query(()=>client.from('medical_resource_requests').select(MEDICAL_REQUEST_COLUMNS).in('incident_id', ids).order('requested_at',{ascending:false}).limit(500)),
+    Promise.all(ids.map(id=>query(()=>client.rpc('get_supply_request_queue', {p_incident_id:id}))))
+  ]);
+  const prev=_allIncidentAlertData, out={};
+  ids.forEach((id,i)=>{
+    // A query that failed keeps that incident's last rows rather than dropping its alerts.
+    const keep=key=>prev[id]?.[key]||[];
+    const pts=patientRows.filter(r=>r.incident_id===id).map(row=>{
+      const p=remotePatientRecord(row);
+      p.createdAt=row.created_at||null;
+      p.incidentId=id;
+      p.tourniquets=tqRows ? serverTourniquetRecords(tqRows.filter(r=>r.incident_id===id), p.id) : (keep('patients').find(x=>x.id===p.id)?.tourniquets||[]);
+      syncLegacyTourniquetAlias(p);
+      return p;
+    });
+    out[id]={
+      patients:pts,
+      watchdog:wdRows ? wdRows.filter(a=>a.incident_id===id && a.patient_id && SERVER_WATCHDOG_TYPES.includes(a.alert_type) && a.payload_json?.source==='server_watchdog') : keep('watchdog'),
+      requests:reqRows ? reqRows.filter(r=>r.incident_id===id).map(overviewRequestFromRow).filter(Boolean) : keep('requests'),
+      supply:supplyLists[i] ? supplyLists[i].filter(r=>r.request_level==='pc_to_logo' && !['delivered','cancelled'].includes(r.status)) : keep('supply')
+    };
+  });
+  _allIncidentAlertData=out;
+  _allIncidentAlertsAt=Date.now();
+}
+function overviewRequestFromRow(row){
+  if(!row || !MEDICAL_REQUEST_ID_RE.test(String(row.id||'')) || !REINFORCEMENT_RESOURCE_LABELS[row.resource_type]) return null;
+  if(OVERVIEW_REQUEST_CLOSED_STATUSES.has(row.status)) return null;
+  return {id:row.id, type:row.request_kind==='death_certification'?'death_certification_request':'medical_reinforcement',
+    resourceType:row.resource_type, urgency:REINFORCEMENT_URGENCY_LABELS[row.urgency]?row.urgency:null, status:String(row.status||''),
+    targetLocation:sanitizeRemoteText(row.target_location)||'—', createdAt:row.requested_at,
+    reasonCodes:(Array.isArray(row.reason_codes)?row.reason_codes:[]).filter(x=>/^[a-z_]{1,40}$/.test(String(x))),
+    linkedPatientIds:(Array.isArray(row.linked_patient_ids)?row.linked_patient_ids:[]).filter(x=>MEDICAL_REQUEST_ID_RE.test(String(x)))};
+}
+// A supply request the PC escalated to company level (request_level pc_to_logo), as the same alert
+// the requesting phone raises for escalated_to_cc (requestAlertObjects).
+function supplyEscalationAlertObject(row){
+  const f=formatSupplyRequestRow(row);
+  const alert={id:`supply-${row.id}`, type:'PC_TRUCK_SHORTAGE_ESCALATED', severity:'high', owner:'cc', audience:['pc','cc','logistics','chamal'], escalatesTo:'cc', escalateAfterMin:0, actionRequired:'dispatch_supply', scope:'company', category:'forces', createdAt:row.requested_at||new Date().toISOString(), title:'בקשת השלמת ציוד — נדרש תגבור פלוגתי', detail:`${f.title} · ${f.sub}`};
+  const list=[]; pushAlert(list, alert); return list[0];
+}
+// Alerts routed to the CC in every open incident, grouped per patient as in the strip of an open
+// incident, then ranked across incidents by severity and age.
+function ccOverviewAlertGroups(nowMs=Date.now()){
+  const out=[];
+  _openIncidents.forEach(inc=>{
+    const d=_allIncidentAlertData[inc.id]; if(!d) return;
+    const alerts=[...patientAlertObjects(d.patients), ...serverWatchdogAlertObjects(d.patients, nowMs, d.watchdog),
+      ...requestAlertObjects(d.requests), ...d.supply.map(supplyEscalationAlertObject)].filter(a=>a.audience.includes('cc'));
+    commandAlertGroups(alerts).forEach(g=>out.push({...g, key:`${inc.id}|${g.key}`, incident:inc, patient:g.patientId?d.patients.find(p=>p.id===g.patientId)||null:null}));
+  });
+  return out.sort((x,y)=>x.rank-y.rank || x.oldest-y.oldest);
 }
 async function enterIncidentContextAfterLogin(){
   pollIncidentOpenAlerts(); // D10: command sees incidents opened in the field right after sign-in
@@ -14395,6 +14482,8 @@ function deactivateIncidentContext(){
   _workingIncidentId=null;
   _openIncidents=[];
   _incidentOverviewState={};
+  _allIncidentTriage={}; _allIncidentTriageAt=null;
+  _allIncidentAlertData={}; _allIncidentAlertsAt=null;
   _incidentOpenAlerts=[];
   _mergePanelFor=null;
   _seenOpenAlertIds=new Set();
@@ -15236,6 +15325,32 @@ async function pullPatientLocations(incidentId){
   }
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
+// A patient another device created, built from its server row (PROJECTED_PATIENT_COLUMNS, or the
+// smaller OVERVIEW_PATIENT_COLUMNS of the CC all-incidents view).
+function remotePatientRecord(row){
+  const access=accessibilityFromServerStatus(row.access_status);
+  const serverTriage=VALID_LOCAL_TRIAGE.has(row.current_triage) ? row.current_triage : null;
+  const status=VALID_LOCAL_STATUS.has(row.current_status) ? row.current_status : null;
+  return {
+    id:row.id, visualId:row.visual_id, triage:serverTriage, _triageSyncRef:serverTriage, accessibility:access.accessibility, trapStatus:access.trapStatus,
+    location:REMOTE_LOCATION_PLACEHOLDER, locDetail:'',
+    injury:null, injuryZones:[], patientStatus:status||'identified',
+    needsFullAssessment:!!row.needs_full_assessment,
+    patientAgeGroup:row.is_pediatric?'pediatric':'adult', patientAge:row.pediatric_age_years||null,
+    fullName:row.optional_name||'לא מזוהה', identityStatus:row.optional_name?'reported':'unknown', temporaryDescription:row.identifying_description||'',
+    assignedMedicId:null, assignedPlatoonId:null, tempPatientId:null,
+    stockSnapshot:{}, lastTouchedBy:'(remote)', lastModifiedAt:new Date().toISOString(),
+    confirmedClinical:true, unsyncedEvents:0, locationHistory:[], possibleDuplicate:false,
+    time:nowT(), vitals:{...VITALS_NOT_ON_DEVICE}, vitalsCapture:null, txHistory:[],
+    alert:false, deterioration:[], lastVitalsAt:row.last_vitals_at?Date.parse(row.last_vitals_at):null,
+    vitalsObserved:{},
+    vitalsHistory:[], tourniquet:null, medic:'(remote)', siteId:INCIDENT_ID_TO_SITE[row.incident_id]||'SITE_A',
+    _serverVersion:row.version, sourcedFromRemote:true,
+    physicianDeathConfirmedAt:row.physician_death_confirmed_at?Date.parse(row.physician_death_confirmed_at):null,
+    physicianDeathConfirmedBy:row.physician_death_confirmed_by||null,
+    events:[{type:'REMOTE_PATIENT_DISCOVERED',time:nowT(),detail:`${row.visual_id} התקבל ממכשיר אחר (סנכרון)`}]
+  };
+}
 function applyProjectedPatientState(rows){
   if(!rows || !rows.length) return;
   const pending=patientsWithPendingLocalEdits();
@@ -15296,25 +15411,7 @@ function applyProjectedPatientState(rows){
       // Unknown locally: another device created this patient. Add a minimal local record so
       // it's visible at all, rather than staying invisible until this device happens to touch it.
       changed=true;
-      patients.push({
-        id:row.id, visualId:row.visual_id, triage:serverTriage, _triageSyncRef:serverTriage, accessibility:access.accessibility, trapStatus:access.trapStatus,
-        location:REMOTE_LOCATION_PLACEHOLDER, locDetail:'',
-        injury:null, injuryZones:[], patientStatus:status||'identified',
-        needsFullAssessment:!!row.needs_full_assessment,
-        patientAgeGroup:row.is_pediatric?'pediatric':'adult', patientAge:row.pediatric_age_years||null,
-        fullName:row.optional_name||'לא מזוהה', identityStatus:row.optional_name?'reported':'unknown', temporaryDescription:row.identifying_description||'',
-        assignedMedicId:null, assignedPlatoonId:null, tempPatientId:null,
-        stockSnapshot:{}, lastTouchedBy:'(remote)', lastModifiedAt:new Date().toISOString(),
-        confirmedClinical:true, unsyncedEvents:0, locationHistory:[], possibleDuplicate:false,
-        time:nowT(), vitals:{...VITALS_NOT_ON_DEVICE}, vitalsCapture:null, txHistory:[],
-        alert:false, deterioration:[], lastVitalsAt:row.last_vitals_at?Date.parse(row.last_vitals_at):null,
-        vitalsObserved:{},
-        vitalsHistory:[], tourniquet:null, medic:'(remote)', siteId:INCIDENT_ID_TO_SITE[row.incident_id]||'SITE_A',
-        _serverVersion:row.version, sourcedFromRemote:true,
-        physicianDeathConfirmedAt:row.physician_death_confirmed_at?Date.parse(row.physician_death_confirmed_at):null,
-        physicianDeathConfirmedBy:row.physician_death_confirmed_by||null,
-        events:[{type:'REMOTE_PATIENT_DISCOVERED',time:nowT(),detail:`${row.visual_id} התקבל ממכשיר אחר (סנכרון)`}]
-      });
+      patients.push(remotePatientRecord(row));
     }
   }
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
@@ -15400,6 +15497,16 @@ function applyRescuePatientBoard(rows, incidentId){
 // Applied only to patients this device received from another device: a patient created here
 // keeps its own, richer tourniquet records (effectiveness, later limb correction, notes).
 const SERVER_TOURNIQUET_COLUMNS='id,patient_id,limb,applied_at,is_active,tourniquet_status';
+// One patient's active tourniquets from server rows (SERVER_TOURNIQUET_COLUMNS).
+function serverTourniquetRecords(rows, patientId){
+  return rows.filter(r=>r.patient_id===patientId && r.is_active!==false).map(r=>{
+    const meta=tourniquetLimbMeta(r.limb);
+    // tourniquet_status comes from TOURNIQUET_REASSESSMENT (effectiveness check, V2.99.42).
+    const effectiveness=r.tourniquet_status==='bleeding_continues'?'bleeding_continues':r.tourniquet_status==='effective'?'effective':'unknown';
+    return {id:`SRV-${r.id}`, appliedAt:Date.parse(r.applied_at)||null, limb:meta.key, limbLabel:meta.label, side:meta.side, bodyPart:meta.bodyPart,
+      appliedBy:'(מכשיר אחר)', source:'server', status:effectiveness==='bleeding_continues'?'ineffective':'active', effectiveness, reasonForAdditional:null, note:''};
+  }).filter(t=>t.appliedAt);
+}
 function applyServerTourniquets(rows, incidentId){
   const site=INCIDENT_ID_TO_SITE[incidentId];
   const pending=patientsWithPendingLocalEdits();
@@ -15407,13 +15514,7 @@ function applyServerTourniquets(rows, incidentId){
   for(const p of patients){
     if(!p.sourcedFromRemote || pending.has(p.id)) continue; // local edit wins until pushed
     if(site && p.siteId && p.siteId!==site) continue;
-    const next=rows.filter(r=>r.patient_id===p.id && r.is_active!==false).map(r=>{
-      const meta=tourniquetLimbMeta(r.limb);
-      // tourniquet_status comes from TOURNIQUET_REASSESSMENT (effectiveness check, V2.99.42).
-      const effectiveness=r.tourniquet_status==='bleeding_continues'?'bleeding_continues':r.tourniquet_status==='effective'?'effective':'unknown';
-      return {id:`SRV-${r.id}`, appliedAt:Date.parse(r.applied_at)||null, limb:meta.key, limbLabel:meta.label, side:meta.side, bodyPart:meta.bodyPart,
-        appliedBy:'(מכשיר אחר)', source:'server', status:effectiveness==='bleeding_continues'?'ineffective':'active', effectiveness, reasonForAdditional:null, note:''};
-    }).filter(t=>t.appliedAt);
+    const next=serverTourniquetRecords(rows, p.id);
     const key=list=>JSON.stringify((list||[]).filter(t=>t.source==='server').map(t=>[t.id,t.limb,t.appliedAt,t.effectiveness]));
     if(key(p.tourniquets)===key(next) && (p.tourniquets||[]).every(t=>t.source==='server')) continue;
     // Clear the legacy p.tourniquet alias first: ensureTourniquetArray() rebuilds an empty
@@ -15628,9 +15729,9 @@ function localTourniquetRank(p, nowMs=Date.now()){
     return Math.max(max, timer ? (TQ_ALERT_RANK[timer.cls]||0) : 0);
   },0);
 }
-function serverWatchdogAlertObjects(pts=patients, nowMs=Date.now()){
+function serverWatchdogAlertObjects(pts=patients, nowMs=Date.now(), rows=Object.values(serverWatchdogAlertsByIncident).flat()){
   const out=[];
-  Object.values(serverWatchdogAlertsByIncident).flat().forEach(a=>{
+  rows.forEach(a=>{
     const p=pts.find(x=>x.id===a.patient_id);
     if(!p) return;
     const payload=a.payload_json||{};
