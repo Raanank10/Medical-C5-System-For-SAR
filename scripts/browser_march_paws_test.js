@@ -75,8 +75,7 @@ async function main() {
 
     // 2. Real taps: treatments, "no treatment needed", and their interaction.
     await page.click('#march-sec-m .chip[data-tx="hemostatic"]');
-    // Consuming stock opens the existing "supply used" sheet; the medic confirms it.
-    await page.click('#supply-used-modal button[onclick="confirmSupplyUsed()"]');
+    // Consuming stock shows the "supply used" banner (V2.99.70); it does not block the next tap.
     // One letter on screen at a time (V2.99.69): a letter's tile opens it.
     await page.click('#march-tile-r');
     await page.click('#march-sec-r .chip[data-tx="chest_seal"]');
@@ -220,7 +219,6 @@ async function main() {
     assert(fits.tileH >= 56, `letter tiles at least 56px tall, got ${fits.tileH}`);
     // Tourniquet-only patient: M treated, then one tap per remaining letter.
     await page.click('#march-sec-m .chip[data-tx="tourniquet"]');
-    await page.click('#supply-used-modal button[onclick="confirmSupplyUsed()"]');
     v = await view();
     assert(v.open === 'm' && v.tiles.m === 'טופל', `choosing a treatment keeps its letter open (limb / time), got ${JSON.stringify(v)}`);
     await page.click('#march-tile-a');

@@ -185,7 +185,13 @@ body.field-mode .patient-card{padding:16px 15px;margin-top:8px;margin-bottom:8px
 .field-mode-toggle.active{background:var(--orange)!important;border-color:var(--orange)!important;color:#fff!important;}
 .autofill-chip{display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(76,201,240,.45);background:rgba(76,201,240,.1);color:var(--accent);border-radius:999px;padding:5px 8px;font-size:11px;font-weight:800;margin:3px;}
 .sweep-warning{background:rgba(255,107,53,.12);border:1px solid var(--orange);border-radius:12px;padding:10px 12px;color:var(--text);font-size:12px;line-height:1.45;margin-bottom:12px;}
-.supply-sheet{border-color:var(--accent);box-shadow:0 -16px 60px rgba(76,201,240,.18);}
+/* At the top, over the step title: the treatment buttons and tourniquet limb choices below stay free. */
+.supply-banner{position:fixed;left:16px;right:16px;top:calc(var(--top-nav-h) + 6px);z-index:170;background:var(--surface2);border:2px solid var(--accent);border-radius:14px;padding:10px 12px;box-shadow:0 10px 30px rgba(0,0,0,.45);font-size:13px;line-height:1.5;}
+.supply-banner.warn{border-color:var(--orange);}
+.supply-banner.hidden{display:none;}
+.supply-banner-warning{color:var(--orange);font-weight:800;margin-top:4px;}
+.supply-banner-actions{display:grid;grid-template-columns:1fr 1fr 1fr 48px;gap:6px;margin-top:8px;}
+.supply-banner-actions button{min-height:48px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--sans);font-size:13px;font-weight:800;cursor:pointer;touch-action:manipulation;padding:4px;}
 .vital-range-warn{display:block;font-size:11px;font-weight:800;margin-top:4px;padding:4px 8px;border-radius:8px;}
 .vital-range-warn.orange{color:var(--orange);background:rgba(255,107,53,0.12);}
 .vital-range-warn.red{color:var(--red);background:rgba(255,59,48,0.12);}
@@ -984,7 +990,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9969</div>
+      <div class="demo-kicker">Demo V2.9970</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1081,7 +1087,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9969</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9970</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1091,7 +1097,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9969</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9970</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2195,18 +2201,17 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
 </div>
 
-<!-- ══════════════════════ SUPPLY USED CONFIRMATION SHEET ══ -->
-<div class="modal-overlay hidden" id="supply-used-modal" onclick="closeSupplyUsedModal(event)">
-  <div class="modal-sheet supply-sheet">
-    <div class="modal-handle"></div>
-    <div class="field-label">ציוד נצרך</div>
-    <div id="supply-used-body" style="font-size:14px;line-height:1.65;margin-bottom:14px"></div>
-    <div class="tap-grid tap-grid-2">
-      <button class="tap-btn triage-green" onclick="confirmSupplyUsed()">אישור</button>
-      <button class="tap-btn triage-yellow" onclick="requestSupplyFromUsedSheet()">בקש השלמה מהחוג״ד</button>
-      <button class="tap-btn" onclick="changeSupplyUseQuantity()">שנה כמות</button>
-      <button class="tap-btn triage-red" onclick="cancelSupplyUse()">בטל שימוש</button>
-    </div>
+<!-- ══════════════════════ SUPPLY USED BANNER ══ -->
+<!-- Non-blocking since V2.99.70 (owner 2026-10-26): it was a sheet that covered the screen after
+     every treatment that uses up an item. The stock is already deducted; the banner only offers
+     corrections. It closes by itself unless stock is low or empty. -->
+<div class="supply-banner hidden" id="supply-used-banner" role="status" aria-live="polite">
+  <div class="supply-banner-body" id="supply-used-body"></div>
+  <div class="supply-banner-actions">
+    <button onclick="cancelSupplyUse()">בטל שימוש</button>
+    <button onclick="changeSupplyUseQuantity()">שנה כמות</button>
+    <button onclick="requestSupplyFromUsedBanner()">בקש השלמה</button>
+    <button class="supply-banner-close" aria-label="סגור" onclick="hideSupplyUsedBanner()">✕</button>
   </div>
 </div>
 
@@ -3218,7 +3223,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.69';
+const APP_VERSION = '2.99.70';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -16767,47 +16772,76 @@ function showOwnInventory(){
   const line=Object.entries(SUPPLY_LABELS).map(([key,label])=>`${label}: ${localStock(key)}`).join(' · ');
   toast(line || 'אין נתוני מלאי');
 }
-function showSupplyUsedSheet(data){
+// How a supply movement names its patient on screen: the patient number, or "הפצוע בתיעוד" for
+// the patient still being documented (an internal draft-... id never reaches the screen).
+function supplyPatientLabel(patientId){
+  if(!patientId) return 'ללא פצוע';
+  const p=patients.find(x=>x.id===patientId);
+  if(p) return p.visualId||p.id;
+  return patientId===state.patientDraftId || String(patientId).startsWith('draft-') ? 'הפצוע בתיעוד' : patientId;
+}
+const SUPPLY_BANNER_MS=6000;
+let supplyBannerTimer=null;
+function showSupplyUsedBanner(data){
   pendingSupplyUse=data;
+  const banner=document.getElementById('supply-used-banner');
   const body=document.getElementById('supply-used-body');
+  if(!banner || !body) return;
   const truck=pcTruckStock[data.item]??PC_TRUCK_BASELINE[data.item]??0;
   const low=data.after<=0?'מלאי אזל — בקש השלמה עכשיו.':data.after<=(SUPPLY_LOW_THRESHOLDS[data.item]??1)?'מלאי נמוך — מומלץ לבקש השלמה מהחוג״ד.':'';
-  const linked=patients.find(p=>p.id===data.patientId);
-  if(body) body.innerHTML=`
-    ${linked?triageBand(linked.triage,linked):''}
-    <div><strong>נרשם שימוש:</strong> ${supplyLabel(data.item)} · ${data.patientId||'ללא פצוע'} · ${data.zone||zoneLabel()}</div>
-    <div style="margin-top:8px">נותר בערכת חובש: <strong>${data.after}</strong> · רכב חוג״ד: <strong>${truck}</strong></div>
-    ${data.before<=0?'<div class="sweep-warning" style="margin-top:10px">נרשם טיפול למרות שמלאי מקומי 0 — עדכן מלאי או בקש השלמה.</div>':''}
-    ${low?`<div class="sweep-warning" style="margin-top:10px">${low}</div>`:''}
+  const usedAtZero=data.before<=0?'נרשם טיפול למרות שמלאי מקומי 0 — עדכן מלאי או בקש השלמה.':'';
+  body.innerHTML=`
+    <div><strong>נרשם שימוש:</strong> ${escAttr(supplyLabel(data.item))}${data.qty>1?` ×${data.qty}`:''} · ${escAttr(supplyPatientLabel(data.patientId))}</div>
+    <div>נותר בערכה: <strong>${data.after}</strong> · רכב חוג״ד: <strong>${truck}</strong></div>
+    ${usedAtZero?`<div class="supply-banner-warning">${usedAtZero}</div>`:''}
+    ${low?`<div class="supply-banner-warning">${low}</div>`:''}
   `;
-  document.getElementById('supply-used-modal')?.classList.remove('hidden');
+  const warn=!!(low||usedAtZero);
+  banner.classList.toggle('warn', warn);
+  banner.classList.remove('hidden');
+  clearTimeout(supplyBannerTimer);
+  // A low or empty stock warning stays until the medic closes it or acts on it.
+  supplyBannerTimer=warn?null:setTimeout(hideSupplyUsedBanner, SUPPLY_BANNER_MS);
 }
-function hideSupplyUsedModal(){
-  document.getElementById('supply-used-modal')?.classList.add('hidden');
+function hideSupplyUsedBanner(){
+  clearTimeout(supplyBannerTimer);
+  supplyBannerTimer=null;
+  document.getElementById('supply-used-banner')?.classList.add('hidden');
   pendingSupplyUse=null;
 }
-function closeSupplyUsedModal(e){ if(e.target.id==='supply-used-modal') hideSupplyUsedModal(); }
-function confirmSupplyUsed(){ hideSupplyUsedModal(); }
+// Keeps a treatment's reconciled quantity in step with a correction from the banner, so
+// unselecting the treatment later returns only what is still counted (no double return).
+function adjustSupplyMovement(use, qtyDelta){
+  const mv=use?.movementKey && state.supplyMovements?.[use.movementKey];
+  if(mv) mv.qty=Math.max(0, (mv.qty||0)+qtyDelta);
+}
 function cancelSupplyUse(){
   if(!pendingSupplyUse) return;
-  consumeFieldSupply(pendingSupplyUse.item, pendingSupplyUse.qty, pendingSupplyUse.patientId, 'correction_reversed', {silentPopup:true});
-  saveLocalEvent({type:'SUPPLY_USE_CANCELLED',detail:`בוטל שימוש בציוד: ${supplyLabel(pendingSupplyUse.item)} · ${pendingSupplyUse.patientId||''}`,warn:false,payload_json:pendingSupplyUse});
-  hideSupplyUsedModal();
+  const use=pendingSupplyUse;
+  consumeFieldSupply(use.item, use.qty, use.patientId, 'correction_reversed', {silentPopup:true});
+  adjustSupplyMovement(use, -use.qty);
+  saveLocalEvent({type:'SUPPLY_USE_CANCELLED',detail:`בוטל שימוש בציוד: ${supplyLabel(use.item)} · ${supplyPatientLabel(use.patientId)}`,warn:false,payload_json:use});
+  hideSupplyUsedBanner();
   toast('שימוש בציוד בוטל במלאי המקומי');
 }
 function changeSupplyUseQuantity(){
   if(!pendingSupplyUse) return;
-  const nextQty=pendingSupplyUse.qty>=3?1:pendingSupplyUse.qty+1;
-  const diff=nextQty-pendingSupplyUse.qty;
-  pendingSupplyUse.qty=nextQty;
-  if(diff!==0) consumeFieldSupply(pendingSupplyUse.item, -diff, pendingSupplyUse.patientId, 'quantity_corrected', {silentPopup:true});
-  pendingSupplyUse.after=localStock(pendingSupplyUse.item);
-  showSupplyUsedSheet(pendingSupplyUse);
+  const use=pendingSupplyUse;
+  const nextQty=use.qty>=3?1:use.qty+1;
+  const diff=nextQty-use.qty;
+  use.qty=nextQty;
+  if(diff!==0){
+    consumeFieldSupply(use.item, -diff, use.patientId, 'quantity_corrected', {silentPopup:true});
+    adjustSupplyMovement(use, diff);
+  }
+  use.after=localStock(use.item);
+  showSupplyUsedBanner(use);
 }
-function requestSupplyFromUsedSheet(){
+function requestSupplyFromUsedBanner(){
   if(!pendingSupplyUse) return;
-  openMedicResupplySheet(pendingSupplyUse.patientId, pendingSupplyUse.after<=0?'stock_empty':'stock_low', pendingSupplyUse.item);
-  document.getElementById('supply-used-modal')?.classList.add('hidden');
+  const use=pendingSupplyUse;
+  hideSupplyUsedBanner();
+  openMedicResupplySheet(use.patientId, use.after<=0?'stock_empty':'stock_low', use.item);
 }
 // Increasing per phone, even for several movements in the same millisecond and across reloads
 // (time-based): with it the server rows of one holder have a clear "latest" (WP-9).
@@ -16841,7 +16875,7 @@ function consumeFieldSupply(itemType, quantityDelta, patientId=null, movementTyp
       p.events.unshift({type:'SUPPLY_CONSUMED',time:nowT(),detail:`${supplyLabel(itemType)} · נותר ${after}`,warn:after<=lowThreshold,confirmed:!!meta.silentPopup});
       p.unsyncedEvents=(p.unsyncedEvents||0)+1;
     }
-    if(!meta.silentPopup) showSupplyUsedSheet({item:itemType, qty:Math.abs(delta), patientId:patientId||state.patientDraftId, zone:meta.zone||zoneLabel(), before, after});
+    if(!meta.silentPopup) showSupplyUsedBanner({item:itemType, qty:Math.abs(delta), patientId:patientId||state.patientDraftId, zone:meta.zone||zoneLabel(), before, after, movementKey:meta.movementKey||null});
   }
   saveLocalEvent({
     type:'INVENTORY_LEDGER_MOVEMENT',
@@ -16884,7 +16918,7 @@ function reconcileSupplySource(movementKey, itemType, desiredQty, patientId=null
   const delta=desiredQty-prev;
   if(delta===0) return;
   state.supplyMovements[movementKey]={itemType, qty:desiredQty};
-  consumeFieldSupply(itemType, -delta, patientId, delta>0?'treatment_consumed':'correction_reversed', meta);
+  consumeFieldSupply(itemType, -delta, patientId, delta>0?'treatment_consumed':'correction_reversed', {...meta, movementKey});
 }
 function confirmPediatricOverride(){
   const pending=state.pendingMedicationOverride;
