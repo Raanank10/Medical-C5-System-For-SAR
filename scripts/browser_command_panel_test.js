@@ -247,7 +247,7 @@ async function checkFile(browser, file) {
     return { demo, live, ownOnSite, tapTarget, mineTappable };
   });
   const d = table.demo;
-  assert(d.onSite[0].join('|') === 'אירוע|אדום|צהוב|ירוק|שחור|ממתין|סה״כ' && d.evacuated[0].join('|') === d.onSite[0].join('|'), `${rel}: both tables have the triage columns`);
+  assert(d.onSite[0].join('|') === 'אירוע|אדום|צהוב|ירוק|שחור|טרם מוין|סה״כ' && d.evacuated[0].join('|') === d.onSite[0].join('|'), `${rel}: both tables have the triage columns`);
   assert(Number(d.onSite[1][6]) === d.expected.aOn && Number(d.evacuated[1][6]) === d.expected.aEv && Number(d.onSite[2][6]) === d.expected.bOn,
     `${rel}: demo rows split by stage (got ${JSON.stringify({ on: d.onSite, ev: d.evacuated, exp: d.expected })})`);
   assert(d.expected.aEv >= 1, `${rel}: the scenario has an evacuated patient on SITE_A`);
@@ -259,6 +259,35 @@ async function checkFile(browser, file) {
   assert(onA && onA[0].includes('שלי') && Number(onA[6]) === table.ownOnSite, `${rel}: the active incident is counted from this phone (got ${onA})`);
   assert(!table.live.onSite.some((r) => r[0].startsWith('inc-x')), `${rel}: only open incidents are listed`);
   assert(table.tapTarget === "enterIncidentFromPicker('inc-b')" && !table.mineTappable, `${rel}: another incident's row opens it; the CC's own row does nothing (got ${table.tapTarget})`);
+
+  // 12. Signed-in CC starts from all open incidents, no incident open (owner, 2026-10-26).
+  const overview = await page.evaluate(() => {
+    currentUser = { id: 'stub-cc', email: 'cc@test', role: 'cc' };
+    _openIncidents = [{ id: 'inc-a', visual_id: 'INC-1', location_name: 'אתר א' }, { id: 'inc-b', visual_id: 'INC-2', location_name: 'אתר ב' }];
+    _allIncidentTriage = { 'inc-a': { onSite: { red: 1, yellow: 0, green: 2, black: 0, pending: 0, total: 3 }, evacuated: { red: 0, yellow: 0, green: 0, black: 0, pending: 0, total: 0 } },
+      'inc-b': { onSite: { red: 2, yellow: 1, green: 0, black: 0, pending: 1, total: 4 }, evacuated: { red: 0, yellow: 1, green: 0, black: 0, pending: 0, total: 1 } } };
+    _allIncidentTriageAt = Date.now();
+    _incidentOverviewState = { 'inc-b': { active_watchdog_alerts: 3 } };
+    activeIncident = { id: 'inc-a', visual_id: 'INC-1' };
+    goTo('demo'); startRoleDashboard('cc');
+    const backChip = !!document.querySelector('#command-status-strip [data-cc-all-incidents]');
+    enterCcAllIncidentsView();
+    const strip = document.getElementById('command-status-strip').textContent;
+    const out = {
+      backChip, mode: isCcOverviewMode(), active: activeIncident, patientsLeft: patients.length, strip,
+      alertLine: document.querySelector('[data-incident-alerts="inc-b"]')?.getAttribute('onclick') || '',
+      tappable: [...document.querySelectorAll('[data-incident-triage-table="onSite"] tr.tappable')].length,
+      actionTab: document.querySelector('[data-cmd-panel="action"]').textContent,
+      reds: document.querySelector('#command-status-strip .cmd-strip-count b').textContent,
+    };
+    currentUser = null; activeIncident = null; _openIncidents = []; _allIncidentTriage = {}; _incidentOverviewState = {};
+    return out;
+  });
+  assert(overview.backChip, `${rel}: inside an incident the CC strip offers "כל האירועים"`);
+  assert(overview.mode && overview.active === null && overview.patientsLeft === 0, `${rel}: the all-incidents view leaves no incident open and no incident's patients on screen`);
+  assert(overview.reds === '3' && overview.strip.includes('2 פתוחים'), `${rel}: the strip totals every incident (got reds ${overview.reds})`);
+  assert(overview.alertLine === "enterIncidentFromPicker('inc-b')", `${rel}: an incident with open server alerts is listed in the strip and opens on tap`);
+  assert(overview.tappable === 2 && overview.actionTab.includes('בחר אירוע'), `${rel}: every incident row opens it; incident tabs ask to choose an incident`);
 
   assert(!errors.length, `${rel}: page errors: ${errors.join(' | ')}`);
   await context.close();

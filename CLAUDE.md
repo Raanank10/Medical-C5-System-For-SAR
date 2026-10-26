@@ -70,7 +70,7 @@ node scripts/browser_march_paws_test.js           # V2.99.62: full-flow treatmen
 node scripts/browser_role_clinical_scope_test.js # database/074: a medic's own patients marked and listed first; RPC sees urgent / not urgent and the evacuation order, never a colour or tourniquet
 node scripts/browser_mobile_layout_test.js        # phone layout at 375x812 / 412x915: no overlaps, nothing past the viewport or clipped by a card, nothing left under the FAB/bottom bar, header <= 64px, no raw keys
 node scripts/browser_evac_point_arrival_test.js   # WP-18: moving to the evacuation point vs arrived; earliest phone time wins (late offline push), waiting minutes on PC/CC boards, medic/PC mark it, CC does not
-node scripts/browser_command_panel_test.js        # V2.99.62: PC/CC panel: sticky strip + 4 tap-only tabs, every alert in the strip, per-patient badges, entry on תמונת מצב, server-contact label, three evacuation stages, CC tables of every open incident by triage (at the site / evacuated), row opens the incident
+node scripts/browser_command_panel_test.js        # V2.99.62: PC/CC panel: sticky strip + 4 tap-only tabs, every alert in the strip, per-patient badges, entry on תמונת מצב, server-contact label, three evacuation stages, CC tables of every open incident by triage (at the site / evacuated), row opens the incident, CC starts on all incidents with none open
 node scripts/test_outbox_eviction.js              # F1: persistOutbox() never evicts an unsynced event, even past the 500 cap (docs/FAILURE_MODE_REVIEW.md)
 node scripts/test_inject_scenario.js              # scenario injector run against a local mock of the Supabase endpoints; checks the wire traffic, no network or real accounts
 

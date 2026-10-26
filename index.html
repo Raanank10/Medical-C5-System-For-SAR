@@ -7622,6 +7622,7 @@ function renderCommandStatusStrip(role, pts, alerts){
       <span id="role-strip-conn" class="cmd-conn ${contact.level}">${escAttr(serverContactLabel(contact))}</span>
       ${tq?`<button class="cmd-strip-chip" style="border-color:${tqColor}" onclick="openPatient('${tq.patient.id}')">⏱ חסם ${tq.minutes} דק׳ · ${escAttr(tq.patient.visualId||tq.patient.id)}</button>`:''}
       ${blocked?`<button class="cmd-strip-chip blocked" onclick="openCommandBlockedEvents('${role}')">⛔ ${blocked} אירועים חסומים</button>`:''}
+      ${role==='cc'&&currentUser?`<button class="cmd-strip-chip" data-cc-all-incidents onclick="enterCcAllIncidentsView()">‹ כל האירועים</button>`:''}
       ${more}
     </div>
     <div class="cmd-strip-counts">${cell(c.red,'אדום','var(--red)')}${cell(c.yellow,'צהוב','var(--yellow)')}${cell(c.green,'ירוק','var(--green)')}${cell(c.black,'שחור','var(--muted)')}${cell(c.trapped,'לכודים','var(--orange)')}</div>
@@ -7658,6 +7659,7 @@ function positionCommandSticky(){
 window.addEventListener('resize', positionCommandSticky);
 function renderCommandPanel(role, ctx){
   if(commandPanelRole!==role){ commandPanelRole=role; resetCommandPanel(); }
+  if(role==='cc' && isCcOverviewMode()) return renderCcOverviewPanel();
   const parts=role==='pc' ? renderPcResponsibilityBoard() : renderCcCommandBoard();
   const hub=`<button class="demo-mini-btn" style="width:100%;margin-top:12px;min-height:52px;border-color:var(--accent)" onclick="openLegacyForRole('${role}')">מסך בקרה מלא (חפ״ק)</button>`;
   // PC already has reinforcement / radio report in its hands-on block; CC's buttons stay here.
@@ -13439,6 +13441,61 @@ const LOCATION_BOARD_EVACUATED_STATUSES = new Set(['handed_over','self_evacuated
 // the extraction site (the rescuers move them), or at the evacuation point waiting for MDA.
 // WP-18: moving (status evacuating, no arrival yet) is told apart from waiting at the point;
 // awaitingMda is both, as atPoint was before V2.99.66, so the ambulance advice is unchanged.
+// CC all-incidents view (owner, 2026-10-26): signed in, a CC starts with no incident open and sees
+// every open incident; tapping one opens it, "כל האירועים" comes back. Its own unsent events stay
+// in the outbox, each pinned to its incident, and are still sent (syncPush groups by incident_id).
+function isCcOverviewMode(){ return !!currentUser && mapServerRole(currentUser.role)==='cc' && !activeIncident; }
+function enterCcAllIncidentsView(){
+  if(!currentUser) return;
+  if(activeIncident){
+    activeIncident=null;
+    _workingIncidentId=null;
+    resetWorkingStateForIncident({id:null});
+    bindIncidentToSites(null);
+    persistActiveIncident();
+    saveDemoState();
+    renderIncidentContext();
+  }
+  startRoleDashboard('cc');
+  refreshOpenIncidents().then(()=>{ if(isCcOverviewMode() && document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard('cc'); });
+}
+function ccOverviewTotals(){
+  const total=emptyTriageCounts();
+  _openIncidents.forEach(inc=>{ const c=_allIncidentTriage[inc.id]; if(c) Object.keys(total).forEach(k=>{ total[k]+=c.onSite[k]; }); });
+  return total;
+}
+// Strip in the all-incidents view: no incident's patients are on this phone, so the alert lines
+// are replaced by each incident's open server alert count (get_incident_command_state), tap to open.
+function renderCcOverviewStrip(){
+  const contact=serverContactState();
+  const t=ccOverviewTotals();
+  const cell=(n,label,color)=>`<div class="cmd-strip-count" style="border-top-color:${color}"><b>${n}</b>${label}</div>`;
+  const withAlerts=_openIncidents.map(inc=>({inc, n:Number(_incidentOverviewState[inc.id]?.active_watchdog_alerts||0)})).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
+  const lines=withAlerts.map(({inc,n})=>`<div class="cmd-strip-alert high" data-incident-alerts="${escAttr(inc.id)}" onclick="enterIncidentFromPicker('${escAttr(inc.id)}')">
+      <span class="cmd-strip-alert-id">${escAttr(inc.visual_id||'')}</span>
+      <div style="flex:1;min-width:0"><div class="cmd-strip-alert-title">${n} התראות פתוחות · ${escAttr(inc.location_name||'')}</div><div class="cmd-strip-alert-sub">הקש כדי לפתוח את האירוע ולראות את ההתראות</div></div>
+    </div>`).join('');
+  return `<div class="cmd-strip" id="command-status-strip">
+    <div class="cmd-strip-row">
+      <span id="role-strip-conn" class="cmd-conn ${contact.level}">${escAttr(serverContactLabel(contact))}</span>
+      <span class="cmd-strip-chip">כל האירועים · ${_openIncidents.length} פתוחים</span>
+    </div>
+    <div class="cmd-strip-counts">${cell(t.red,'אדום','var(--red)')}${cell(t.yellow,'צהוב','var(--yellow)')}${cell(t.green,'ירוק','var(--green)')}${cell(t.black,'שחור','var(--muted)')}${cell(t.pending,'טרם מוין','var(--muted)')}</div>
+    <div class="cmd-strip-alerts">${lines||'<div class="cmd-strip-alert-sub" style="padding:6px 2px">אין התראות שרת פתוחות באירועים</div>'}</div>
+  </div>`;
+}
+function renderCcOverviewPanel(){
+  const pick='<div class="role-row"><div class="role-row-title">בחר אירוע</div><div class="role-row-sub">הקש על אירוע בטבלאות בלשונית תמונת מצב כדי לראות את הפצועים, ההתראות והבקשות שלו.</div></div>';
+  const panels={
+    overview:`${roleSection('כל האירועים — פצועים לפי מיון', renderAllIncidentsTriageTable())}
+      <button class="demo-mini-btn" style="width:100%;margin-top:4px" onclick="openIncidentPicker()">רשימת אירועים · פתיחה ומיזוג כפילויות</button>`,
+    action:pick,
+    forces:pick+(canManagePlatoonRoster()?roleSection('פלוגות ומחלקות — שיבוץ', '<div id="platoon-roster-panel" style="font-size:13px;color:var(--muted)">טוען…</div>'):''),
+    supply:pick
+  };
+  return `<div id="command-sticky" class="cmd-sticky">${renderCcOverviewStrip()}${renderCommandTabBar([])}</div>
+    ${COMMAND_PANEL_TABS.map(([key])=>`<div class="cmd-tab-panel" data-cmd-panel="${key}"${key===commandPanelTab?'':' hidden'}>${panels[key]}</div>`).join('')}`;
+}
 // Two tables (owner, 2026-10-25): patients still at the site (extraction site and evacuation point)
 // and patients evacuated. Tapping another incident's row opens that incident.
 function renderAllIncidentsTriageTable(){
@@ -13459,7 +13516,7 @@ function renderAllIncidentsTriageTable(){
     footer='מצב דמו · נתונים מקומיים';
   }
   if(!rows.length) return renderOperationalEmptyState('אין אירועים פתוחים');
-  const cols=[['red','אדום','var(--red)'],['yellow','צהוב','var(--yellow)'],['green','ירוק','var(--green)'],['black','שחור','var(--muted)'],['pending','ממתין','var(--muted)'],['total','סה״כ','var(--text)']];
+  const cols=[['red','אדום','var(--red)'],['yellow','צהוב','var(--yellow)'],['green','ירוק','var(--green)'],['black','שחור','var(--muted)'],['pending','טרם מוין','var(--muted)'],['total','סה״כ','var(--text)']];
   const cells=c=>cols.map(([k,,color])=>`<td style="color:${c&&c[k]?color:'var(--muted)'}">${c?c[k]:'—'}</td>`).join('');
   const table=(part,title)=>{
     const total=emptyTriageCounts();
@@ -14182,6 +14239,8 @@ async function enterIncidentContextAfterLogin(){
   pollIncidentOpenAlerts(); // D10: command sees incidents opened in the field right after sign-in
   const stored=await loadStoredActiveIncident();
   const listed=await refreshOpenIncidents();
+  // CC starts from every open incident, not from one site, also offline (owner, 2026-10-26).
+  if(currentUser.role==='cc'){ enterCcAllIncidentsView(); return; }
   if(stored){
     const fresh=_openIncidents.find(i=>i.id===stored.id);
     if(fresh && (fresh.is_member || hasBlanketIncidentAccess())){ await activateIncident(fresh); return; }
