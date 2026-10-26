@@ -316,6 +316,28 @@ assert.equal(rules.tourniquetAlertToRaise("decision", "decision"), null);
 assert.equal(rules.tourniquetAlertToRaise("critical", "decision"), "critical");
 assert.equal(rules.tourniquetAlertToRaise("warn", "decision"), null);
 
+// Past 120 minutes, one level per full hour (owner, 2026-10-26): 3h, 4h, 5h, 6h, ... Red colour kept.
+const tqAt = (min) => rules.tourniquetTimer(patient({ tourniquet: { limb: "right leg", appliedAt: baseTime } }), baseTime + min * 60 * 1000);
+assert.equal(tqAt(179).stage, "critical");
+assert.deepEqual(tqAt(180), { cls: "critical", stage: "hours_3", minutes: 180, limb: "right leg" });
+assert.equal(tqAt(239).stage, "hours_3");
+assert.equal(tqAt(240).stage, "hours_4");
+assert.equal(tqAt(360).stage, "hours_6");
+assert.equal(tqAt(421).stage, "hours_7");
+assert.equal(rules.TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS, 6 * 60 * 60 * 1000);
+assert.equal(rules.tourniquetAlertRank("critical"), 4);
+assert.equal(rules.tourniquetAlertRank("hours_3"), 5);
+assert.equal(rules.tourniquetAlertRank("hours_6"), 8);
+assert.equal(rules.tourniquetAlertRank("hours_2"), 0);
+assert.equal(rules.tourniquetAlertRank("bogus"), 0);
+assert.equal(rules.tourniquetAlertRank("toString"), 0);
+assert.equal(rules.tourniquetAlertToRaise("hours_3", "critical"), "hours_3");
+assert.equal(rules.tourniquetAlertToRaise("hours_3", "hours_3"), null);
+assert.equal(rules.tourniquetAlertToRaise("hours_4", "hours_3"), "hours_4");
+// Opened after hours closed: only the current hour alerts, once.
+assert.equal(rules.tourniquetAlertToRaise("hours_5", "warn"), "hours_5");
+assert.equal(rules.tourniquetAlertToRaise("critical", "hours_4"), null);
+
 // "Remind me later" on tourniquet alerts (owner, 2026-10-26): delay length and count per level;
 // the last allowed delay escalates to command; then no more delays.
 assert.deepEqual(rules.tourniquetSnoozeOption("notice", 0), { minutes: 5, used: 1, max: 2, escalates: false });
@@ -326,6 +348,10 @@ assert.equal(rules.tourniquetSnoozeOption("decision", 1), null);
 assert.deepEqual(rules.tourniquetSnoozeOption("critical", undefined), { minutes: 1, used: 1, max: 1, escalates: true });
 assert.equal(rules.tourniquetSnoozeOption("critical", 1), null);
 assert.equal(rules.tourniquetSnoozeOption("", 0), null);
+assert.deepEqual(rules.tourniquetSnoozeOption("hours_3", 0), { minutes: 5, used: 1, max: 2, escalates: false });
+assert.deepEqual(rules.tourniquetSnoozeOption("hours_6", 1), { minutes: 5, used: 2, max: 2, escalates: true });
+assert.equal(rules.tourniquetSnoozeOption("hours_6", 2), null);
+assert.equal(rules.tourniquetSnoozeOption("toString", 0), null);
 
 // Command status strip: server contact freshness (V2.99.62).
 {

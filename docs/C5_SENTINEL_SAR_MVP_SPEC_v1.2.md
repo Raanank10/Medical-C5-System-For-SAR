@@ -372,6 +372,7 @@ Watchdogs run locally and should also be reproducible server-side for Chamal/AAR
 | Tourniquet Warning | Tourniquet per limb | +60m from application | Amber |
 | Tourniquet Decision | Tourniquet per limb | +100m from application | Amber (20 min before the medic's 120-minute release window closes) |
 | Tourniquet Critical | Tourniquet per limb | +120m from application | Red (release past 120m: physician only, up to 6 hours) |
+| Tourniquet Hourly | Tourniquet per limb | +3h, +4h, +5h, +6h (end of the physician's release window), then every hour | Red, phone only |
 | Reassessment RED | Triage = RED | Every 10m | Prompt |
 | Reassessment YELLOW | Triage = YELLOW | Every 30m | Prompt |
 | Dead Man's Switch | Medic inactivity | >5m with no events/heartbeat | Supervisor alert |

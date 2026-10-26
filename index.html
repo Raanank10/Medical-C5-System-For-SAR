@@ -2728,6 +2728,10 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   // alert gives the medic 20 minutes to decide (convert / evacuate) before that window closes.
   const TOURNIQUET_DECISION_MS = 100 * 60 * 1000;
   const TOURNIQUET_CRITICAL_MS = 120 * 60 * 1000;
+  // Past 120 minutes the phone alerts again every hour while the tourniquet is on (owner,
+  // 2026-10-26): 3, 4, 5 hours, 6 hours (the end of the physician's release window) and on.
+  const TOURNIQUET_HOURLY_PING_MS = 60 * 60 * 1000;
+  const TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS = 6 * 60 * 60 * 1000;
   const DEVICE_SILENCE_MS = 10 * 60 * 1000;
   // Server contact freshness for the command status strip (repo owner, V2.99.62). The phone
   // syncs every 45 seconds, so under 2 minutes since the last successful server response
@@ -2828,8 +2832,13 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
       : elapsedMs >= TOURNIQUET_NOTICE_MS ? "notice"
       : "";
     // stage is the alert level: cls (the colour) plus the 100-minute decision point, which keeps
-    // the orange "warn" colour everywhere a timer is shown.
-    const stage = cls === "warn" && elapsedMs >= TOURNIQUET_DECISION_MS ? "decision" : cls;
+    // the orange "warn" colour everywhere a timer is shown, and from 3 hours one level per full
+    // hour ("hours_3", "hours_4", ...), which keep the red "critical" colour.
+    const stage =
+      cls === "warn" && elapsedMs >= TOURNIQUET_DECISION_MS ? "decision"
+      : cls === "critical" && elapsedMs >= TOURNIQUET_CRITICAL_MS + TOURNIQUET_HOURLY_PING_MS
+        ? `hours_${Math.floor(elapsedMs / TOURNIQUET_HOURLY_PING_MS)}`
+      : cls;
     return { cls, stage, minutes, limb: tourniquet.limb || "לא צוין" };
   }
 
@@ -2838,9 +2847,15 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   // level this tourniquet was last alerted at, returns the level to alert now, or null. Each level
   // alerts once; a level skipped while the app was closed is not replayed, only the current one.
   const TOURNIQUET_ALERT_RANK = { "": 0, notice: 1, warn: 2, decision: 3, critical: 4 };
+  // hours_3 ranks just above critical, hours_4 above that, and so on.
+  function tourniquetAlertRank(stage) {
+    if (Object.prototype.hasOwnProperty.call(TOURNIQUET_ALERT_RANK, stage || "")) return TOURNIQUET_ALERT_RANK[stage || ""];
+    const hourly = /^hours_(\d+)$/.exec(String(stage));
+    return hourly && Number(hourly[1]) >= 3 ? TOURNIQUET_ALERT_RANK.critical + Number(hourly[1]) - 2 : 0;
+  }
   function tourniquetAlertToRaise(timerStage, lastAlertedStage) {
-    const now = TOURNIQUET_ALERT_RANK[timerStage || ""] || 0;
-    const last = TOURNIQUET_ALERT_RANK[lastAlertedStage || ""] || 0;
+    const now = tourniquetAlertRank(timerStage);
+    const last = tourniquetAlertRank(lastAlertedStage);
     return now > last ? timerStage : null;
   }
 
@@ -2853,9 +2868,11 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     warn: { minutes: 5, max: 2 },
     decision: { minutes: 2, max: 1 },
     critical: { minutes: 1, max: 1 },
+    hourly: { minutes: 5, max: 2 },
   };
   function tourniquetSnoozeOption(stage, usedAtStage) {
-    const policy = TOURNIQUET_SNOOZE_POLICY[stage || ""];
+    const key = tourniquetAlertRank(stage) > TOURNIQUET_ALERT_RANK.critical ? "hourly" : stage || "";
+    const policy = Object.prototype.hasOwnProperty.call(TOURNIQUET_SNOOZE_POLICY, key) ? TOURNIQUET_SNOOZE_POLICY[key] : null;
     const used = Math.max(0, Number(usedAtStage) || 0);
     if (!policy || used >= policy.max) return null;
     return { minutes: policy.minutes, used: used + 1, max: policy.max, escalates: used + 1 >= policy.max };
@@ -3113,7 +3130,9 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     SUPPLY_CRITICAL_RATIO,
     TOURNIQUET_CRITICAL_MS,
     TOURNIQUET_DECISION_MS,
+    TOURNIQUET_HOURLY_PING_MS,
     TOURNIQUET_NOTICE_MS,
+    TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS,
     TOURNIQUET_SNOOZE_POLICY,
     TOURNIQUET_WARN_MS,
     VITALS_INTERVAL_MS_BY_TRIAGE,
@@ -3155,6 +3174,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     supplyCriticalThreshold,
     supplyRiskTier,
     timeCodeToTodayMs,
+    tourniquetAlertRank,
     tourniquetAlertToRaise,
     tourniquetSnoozeOption,
     tourniquetTimer,
@@ -9544,17 +9564,31 @@ function renderAlerts(){
 //   timeAlertedLevel  the highest level raised so far (each level alerts once)
 //   timeAlertOpen     the level whose banner is still unanswered; null once the patient is opened
 //   timeAlertSnooze   {level, used, until, returned}: delays used at that level
-const TQ_ALERT_RANK={notice:1, warn:2, decision:3, critical:4};
+// Levels past 120 minutes are "hours_3", "hours_4", ... (one per full hour, owner 2026-10-26);
+// they rank above critical and look like it.
+const tqAlertRank=level=>C5Rules.tourniquetAlertRank(level);
+const tqAlertBase=level=>tqAlertRank(level)>tqAlertRank('critical') ? 'critical' : level;
+const tqAlertHours=level=>Number(/^hours_(\d+)$/.exec(String(level))?.[1])||null;
 const TQ_ALERT_TITLES={
   notice:'חסם עורקים: 45 דקות',
   warn:'חסם עורקים: עברה שעה',
   decision:'חסם עורקים: 20 דקות ל-120 - הכן החלטה (המרה / פינוי)',
   critical:'חסם עורקים: עברו 120 דקות',
 };
+function tqAlertTitle(level){
+  const hours=tqAlertHours(level);
+  return hours ? `חסם עורקים: עברו ${hours} שעות` : TQ_ALERT_TITLES[level];
+}
 // Past 120 minutes only a physician may release a tourniquet, up to 6 hours (owner, 2026-10-26).
-const TQ_ALERT_NOTES={critical:'שחרור חסם אחרי 120 דק׳: רופא בלבד (עד 6 שעות)'};
+function tqAlertNote(level){
+  const hours=tqAlertHours(level);
+  if(hours && hours>=C5Rules.TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS/3600000) return 'עבר חלון השחרור של רופא (6 שעות)';
+  return level==='critical' || hours ? 'שחרור חסם אחרי 120 דק׳: רופא בלבד (עד 6 שעות)' : '';
+}
 const TQ_ALERT_HAPTICS={notice:150, warn:[250,100,250], decision:[300,100,300,100,300], critical:[400,150,400,150,400]};
 const TQ_ALERT_COLORS={notice:'var(--yellow)', warn:'var(--orange)', decision:'var(--orange)', critical:'var(--red)'};
+const tqAlertHaptic=level=>TQ_ALERT_HAPTICS[tqAlertBase(level)]||TQ_ALERT_HAPTICS.warn;
+const tqAlertColor=level=>TQ_ALERT_COLORS[tqAlertBase(level)]||'var(--orange)';
 let _tqSnoozeTimer=null;
 function tqAlertEscalationTarget(){
   const role=currentUser?.role||activeRoleDashboard;
@@ -9565,14 +9599,14 @@ function tourniquetAlertEntries(nowMs=Date.now()){
   (patients||[]).forEach(p=>{
     if(['handed_over','deceased'].includes(p.patientStatus)) return;
     activeTourniquets(p).forEach(tq=>{
-      if(!TQ_ALERT_RANK[tq.timeAlertOpen]) return;
+      if(!tqAlertRank(tq.timeAlertOpen)) return;
       const timer=C5Rules.tourniquetTimer({tourniquet:tq}, nowMs);
       if(!timer) return;
       const snooze=tq.timeAlertSnooze && tq.timeAlertSnooze.level===tq.timeAlertOpen ? tq.timeAlertSnooze : null;
       out.push({p, tq, level:tq.timeAlertOpen, minutes:timer.minutes, used:snooze?snooze.used:0, snoozedUntil:snooze && snooze.until>nowMs ? snooze.until : null});
     });
   });
-  return out.sort((a,b)=>TQ_ALERT_RANK[b.level]-TQ_ALERT_RANK[a.level] || (a.tq.appliedAt||0)-(b.tq.appliedAt||0));
+  return out.sort((a,b)=>tqAlertRank(b.level)-tqAlertRank(a.level) || (a.tq.appliedAt||0)-(b.tq.appliedAt||0));
 }
 function checkTourniquetTimeAlerts(nowMs=Date.now()){
   let top=null, back=null, changed=false;
@@ -9589,7 +9623,7 @@ function checkTourniquetTimeAlerts(nowMs=Date.now()){
         changed=true;
         p.events=p.events||[];
         p.events.unshift({type:'TOURNIQUET_TIME_ALERT',time:nowT(),detail:`${tq.id} · ${tq.limbLabel||tourniquetLimbMeta(tq.limb).label} · +${timer.minutes} דק׳`,warn:level!=='notice'});
-        if(!top || TQ_ALERT_RANK[level]>TQ_ALERT_RANK[top]) top=level;
+        if(!top || tqAlertRank(level)>tqAlertRank(top)) top=level;
         return;
       }
       // A delay ran out: the banner comes back, vibrating again.
@@ -9597,13 +9631,13 @@ function checkTourniquetTimeAlerts(nowMs=Date.now()){
       if(s && s.level===tq.timeAlertOpen && !s.returned && s.until<=nowMs){
         s.returned=true;
         changed=true;
-        if(!back || TQ_ALERT_RANK[s.level]>TQ_ALERT_RANK[back]) back=s.level;
+        if(!back || tqAlertRank(s.level)>tqAlertRank(back)) back=s.level;
       }
     });
   });
   if(changed) saveDemoState();
-  const buzz=top && (!back || TQ_ALERT_RANK[top]>=TQ_ALERT_RANK[back]) ? top : back;
-  if(buzz) haptic(TQ_ALERT_HAPTICS[buzz]);
+  const buzz=top && (!back || tqAlertRank(top)>=tqAlertRank(back)) ? top : back;
+  if(buzz) haptic(tqAlertHaptic(buzz));
   renderTourniquetTimeAlert(nowMs);
   return top;
 }
@@ -9622,7 +9656,7 @@ function renderTourniquetTimeAlert(nowMs=Date.now()){
       el.setAttribute('role','alert');
       document.body.appendChild(el);
     }
-    el.style.cssText=`position:fixed;top:12px;left:12px;right:12px;z-index:600;background:${TQ_ALERT_COLORS[level]};color:#111;padding:14px 16px;border-radius:14px;font-weight:900;box-shadow:0 10px 30px rgba(0,0,0,0.45)`;
+    el.style.cssText=`position:fixed;top:12px;left:12px;right:12px;z-index:600;background:${tqAlertColor(level)};color:#111;padding:14px 16px;border-radius:14px;font-weight:900;box-shadow:0 10px 30px rgba(0,0,0,0.45)`;
     el.dataset.level=level;
     el.dataset.patientId=p.id;
     const opt=C5Rules.tourniquetSnoozeOption(level, used);
@@ -9631,9 +9665,10 @@ function renderTourniquetTimeAlert(nowMs=Date.now()){
     const snoozeBtn=opt
       ? `<button class="tq-alert-btn" data-tq-action="snooze" onclick="snoozeTourniquetAlert('${pid}','${tid}')">הזכר לי בעוד ${opt.minutes} דק׳${opt.escalates?` (יעדכן ${tqAlertEscalationTarget()})`:''}</button>`
       : `<span class="tq-alert-nomore">אין דחיות נוספות · ${tqAlertEscalationTarget()} עודכן</span>`;
-    el.innerHTML=`<div style="font-size:16px">${TQ_ALERT_TITLES[level]}</div>
+    const note=tqAlertNote(level);
+    el.innerHTML=`<div style="font-size:16px">${tqAlertTitle(level)}</div>
       <div style="font-size:13px;margin-top:4px">${escAttr(p.visualId||p.id)} · ${escAttr(tq.limbLabel||tourniquetLimbMeta(tq.limb).label)} · +${minutes} דק׳${more}</div>
-      ${TQ_ALERT_NOTES[level]?`<div style="font-size:12px;margin-top:4px">${TQ_ALERT_NOTES[level]}</div>`:''}
+      ${note?`<div style="font-size:12px;margin-top:4px">${note}</div>`:''}
       <div class="tq-alert-actions"><button class="tq-alert-btn primary" data-tq-action="open" onclick="openTourniquetAlert('${pid}','${tid}')">פתח מטופל</button>${snoozeBtn}</div>`;
   }
   let chip=document.getElementById('tq-snooze-chip');
@@ -9647,7 +9682,7 @@ function renderTourniquetTimeAlert(nowMs=Date.now()){
       chip.type='button';
       document.body.appendChild(chip);
     }
-    chip.style.borderColor=TQ_ALERT_COLORS[level];
+    chip.style.borderColor=tqAlertColor(level);
     chip.dataset.patientId=p.id;
     const at=new Date(snoozedUntil).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
     chip.innerHTML=`⏱ חסם <bdi>${escAttr(p.visualId||p.id)}</bdi> · <bdi>+${minutes}</bdi> דק׳ · תזכורת <bdi>${at}</bdi>${waiting.length>1?` · <bdi>+${waiting.length-1}</bdi>`:''}`;
@@ -9675,7 +9710,7 @@ function sendTourniquetAlertEvent(p, tq, reason, extra={}){
 }
 function snoozeTourniquetAlert(patientId, tqId){
   const {p, tq}=tourniquetForAlert(patientId, tqId);
-  if(!p || !tq || !TQ_ALERT_RANK[tq.timeAlertOpen]) return;
+  if(!p || !tq || !tqAlertRank(tq.timeAlertOpen)) return;
   const level=tq.timeAlertOpen;
   const used=tq.timeAlertSnooze && tq.timeAlertSnooze.level===level ? tq.timeAlertSnooze.used : 0;
   const opt=C5Rules.tourniquetSnoozeOption(level, used);
@@ -15646,12 +15681,12 @@ async function pullServerWatchdogAlerts(incidentId){
   serverWatchdogAlertsByIncident[incidentId]=rows;
   if(JSON.stringify(rows)!==before) refreshActiveScreenData();
 }
-// Same ranks as TQ_ALERT_RANK; TOURNIQUET_TIME_DECISION (100 min) comes from database/079.
+// Same ranks as C5Rules.tourniquetAlertRank; TOURNIQUET_TIME_DECISION (100 min) comes from database/079.
 const SERVER_TQ_LEVEL_RANK={TOURNIQUET_TIME_NOTICE:1, TOURNIQUET_TIME_WARNING:2, TOURNIQUET_TIME_DECISION:3, TOURNIQUET_TIME_CRITICAL:4};
 function localTourniquetRank(p, nowMs=Date.now()){
   return activeTourniquets(p).reduce((max,tq)=>{
     const timer=C5Rules.tourniquetTimer({tourniquet:tq}, nowMs);
-    return Math.max(max, timer ? (TQ_ALERT_RANK[timer.stage]||0) : 0);
+    return Math.max(max, timer ? (tqAlertRank(timer.stage)) : 0);
   },0);
 }
 function serverWatchdogAlertObjects(pts=patients, nowMs=Date.now()){
@@ -15711,7 +15746,7 @@ function applyTourniquetSnoozes(rows, incidentId){
   const list=[];
   Object.values(latest).forEach(({at, row})=>{
     const payload=row.payload_json||{};
-    if(payload.reason!=='tourniquet_snoozed' || !TQ_ALERT_RANK[payload.level]) return;
+    if(payload.reason!=='tourniquet_snoozed' || !tqAlertRank(payload.level)) return;
     const until=Date.parse(payload.snoozed_until);
     list.push({key:`${row.device_id}:${row.local_timestamp}`, patientId:row.patient_id, at, level:payload.level,
       until:Number.isFinite(until)?until:null, escalated:payload.escalated===true,
@@ -15729,7 +15764,7 @@ function activeTourniquetSnoozes(pts=patients, nowMs=Date.now()){
     const p=pts.find(x=>x.id===s.patientId);
     if(!p || ['handed_over','deceased'].includes(p.patientStatus)) return null;
     const tqs=activeTourniquets(p);
-    if(!tqs.length || localTourniquetRank(p, nowMs)>TQ_ALERT_RANK[s.level]) return null;
+    if(!tqs.length || localTourniquetRank(p, nowMs)>tqAlertRank(s.level)) return null;
     const minutes=Math.max(...tqs.map(t=>C5Rules.tourniquetTimer({tourniquet:t}, nowMs)?.minutes||0));
     return {...s, p, minutes};
   }).filter(Boolean);
@@ -15759,8 +15794,8 @@ function announceTourniquetSnoozeEscalations(){
   const seen=seenTourniquetEscalations();
   const fresh=activeTourniquetSnoozes().filter(s=>s.escalated && !seen.has(s.key));
   if(!fresh.length) return;
-  const s=fresh.sort((a,b)=>TQ_ALERT_RANK[b.level]-TQ_ALERT_RANK[a.level])[0];
-  haptic(TQ_ALERT_HAPTICS[s.level]||TQ_ALERT_HAPTICS.warn);
+  const s=fresh.sort((a,b)=>tqAlertRank(b.level)-tqAlertRank(a.level))[0];
+  haptic(tqAlertHaptic(s.level));
   let el=document.getElementById('tq-snooze-escalation');
   if(!el){
     el=document.createElement('div');
@@ -15770,7 +15805,7 @@ function announceTourniquetSnoozeEscalations(){
   }
   el.dataset.patientId=s.p.id;
   el.dataset.keys=JSON.stringify(fresh.map(x=>x.key));
-  el.style.cssText=`position:fixed;top:12px;left:12px;right:12px;z-index:601;background:${TQ_ALERT_COLORS[s.level]};color:#111;padding:14px 16px;border-radius:14px;font-weight:900;box-shadow:0 10px 30px rgba(0,0,0,0.45)`;
+  el.style.cssText=`position:fixed;top:12px;left:12px;right:12px;z-index:601;background:${tqAlertColor(s.level)};color:#111;padding:14px 16px;border-radius:14px;font-weight:900;box-shadow:0 10px 30px rgba(0,0,0,0.45)`;
   el.innerHTML=`<div style="font-size:16px">חסם עורקים נדחה שוב ושוב</div>
     <div style="font-size:13px;margin-top:4px">${escAttr(s.p.visualId||s.p.id)} · ${s.minutes} דק׳ · ${escAttr(tourniquetSnoozeWho(s))} ניצל/ה את כל הדחיות${fresh.length>1?` · +${fresh.length-1}`:''}</div>
     <div class="tq-alert-actions"><button class="tq-alert-btn primary" data-tq-action="open" onclick="closeTourniquetEscalation(true)">פתח מטופל</button><button class="tq-alert-btn" data-tq-action="seen" onclick="closeTourniquetEscalation(false)">ראיתי</button></div>`;

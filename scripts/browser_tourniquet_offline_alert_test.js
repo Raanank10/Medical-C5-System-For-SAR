@@ -7,6 +7,7 @@
 // 3. Crossing 120 minutes alerts again, as critical; "open patient" opens it.
 // 4. A remote tourniquet refreshed from the server keeps its alert level (no repeat).
 // 5. A handed-over patient's tourniquet does not alert.
+// 6. Past 120 minutes it pings again every full hour (3 h, 4 h, ... 6 h), once each.
 // "Remind me later" is covered by scripts/browser_tourniquet_snooze_test.js.
 //
 // Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
@@ -103,6 +104,23 @@ async function checkFile(browser, file) {
   // 5. The handed-over patient never alerted.
   const handed = await page.evaluate(() => patients.find((p) => p.visualId === 'P-HANDED').tourniquets[0].timeAlertedLevel || null);
   assert(handed === null, `${rel}: a handed-over patient's tourniquet must not alert`);
+
+  // 6. Past 120 minutes it pings every hour (owner, 2026-10-26): 3 hours, ..., 6 hours (the end of
+  //    the physician's release window), each once, vibrating.
+  const hourly = async (minutes) => {
+    await page.clock.runFor(minutes * 60000);
+    return page.evaluate(() => ({ n: window.__vibrations.length, level: document.getElementById('tq-time-alert')?.dataset.level, banner: document.getElementById('tq-time-alert')?.textContent || '' }));
+  };
+  const v0 = await page.evaluate(() => window.__vibrations.length);
+  const h3 = await hourly(60); // P-TQ-OFF is now just past 3 hours
+  assert(h3.level === 'hours_3' && h3.banner.includes('עברו 3 שעות') && h3.banner.includes('רופא בלבד') && h3.n > v0, `${rel}: 3 hours must ping (got ${JSON.stringify(h3)})`);
+  await page.click('#tq-time-alert [data-tq-action="open"]');
+  const quiet = await hourly(30);
+  assert(quiet.level !== 'hours_3' && quiet.level !== 'hours_4', `${rel}: no repeat within the same hour (got ${JSON.stringify(quiet)})`);
+  // answer whatever is still showing (the remote patient's levels), so only the 6-hour ping is left
+  await page.evaluate(() => { while (document.querySelector('#tq-time-alert [data-tq-action="open"]')) document.querySelector('#tq-time-alert [data-tq-action="open"]').click(); });
+  const h6 = await hourly(150); // just past 6 hours
+  assert(h6.level === 'hours_6' && h6.banner.includes('עברו 6 שעות') && h6.banner.includes('עבר חלון השחרור של רופא'), `${rel}: 6 hours must ping with the end of the physician window (got ${JSON.stringify(h6)})`);
 
   assert(pageErrors.length === 0, `${rel}: uncaught page error(s): ${pageErrors.join(' | ')}`);
   await context.close();

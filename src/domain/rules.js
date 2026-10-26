@@ -27,6 +27,10 @@
   // alert gives the medic 20 minutes to decide (convert / evacuate) before that window closes.
   const TOURNIQUET_DECISION_MS = 100 * 60 * 1000;
   const TOURNIQUET_CRITICAL_MS = 120 * 60 * 1000;
+  // Past 120 minutes the phone alerts again every hour while the tourniquet is on (owner,
+  // 2026-10-26): 3, 4, 5 hours, 6 hours (the end of the physician's release window) and on.
+  const TOURNIQUET_HOURLY_PING_MS = 60 * 60 * 1000;
+  const TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS = 6 * 60 * 60 * 1000;
   const DEVICE_SILENCE_MS = 10 * 60 * 1000;
   // Server contact freshness for the command status strip (repo owner, V2.99.62). The phone
   // syncs every 45 seconds, so under 2 minutes since the last successful server response
@@ -127,8 +131,13 @@
       : elapsedMs >= TOURNIQUET_NOTICE_MS ? "notice"
       : "";
     // stage is the alert level: cls (the colour) plus the 100-minute decision point, which keeps
-    // the orange "warn" colour everywhere a timer is shown.
-    const stage = cls === "warn" && elapsedMs >= TOURNIQUET_DECISION_MS ? "decision" : cls;
+    // the orange "warn" colour everywhere a timer is shown, and from 3 hours one level per full
+    // hour ("hours_3", "hours_4", ...), which keep the red "critical" colour.
+    const stage =
+      cls === "warn" && elapsedMs >= TOURNIQUET_DECISION_MS ? "decision"
+      : cls === "critical" && elapsedMs >= TOURNIQUET_CRITICAL_MS + TOURNIQUET_HOURLY_PING_MS
+        ? `hours_${Math.floor(elapsedMs / TOURNIQUET_HOURLY_PING_MS)}`
+      : cls;
     return { cls, stage, minutes, limb: tourniquet.limb || "לא צוין" };
   }
 
@@ -137,9 +146,15 @@
   // level this tourniquet was last alerted at, returns the level to alert now, or null. Each level
   // alerts once; a level skipped while the app was closed is not replayed, only the current one.
   const TOURNIQUET_ALERT_RANK = { "": 0, notice: 1, warn: 2, decision: 3, critical: 4 };
+  // hours_3 ranks just above critical, hours_4 above that, and so on.
+  function tourniquetAlertRank(stage) {
+    if (Object.prototype.hasOwnProperty.call(TOURNIQUET_ALERT_RANK, stage || "")) return TOURNIQUET_ALERT_RANK[stage || ""];
+    const hourly = /^hours_(\d+)$/.exec(String(stage));
+    return hourly && Number(hourly[1]) >= 3 ? TOURNIQUET_ALERT_RANK.critical + Number(hourly[1]) - 2 : 0;
+  }
   function tourniquetAlertToRaise(timerStage, lastAlertedStage) {
-    const now = TOURNIQUET_ALERT_RANK[timerStage || ""] || 0;
-    const last = TOURNIQUET_ALERT_RANK[lastAlertedStage || ""] || 0;
+    const now = tourniquetAlertRank(timerStage);
+    const last = tourniquetAlertRank(lastAlertedStage);
     return now > last ? timerStage : null;
   }
 
@@ -152,9 +167,11 @@
     warn: { minutes: 5, max: 2 },
     decision: { minutes: 2, max: 1 },
     critical: { minutes: 1, max: 1 },
+    hourly: { minutes: 5, max: 2 },
   };
   function tourniquetSnoozeOption(stage, usedAtStage) {
-    const policy = TOURNIQUET_SNOOZE_POLICY[stage || ""];
+    const key = tourniquetAlertRank(stage) > TOURNIQUET_ALERT_RANK.critical ? "hourly" : stage || "";
+    const policy = Object.prototype.hasOwnProperty.call(TOURNIQUET_SNOOZE_POLICY, key) ? TOURNIQUET_SNOOZE_POLICY[key] : null;
     const used = Math.max(0, Number(usedAtStage) || 0);
     if (!policy || used >= policy.max) return null;
     return { minutes: policy.minutes, used: used + 1, max: policy.max, escalates: used + 1 >= policy.max };
@@ -412,7 +429,9 @@
     SUPPLY_CRITICAL_RATIO,
     TOURNIQUET_CRITICAL_MS,
     TOURNIQUET_DECISION_MS,
+    TOURNIQUET_HOURLY_PING_MS,
     TOURNIQUET_NOTICE_MS,
+    TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS,
     TOURNIQUET_SNOOZE_POLICY,
     TOURNIQUET_WARN_MS,
     VITALS_INTERVAL_MS_BY_TRIAGE,
@@ -454,6 +473,7 @@
     supplyCriticalThreshold,
     supplyRiskTier,
     timeCodeToTodayMs,
+    tourniquetAlertRank,
     tourniquetAlertToRaise,
     tourniquetSnoozeOption,
     tourniquetTimer,
