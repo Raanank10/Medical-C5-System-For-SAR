@@ -9650,7 +9650,7 @@ function renderTourniquetTimeAlert(nowMs=Date.now()){
     chip.style.borderColor=TQ_ALERT_COLORS[level];
     chip.dataset.patientId=p.id;
     const at=new Date(snoozedUntil).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
-    chip.textContent=`⏱ חסם ${p.visualId||p.id} · +${minutes} דק׳ · תזכורת ${at}${waiting.length>1?` · +${waiting.length-1}`:''}`;
+    chip.innerHTML=`⏱ חסם <bdi>${escAttr(p.visualId||p.id)}</bdi> · <bdi>+${minutes}</bdi> דק׳ · תזכורת <bdi>${at}</bdi>${waiting.length>1?` · <bdi>+${waiting.length-1}</bdi>`:''}`;
     chip.onclick=()=>openTourniquetAlert(p.id, tq.id);
   }
   // Bring a delayed alert back on time, not only on the next 30-second refresh.
