@@ -248,6 +248,35 @@ async function main() {
     v = await view();
     assert(v.open === 'a', `re-entering opens the first undocumented letter (A), got ${v.open}`);
 
+    // 9. A chosen treatment / limb is unmistakable (solid fill, ring, white check), and the progress
+    // bar follows the step actually shown (step7 is 6 / 8; location, screen step2, is 7 / 8).
+    const look = await page.evaluate(() => {
+      startNewPatient('extended');
+      goTo('step7');
+      const chip = document.querySelector('#march-sec-m .chip[data-tx="bandage"]');
+      chip.style.transition = 'none'; // read the end state, not the 0.12s animation
+      chip.classList.add('selected');
+      const live = getComputedStyle(chip); // live object: copy before the class comes off
+      const cs = { backgroundColor: live.backgroundColor, boxShadow: live.boxShadow };
+      const check = getComputedStyle(chip, '::after').content;
+      const limb = document.querySelector('#limb-grid .limb-btn');
+      limb.classList.add('selected');
+      const limbCheck = getComputedStyle(limb, '::after').content;
+      chip.classList.remove('selected'); limb.classList.remove('selected');
+      const bars = {};
+      for (const sid of ['step3', 'step4', 'step5', 'step6', 'step7', 'step2', 'step8']) {
+        goTo(sid);
+        const root = document.getElementById('screen-' + sid);
+        bars[sid] = [root.querySelector('.flow-step').textContent, parseFloat(root.querySelector('.progress-fill').style.width)];
+      }
+      return { bg: cs.backgroundColor, ring: cs.boxShadow, check, limbCheck, bars };
+    });
+    assert(look.bg === 'rgb(67, 97, 238)' && look.ring.includes('3px') && look.check.includes('✓'), `a selected treatment needs a solid fill, ring and check, got ${JSON.stringify(look)}`);
+    assert(look.limbCheck.includes('✓'), `a selected tourniquet limb needs a check mark, got ${look.limbCheck}`);
+    const order = ['step3', 'step4', 'step5', 'step6', 'step7', 'step2', 'step8'].map((sid) => look.bars[sid]);
+    assert(look.bars.step7[0] === 'שלב 6 / 8' && look.bars.step2[0] === 'שלב 7 / 8', `step labels, got ${JSON.stringify(look.bars)}`);
+    assert(order.every(([, w], i) => i === 0 || w > order[i - 1][1]) && order[order.length - 1][1] === 100, `the progress bar must only grow through the full flow, got ${JSON.stringify(look.bars)}`);
+
     assert(pageErrors.length === 0, `uncaught page error(s): ${pageErrors.join(' | ')}`);
     await page.close();
     console.log('index.html: MARCH-PAWS treatment step browser test passed');

@@ -304,6 +304,13 @@ body.field-mode .patient-card{padding:16px 15px;margin-top:8px;margin-bottom:8px
 #screen-step7 .march-section .chip-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 #screen-step7 .march-section .chip{border-radius:14px;justify-content:center;text-align:center;padding:10px 8px;font-size:14px;min-width:0;}
 .march-state.none{color:var(--orange);}
+/* A chosen treatment or tourniquet limb reads at a glance (V2.99.67, owner 2026-10-26): solid fill,
+   outer ring and white check mark, as AVPU and the tap choices since V2.99.59. */
+.chip[data-tx]{position:relative;}
+.chip[data-tx].selected{background:var(--accent);border-color:#fff;box-shadow:0 0 0 3px var(--accent);color:#fff;font-weight:900;}
+.limb-btn{position:relative;}
+.limb-btn.selected{background:rgba(230,57,70,0.5);border-color:var(--red);box-shadow:0 0 0 3px var(--red);color:#fff;font-weight:900;}
+.chip[data-tx].selected::after,.limb-btn.selected::after{content:'✓';position:absolute;top:-8px;inset-inline-start:-6px;box-shadow:0 0 0 2px var(--surface);width:22px;height:22px;border-radius:50%;background:#fff;color:#111;font-size:14px;font-weight:900;line-height:22px;text-align:center;font-family:var(--sans);}
 
 /* ── VITALS ── */
 .vital-row{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px;margin-bottom:9px;}
@@ -1468,7 +1475,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-step2" class="screen">
   <div class="flow-header">
     <button class="btn-back" onclick="goTo('step5')">←</button>
-    <div><div class="flow-step">שלב 2 / 8</div><div class="flow-title">מיקום</div></div>
+    <div><div class="flow-step">שלב 7 / 8</div><div class="flow-title">מיקום</div></div>
   </div>
   <div class="progress-bar"><div class="progress-fill" style="width:25%"></div></div>
   <div class="flow-content">
@@ -1514,7 +1521,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-step3" class="screen">
   <div class="flow-header">
     <button class="btn-back" onclick="goTo('step1')">←</button>
-    <div><div class="flow-step">שלב 3 / 8</div><div class="flow-title">חסם עורקים מיידי</div></div>
+    <div><div class="flow-step">שלב 2 / 8</div><div class="flow-title">חסם עורקים מיידי</div></div>
   </div>
   <div class="progress-bar"><div class="progress-fill" style="width:37.5%"></div></div>
   <div class="flow-content">
@@ -1563,7 +1570,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-step4" class="screen">
   <div class="flow-header">
     <button class="btn-back" onclick="goTo('step3')">←</button>
-    <div><div class="flow-step">שלב 4 / 8</div><div class="flow-title">מדדים חיוניים</div></div>
+    <div><div class="flow-step">שלב 3 / 8</div><div class="flow-title">מדדים חיוניים</div></div>
   </div>
   <div class="progress-bar"><div class="progress-fill" style="width:50%"></div></div>
   <div class="flow-content">
@@ -1737,7 +1744,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-step5" class="screen">
   <div class="flow-header">
     <button class="btn-back" onclick="goTo('step4')">←</button>
-    <div><div class="flow-step">שלב 5 / 8</div><div class="flow-title">מיון MSTART</div></div>
+    <div><div class="flow-step">שלב 4 / 8</div><div class="flow-title">מיון MSTART</div></div>
   </div>
   <div class="progress-bar"><div class="progress-fill" style="width:62.5%"></div></div>
   <div class="flow-content">
@@ -1783,7 +1790,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-step6" class="screen">
   <div class="flow-header">
     <button class="btn-back" onclick="goTo('step5')">←</button>
-    <div><div class="flow-step">שלב 6 / 8</div><div class="flow-title">פציעה ומצב</div></div>
+    <div><div class="flow-step">שלב 5 / 8</div><div class="flow-title">פציעה ומצב</div></div>
   </div>
   <div class="progress-bar"><div class="progress-fill" style="width:75%"></div></div>
   <div class="flow-content">
@@ -1838,7 +1845,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-step7" class="screen">
   <div class="flow-header">
     <button class="btn-back" onclick="goTo('step6')">←</button>
-    <div><div class="flow-step">שלב 7 / 8</div><div class="flow-title">טיפולים - MARCH-PAWS</div></div>
+    <div><div class="flow-step">שלב 6 / 8</div><div class="flow-title">טיפולים - MARCH-PAWS</div></div>
   </div>
   <div class="progress-bar"><div class="progress-fill" style="width:87.5%"></div></div>
   <div class="flow-content">
@@ -8220,6 +8227,11 @@ function setStepChrome(screen, stepText, titleText=null){
   const title=root.querySelector('.flow-title');
   if(step) step.textContent=stepText;
   if(titleText && title) title.textContent=titleText;
+  // The bar follows the step actually shown, not the screen's id: the flow visits step3..step7,
+  // then step2 (location), then step8, so fixed widths jumped back at location (V2.99.67).
+  const m=/(\d+)\s*\/\s*(\d+)/.exec(stepText);
+  const fill=root.querySelector('.progress-fill');
+  if(m && fill) fill.style.width=`${Math.round(Number(m[1])/Number(m[2])*1000)/10}%`;
 }
 function updateFlowChrome(screen){
   const isQuick=state.flowMode==='quick';
