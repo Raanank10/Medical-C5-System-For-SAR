@@ -332,12 +332,19 @@ async function checkFile(browser, file) {
   // 7. CC: overview of all open incidents with server counts.
   await page.evaluate(() => signOut());
   await login(page, 'cc@test');
+  // Since 2026-10-26 a CC starts on the all-incidents view (no incident open), even with a stored one.
+  await page.waitForSelector('#screen-role-dashboard.active', { timeout: 5000 });
+  await page.waitForFunction(() => isCcOverviewMode() && !!document.querySelector('[data-incident-triage-table="onSite"] tr.tappable'), null, { timeout: 5000 });
+  assert((await page.textContent('[data-incident-triage-table="onSite"]')).includes('Synthetic Site Alpha'), `${rel}: CC all-incidents view should list the incident`);
+  // The picker, with its server counts, is still one tap away.
+  await page.click('button:has-text("רשימת אירועים · פתיחה ומיזוג כפילויות")');
   await page.waitForSelector('#screen-incident-picker.active', { timeout: 5000 });
   await page.waitForFunction(() => document.getElementById('incident-picker-list').textContent.includes('אדומים פעילים'), { timeout: 5000 });
-  assert((await page.textContent('#incident-picker-list')).includes('Synthetic Site Alpha'), `${rel}: CC overview should list the incident`);
+  assert((await page.textContent('#incident-picker-list')).includes('Synthetic Site Alpha'), `${rel}: CC picker should list the incident`);
 
   await page.click('#incident-picker-list button:has-text("כניסה")');
   await page.waitForSelector('#screen-role-dashboard.active', { timeout: 5000 });
+  assert(await page.evaluate(() => !isCcOverviewMode() && !!activeIncident), `${rel}: entering opens the incident`);
   const ccEmits = await page.evaluate(() => {
     const p = { id: newUuid(), visualId: 'TCC', triage: 'red', patientStatus: 'identified', events: [], siteId: 'SITE_A', _serverVersion: 1 };
     patients.push(p); saveDemoState();

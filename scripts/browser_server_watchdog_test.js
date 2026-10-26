@@ -239,7 +239,8 @@ async function checkFile(browser, file) {
   // 1. The regular pull reads the open watchdog alerts (open only, watchdog types only).
   await cc.page.evaluate(() => pullProjectedPatientStateAll());
   await cc.page.waitForTimeout(500);
-  const read = SERVER.alertReads.find((r) => r.userId === CC);
+  // The per-incident pull (eq); since V2.99.68 the CC's all-incidents view also reads every open incident's alerts (in).
+  const read = SERVER.alertReads.find((r) => r.userId === CC && r.eq.incident_id);
   assert(read && read.eq.incident_id === INC1 && read.is && read.is.resolved_at === null && JSON.stringify(read.in.alert_type) === JSON.stringify(['TOURNIQUET_TIME_NOTICE', 'TOURNIQUET_TIME_WARNING', 'TOURNIQUET_TIME_CRITICAL', 'VITALS_OVERDUE']),
     `${rel}: the pull must ask for this incident's open watchdog alerts (got ${JSON.stringify(read)})`);
 

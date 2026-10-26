@@ -11,7 +11,7 @@
 //   with undocumented letters as null (shown as "לא תועד", never hidden);
 // - hemostatic gauze and the hypothermia blanket come out of the medic's own stock;
 // - a restored draft shows its selected treatments and letter states again;
-// - V2.99.67 letter strip: one letter's treatments at a time, every letter's state in the strip,
+// - V2.99.69 letter strip: one letter's treatments at a time, every letter's state in the strip,
 //   the strip on the first screen, "no treatment needed" moves on to the next undocumented letter.
 //
 // Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
@@ -77,7 +77,7 @@ async function main() {
     await page.click('#march-sec-m .chip[data-tx="hemostatic"]');
     // Consuming stock opens the existing "supply used" sheet; the medic confirms it.
     await page.click('#supply-used-modal button[onclick="confirmSupplyUsed()"]');
-    // One letter on screen at a time (V2.99.67): a letter's tile opens it.
+    // One letter on screen at a time (V2.99.69): a letter's tile opens it.
     await page.click('#march-tile-r');
     await page.click('#march-sec-r .chip[data-tx="chest_seal"]');
     await page.click('#march-tile-a');
@@ -199,7 +199,7 @@ async function main() {
     const demoParamedic = await scopeFor({ role: 'paramedic' });
     assert(demoParamedic.selected === 'cric,needle_decompression', `demo paramedic must record both, got ${JSON.stringify(demoParamedic)}`);
 
-    // 8. Letter strip (V2.99.67, owner 2026-10-26): one letter's treatments at a time, every
+    // 8. Letter strip (V2.99.69, owner 2026-10-26): one letter's treatments at a time, every
     // letter's state in the strip, "no treatment needed" moves on to the next undocumented letter.
     const view = () => page.evaluate(() => ({
       open: [...document.querySelectorAll('#screen-step7 .march-section')].filter((el) => getComputedStyle(el).display !== 'none').map((el) => el.id.replace('march-sec-', '')).join(),

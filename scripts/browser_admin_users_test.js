@@ -163,7 +163,8 @@ async function checkFile(browser, file) {
 
   // 1. A non-admin (cc) never sees the entry point.
   await login(page, 'cc@test');
-  await page.waitForSelector('#screen-incident-picker.active', { timeout: 5000 });
+  // Since 2026-10-26 a CC starts on its all-incidents view, not the picker.
+  await page.waitForSelector('#screen-role-dashboard.active', { timeout: 5000 });
   // The entry point lives in the top nav's account menu (owner, 2026-10-23); open it so this
   // checks the button is really absent, not just hidden by a closed menu.
   await page.click('#auth-account-menu summary');
