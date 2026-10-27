@@ -14,7 +14,7 @@
 -- Applied live: a tourniquet already past 100 minutes (and under 120) with an open WARNING gets
 -- DECISION on the next minute's run, and its WARNING is resolved; one already past 120 is not
 -- given a DECISION (only the highest level reached is raised, as before).
--- Client (V2.99.67): SERVER_WATCHDOG_TYPES and SERVER_TQ_LEVEL_RANK in index.html know the new
+-- Client (V2.99.70): SERVER_WATCHDOG_TYPES and SERVER_TQ_LEVEL_RANK in index.html know the new
 -- type; until this file is applied the phone still raises 100 minutes on its own.
 -- Deploy order: either order works.
 
