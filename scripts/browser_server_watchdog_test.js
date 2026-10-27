@@ -241,7 +241,7 @@ async function checkFile(browser, file) {
   await cc.page.waitForTimeout(500);
   // The per-incident pull (eq); since V2.99.68 the CC's all-incidents view also reads every open incident's alerts (in).
   const read = SERVER.alertReads.find((r) => r.userId === CC && r.eq.incident_id);
-  assert(read && read.eq.incident_id === INC1 && read.is && read.is.resolved_at === null && JSON.stringify(read.in.alert_type) === JSON.stringify(['TOURNIQUET_TIME_NOTICE', 'TOURNIQUET_TIME_WARNING', 'TOURNIQUET_TIME_CRITICAL', 'VITALS_OVERDUE']),
+  assert(read && read.eq.incident_id === INC1 && read.is && read.is.resolved_at === null && JSON.stringify(read.in.alert_type) === JSON.stringify(['TOURNIQUET_TIME_NOTICE', 'TOURNIQUET_TIME_WARNING', 'TOURNIQUET_TIME_DECISION', 'TOURNIQUET_TIME_CRITICAL', 'VITALS_OVERDUE']),
     `${rel}: the pull must ask for this incident's open watchdog alerts (got ${JSON.stringify(read)})`);
 
   // 2. CC: only what this phone does not raise itself, marked as from the server.
@@ -292,6 +292,14 @@ async function checkFile(browser, file) {
   // 7. Logistics and rescue roles are not an audience.
   const aud = await m.page.evaluate(() => buildAlertObjects(patients).filter((a) => a.source === 'server').map((a) => a.audience));
   assert(aud.every((a) => !a.includes('logistics') && !a.includes('rpc')), `${rel}: command and medic only (got ${JSON.stringify(aud)})`);
+
+  // 8. The 100-minute level (database/079): listed while this phone's own timer is below it
+  //    (P-OTHER's tourniquet is at 70 minutes here).
+  SERVER.alerts.push(alert('a-other-decision', OTHER, 'TOURNIQUET_TIME_DECISION', 'warning', { limb: 'left_leg', minutes: 101, level: 'decision' }));
+  await pullAlerts(cc.page);
+  l = await listed(cc.page, 'cc');
+  const dec = l.find((a) => a.id === 'server-tq-a-other-decision');
+  assert(dec && dec.title.includes('P-OTHER') && dec.title.includes('100 דקות') && dec.title.includes('(שרת)') && dec.severity === 'high', `${rel}: the server's 100-minute alert must be listed (got ${JSON.stringify(l)})`);
 
   const errors = [...m.errors, ...cc.errors];
   assert(errors.length === 0, `${rel}: page errors: ${errors.join(' | ')}`);

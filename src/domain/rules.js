@@ -22,7 +22,27 @@
   // the medic, well before the 60-minute review point actually arrives.
   const TOURNIQUET_NOTICE_MS = 45 * 60 * 1000;
   const TOURNIQUET_WARN_MS = 60 * 60 * 1000;
+  // Repo owner, 2026-10-26 / 27: a medic may convert a tourniquet to direct pressure only up to 120
+  // minutes after it went on; a paramedic up to 4 hours, a physician up to 6 (see
+  // TOURNIQUET_CONVERSION_LIMIT_MS). The 100-minute
+  // alert gives the medic 20 minutes to decide (convert / evacuate) before that window closes.
+  const TOURNIQUET_DECISION_MS = 100 * 60 * 1000;
   const TOURNIQUET_CRITICAL_MS = 120 * 60 * 1000;
+  // Past 120 minutes the phone alerts again every hour while the tourniquet is on (owner,
+  // 2026-10-26): 3, 4, 5 hours, 6 hours (the end of the physician's release window) and on.
+  const TOURNIQUET_HOURLY_PING_MS = 60 * 60 * 1000;
+  const TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS = 6 * 60 * 60 * 1000;
+  // Converting a tourniquet to direct pressure (repo owner, 2026-10-26 / 27): how long after
+  // application each role may do it. A medic (and a PC, the platoon's medical commander) up to 120
+  // minutes, a paramedic up to 4 hours; past that the phone blocks them. A physician is never
+  // blocked: 6 hours is the end of the physician's window and is shown as a warning only. Any other
+  // role may not convert (no admin exception, as with cric / needle decompression).
+  const TOURNIQUET_CONVERSION_LIMIT_MS = {
+    medic: TOURNIQUET_CRITICAL_MS,
+    pc: TOURNIQUET_CRITICAL_MS,
+    paramedic: 4 * 60 * 60 * 1000,
+    physician: null,
+  };
   const DEVICE_SILENCE_MS = 10 * 60 * 1000;
   // Server contact freshness for the command status strip (repo owner, V2.99.62). The phone
   // syncs every 45 seconds, so under 2 minutes since the last successful server response
@@ -122,18 +142,67 @@
       : elapsedMs >= TOURNIQUET_WARN_MS ? "warn"
       : elapsedMs >= TOURNIQUET_NOTICE_MS ? "notice"
       : "";
-    return { cls, minutes, limb: tourniquet.limb || "לא צוין" };
+    // stage is the alert level: cls (the colour) plus the 100-minute decision point, which keeps
+    // the orange "warn" colour everywhere a timer is shown, and from 3 hours one level per full
+    // hour ("hours_3", "hours_4", ...), which keep the red "critical" colour.
+    const stage =
+      cls === "warn" && elapsedMs >= TOURNIQUET_DECISION_MS ? "decision"
+      : cls === "critical" && elapsedMs >= TOURNIQUET_CRITICAL_MS + TOURNIQUET_HOURLY_PING_MS
+        ? `hours_${Math.floor(elapsedMs / TOURNIQUET_HOURLY_PING_MS)}`
+      : cls;
+    return { cls, stage, minutes, limb: tourniquet.limb || "לא צוין" };
   }
 
   // D1 (repo owner, 2026-10-20): the phone raises tourniquet time alerts itself, from its own clock,
-  // with or without a server connection. Given the timer level now (tourniquetTimer().cls) and the
+  // with or without a server connection. Given the timer level now (tourniquetTimer().stage) and the
   // level this tourniquet was last alerted at, returns the level to alert now, or null. Each level
   // alerts once; a level skipped while the app was closed is not replayed, only the current one.
-  const TOURNIQUET_ALERT_RANK = { "": 0, notice: 1, warn: 2, critical: 3 };
-  function tourniquetAlertToRaise(timerCls, lastAlertedCls) {
-    const now = TOURNIQUET_ALERT_RANK[timerCls || ""] || 0;
-    const last = TOURNIQUET_ALERT_RANK[lastAlertedCls || ""] || 0;
-    return now > last ? timerCls : null;
+  const TOURNIQUET_ALERT_RANK = { "": 0, notice: 1, warn: 2, decision: 3, critical: 4 };
+  // hours_3 ranks just above critical, hours_4 above that, and so on.
+  function tourniquetAlertRank(stage) {
+    if (Object.prototype.hasOwnProperty.call(TOURNIQUET_ALERT_RANK, stage || "")) return TOURNIQUET_ALERT_RANK[stage || ""];
+    const hourly = /^hours_(\d+)$/.exec(String(stage));
+    return hourly && Number(hourly[1]) >= 3 ? TOURNIQUET_ALERT_RANK.critical + Number(hourly[1]) - 2 : 0;
+  }
+  function tourniquetAlertToRaise(timerStage, lastAlertedStage) {
+    const now = tourniquetAlertRank(timerStage);
+    const last = tourniquetAlertRank(lastAlertedStage);
+    return now > last ? timerStage : null;
+  }
+
+  // "Remind me later" on a tourniquet time alert (repo owner, 2026-10-26). Per level: how long one
+  // delay lasts and how many delays a tourniquet gets at that level. A delay never hides the alert:
+  // it shrinks to a chip and comes back when the time is up, and a new level cancels it. Using the
+  // last allowed delay tells command (escalates); after that the only way out is to open the patient.
+  const TOURNIQUET_SNOOZE_POLICY = {
+    notice: { minutes: 5, max: 2 },
+    warn: { minutes: 5, max: 2 },
+    decision: { minutes: 2, max: 1 },
+    critical: { minutes: 1, max: 1 },
+    hourly: { minutes: 5, max: 2 },
+  };
+  function tourniquetSnoozeOption(stage, usedAtStage) {
+    const key = tourniquetAlertRank(stage) > TOURNIQUET_ALERT_RANK.critical ? "hourly" : stage || "";
+    const policy = Object.prototype.hasOwnProperty.call(TOURNIQUET_SNOOZE_POLICY, key) ? TOURNIQUET_SNOOZE_POLICY[key] : null;
+    const used = Math.max(0, Number(usedAtStage) || 0);
+    if (!policy || used >= policy.max) return null;
+    return { minutes: policy.minutes, used: used + 1, max: policy.max, escalates: used + 1 >= policy.max };
+  }
+
+  // { allowed, limitMs, reason, pastPhysicianWindow }. reason is null when allowed, 'role' for a role
+  // that may not convert, 'time' past the role's limit, or 'time_unknown' when the application time
+  // is not known and the role has a limit (it cannot be shown to be within it).
+  function tourniquetConversionAllowed(role, elapsedMs) {
+    if (!Object.prototype.hasOwnProperty.call(TOURNIQUET_CONVERSION_LIMIT_MS, role || "")) {
+      return { allowed: false, limitMs: null, reason: "role", pastPhysicianWindow: false };
+    }
+    const limitMs = TOURNIQUET_CONVERSION_LIMIT_MS[role];
+    const known = Number.isFinite(elapsedMs) && elapsedMs >= 0;
+    const pastPhysicianWindow = known && elapsedMs > TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS;
+    if (limitMs === null) return { allowed: true, limitMs: null, reason: null, pastPhysicianWindow };
+    if (!known) return { allowed: false, limitMs, reason: "time_unknown", pastPhysicianWindow: false };
+    if (elapsedMs > limitMs) return { allowed: false, limitMs, reason: "time", pastPhysicianWindow };
+    return { allowed: true, limitMs, reason: null, pastPhysicianWindow };
   }
 
   function isDeviceSilent(lastSeenMs, nowMs = Date.now()) {
@@ -386,8 +455,13 @@
     SERVER_CONTACT_STALE_MS,
     SUPPLY_BURN_WINDOW_MS,
     SUPPLY_CRITICAL_RATIO,
+    TOURNIQUET_CONVERSION_LIMIT_MS,
     TOURNIQUET_CRITICAL_MS,
+    TOURNIQUET_DECISION_MS,
+    TOURNIQUET_HOURLY_PING_MS,
     TOURNIQUET_NOTICE_MS,
+    TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS,
+    TOURNIQUET_SNOOZE_POLICY,
     TOURNIQUET_WARN_MS,
     VITALS_INTERVAL_MS_BY_TRIAGE,
     VITALS_WARN_BUFFER_MS,
@@ -428,7 +502,10 @@
     supplyCriticalThreshold,
     supplyRiskTier,
     timeCodeToTodayMs,
+    tourniquetAlertRank,
+    tourniquetConversionAllowed,
     tourniquetAlertToRaise,
+    tourniquetSnoozeOption,
     tourniquetTimer,
     vitalsAgeMs,
     vitalsIntervalMsFor,
