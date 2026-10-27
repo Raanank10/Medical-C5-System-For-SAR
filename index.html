@@ -2754,8 +2754,9 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   // the medic, well before the 60-minute review point actually arrives.
   const TOURNIQUET_NOTICE_MS = 45 * 60 * 1000;
   const TOURNIQUET_WARN_MS = 60 * 60 * 1000;
-  // Repo owner, 2026-10-26: a medic may release a tourniquet (convert to direct pressure) only up
-  // to 120 minutes after it went on; past that only a physician may, up to 6 hours. The 100-minute
+  // Repo owner, 2026-10-26 / 27: a medic may convert a tourniquet to direct pressure only up to 120
+  // minutes after it went on; a paramedic up to 4 hours, a physician up to 6 (see
+  // TOURNIQUET_CONVERSION_LIMIT_MS). The 100-minute
   // alert gives the medic 20 minutes to decide (convert / evacuate) before that window closes.
   const TOURNIQUET_DECISION_MS = 100 * 60 * 1000;
   const TOURNIQUET_CRITICAL_MS = 120 * 60 * 1000;
@@ -2763,6 +2764,17 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   // 2026-10-26): 3, 4, 5 hours, 6 hours (the end of the physician's release window) and on.
   const TOURNIQUET_HOURLY_PING_MS = 60 * 60 * 1000;
   const TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS = 6 * 60 * 60 * 1000;
+  // Converting a tourniquet to direct pressure (repo owner, 2026-10-26 / 27): how long after
+  // application each role may do it. A medic (and a PC, the platoon's medical commander) up to 120
+  // minutes, a paramedic up to 4 hours; past that the phone blocks them. A physician is never
+  // blocked: 6 hours is the end of the physician's window and is shown as a warning only. Any other
+  // role may not convert (no admin exception, as with cric / needle decompression).
+  const TOURNIQUET_CONVERSION_LIMIT_MS = {
+    medic: TOURNIQUET_CRITICAL_MS,
+    pc: TOURNIQUET_CRITICAL_MS,
+    paramedic: 4 * 60 * 60 * 1000,
+    physician: null,
+  };
   const DEVICE_SILENCE_MS = 10 * 60 * 1000;
   // Server contact freshness for the command status strip (repo owner, V2.99.62). The phone
   // syncs every 45 seconds, so under 2 minutes since the last successful server response
@@ -2907,6 +2919,22 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     const used = Math.max(0, Number(usedAtStage) || 0);
     if (!policy || used >= policy.max) return null;
     return { minutes: policy.minutes, used: used + 1, max: policy.max, escalates: used + 1 >= policy.max };
+  }
+
+  // { allowed, limitMs, reason, pastPhysicianWindow }. reason is null when allowed, 'role' for a role
+  // that may not convert, 'time' past the role's limit, or 'time_unknown' when the application time
+  // is not known and the role has a limit (it cannot be shown to be within it).
+  function tourniquetConversionAllowed(role, elapsedMs) {
+    if (!Object.prototype.hasOwnProperty.call(TOURNIQUET_CONVERSION_LIMIT_MS, role || "")) {
+      return { allowed: false, limitMs: null, reason: "role", pastPhysicianWindow: false };
+    }
+    const limitMs = TOURNIQUET_CONVERSION_LIMIT_MS[role];
+    const known = Number.isFinite(elapsedMs) && elapsedMs >= 0;
+    const pastPhysicianWindow = known && elapsedMs > TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS;
+    if (limitMs === null) return { allowed: true, limitMs: null, reason: null, pastPhysicianWindow };
+    if (!known) return { allowed: false, limitMs, reason: "time_unknown", pastPhysicianWindow: false };
+    if (elapsedMs > limitMs) return { allowed: false, limitMs, reason: "time", pastPhysicianWindow };
+    return { allowed: true, limitMs, reason: null, pastPhysicianWindow };
   }
 
   function isDeviceSilent(lastSeenMs, nowMs = Date.now()) {
@@ -3159,6 +3187,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     SERVER_CONTACT_STALE_MS,
     SUPPLY_BURN_WINDOW_MS,
     SUPPLY_CRITICAL_RATIO,
+    TOURNIQUET_CONVERSION_LIMIT_MS,
     TOURNIQUET_CRITICAL_MS,
     TOURNIQUET_DECISION_MS,
     TOURNIQUET_HOURLY_PING_MS,
@@ -3206,6 +3235,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     supplyRiskTier,
     timeCodeToTodayMs,
     tourniquetAlertRank,
+    tourniquetConversionAllowed,
     tourniquetAlertToRaise,
     tourniquetSnoozeOption,
     tourniquetTimer,
@@ -8451,6 +8481,7 @@ function tourniquetEntriesFromState(){
 function tourniquetStatusLabel(tq={}){
   if(tq.status==='ineffective' || tq.effectiveness==='bleeding_continues') return 'לא יעיל · דימום ממשיך';
   if(tq.status==='replaced') return 'הוחלף';
+  if(tq.status==='converted') return 'הומר ללחץ ישיר';
   if(tq.status==='removed_error' || tq.status==='removed') return 'בוטל כטעות הקלדה';
   if(tq.effectiveness==='effective') return 'פעיל · יעיל';
   return 'פעיל · יעילות לא נבדקה';
@@ -8497,7 +8528,7 @@ function ensureTourniquetArray(p={}){
   return p.tourniquets;
 }
 function activeTourniquets(p={}){
-  return ensureTourniquetArray(p).filter(t=>!['removed','removed_error','replaced'].includes(t.status));
+  return ensureTourniquetArray(p).filter(t=>!['removed','removed_error','replaced','converted'].includes(t.status));
 }
 function hemorrhageControlStatus(p={}){
   if(p.hemorrhageControl?.status) return p.hemorrhageControl.status;
@@ -9100,9 +9131,68 @@ function patientTourniquetFixHtml(p){
           <button class="demo-mini-btn" style="grid-column:1 / -1;border-color:var(--red);color:var(--red)" onclick="confirmCancelTourniquetEntry('${p.id}','${tq.id}')">בטל רישום — נרשם בטעות</button>
         </div>
       </details>`:'';
-    return `<div class="sweep-tq-card"><div class="sweep-tq-title"><bdi>${tq.id}</bdi> · ${key==='unknown'?'<span style="color:var(--orange)">גפה לא ידועה</span>':limb} · +${elapsedMinutes(tq.appliedAt)} דק׳</div>${fix}</div>`;
+    return `<div class="sweep-tq-card"><div class="sweep-tq-title"><bdi>${tq.id}</bdi> · ${key==='unknown'?'<span style="color:var(--orange)">גפה לא ידועה</span>':limb} · +${elapsedMinutes(tq.appliedAt)} דק׳</div>${canFix?tourniquetConversionButtonHtml(p,tq):''}${fix}</div>`;
   }).join('');
   return `<div class="summary-card"><div class="summary-key" style="margin-bottom:8px">חסמים פעילים</div>${rows}</div>`;
+}
+// Converting a tourniquet to direct pressure (repo owner, 2026-10-26 / 27): a medic or PC may do
+// it up to 120 minutes after application, a paramedic up to 4 hours, a physician at any time (past
+// 6 hours with a warning); the phone blocks the others (C5Rules.tourniquetConversionAllowed). Before
+// this the app had no way to record a release at all, only "cancel an entry recorded by mistake".
+// The conversion stops that tourniquet's alerts and is sent as TOURNIQUET_RELEASED with reason
+// 'converted_direct_pressure', which closes the server row (project_tourniquet_events) and resolves
+// its watchdog alerts (silence_resolved_watchdogs_for_event).
+const TQ_CONVERSION_ROLE_LIMIT_LABELS={medic:'120 דק׳', pc:'120 דק׳', paramedic:'4 שעות'};
+function tourniquetConversionRole(){ return currentUser?.role || activeRoleDashboard; }
+function tourniquetElapsedMs(tq, nowMs=Date.now()){
+  const at=Number(tq?.appliedAt);
+  return Number.isFinite(at) && at>0 ? nowMs-at : NaN;
+}
+function tourniquetConversionCheck(tq, nowMs=Date.now()){
+  return C5Rules.tourniquetConversionAllowed(tourniquetConversionRole(), tourniquetElapsedMs(tq, nowMs));
+}
+function tourniquetConversionBlockedText(check){
+  if(check.reason==='role') return 'חובש / פראמדיק / רופא בלבד';
+  if(check.reason==='time_unknown') return 'זמן הנחה לא ידוע · רופא בלבד';
+  const role=tourniquetConversionRole();
+  return role==='paramedic' ? 'עברו 4 שעות · רופא בלבד' : `עברו ${TQ_CONVERSION_ROLE_LIMIT_LABELS[role]||'120 דק׳'} · פראמדיק / רופא בלבד`;
+}
+function tourniquetConversionButtonHtml(p, tq){
+  const check=tourniquetConversionCheck(tq);
+  const pid=escAttr(p.id), tid=escAttr(tq.id);
+  if(!check.allowed) return `<button class="demo-mini-btn tq-convert-btn" data-tq-convert="${tid}" disabled aria-disabled="true" style="width:100%;margin-top:8px;opacity:0.55" onclick="convertTourniquetToDirectPressure('${pid}','${tid}')">המרה ללחץ ישיר · ${tourniquetConversionBlockedText(check)}</button>`;
+  return `<button class="demo-mini-btn tq-convert-btn" data-tq-convert="${tid}" style="width:100%;margin-top:8px;border-color:var(--orange);color:var(--orange)" onclick="convertTourniquetToDirectPressure('${pid}','${tid}')">המרה ללחץ ישיר${check.pastPhysicianWindow?' · עברו 6 שעות':''}</button>`;
+}
+function convertTourniquetToDirectPressure(patientId, tourniquetId){
+  const p=patients.find(x=>x.id===patientId); if(!p) return;
+  const tq=activeTourniquets(p).find(x=>x.id===tourniquetId); if(!tq) return;
+  const check=tourniquetConversionCheck(tq); // again at the tap: the time may have passed the limit
+  if(!check.allowed){ toast(`לא ניתן להמיר: ${tourniquetConversionBlockedText(check)}`); rerenderAfterTourniquetFix(p); return; }
+  const limb=tq.limbLabel||tourniquetLimbMeta(tq.limb).label;
+  const minutes=Math.round(tourniquetElapsedMs(tq)/60000);
+  const warning=check.pastPhysicianWindow ? '\n\nשים לב: עברו יותר מ-6 שעות מהנחת החסם.' : '';
+  if(!confirm(`להמיר את החסם (${limb}, +${Number.isFinite(minutes)?minutes:'?'} דק׳) ללחץ ישיר?\n\nהחסם יסומן כמשוחרר וההתראות שלו ייעצרו.${warning}`)) return;
+  const now=Date.now();
+  tq.status='converted';
+  tq.convertedAt=now;
+  tq.convertedByRole=tourniquetConversionRole();
+  tq.timeAlertOpen=null;
+  tq.timeAlertSnooze=null;
+  syncLegacyTourniquetAlias(p);
+  const detail=`${tq.id} · ${limb} · הומר ללחץ ישיר אחרי ${Number.isFinite(minutes)?minutes:'?'} דק׳`;
+  p.events=p.events||[];
+  p.events.unshift({type:'TOURNIQUET_CONVERTED',time:nowT(),detail,warn:check.pastPhysicianWindow});
+  // Same server rule as a cancelled entry: the server keeps one row per patient and limb, so only
+  // release it when no other active tourniquet is on that limb.
+  if(tq.serverLimb && !activeTourniquets(p).some(x=>x.serverLimb===tq.serverLimb)){
+    saveLocalEvent({type:'TOURNIQUET_RELEASED',detail:`${p.visualId||p.id} · ${detail}`,warn:check.pastPhysicianWindow,patient_id:p.id,
+      payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb:tq.serverLimb,reason:'converted_direct_pressure',minutes_on_limb:Number.isFinite(minutes)?minutes:null,
+        past_physician_window:check.pastPhysicianWindow}});
+  }
+  saveDemoState();
+  renderTourniquetTimeAlert();
+  rerenderAfterTourniquetFix(p);
+  toast('החסם הומר ללחץ ישיר');
 }
 function markSweepTourniquetEffectiveness(tourniquetId, effectiveness){
   const p=activeSweepPatient(); if(!p) return;
@@ -9633,11 +9723,13 @@ function tqAlertTitle(level){
   const hours=tqAlertHours(level);
   return hours ? `חסם עורקים: עברו ${hours} שעות` : TQ_ALERT_TITLES[level];
 }
-// Past 120 minutes only a physician may release a tourniquet, up to 6 hours (owner, 2026-10-26).
+// Who may still convert the tourniquet to direct pressure (owner, 2026-10-26 / 27): past 120
+// minutes a paramedic up to 4 hours and a physician up to 6 (C5Rules.TOURNIQUET_CONVERSION_LIMIT_MS).
 function tqAlertNote(level){
   const hours=tqAlertHours(level);
   if(hours && hours>=C5Rules.TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS/3600000) return 'עבר חלון השחרור של רופא (6 שעות)';
-  return level==='critical' || hours ? 'שחרור חסם אחרי 120 דק׳: רופא בלבד (עד 6 שעות)' : '';
+  if(hours && hours>=C5Rules.TOURNIQUET_CONVERSION_LIMIT_MS.paramedic/3600000) return 'המרה ללחץ ישיר: רופא בלבד (עד 6 שעות)';
+  return level==='critical' || hours ? 'המרה ללחץ ישיר אחרי 120 דק׳: פראמדיק עד 4 שעות, רופא עד 6 שעות' : '';
 }
 const TQ_ALERT_HAPTICS={notice:150, warn:[250,100,250], decision:[300,100,300,100,300], critical:[400,150,400,150,400]};
 const TQ_ALERT_COLORS={notice:'var(--yellow)', warn:'var(--orange)', decision:'var(--orange)', critical:'var(--red)'};

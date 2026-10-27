@@ -22,8 +22,9 @@
   // the medic, well before the 60-minute review point actually arrives.
   const TOURNIQUET_NOTICE_MS = 45 * 60 * 1000;
   const TOURNIQUET_WARN_MS = 60 * 60 * 1000;
-  // Repo owner, 2026-10-26: a medic may release a tourniquet (convert to direct pressure) only up
-  // to 120 minutes after it went on; past that only a physician may, up to 6 hours. The 100-minute
+  // Repo owner, 2026-10-26 / 27: a medic may convert a tourniquet to direct pressure only up to 120
+  // minutes after it went on; a paramedic up to 4 hours, a physician up to 6 (see
+  // TOURNIQUET_CONVERSION_LIMIT_MS). The 100-minute
   // alert gives the medic 20 minutes to decide (convert / evacuate) before that window closes.
   const TOURNIQUET_DECISION_MS = 100 * 60 * 1000;
   const TOURNIQUET_CRITICAL_MS = 120 * 60 * 1000;
@@ -31,6 +32,17 @@
   // 2026-10-26): 3, 4, 5 hours, 6 hours (the end of the physician's release window) and on.
   const TOURNIQUET_HOURLY_PING_MS = 60 * 60 * 1000;
   const TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS = 6 * 60 * 60 * 1000;
+  // Converting a tourniquet to direct pressure (repo owner, 2026-10-26 / 27): how long after
+  // application each role may do it. A medic (and a PC, the platoon's medical commander) up to 120
+  // minutes, a paramedic up to 4 hours; past that the phone blocks them. A physician is never
+  // blocked: 6 hours is the end of the physician's window and is shown as a warning only. Any other
+  // role may not convert (no admin exception, as with cric / needle decompression).
+  const TOURNIQUET_CONVERSION_LIMIT_MS = {
+    medic: TOURNIQUET_CRITICAL_MS,
+    pc: TOURNIQUET_CRITICAL_MS,
+    paramedic: 4 * 60 * 60 * 1000,
+    physician: null,
+  };
   const DEVICE_SILENCE_MS = 10 * 60 * 1000;
   // Server contact freshness for the command status strip (repo owner, V2.99.62). The phone
   // syncs every 45 seconds, so under 2 minutes since the last successful server response
@@ -175,6 +187,22 @@
     const used = Math.max(0, Number(usedAtStage) || 0);
     if (!policy || used >= policy.max) return null;
     return { minutes: policy.minutes, used: used + 1, max: policy.max, escalates: used + 1 >= policy.max };
+  }
+
+  // { allowed, limitMs, reason, pastPhysicianWindow }. reason is null when allowed, 'role' for a role
+  // that may not convert, 'time' past the role's limit, or 'time_unknown' when the application time
+  // is not known and the role has a limit (it cannot be shown to be within it).
+  function tourniquetConversionAllowed(role, elapsedMs) {
+    if (!Object.prototype.hasOwnProperty.call(TOURNIQUET_CONVERSION_LIMIT_MS, role || "")) {
+      return { allowed: false, limitMs: null, reason: "role", pastPhysicianWindow: false };
+    }
+    const limitMs = TOURNIQUET_CONVERSION_LIMIT_MS[role];
+    const known = Number.isFinite(elapsedMs) && elapsedMs >= 0;
+    const pastPhysicianWindow = known && elapsedMs > TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS;
+    if (limitMs === null) return { allowed: true, limitMs: null, reason: null, pastPhysicianWindow };
+    if (!known) return { allowed: false, limitMs, reason: "time_unknown", pastPhysicianWindow: false };
+    if (elapsedMs > limitMs) return { allowed: false, limitMs, reason: "time", pastPhysicianWindow };
+    return { allowed: true, limitMs, reason: null, pastPhysicianWindow };
   }
 
   function isDeviceSilent(lastSeenMs, nowMs = Date.now()) {
@@ -427,6 +455,7 @@
     SERVER_CONTACT_STALE_MS,
     SUPPLY_BURN_WINDOW_MS,
     SUPPLY_CRITICAL_RATIO,
+    TOURNIQUET_CONVERSION_LIMIT_MS,
     TOURNIQUET_CRITICAL_MS,
     TOURNIQUET_DECISION_MS,
     TOURNIQUET_HOURLY_PING_MS,
@@ -474,6 +503,7 @@
     supplyRiskTier,
     timeCodeToTodayMs,
     tourniquetAlertRank,
+    tourniquetConversionAllowed,
     tourniquetAlertToRaise,
     tourniquetSnoozeOption,
     tourniquetTimer,

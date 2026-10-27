@@ -52,6 +52,7 @@ node scripts/browser_remote_treatments_test.js    # treatments, medications and 
 node scripts/browser_tourniquet_followups_test.js # later limb, effectiveness check, vitals-screen tourniquet sent; remote effectiveness shown (WP-2b)
 node scripts/browser_tourniquet_offline_alert_test.js # D1: network off, fake clock; 60/100/120-minute and hourly (3 h ... 6 h) tourniquet alerts vibrate + banner, once per level
 node scripts/browser_tourniquet_snooze_test.js    # V2.99.70: "remind me later" on tourniquet banners: stays on the current screen, chip, comes back vibrating, per-level limits, last delay escalates; PC strip line + one vibration
+node scripts/browser_tourniquet_conversion_test.js # V2.99.70: "המרה ללחץ ישיר" on the patient screen: medic 120 min, paramedic 4 h, physician warned past 6 h, admin greyed, CC none; TOURNIQUET_RELEASED reason converted_direct_pressure
 node scripts/browser_resupply_decision_sync_test.js # PC approves / escalates / delivers a medic's resupply request from another device; CC, logistics and the medic see it (WP-6)
 node scripts/browser_rescue_site_authority_test.js # RPC/RCC T0, building status and site clear reach PC, medic and other rescue phones; a PC's attempt changes nothing (WP-8)
 node scripts/browser_offline_cold_start_test.js  # WP-10: serves the repo on localhost, sw.js caches the shell, network off + reload: PIN gate, local data, signed-in session and incident come back
@@ -114,7 +115,7 @@ This is the one piece of logic that has been pulled out of the HTML prototype in
 
 It owns:
 - vitals reassessment timing (`vitalsTimer`, interval varies by triage color — red 10m / yellow 20m / green 30m — 1-minute warning buffer before each)
-- tourniquet timing (`tourniquetTimer`, 45-minute heads-up notice / 60-minute warning / 100-minute decision `stage` / 120-minute critical / then hourly `hours_N` stages, ordered by `tourniquetAlertRank`) and when the phone raises each level (`tourniquetAlertToRaise`: once per level per tourniquet, from the device clock, offline too; D1), plus how often each level may be put off (`tourniquetSnoozeOption`, owner 2026-10-26)
+- tourniquet timing (`tourniquetTimer`, 45-minute heads-up notice / 60-minute warning / 100-minute decision `stage` / 120-minute critical / then hourly `hours_N` stages, ordered by `tourniquetAlertRank`) and when the phone raises each level (`tourniquetAlertToRaise`: once per level per tourniquet, from the device clock, offline too; D1), plus how often each level may be put off (`tourniquetSnoozeOption`, owner 2026-10-26) and who may convert a tourniquet to direct pressure and until when (`tourniquetConversionAllowed`: medic / PC 120 min, paramedic 4 h, physician not blocked)
 - device-silence detection (`isDeviceSilent`, 10-minute threshold, one shared constant across the medic load board, command-view device panel, and Dead Man's Switch watchdog row)
 - MSTART triage computation (`computeMstartTriage`, `suggestMstartTriage`) — the auto-triage suggestion logic from vitals/SABCDE
 - pediatric detection and high-risk medication dose guardrails (`isPediatricPatient`, `isHighRiskDose` — age cutoff 8, dose limits currently hardcoded for morphine/fentanyl)

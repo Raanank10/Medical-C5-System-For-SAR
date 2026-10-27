@@ -1,6 +1,6 @@
 -- Tourniquet 100-minute decision alert on the server watchdog (repo owner, 2026-10-26).
--- A medic may release a tourniquet (convert to direct pressure) only up to 120 minutes after it
--- went on; past that only a physician may, up to 6 hours. The phone now alerts at 45, 60, 100 and
+-- A medic may convert a tourniquet to direct pressure only up to 120 minutes after it went on (a
+-- paramedic up to 4 hours, a physician up to 6). The phone now alerts at 45, 60, 100 and
 -- 120 minutes (src/domain/rules.js: TOURNIQUET_DECISION_MS, tourniquetTimer().stage), so the
 -- 100-minute "prepare a decision (convert / evacuate)" alert gives 20 minutes before that window
 -- closes. This file makes the server watchdog (database/072, WP-12) raise the same level:

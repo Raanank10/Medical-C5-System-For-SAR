@@ -4,7 +4,7 @@
 // recorded:
 // 1. A tourniquet past 60 minutes alerts once (vibration + banner that stays), not on every tick.
 // 2. Crossing 100 minutes alerts again: the decision point (owner, 2026-10-26).
-// 3. Crossing 120 minutes alerts again, as critical; "open patient" opens it.
+// 3. Crossing 120 minutes alerts again, as critical, saying who may still convert; "open patient" opens it.
 // 4. A remote tourniquet refreshed from the server keeps its alert level (no repeat).
 // 5. A handed-over patient's tourniquet does not alert.
 // 6. Past 120 minutes it pings again every full hour (3 h, 4 h, ... 6 h), once each.
@@ -79,10 +79,10 @@ async function checkFile(browser, file) {
   const decision = await page.evaluate(() => ({ n: window.__vibrations.length, level: document.getElementById('tq-time-alert')?.dataset.level, banner: document.getElementById('tq-time-alert')?.textContent || '' }));
   assert(decision.n === 2 && decision.level === 'decision' && decision.banner.includes('20 דקות ל-120') && decision.banner.includes('הכן החלטה'), `${rel}: crossing 100 minutes must raise the decision alert (got ${JSON.stringify(decision)})`);
 
-  // 3. Past 120 minutes: critical, with the physician-only release note.
+  // 3. Past 120 minutes: critical, saying who may still convert (paramedic 4 h, physician 6 h).
   await page.clock.runFor(20 * 60000);
   const crit = await page.evaluate(() => ({ n: window.__vibrations.length, level: document.getElementById('tq-time-alert')?.dataset.level, banner: document.getElementById('tq-time-alert')?.textContent || '' }));
-  assert(crit.n === 3 && crit.level === 'critical' && crit.banner.includes('120') && crit.banner.includes('רופא בלבד'), `${rel}: crossing 120 minutes must raise a critical alert (got ${JSON.stringify(crit)})`);
+  assert(crit.n === 3 && crit.level === 'critical' && crit.banner.includes('120') && crit.banner.includes('פראמדיק עד 4 שעות') && crit.banner.includes('רופא עד 6 שעות'), `${rel}: crossing 120 minutes must raise a critical alert (got ${JSON.stringify(crit)})`);
   await page.click('#tq-time-alert [data-tq-action="open"]');
   assert(await page.evaluate(() => !document.getElementById('tq-time-alert') && document.getElementById('detail-pid')?.textContent === 'P-TQ-OFF'), `${rel}: "open patient" on the banner opens the patient`);
 
@@ -113,7 +113,7 @@ async function checkFile(browser, file) {
   };
   const v0 = await page.evaluate(() => window.__vibrations.length);
   const h3 = await hourly(60); // P-TQ-OFF is now just past 3 hours
-  assert(h3.level === 'hours_3' && h3.banner.includes('עברו 3 שעות') && h3.banner.includes('רופא בלבד') && h3.n > v0, `${rel}: 3 hours must ping (got ${JSON.stringify(h3)})`);
+  assert(h3.level === 'hours_3' && h3.banner.includes('עברו 3 שעות') && h3.banner.includes('פראמדיק עד 4 שעות') && h3.n > v0, `${rel}: 3 hours must ping (got ${JSON.stringify(h3)})`);
   await page.click('#tq-time-alert [data-tq-action="open"]');
   const quiet = await hourly(30);
   assert(quiet.level !== 'hours_3' && quiet.level !== 'hours_4', `${rel}: no repeat within the same hour (got ${JSON.stringify(quiet)})`);
