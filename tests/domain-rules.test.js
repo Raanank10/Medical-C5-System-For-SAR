@@ -353,12 +353,47 @@ assert.equal(rules.tourniquetAlertToRaise("critical", "hours_4"), null);
   assert.deepEqual(ok("physician", 300), { allowed: true, limitMs: 360 * M, reason: null });
   assert.deepEqual(ok("physician", 360), { allowed: true, limitMs: 360 * M, reason: null });
   assert.deepEqual(ok("physician", 361), { allowed: false, limitMs: 360 * M, reason: "time" });
-  for (const role of ["admin", "cc", "chamal", "rpc", "rcc", "logistics_officer", "", undefined, "toString"]) {
+  // admin (owner 2026-11-08): every option open, with the physician's limits.
+  assert.deepEqual(ok("admin", 300), { allowed: true, limitMs: 360 * M, reason: null });
+  assert.deepEqual(ok("admin", 361), { allowed: false, limitMs: 360 * M, reason: "time" });
+  assert.equal(rules.tourniquetConversionAllowed("admin", NaN).reason, "time_unknown");
+  for (const role of ["cc", "chamal", "rpc", "rcc", "logistics_officer", "", undefined, "toString"]) {
     assert.deepEqual(rules.tourniquetConversionAllowed(role, 10 * M), { allowed: false, limitMs: null, reason: "role" }, String(role));
   }
   assert.equal(rules.tourniquetConversionAllowed("medic", NaN).reason, "time_unknown");
   assert.equal(rules.tourniquetConversionAllowed("paramedic", null).reason, "time_unknown");
   assert.deepEqual(rules.tourniquetConversionAllowed("physician", NaN), { allowed: false, limitMs: 360 * 60 * 1000, reason: "time_unknown" });
+}
+
+// Tourniquet time from the 4 digits written on the body (owner, 2026-11-08). Local time, no date.
+{
+  const at = (h, m) => new Date(2026, 10, 8, h, m, 0, 0).getTime();
+  const now = at(14, 20);
+  const parse = (code, n = now) => rules.parseTourniquetTimeCode(code, n);
+  assert.deepEqual(parse("1355"), { ok: true, appliedAtMs: at(13, 55), minutesAgo: 25, needsConfirm: false });
+  assert.deepEqual(parse("1420"), { ok: true, appliedAtMs: now, minutesAgo: 0, needsConfirm: false });
+  // a watch up to 5 minutes fast counts as just now
+  assert.deepEqual(parse("1422"), { ok: true, appliedAtMs: now, minutesAgo: 0, needsConfirm: false });
+  assert.deepEqual(parse("1425"), { ok: true, appliedAtMs: now, minutesAgo: 0, needsConfirm: false });
+  // later than that: refused, never read as almost a day ago
+  assert.deepEqual(parse("1426"), { ok: false, reason: "future", aheadMinutes: 6 });
+  assert.deepEqual(parse("1445"), { ok: false, reason: "future", aheadMinutes: 25 });
+  assert.deepEqual(parse("1520"), { ok: false, reason: "future", aheadMinutes: 60 });
+  // more than an hour later: yesterday, and asked about because it is more than 12 h ago
+  assert.deepEqual(parse("1600"), { ok: true, appliedAtMs: new Date(2026, 10, 7, 16, 0).getTime(), minutesAgo: 1340, needsConfirm: true });
+  // 13 h ago across midnight: asked about, not refused
+  assert.deepEqual(parse("2351", at(12, 51)), { ok: true, appliedAtMs: new Date(2026, 10, 7, 23, 51).getTime(), minutesAgo: 780, needsConfirm: true });
+  // more than 12 hours ago: accepted after confirmation
+  assert.deepEqual(parse("0130"), { ok: true, appliedAtMs: at(1, 30), minutesAgo: 770, needsConfirm: true });
+  assert.equal(parse("0220").needsConfirm, false); // exactly 12 h
+  // across midnight: 2350 entered at 00:20 is yesterday, 30 minutes ago
+  assert.deepEqual(parse("2350", at(0, 20)), { ok: true, appliedAtMs: new Date(2026, 10, 7, 23, 50).getTime(), minutesAgo: 30, needsConfirm: false });
+  assert.deepEqual(parse("0030", at(0, 20)), { ok: false, reason: "future", aheadMinutes: 10 });
+  // yesterday afternoon seen early in the morning, within 12 h: fine
+  assert.deepEqual(parse("1500", at(1, 0)), { ok: true, appliedAtMs: new Date(2026, 10, 7, 15, 0).getTime(), minutesAgo: 600, needsConfirm: false });
+  for (const bad of ["", null, undefined, "930", "09:30", "2400", "1260", "abcd", "12345"]) {
+    assert.deepEqual(parse(bad), { ok: false, reason: "format" }, String(bad));
+  }
 }
 
 // "Remind me later" on tourniquet alerts (owner, 2026-10-26): delay length and count per level;

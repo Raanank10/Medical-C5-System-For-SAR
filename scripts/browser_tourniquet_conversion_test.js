@@ -6,7 +6,7 @@
 // 2. A medic past 120 minutes: the button is disabled and says who may; a tap does nothing.
 // 3. A paramedic: allowed at 200 minutes, blocked past 4 hours.
 // 4. A physician: allowed at 5 hours, blocked past 6 hours, and blocked when the time is unknown.
-// 5. An admin sees the button disabled; a CC sees none (no clinical writes).
+// 5. Admin (owner, 2026-11-08): every option, with the physician's limits; a CC sees no button.
 //
 // Runs in CI through scripts/run_tests.js; also runs on its own.
 // Run: npm install && node scripts/browser_tourniquet_conversion_test.js
@@ -112,8 +112,10 @@ async function main() {
     assert(r.active === 1 && r.sent.length === 0, `unknown time changes nothing (got ${JSON.stringify(r)})`);
 
     // 5. Admin: disabled; CC: no button.
-    s = await setup('admin', 30, 6);
-    assert(s.shown && s.disabled && s.text.includes('חובש / פראמדיק / רופא בלבד'), `admin must see it disabled (got ${JSON.stringify(s)})`);
+    s = await setup('admin', 300, 6);
+    assert(s.shown && !s.disabled, `admin at 5 h must be allowed (got ${JSON.stringify(s)})`);
+    s = await setup('admin', 400, 10);
+    assert(s.shown && s.disabled && s.text.includes('עברו 6 שעות'), `admin past 6 h is blocked like a physician (got ${JSON.stringify(s)})`);
     s = await setup('cc', 30, 7);
     assert(!s.shown, `CC must not get the button (got ${JSON.stringify(s)})`);
 
