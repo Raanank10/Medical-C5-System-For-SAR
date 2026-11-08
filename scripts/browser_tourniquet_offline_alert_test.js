@@ -3,9 +3,12 @@
 // start, the 30-second alert refresh is driven by Playwright's fake clock, and vibration calls are
 // recorded:
 // 1. A tourniquet past 60 minutes alerts once (vibration + banner that stays), not on every tick.
-// 2. Crossing 120 minutes alerts again, as critical.
-// 3. A remote tourniquet refreshed from the server keeps its alert level (no repeat).
-// 4. A handed-over patient's tourniquet does not alert.
+// 2. Crossing 100 minutes alerts again: the decision point (owner, 2026-10-26).
+// 3. Crossing 120 minutes alerts again, as critical, saying who may still convert; "open patient" opens it.
+// 4. A remote tourniquet refreshed from the server keeps its alert level (no repeat).
+// 5. A handed-over patient's tourniquet does not alert.
+// 6. Past 120 minutes it pings again every full hour (3 h, 4 h, ... 6 h), once each.
+// "Remind me later" is covered by scripts/browser_tourniquet_snooze_test.js.
 //
 // Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_tourniquet_offline_alert_test.js
@@ -71,14 +74,19 @@ async function checkFile(browser, file) {
   assert((await page.evaluate(() => window.__vibrations.length)) === 1, `${rel}: the same level must not alert again on later ticks`);
   assert(await page.evaluate(() => !!document.getElementById('tq-time-alert')), `${rel}: the banner must stay until tapped`);
 
-  // 2. Past 120 minutes: critical.
-  await page.clock.runFor(56 * 60000);
-  const crit = await page.evaluate(() => ({ n: window.__vibrations.length, level: document.getElementById('tq-time-alert')?.dataset.level, banner: document.getElementById('tq-time-alert')?.textContent || '' }));
-  assert(crit.n === 2 && crit.level === 'critical' && crit.banner.includes('120'), `${rel}: crossing 120 minutes must raise a critical alert (got ${JSON.stringify(crit)})`);
-  await page.click('#tq-time-alert');
-  assert(await page.evaluate(() => !document.getElementById('tq-time-alert') && document.getElementById('detail-pid')?.textContent === 'P-TQ-OFF'), `${rel}: tapping the banner opens the patient`);
+  // 2. Past 100 minutes (owner, 2026-10-26): the decision alert, 20 minutes before 120.
+  await page.clock.runFor(35 * 60000);
+  const decision = await page.evaluate(() => ({ n: window.__vibrations.length, level: document.getElementById('tq-time-alert')?.dataset.level, banner: document.getElementById('tq-time-alert')?.textContent || '' }));
+  assert(decision.n === 2 && decision.level === 'decision' && decision.banner.includes('20 דקות ל-120') && decision.banner.includes('הכן החלטה'), `${rel}: crossing 100 minutes must raise the decision alert (got ${JSON.stringify(decision)})`);
 
-  // 3. A remote tourniquet refreshed from the server keeps its alert level.
+  // 3. Past 120 minutes: critical, saying who may still convert (paramedic 4 h, physician 6 h).
+  await page.clock.runFor(20 * 60000);
+  const crit = await page.evaluate(() => ({ n: window.__vibrations.length, level: document.getElementById('tq-time-alert')?.dataset.level, banner: document.getElementById('tq-time-alert')?.textContent || '' }));
+  assert(crit.n === 3 && crit.level === 'critical' && crit.banner.includes('120') && crit.banner.includes('פראמדיק עד 4 שעות') && crit.banner.includes('רופא עד 6 שעות'), `${rel}: crossing 120 minutes must raise a critical alert (got ${JSON.stringify(crit)})`);
+  await page.click('#tq-time-alert [data-tq-action="open"]');
+  assert(await page.evaluate(() => !document.getElementById('tq-time-alert') && document.getElementById('detail-pid')?.textContent === 'P-TQ-OFF'), `${rel}: "open patient" on the banner opens the patient`);
+
+  // 4. A remote tourniquet refreshed from the server keeps its alert level.
   const remote = await page.evaluate(() => {
     const inc = SITE_TO_INCIDENT_ID.SITE_A;
     const id = 'eeeeeeee-0000-4000-8000-000000000003';
@@ -93,9 +101,26 @@ async function checkFile(browser, file) {
   });
   assert(remote.first === 'warn' && remote.second === null && remote.added === 1, `${rel}: a remote tourniquet alerts once and a server refresh must not repeat it (got ${JSON.stringify(remote)})`);
 
-  // 4. The handed-over patient never alerted.
+  // 5. The handed-over patient never alerted.
   const handed = await page.evaluate(() => patients.find((p) => p.visualId === 'P-HANDED').tourniquets[0].timeAlertedLevel || null);
   assert(handed === null, `${rel}: a handed-over patient's tourniquet must not alert`);
+
+  // 6. Past 120 minutes it pings every hour (owner, 2026-10-26): 3 hours, ..., 6 hours (the end of
+  //    the physician's release window), each once, vibrating.
+  const hourly = async (minutes) => {
+    await page.clock.runFor(minutes * 60000);
+    return page.evaluate(() => ({ n: window.__vibrations.length, level: document.getElementById('tq-time-alert')?.dataset.level, banner: document.getElementById('tq-time-alert')?.textContent || '' }));
+  };
+  const v0 = await page.evaluate(() => window.__vibrations.length);
+  const h3 = await hourly(60); // P-TQ-OFF is now just past 3 hours
+  assert(h3.level === 'hours_3' && h3.banner.includes('עברו 3 שעות') && h3.banner.includes('פראמדיק עד 4 שעות') && h3.n > v0, `${rel}: 3 hours must ping (got ${JSON.stringify(h3)})`);
+  await page.click('#tq-time-alert [data-tq-action="open"]');
+  const quiet = await hourly(30);
+  assert(quiet.level !== 'hours_3' && quiet.level !== 'hours_4', `${rel}: no repeat within the same hour (got ${JSON.stringify(quiet)})`);
+  // answer whatever is still showing (the remote patient's levels), so only the 6-hour ping is left
+  await page.evaluate(() => { while (document.querySelector('#tq-time-alert [data-tq-action="open"]')) document.querySelector('#tq-time-alert [data-tq-action="open"]').click(); });
+  const h6 = await hourly(150); // just past 6 hours
+  assert(h6.level === 'hours_6' && h6.banner.includes('עברו 6 שעות') && h6.banner.includes('עבר חלון השחרור של רופא'), `${rel}: 6 hours must ping with the end of the physician window (got ${JSON.stringify(h6)})`);
 
   assert(pageErrors.length === 0, `${rel}: uncaught page error(s): ${pageErrors.join(' | ')}`);
   await context.close();
