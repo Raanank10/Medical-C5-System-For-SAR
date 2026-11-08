@@ -40,7 +40,7 @@ function checkFile(file) {
     'field-mode-toggle',
     '+ פצוע | אותו אזור', // the sweep's one add-casualty button since 2026-10-23
     'מה המחברת הייתה מפספסת?',
-    'supply-used-modal',
+    'supply-used-banner',
     'resupply-modal',
     'vitals-modal',
     'tourniquet-limb-modal'
@@ -68,7 +68,7 @@ function checkFile(file) {
     'confirmSuspectedNotSalvageable',
     'skipToSummaryBlack',
     'consumeFieldSupply',
-    'showSupplyUsedSheet',
+    'showSupplyUsedBanner',
     'createResupplyRequest',
     'renderCommander',
     'renderRoleDashboard',
