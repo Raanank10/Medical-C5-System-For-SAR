@@ -370,12 +370,16 @@ Watchdogs run locally and should also be reproducible server-side for Chamal/AAR
 | Golden Hour | Any registered patient | T_injury + 45m | Amber |
 | Golden Hour | Any registered patient | T_injury + 60m | Red |
 | Tourniquet Warning | Tourniquet per limb | +60m from application | Amber |
-| Tourniquet Critical | Tourniquet per limb | +120m from application | Red |
+| Tourniquet Decision | Tourniquet per limb | +100m from application | Amber (20 min before the medic's 120-minute release window closes) |
+| Tourniquet Critical | Tourniquet per limb | +120m from application | Red (conversion to direct pressure: medic up to 120m, paramedic up to 4h, physician up to 6h) |
+| Tourniquet Hourly | Tourniquet per limb | +3h, +4h, +5h, +6h (end of the physician's release window), then every hour | Red, phone only |
 | Reassessment RED | Triage = RED | Every 10m | Prompt |
 | Reassessment YELLOW | Triage = YELLOW | Every 30m | Prompt |
 | Dead Man's Switch | Medic inactivity | >5m with no events/heartbeat | Supervisor alert |
 
 Persistent banners must remain visible until acknowledged/resolved.
+
+A tourniquet time banner may be put off ("remind me later", repo owner 2026-10-26) within per-level limits: it stays on screen as a chip and comes back when the delay ends; the last allowed delay escalates to command. See `docs/TACTICAL_UI_GUIDELINES.md`.
 
 Reassessment prompts include:
 
