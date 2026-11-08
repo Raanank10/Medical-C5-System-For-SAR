@@ -338,26 +338,27 @@ assert.equal(rules.tourniquetAlertToRaise("hours_4", "hours_3"), "hours_4");
 assert.equal(rules.tourniquetAlertToRaise("hours_5", "warn"), "hours_5");
 assert.equal(rules.tourniquetAlertToRaise("critical", "hours_4"), null);
 
-// Converting a tourniquet to direct pressure (owner, 2026-10-26 / 27): medic and PC up to 120 min,
-// paramedic up to 4 h, physician never blocked (past 6 h flagged), other roles never.
+// Converting a tourniquet to direct pressure (owner, 2026-10-26 / 27 / 11-08): medic and PC up to
+// 120 min, paramedic up to 4 h, physician up to 6 h, other roles never.
 {
   const M = 60 * 1000;
   const ok = (role, min) => rules.tourniquetConversionAllowed(role, min * M);
-  assert.deepEqual(ok("medic", 120), { allowed: true, limitMs: 120 * M, reason: null, pastPhysicianWindow: false });
-  assert.deepEqual(ok("medic", 121), { allowed: false, limitMs: 120 * M, reason: "time", pastPhysicianWindow: false });
+  assert.deepEqual(ok("medic", 120), { allowed: true, limitMs: 120 * M, reason: null });
+  assert.deepEqual(ok("medic", 121), { allowed: false, limitMs: 120 * M, reason: "time" });
   assert.equal(ok("pc", 119).allowed, true);
   assert.equal(ok("pc", 121).reason, "time");
   assert.equal(ok("paramedic", 121).allowed, true);
   assert.equal(ok("paramedic", 240).allowed, true);
-  assert.deepEqual(ok("paramedic", 241), { allowed: false, limitMs: 240 * M, reason: "time", pastPhysicianWindow: false });
-  assert.deepEqual(ok("physician", 300), { allowed: true, limitMs: null, reason: null, pastPhysicianWindow: false });
-  assert.deepEqual(ok("physician", 361), { allowed: true, limitMs: null, reason: null, pastPhysicianWindow: true });
+  assert.deepEqual(ok("paramedic", 241), { allowed: false, limitMs: 240 * M, reason: "time" });
+  assert.deepEqual(ok("physician", 300), { allowed: true, limitMs: 360 * M, reason: null });
+  assert.deepEqual(ok("physician", 360), { allowed: true, limitMs: 360 * M, reason: null });
+  assert.deepEqual(ok("physician", 361), { allowed: false, limitMs: 360 * M, reason: "time" });
   for (const role of ["admin", "cc", "chamal", "rpc", "rcc", "logistics_officer", "", undefined, "toString"]) {
-    assert.deepEqual(rules.tourniquetConversionAllowed(role, 10 * M), { allowed: false, limitMs: null, reason: "role", pastPhysicianWindow: false }, String(role));
+    assert.deepEqual(rules.tourniquetConversionAllowed(role, 10 * M), { allowed: false, limitMs: null, reason: "role" }, String(role));
   }
   assert.equal(rules.tourniquetConversionAllowed("medic", NaN).reason, "time_unknown");
   assert.equal(rules.tourniquetConversionAllowed("paramedic", null).reason, "time_unknown");
-  assert.equal(rules.tourniquetConversionAllowed("physician", NaN).allowed, true);
+  assert.deepEqual(rules.tourniquetConversionAllowed("physician", NaN), { allowed: false, limitMs: 360 * 60 * 1000, reason: "time_unknown" });
 }
 
 // "Remind me later" on tourniquet alerts (owner, 2026-10-26): delay length and count per level;

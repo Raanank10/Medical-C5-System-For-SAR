@@ -32,16 +32,15 @@
   // 2026-10-26): 3, 4, 5 hours, 6 hours (the end of the physician's release window) and on.
   const TOURNIQUET_HOURLY_PING_MS = 60 * 60 * 1000;
   const TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS = 6 * 60 * 60 * 1000;
-  // Converting a tourniquet to direct pressure (repo owner, 2026-10-26 / 27): how long after
+  // Converting a tourniquet to direct pressure (repo owner, 2026-10-26 / 27 / 11-08): how long after
   // application each role may do it. A medic (and a PC, the platoon's medical commander) up to 120
-  // minutes, a paramedic up to 4 hours; past that the phone blocks them. A physician is never
-  // blocked: 6 hours is the end of the physician's window and is shown as a warning only. Any other
-  // role may not convert (no admin exception, as with cric / needle decompression).
+  // minutes, a paramedic up to 4 hours, a physician up to 6 hours; past that the phone blocks them.
+  // Any other role may not convert (no admin exception, as with cric / needle decompression).
   const TOURNIQUET_CONVERSION_LIMIT_MS = {
     medic: TOURNIQUET_CRITICAL_MS,
     pc: TOURNIQUET_CRITICAL_MS,
     paramedic: 4 * 60 * 60 * 1000,
-    physician: null,
+    physician: TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS,
   };
   const DEVICE_SILENCE_MS = 10 * 60 * 1000;
   // Server contact freshness for the command status strip (repo owner, V2.99.62). The phone
@@ -189,20 +188,17 @@
     return { minutes: policy.minutes, used: used + 1, max: policy.max, escalates: used + 1 >= policy.max };
   }
 
-  // { allowed, limitMs, reason, pastPhysicianWindow }. reason is null when allowed, 'role' for a role
-  // that may not convert, 'time' past the role's limit, or 'time_unknown' when the application time
-  // is not known and the role has a limit (it cannot be shown to be within it).
+  // { allowed, limitMs, reason }. reason is null when allowed, 'role' for a role that may not
+  // convert, 'time' past the role's limit, or 'time_unknown' when the application time is not known
+  // (it cannot be shown to be within the limit; every role, physician included, owner 2026-11-08).
   function tourniquetConversionAllowed(role, elapsedMs) {
     if (!Object.prototype.hasOwnProperty.call(TOURNIQUET_CONVERSION_LIMIT_MS, role || "")) {
-      return { allowed: false, limitMs: null, reason: "role", pastPhysicianWindow: false };
+      return { allowed: false, limitMs: null, reason: "role" };
     }
     const limitMs = TOURNIQUET_CONVERSION_LIMIT_MS[role];
-    const known = Number.isFinite(elapsedMs) && elapsedMs >= 0;
-    const pastPhysicianWindow = known && elapsedMs > TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS;
-    if (limitMs === null) return { allowed: true, limitMs: null, reason: null, pastPhysicianWindow };
-    if (!known) return { allowed: false, limitMs, reason: "time_unknown", pastPhysicianWindow: false };
-    if (elapsedMs > limitMs) return { allowed: false, limitMs, reason: "time", pastPhysicianWindow };
-    return { allowed: true, limitMs, reason: null, pastPhysicianWindow };
+    if (!(Number.isFinite(elapsedMs) && elapsedMs >= 0)) return { allowed: false, limitMs, reason: "time_unknown" };
+    if (elapsedMs > limitMs) return { allowed: false, limitMs, reason: "time" };
+    return { allowed: true, limitMs, reason: null };
   }
 
   function isDeviceSilent(lastSeenMs, nowMs = Date.now()) {

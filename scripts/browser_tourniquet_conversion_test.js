@@ -5,7 +5,7 @@
 //    'converted_direct_pressure'.
 // 2. A medic past 120 minutes: the button is disabled and says who may; a tap does nothing.
 // 3. A paramedic: allowed at 200 minutes, blocked past 4 hours.
-// 4. A physician past 6 hours: allowed, with the 6-hour warning on the button and in the dialog.
+// 4. A physician: allowed at 5 hours, blocked past 6 hours, and blocked when the time is unknown.
 // 5. An admin sees the button disabled; a CC sees none (no clinical writes).
 //
 // Runs in CI through scripts/run_tests.js; also runs on its own.
@@ -86,11 +86,30 @@ async function main() {
     r = await tap(s.id);
     assert(r.active === 1 && r.sent.length === 0, `paramedic past 4 h changes nothing (got ${JSON.stringify(r)})`);
 
-    // 4. Physician past 6 hours: allowed, warned.
-    s = await setup('physician', 400, 5);
-    assert(s.shown && !s.disabled && s.text.includes('עברו 6 שעות'), `physician past 6 h must be allowed with a warning (got ${JSON.stringify(s)})`);
+    // 4. Physician (owner, 2026-11-08): allowed at 5 hours, blocked past 6 hours.
+    s = await setup('physician', 300, 5);
+    assert(s.shown && !s.disabled, `physician at 5 h must be allowed (got ${JSON.stringify(s)})`);
     r = await tap(s.id);
-    assert(r.active === 0 && r.sent.length === 1 && r.sent[0].past_physician_window === true && dialogs[dialogs.length - 1].includes('6 שעות'), `physician past 6 h converts with the warning (got ${JSON.stringify({ r, dialog: dialogs[dialogs.length - 1] })})`);
+    assert(r.active === 0 && r.sent.length === 1, `physician at 5 h converts (got ${JSON.stringify(r)})`);
+    const before = dialogs.length;
+    s = await setup('physician', 400, 8);
+    assert(s.shown && s.disabled && s.text.includes('עברו 6 שעות') && s.text.includes('חלון ההמרה נסגר'), `physician past 6 h must be blocked (got ${JSON.stringify(s)})`);
+    r = await tap(s.id);
+    assert(r.active === 1 && r.sent.length === 0 && dialogs.length === before, `physician past 6 h changes nothing (got ${JSON.stringify(r)})`);
+
+    // 4b. A New Patient flow tourniquet saved without its time: nobody may convert, physician included.
+    const unknown = await page.evaluate(() => {
+      currentUser = { id: 'user-physician', role: 'physician', email: 'physician@example.test' };
+      const id = 'eeeeeeee-0000-4000-8000-000000000009';
+      patients.push({ id, visualId: 'P-CV9', triage: 'red', patientStatus: 'stabilizing', siteId: 'SITE_A', events: [], vitals: { ...VITALS_NOT_ON_DEVICE },
+        tourniquets: [{ id: 'TQ-001', appliedAt: Date.now() - 20 * 60000, timeCode: null, source: 'patient_flow', limb: 'left_leg', limbLabel: 'רגל שמאל', serverLimb: 'left_leg', status: 'active', effectiveness: 'unknown' }] });
+      openPatient(id);
+      const btn = document.querySelector('[data-tq-convert="TQ-001"]');
+      return { id, disabled: !!btn?.disabled, text: btn?.textContent || '' };
+    });
+    assert(unknown.disabled && unknown.text.includes('שעת הנחה לא ידועה'), `unknown time must block a physician too (got ${JSON.stringify(unknown)})`);
+    r = await tap(unknown.id);
+    assert(r.active === 1 && r.sent.length === 0, `unknown time changes nothing (got ${JSON.stringify(r)})`);
 
     // 5. Admin: disabled; CC: no button.
     s = await setup('admin', 30, 6);
