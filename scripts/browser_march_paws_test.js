@@ -75,7 +75,7 @@ async function main() {
 
     // 2. Real taps: treatments, "no treatment needed", and their interaction.
     await page.click('#march-sec-m .chip[data-tx="hemostatic"]');
-    // Consuming stock shows the "supply used" banner (V2.99.70); it does not block the next tap.
+    // Consuming stock shows the "supply used" banner (V2.99.71); it does not block the next tap.
     // One letter on screen at a time (V2.99.69): a letter's tile opens it.
     await page.click('#march-tile-r');
     await page.click('#march-sec-r .chip[data-tx="chest_seal"]');

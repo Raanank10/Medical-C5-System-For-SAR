@@ -1,4 +1,4 @@
-// Real-browser test for V2.99.70: the "supply used" banner that replaced the sheet which covered
+// Real-browser test for V2.99.71: the "supply used" banner that replaced the sheet which covered
 // the screen after every treatment that uses up an item (owner 2026-10-26).
 //
 // Checks, at phone width (375x812), in local demo mode with the page's own functions:
