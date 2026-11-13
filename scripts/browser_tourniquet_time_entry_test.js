@@ -11,6 +11,7 @@
 //    and one the server marks 'unknown' cannot be converted here.
 // 7. New Patient form: a typed time is 'entered' (passed levels seen), "עכשיו" is 'phone', an empty
 //    field is 'unknown', and a time later than the phone's clock is refused.
+// 8. New Patient forms' bag stock: only "עכשיו" takes a tourniquet from the medic's bag.
 //
 // Runs in CI through scripts/run_tests.js; also runs on its own.
 // Run: npm install && node scripts/browser_tourniquet_time_entry_test.js
@@ -193,6 +194,43 @@ async function main() {
     });
     assert(r.empty === 'unknown' && r.now === 'phone' && r.typed === 'entered' && r.typedSeen === 'warn' && r.typedMin === 70, `form time sources (got ${JSON.stringify(r)})`);
     assert(r.futureOk === false && r.futureMsg.includes('מאוחרת ב-25 דק׳') && r.futureCleared, `a later time in the form is refused (got ${JSON.stringify(r)})`);
+
+    // 8. Bag stock in the New Patient forms (owner, 2026-11-13): only "עכשיו" (placed now) takes a
+    //    tourniquet from the medic's bag; a typed time or an emptied field gives it back.
+    r = await page.evaluate(() => {
+      const qty = (key) => state.supplyMovements?.[key]?.qty || 0;
+      const out = {};
+      quickTqData = { applied: false, time: null, timeTyped: false, limbs: new Set() };
+      toggleQuickTQ(document.getElementById('quick-tq-yes-btn'), true);
+      out.quickTicked = qty('quick:tq');
+      onQuickTQTimeInput(codeAgo(70));
+      out.quickTyped = qty('quick:tq');
+      setQuickTQTimeNow();
+      out.quickNow = qty('quick:tq');
+      onQuickTQTimeInput('');
+      out.quickEmptied = qty('quick:tq');
+      toggleQuickTQ(document.getElementById('quick-tq-no-btn'), false);
+      toggleQuickTQ(document.getElementById('quick-tq-yes-btn'), true);
+      out.quickRetickTyped = qty('quick:tq');
+      quickTqData = { applied: false, time: null, timeTyped: false, limbs: new Set() };
+      reconcileSupplySource('quick:tq', 'tourniquets', 0);
+      const chip = document.querySelector('[data-tx="tourniquet"]');
+      toggleChip(chip, 'tourniquet');
+      out.fullTicked = qty('tx:tourniquet');
+      onTQTimeInput(codeAgo(70));
+      out.fullTyped = qty('tx:tourniquet');
+      queueInventoryBeforeSave(null);
+      out.fullSaveTyped = qty('tx:tourniquet');
+      setTQTimeNow();
+      out.fullNow = qty('tx:tourniquet');
+      toggleChip(chip, 'tourniquet');
+      out.fullOff = qty('tx:tourniquet');
+      return out;
+    });
+    assert(r.quickTicked === 1 && r.quickTyped === 0 && r.quickNow === 1 && r.quickEmptied === 0 && r.quickRetickTyped === 0,
+      `quick form: only "now" takes from the bag (got ${JSON.stringify(r)})`);
+    assert(r.fullTicked === 1 && r.fullTyped === 0 && r.fullSaveTyped === 0 && r.fullNow === 1 && r.fullOff === 0,
+      `full form: only "now" takes from the bag (got ${JSON.stringify(r)})`);
 
     assert(pageErrors.length === 0, `uncaught page error(s): ${pageErrors.join(' | ')}`);
   } finally {

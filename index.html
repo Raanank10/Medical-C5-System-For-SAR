@@ -11956,7 +11956,10 @@ function toggleChip(btn, key){
   if(state.interventions.has(key) && ['tourniquet','morphine','iv','fluids','airway_mgmt','cpr','atq'].includes(key)){
     projectPatientStatus('stabilizing', key==='tourniquet'?'TOURNIQUET_APPLIED':'INTERVENTION_LOGGED');
   }
-  if(key==='tourniquet'&&state.interventions.has('tourniquet')&&!tqData.time) setTQTimeNow();
+  if(key==='tourniquet'&&state.interventions.has('tourniquet')){
+    if(!tqData.time && !tqData.timeTyped) setTQTimeNow();
+    else syncFlowTourniquetSupply(); // a time typed from the body: not from this medic's bag
+  }
   if(['morphine','atq'].includes(key)) maybeWarnHighRiskMedication(key);
   updatePediatricTreatmentUi();
   renderLocalStockPanel();
@@ -12077,6 +12080,7 @@ function setTQTimeNow(){
   tqData.time=t;
   tqData.timeTyped=false;
   updateTQDisplay(t);
+  syncFlowTourniquetSupply();
 }
 function isValidTimeCode(val){
   if(!/^\d{4}$/.test(val||'')) return false;
@@ -12084,9 +12088,11 @@ function isValidTimeCode(val){
   return hh>=0 && hh<=23 && mm>=0 && mm<=59;
 }
 function onTQTimeInput(val){
+  const wasFromBag=flowTourniquetFromBag(tqData);
   tqData.timeTyped=true;
   if(val.length===4&&isValidTimeCode(val)){ tqData.time=val; updateTQDisplay(val); }
   else { tqData.time=null; document.getElementById('tq-time-display').textContent=''; }
+  if(wasFromBag) syncFlowTourniquetSupply();
 }
 function validateTQTimeInput(showToast=false){
   const el=document.getElementById('tourniquet-time-input');
@@ -12367,8 +12373,17 @@ function queueIntakeClinicalEventsAtSave(patientId){
 }
 
 function queueInventoryBeforeSave(patientId){
-  reconcileSupplySource('quick:tq', 'tourniquets', quickTqData.applied ? 1 : 0, patientId);
-  ['tourniquet','bandage','hemostatic','blanket','morphine','atq','fluids'].forEach(key=>reconcileSupplyForIntervention(key, state.interventions.has(key)?null:0, patientId));
+  reconcileSupplySource('quick:tq', 'tourniquets', quickTqData.applied && flowTourniquetFromBag(quickTqData) ? 1 : 0, patientId);
+  ['tourniquet','bandage','hemostatic','blanket','morphine','atq','fluids'].forEach(key=>reconcileSupplyForIntervention(key,
+    !state.interventions.has(key) || (key==='tourniquet' && !flowTourniquetFromBag(tqData)) ? 0 : null, patientId));
+}
+// A tourniquet ticked in the New Patient form comes from this medic's bag only when it was placed
+// now (the phone's time, "עכשיו"). A time typed from the body, or an emptied time field, means it
+// was already on the patient: the first responder's tourniquet, not this medic's (owner, 2026-11-13).
+function flowTourniquetFromBag(src){ return !!src?.time && !src.timeTyped; }
+function syncFlowTourniquetSupply(){
+  if(quickTqData.applied) reconcileSupplySource('quick:tq', 'tourniquets', flowTourniquetFromBag(quickTqData) ? 1 : 0);
+  if(state.interventions?.has('tourniquet')) reconcileSupplyForIntervention('tourniquet', flowTourniquetFromBag(tqData) ? null : 0);
 }
 
 function buildLocStr(){
@@ -14541,9 +14556,9 @@ function toggleQuickTQ(btn, applied) {
   btn.classList.add('selected');
   document.getElementById('quick-tq-panel').style.display = applied ? 'block' : 'none';
   if (applied) {
-    reconcileSupplySource('quick:tq', 'tourniquets', 1);
     projectPatientStatus('stabilizing','TOURNIQUET_APPLIED',{source:'quick_patient_flow'});
-    if (!quickTqData.time) setQuickTQTimeNow();
+    if (!quickTqData.time && !quickTqData.timeTyped) setQuickTQTimeNow();
+    else syncFlowTourniquetSupply();
   } else {
     reconcileSupplySource('quick:tq', 'tourniquets', 0);
   }
@@ -14557,10 +14572,12 @@ function setQuickTQTimeNow() {
   document.getElementById('quick-tq-time').value = t;
   quickTqData.time = t;
   quickTqData.timeTyped = false;
+  syncFlowTourniquetSupply();
   document.getElementById('quick-tq-display').textContent = `שעת הנחה: ${t.slice(0,2)}:${t.slice(2)}`;
 }
 
 function onQuickTQTimeInput(val) {
+  const wasFromBag = flowTourniquetFromBag(quickTqData);
   quickTqData.timeTyped = true;
   if (val.length === 4 && isValidTimeCode(val)) {
     quickTqData.time = val;
@@ -14569,6 +14586,7 @@ function onQuickTQTimeInput(val) {
     quickTqData.time = null;
     document.getElementById('quick-tq-display').textContent = '';
   }
+  if (wasFromBag) syncFlowTourniquetSupply();
 }
 
 function validateQuickTQTime(showToast=false) {
