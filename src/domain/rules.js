@@ -41,7 +41,19 @@
     pc: TOURNIQUET_CRITICAL_MS,
     paramedic: 4 * 60 * 60 * 1000,
     physician: TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS,
+    // The owner's test / monitoring profile (2026-11-08): every option open, with the physician's
+    // limits so the blocked states can be seen too.
+    admin: TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS,
   };
+  // A tourniquet time read from the 4 digits written on the body (owner, 2026-11-08). There is no
+  // date, so the day is inferred: up to 5 minutes after the phone's clock counts as "just now" (a
+  // first responder's watch running a little fast); 5 to 60 minutes after it is refused as later
+  // than the phone's clock (a typo or a wrong watch, never silently read as almost a day ago); later
+  // than that it is yesterday (2350 entered at 00:20). A time more than 12 hours ago, either way, is
+  // accepted only after the medic confirms it, which shows how long that would be.
+  const TOURNIQUET_TIME_FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
+  const TOURNIQUET_TIME_FUTURE_REFUSE_MS = 60 * 60 * 1000;
+  const TOURNIQUET_TIME_CONFIRM_AFTER_MS = 12 * 60 * 60 * 1000;
   const DEVICE_SILENCE_MS = 10 * 60 * 1000;
   // Server contact freshness for the command status strip (repo owner, V2.99.62). The phone
   // syncs every 45 seconds, so under 2 minutes since the last successful server response
@@ -268,6 +280,32 @@
     return day.getTime();
   }
 
+  // { ok, appliedAtMs, minutesAgo, needsConfirm } or { ok: false, reason: 'format' | 'future',
+  // aheadMinutes }.
+  function parseTourniquetTimeCode(code, nowMs = Date.now()) {
+    const text = String(code == null ? "" : code).trim();
+    if (!/^\d{4}$/.test(text)) return { ok: false, reason: "format" };
+    const hh = Number(text.slice(0, 2));
+    const mm = Number(text.slice(2));
+    if (hh > 23 || mm > 59) return { ok: false, reason: "format" };
+    const day = new Date(nowMs);
+    day.setHours(hh, mm, 0, 0);
+    const todayMs = day.getTime();
+    if (todayMs <= nowMs) {
+      const age = nowMs - todayMs;
+      return { ok: true, appliedAtMs: todayMs, minutesAgo: Math.floor(age / 60000), needsConfirm: age > TOURNIQUET_TIME_CONFIRM_AFTER_MS };
+    }
+    if (todayMs - nowMs <= TOURNIQUET_TIME_FUTURE_TOLERANCE_MS) {
+      return { ok: true, appliedAtMs: nowMs, minutesAgo: 0, needsConfirm: false };
+    }
+    if (todayMs - nowMs <= TOURNIQUET_TIME_FUTURE_REFUSE_MS) {
+      return { ok: false, reason: "future", aheadMinutes: Math.ceil((todayMs - nowMs) / 60000) };
+    }
+    day.setDate(day.getDate() - 1);
+    const age = nowMs - day.getTime();
+    return { ok: true, appliedAtMs: day.getTime(), minutesAgo: Math.floor(age / 60000), needsConfirm: age > TOURNIQUET_TIME_CONFIRM_AFTER_MS };
+  }
+
   function computeMstartTriage(vitals) {
     if (!vitals) return null;
     if (vitals.rr === 0) return "black";
@@ -458,6 +496,9 @@
     TOURNIQUET_NOTICE_MS,
     TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS,
     TOURNIQUET_SNOOZE_POLICY,
+    TOURNIQUET_TIME_CONFIRM_AFTER_MS,
+    TOURNIQUET_TIME_FUTURE_REFUSE_MS,
+    TOURNIQUET_TIME_FUTURE_TOLERANCE_MS,
     TOURNIQUET_WARN_MS,
     VITALS_INTERVAL_MS_BY_TRIAGE,
     VITALS_WARN_BUFFER_MS,
@@ -473,6 +514,7 @@
     isPediatricPatient,
     isRoutineAlert,
     isValidMdaClassification,
+    parseTourniquetTimeCode,
     isVitalsOverdue,
     MDA_CLASSIFICATIONS,
     MDA_EXPECTED_BY_TRIAGE,

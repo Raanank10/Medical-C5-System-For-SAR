@@ -113,6 +113,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .tq-alert-btn{flex:1 1 140px;min-height:44px;border-radius:10px;border:2px solid #111;background:rgba(255,255,255,0.55);color:#111;font-weight:900;font-size:14px;font-family:inherit;cursor:pointer;}
 .tq-alert-btn.primary{background:#111;color:#fff;}
 .tq-alert-nomore{flex:1 1 140px;align-self:center;font-size:12px;}
+.tq-time-entry-overlay{position:fixed;inset:0;z-index:650;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px;}
+.tq-time-entry-card{width:100%;max-width:420px;background:var(--surface2);color:var(--text);border:2px solid var(--orange);border-radius:16px;padding:16px;}
+.tq-time-entry-card .tq-alert-btn{background:var(--surface);color:var(--text);border-color:var(--border);}
+.tq-time-entry-card .tq-alert-btn.primary{background:var(--orange);color:#111;border-color:var(--orange);}
+.tq-time-entry-card .tq-alert-actions.stacked{flex-direction:column;}
+.tq-time-entry-card .tq-alert-actions.stacked .tq-alert-btn{flex:0 0 auto;min-height:52px;}
 #tq-snooze-chip{position:fixed;top:68px;left:50%;transform:translateX(-50%);z-index:590;max-width:calc(100vw - 32px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--surface2);color:var(--text);border:2px solid var(--orange);border-radius:20px;padding:6px 12px;font-weight:800;font-size:12px;font-family:inherit;box-shadow:0 6px 18px rgba(0,0,0,0.35);cursor:pointer;}
 .sweep-tq-card{border:1px solid var(--border);border-right:4px solid var(--red);border-radius:10px;padding:10px;margin-bottom:8px;background:var(--surface2);}
 .sweep-tq-card.ineffective{border-color:var(--red);background:rgba(230,57,70,.12);}
@@ -995,7 +1001,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9971</div>
+      <div class="demo-kicker">Demo V2.9972</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1092,7 +1098,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9971</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9972</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1102,7 +1108,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9971</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9972</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2778,7 +2784,19 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     pc: TOURNIQUET_CRITICAL_MS,
     paramedic: 4 * 60 * 60 * 1000,
     physician: TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS,
+    // The owner's test / monitoring profile (2026-11-08): every option open, with the physician's
+    // limits so the blocked states can be seen too.
+    admin: TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS,
   };
+  // A tourniquet time read from the 4 digits written on the body (owner, 2026-11-08). There is no
+  // date, so the day is inferred: up to 5 minutes after the phone's clock counts as "just now" (a
+  // first responder's watch running a little fast); 5 to 60 minutes after it is refused as later
+  // than the phone's clock (a typo or a wrong watch, never silently read as almost a day ago); later
+  // than that it is yesterday (2350 entered at 00:20). A time more than 12 hours ago, either way, is
+  // accepted only after the medic confirms it, which shows how long that would be.
+  const TOURNIQUET_TIME_FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
+  const TOURNIQUET_TIME_FUTURE_REFUSE_MS = 60 * 60 * 1000;
+  const TOURNIQUET_TIME_CONFIRM_AFTER_MS = 12 * 60 * 60 * 1000;
   const DEVICE_SILENCE_MS = 10 * 60 * 1000;
   // Server contact freshness for the command status strip (repo owner, V2.99.62). The phone
   // syncs every 45 seconds, so under 2 minutes since the last successful server response
@@ -3005,6 +3023,32 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     return day.getTime();
   }
 
+  // { ok, appliedAtMs, minutesAgo, needsConfirm } or { ok: false, reason: 'format' | 'future',
+  // aheadMinutes }.
+  function parseTourniquetTimeCode(code, nowMs = Date.now()) {
+    const text = String(code == null ? "" : code).trim();
+    if (!/^\d{4}$/.test(text)) return { ok: false, reason: "format" };
+    const hh = Number(text.slice(0, 2));
+    const mm = Number(text.slice(2));
+    if (hh > 23 || mm > 59) return { ok: false, reason: "format" };
+    const day = new Date(nowMs);
+    day.setHours(hh, mm, 0, 0);
+    const todayMs = day.getTime();
+    if (todayMs <= nowMs) {
+      const age = nowMs - todayMs;
+      return { ok: true, appliedAtMs: todayMs, minutesAgo: Math.floor(age / 60000), needsConfirm: age > TOURNIQUET_TIME_CONFIRM_AFTER_MS };
+    }
+    if (todayMs - nowMs <= TOURNIQUET_TIME_FUTURE_TOLERANCE_MS) {
+      return { ok: true, appliedAtMs: nowMs, minutesAgo: 0, needsConfirm: false };
+    }
+    if (todayMs - nowMs <= TOURNIQUET_TIME_FUTURE_REFUSE_MS) {
+      return { ok: false, reason: "future", aheadMinutes: Math.ceil((todayMs - nowMs) / 60000) };
+    }
+    day.setDate(day.getDate() - 1);
+    const age = nowMs - day.getTime();
+    return { ok: true, appliedAtMs: day.getTime(), minutesAgo: Math.floor(age / 60000), needsConfirm: age > TOURNIQUET_TIME_CONFIRM_AFTER_MS };
+  }
+
   function computeMstartTriage(vitals) {
     if (!vitals) return null;
     if (vitals.rr === 0) return "black";
@@ -3195,6 +3239,9 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     TOURNIQUET_NOTICE_MS,
     TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS,
     TOURNIQUET_SNOOZE_POLICY,
+    TOURNIQUET_TIME_CONFIRM_AFTER_MS,
+    TOURNIQUET_TIME_FUTURE_REFUSE_MS,
+    TOURNIQUET_TIME_FUTURE_TOLERANCE_MS,
     TOURNIQUET_WARN_MS,
     VITALS_INTERVAL_MS_BY_TRIAGE,
     VITALS_WARN_BUFFER_MS,
@@ -3210,6 +3257,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     isPediatricPatient,
     isRoutineAlert,
     isValidMdaClassification,
+    parseTourniquetTimeCode,
     isVitalsOverdue,
     MDA_CLASSIFICATIONS,
     MDA_EXPECTED_BY_TRIAGE,
@@ -3301,7 +3349,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.71';
+const APP_VERSION = '2.99.72';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3350,7 +3398,7 @@ const SYNC_ELIGIBLE_EVENT_TYPES = new Set([
   'PATIENT_EVAC_POINT_ARRIVED',
   'PATIENT_T_INJURY_UPDATED','PATIENT_HANDED_OVER','PATIENT_TRIAGED_EXPECTANT','VITALS_RECORDED',
   'MINIMAL_TRIAGE_RECORDED','SABCDE_RECORDED','MSTART_SUGGESTED','JUMPSTART_SUGGESTED','MSTART_OVERRIDE',
-  'JUMPSTART_OVERRIDE','TOURNIQUET_APPLIED','TOURNIQUET_REASSESSMENT','TOURNIQUET_RELEASED',
+  'JUMPSTART_OVERRIDE','TOURNIQUET_APPLIED','TOURNIQUET_REASSESSMENT','TOURNIQUET_RELEASED','TOURNIQUET_TIME_RECORDED',
   'TOURNIQUET_CONTEXT_UPDATED','TOURNIQUET_LIMB_RECORDED','INTERVENTION_RECORDED','MEDICATION_ADMINISTERED','AIRWAY_MANAGED',
   'HIGH_RISK_OVERRIDE_CONFIRMED','FIRST_RESPONDER_REPORT','OFFICIAL_INCIDENT_OPENED_BY_RESCUE',
   'INCIDENT_CLOSE_TOGGLED','BUILDING_STATUS_UPDATED','SITE_CLEAR_CONFIRMED','INCIDENT_DRAFT_CREATED',
@@ -4888,7 +4936,7 @@ function triageVitalsFromFlow(){
 const EMPTY_VITALS = {pulse:null, spo2:null, bp_estimate:null, rr:null, avpu:null};
 let spo2Active = false;
 let doses = {morphine:5, fluids:500};
-let tqData = {time:null, limbs:new Set()};
+let tqData = {time:null, timeTyped:false, limbs:new Set()};
 
 // Modal
 let modalPid = null;
@@ -4968,8 +5016,8 @@ function hydrateActiveDraft(snapshot){
   counts={...COUNT_BASELINE, ...(snapshot.counts||{})};
   spo2Active=!!snapshot.spo2Active;
   doses={morphine:5, fluids:500, ...(snapshot.doses||{})};
-  tqData={time:snapshot.tqData?.time||null, limbs:new Set(snapshot.tqData?.limbs||[])};
-  quickTqData={applied:!!snapshot.quickTqData?.applied, time:snapshot.quickTqData?.time||null, limbs:new Set(snapshot.quickTqData?.limbs||[])};
+  tqData={time:snapshot.tqData?.time||null, timeTyped:!!snapshot.tqData?.timeTyped, limbs:new Set(snapshot.tqData?.limbs||[])};
+  quickTqData={applied:!!snapshot.quickTqData?.applied, time:snapshot.quickTqData?.time||null, timeTyped:!!snapshot.quickTqData?.timeTyped, limbs:new Set(snapshot.quickTqData?.limbs||[])};
   setTimeout(()=>{ updatePediatricEstimatePanel(); updatePediatricTreatmentUi(); renderLocalStockPanel(); },0);
   return true;
 }
@@ -5099,7 +5147,7 @@ let medicIncidentAssignments={}; // medicUserId -> {siteId, assignedById, assign
 // which ones are this medic's own, so the medic board can show them first.
 let handledPatientIds={};
 const HANDS_ON_EVENT_TYPES=new Set(['PATIENT_CREATED','QUICK_PATIENT_CREATED','VITALS_RECORDED','SABCDE_RECORDED',
-  'INTERVENTION_RECORDED','MEDICATION_ADMINISTERED','AIRWAY_MANAGED','TOURNIQUET_APPLIED','TOURNIQUET_LIMB_RECORDED',
+  'INTERVENTION_RECORDED','MEDICATION_ADMINISTERED','AIRWAY_MANAGED','TOURNIQUET_APPLIED','TOURNIQUET_LIMB_RECORDED','TOURNIQUET_TIME_RECORDED',
   'TOURNIQUET_REASSESSMENT','TOURNIQUET_RELEASED','PATIENT_TRIAGE_UPDATED','PATIENT_TRIAGED_EXPECTANT',
   'MINIMAL_TRIAGE_RECORDED','MSTART_OVERRIDE','PATIENT_INJURY_UPDATED','PATIENT_HANDED_OVER','SUPPLY_CONSUMED']);
 function handlerKey(){ return currentUser?.id || 'local'; }
@@ -8131,7 +8179,10 @@ function assessmentDebtForPatient(p){
   if(!normalizeTrapStatus(p)) debt.push('missing_trap_status');
   if(!['evacuating','evacuated','handed_over'].includes(p.patientStatus)) debt.push('pending_handover');
   if(isVitalsOverdue(p)) debt.push('stale_vitals');
-  if(p.tourniquet && !p.tourniquet.timeCode) debt.push('tourniquet_time_unknown');
+  // Any active tourniquet whose time is not known (tourniquetTimeUnknown), or a legacy single
+  // p.tourniquet record with no time at all.
+  const legacyTq=p.tourniquet && !p.tourniquet.timeCode && !p.tourniquet.source && !p.tourniquet.timeSource;
+  if(activeTourniquets(p).some(tourniquetTimeUnknown) || legacyTq) debt.push('tourniquet_time_unknown');
   return debt;
 }
 function exportExperimentLog(){
@@ -8461,22 +8512,37 @@ function tourniquetLimbMeta(value='unknown'){
 function queueTourniquetAppliedEvent(p, tq, extra={}){
   const limb=tourniquetLimbKey(tq.limb);
   tq.serverLimb=limb;
+  // time_source (database/081): 'phone' = placed now by this phone's user, 'entered' = the time
+  // written on the body, 'unknown' = already on the patient with no time (application_time is then
+  // only the registration time, a lower bound).
+  const timeSource=tourniquetTimeUnknown(tq) ? 'unknown' : tq.timeSource==='entered' ? 'entered' : 'phone';
   saveLocalEvent({type:'TOURNIQUET_APPLIED',detail:`${p.visualId||p.id} · ${tq.id} · ${tq.limbLabel||tourniquetLimbMeta(limb).label}`,warn:true,patient_id:p.id,
-    payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb,application_time:new Date(tq.appliedAt||Date.now()).toISOString(),clinical_context:'unknown',...extra}});
+    payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb,application_time:new Date(tq.appliedAt||Date.now()).toISOString(),clinical_context:'unknown',
+      time_source:timeSource, ...(timeSource==='entered'?{time_code:tq.timeCode||null, time_entered_at:new Date(tq.timeEnteredAt||Date.now()).toISOString()}:{}), ...extra}});
 }
 // The flow's limb buttons (LIMB_LABELS keys) mapped to TOURNIQUET_LIMBS keys.
 const FLOW_LIMB_TO_TOURNIQUET_LIMB={yl:'left_arm', yr:'right_arm', rl:'left_leg', rr:'right_leg'};
 // One entry per limb marked in the New Patient flow (quick or full), or one 'unknown' entry when
 // a tourniquet was marked without a limb. Same time for all, the time the medic entered.
+// The time field is filled with the phone's time when the tourniquet is ticked ("placed now");
+// a time the medic typed is the one written on the body ("entered", owner 2026-11-08): its alert
+// levels already passed are taken as seen. An empty field means the time is unknown.
 function tourniquetEntriesFromState(){
   const src=quickTqData.applied ? quickTqData : state.interventions.has('tourniquet') ? tqData : null;
   if(!src) return [];
-  const appliedAt=timeCodeToTodayMs(src.time) || Date.now();
+  const now=Date.now();
+  const parsed=src.time ? C5Rules.parseTourniquetTimeCode(src.time, now) : null;
+  const known=!!(parsed && parsed.ok);
+  const appliedAt=known ? parsed.appliedAtMs : now;
+  const timeSource=!known ? 'unknown' : src.timeTyped ? 'entered' : 'phone';
   const limbs=[...(src.limbs||[])].map(l=>FLOW_LIMB_TO_TOURNIQUET_LIMB[l]||tourniquetLimbKey(l));
   return (limbs.length?limbs:['unknown']).map((limb,i)=>{
     const meta=tourniquetLimbMeta(limb);
-    return {id:`TQ-${String(i+1).padStart(3,'0')}`, appliedAt, timeCode:src.time||null, limb:meta.key, limbLabel:meta.label, side:meta.side, bodyPart:meta.bodyPart,
+    const tq={id:`TQ-${String(i+1).padStart(3,'0')}`, appliedAt, timeCode:known?src.time:null, timeSource, limb:meta.key, limbLabel:meta.label, side:meta.side, bodyPart:meta.bodyPart,
       appliedBy:currentMedicName(), source:'patient_flow', status:'active', effectiveness:'unknown', reasonForAdditional:null, note:''};
+    if(timeSource==='unknown') tq.timeUnknown=true;
+    if(timeSource==='entered'){ tq.timeEnteredAt=now; tq.timeAlertedLevel=tourniquetStageAt(tq, now)||null; }
+    return tq;
   });
 }
 function tourniquetStatusLabel(tq={}){
@@ -8988,7 +9054,8 @@ function recordSweepTreatment(type, meta={}){
     const tqList=ensureTourniquetArray(p);
     const limbMeta=tourniquetLimbMeta(meta.limb);
     const sequenceOnLimb=tqList.filter(x=>x.status!=='removed_error' && tourniquetLimbKey(x.limb)===limbMeta.key).length+1;
-    const tq={id:`TQ-${String(tqList.length+1).padStart(3,'0')}`,limb:limbMeta.key,limbLabel:limbMeta.label,side:limbMeta.side,bodyPart:limbMeta.bodyPart,appliedAt:Date.now(),timeCode:nowT().replace(':',''),appliedBy:currentMedicName(),source:'mstart_sweep',status:'active',effectiveness:'unknown',reasonForAdditional:meta.reasonForAdditional||null,sourceTourniquetId:meta.sourceTourniquetId||null,sequenceOnLimb,placementRelation:meta.placementRelation||null,bleedingStatusAtApplication:meta.bleedingStatusAtApplication||'unknown',effectiveAt:null,ineffectiveAt:null,note:meta.note||''};
+    const pre=!!meta.preExisting;
+    const tq={id:`TQ-${String(tqList.length+1).padStart(3,'0')}`,limb:limbMeta.key,limbLabel:limbMeta.label,side:limbMeta.side,bodyPart:limbMeta.bodyPart,appliedAt:Date.now(),timeCode:pre?null:nowT().replace(':',''),timeSource:pre?'unknown':'phone',timeUnknown:pre,preExisting:pre,appliedBy:pre?'(לפני הגעת הצוות)':currentMedicName(),source:'mstart_sweep',status:'active',effectiveness:'unknown',reasonForAdditional:meta.reasonForAdditional||null,sourceTourniquetId:meta.sourceTourniquetId||null,sequenceOnLimb,placementRelation:meta.placementRelation||null,bleedingStatusAtApplication:meta.bleedingStatusAtApplication||'unknown',effectiveAt:null,ineffectiveAt:null,note:meta.note||''};
     tqList.push(tq);
     const control=ensureHemorrhageControl(p);
     if(tqList.length===1){
@@ -9006,7 +9073,8 @@ function recordSweepTreatment(type, meta={}){
     p.assessmentDebt=p.assessmentDebt||[];
     if(tq.limb==='unknown' && !p.assessmentDebt.includes('tourniquet_limb_missing')) p.assessmentDebt.push('tourniquet_limb_missing');
     if(tq.limb!=='unknown' && !activeTourniquets(p).some(x=>tourniquetLimbKey(x.limb)==='unknown')) p.assessmentDebt=p.assessmentDebt.filter(x=>x!=='tourniquet_limb_missing');
-    reconcileSupplySource(`sweep:${p.id}:tq:${tq.id}`, 'tourniquets', 1, p.id, {silentPopup:true,silentWarnings:true,suppressAutoResupply:true});
+    // Already on the patient: the first responder's tourniquet, not one from this medic's bag.
+    if(!pre) reconcileSupplySource(`sweep:${p.id}:tq:${tq.id}`, 'tourniquets', 1, p.id, {silentPopup:true,silentWarnings:true,suppressAutoResupply:true});
     p.triage='red';
     p.mstart.color='red';
     p.patientStatus='stabilizing';
@@ -9132,7 +9200,14 @@ function patientTourniquetFixHtml(p){
           <button class="demo-mini-btn" style="grid-column:1 / -1;border-color:var(--red);color:var(--red)" onclick="confirmCancelTourniquetEntry('${p.id}','${tq.id}')">בטל רישום — נרשם בטעות</button>
         </div>
       </details>`:'';
-    return `<div class="sweep-tq-card"><div class="sweep-tq-title"><bdi>${tq.id}</bdi> · ${key==='unknown'?'<span style="color:var(--orange)">גפה לא ידועה</span>':limb} · +${elapsedMinutes(tq.appliedAt)} דק׳</div>${canFix?tourniquetConversionButtonHtml(p,tq):''}${fix}</div>`;
+    const unknownTime=tourniquetTimeUnknown(tq);
+    const timeText=unknownTime
+      ? `<span style="color:var(--orange)">שעת הנחה לא ידועה</span> · לפחות +${elapsedMinutes(tq.appliedAt)} דק׳`
+      : `+${elapsedMinutes(tq.appliedAt)} דק׳${tq.timeSource==='entered'&&tq.timeCode?` · שעה מהגוף ${tq.timeCode.slice(0,2)}:${tq.timeCode.slice(2)}`:''}`;
+    const timeBtn=canEnterTourniquetTime(tq)
+      ? `<button class="demo-mini-btn" data-tq-time-entry="${escAttr(tq.id)}" style="width:100%;margin-top:8px;${unknownTime?'border-color:var(--orange);color:var(--orange);font-weight:900':''}" onclick="openTourniquetTimeEntry('${escAttr(p.id)}','${escAttr(tq.id)}')">${unknownTime?'הזן שעת הנחה (כפי שנכתבה על הגוף)':'תקן שעת הנחה'}</button>`
+      : '';
+    return `<div class="sweep-tq-card"><div class="sweep-tq-title"><bdi>${tq.id}</bdi> · ${key==='unknown'?'<span style="color:var(--orange)">גפה לא ידועה</span>':limb} · ${timeText}</div>${timeBtn}${canFix?tourniquetConversionButtonHtml(p,tq):''}${fix}</div>`;
   }).join('');
   return `<div class="summary-card"><div class="summary-key" style="margin-bottom:8px">חסמים פעילים</div>${rows}</div>`;
 }
@@ -9143,12 +9218,20 @@ function patientTourniquetFixHtml(p){
 // The conversion stops that tourniquet's alerts and is sent as TOURNIQUET_RELEASED with reason
 // 'converted_direct_pressure', which closes the server row (project_tourniquet_events) and resolves
 // its watchdog alerts (silence_resolved_watchdogs_for_event).
-const TQ_CONVERSION_ROLE_LIMIT_LABELS={medic:'120 דק׳', pc:'120 דק׳', paramedic:'4 שעות', physician:'6 שעות'};
+const TQ_CONVERSION_ROLE_LIMIT_LABELS={medic:'120 דק׳', pc:'120 דק׳', paramedic:'4 שעות', physician:'6 שעות', admin:'6 שעות'};
 function tourniquetConversionRole(){ return currentUser?.role || activeRoleDashboard; }
-// A tourniquet from the New Patient flow saved without the 4-digit time: appliedAt is the
-// registration time (timeCodeToTodayMs falls back to now), not when it went on, so its real time is
-// unknown (the same case as the "שעת חסם לא ידועה" debt).
-function tourniquetTimeUnknown(tq){ return tq?.source==='patient_flow' && !tq.timeCode; }
+// A tourniquet's time is unknown when it was already on the patient and no time has been entered:
+// the sweep's "היה על הפצוע" with no time, a New Patient flow tourniquet saved with an empty time
+// field, or another phone's row the server marks time_source 'unknown' (database/081). appliedAt is
+// then only the registration time, a lower bound: alerts still run from it, conversion is blocked.
+// timeSource 'phone' (placed now) or 'entered' (from the body) is a known time.
+function tourniquetTimeUnknown(tq){
+  if(!tq || tq.timeSource==='entered' || tq.timeSource==='phone') return false;
+  return tq.timeUnknown===true || tq.timeSource==='unknown' || (tq.source==='patient_flow' && !tq.timeCode);
+}
+function tourniquetStageAt(tq, atMs=Date.now()){
+  return C5Rules.tourniquetTimer({tourniquet:{appliedAt:tq?.appliedAt}}, atMs)?.stage||'';
+}
 function tourniquetElapsedMs(tq, nowMs=Date.now()){
   const at=Number(tq?.appliedAt);
   return Number.isFinite(at) && at>0 && !tourniquetTimeUnknown(tq) ? nowMs-at : NaN;
@@ -9160,7 +9243,7 @@ function tourniquetConversionBlockedText(check){
   if(check.reason==='role') return 'חובש / פראמדיק / רופא בלבד';
   if(check.reason==='time_unknown') return 'שעת הנחה לא ידועה · לא ניתן להמיר';
   const role=tourniquetConversionRole();
-  if(role==='physician') return 'עברו 6 שעות · חלון ההמרה נסגר';
+  if(role==='physician' || role==='admin') return 'עברו 6 שעות · חלון ההמרה נסגר';
   return role==='paramedic' ? 'עברו 4 שעות · רופא בלבד' : `עברו ${TQ_CONVERSION_ROLE_LIMIT_LABELS[role]||'120 דק׳'} · פראמדיק / רופא בלבד`;
 }
 function tourniquetConversionButtonHtml(p, tq){
@@ -9197,6 +9280,131 @@ function convertTourniquetToDirectPressure(patientId, tourniquetId){
   renderTourniquetTimeAlert();
   rerenderAfterTourniquetFix(p);
   toast('החסם הומר ללחץ ישיר');
+}
+// ── Tourniquet time from the body (repo owner, 2026-11-08) ──
+// First responders write the time on the patient in 4 digits; the medic may see the patient much
+// later. Any medical role (medic, paramedic, physician, PC) and admin enters that time for a
+// tourniquet whose time is unknown, or corrects a time entered earlier (each change kept in
+// tq.timeHistory). A tourniquet placed with this app keeps the phone's time. On entry the levels
+// already passed are taken as seen: no banner, no vibration; the screen shows how long it has been
+// on, and the next level alerts as usual. The entry is sent as TOURNIQUET_TIME_RECORDED, which moves
+// the server row's applied_at (database/081) so other phones and the server watchdog follow it.
+function tourniquetHhmm(ms){ return new Date(ms).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}); }
+function tourniquetFutureTimeMessage(code, parsed){
+  return `השעה ${code.slice(0,2)}:${code.slice(2)} מאוחרת ב-${parsed.aheadMinutes} דק׳ מהשעה בטלפון (${tourniquetHhmm(Date.now())}). בדוק את השעה שנכתבה על הגוף.`;
+}
+function tourniquetOldTimeQuestion(parsed){
+  const h=Math.floor(parsed.minutesAgo/60), m=parsed.minutesAgo%60;
+  return `החסם הונח לפני ${h} שעות ו-${m} דק׳?`;
+}
+function canEnterTourniquetTime(tq){
+  return canCorrectTourniquets() && !!tq && (tourniquetTimeUnknown(tq) || tq.timeSource==='entered');
+}
+let _tqTimeEntry=null; // {patientId, tourniquetId}
+function openTourniquetTimeEntry(patientId, tourniquetId){
+  const p=patients.find(x=>x.id===patientId);
+  const tq=p ? activeTourniquets(p).find(t=>t.id===tourniquetId) : null;
+  if(!tq || !canEnterTourniquetTime(tq)) return;
+  _tqTimeEntry={patientId, tourniquetId};
+  let el=document.getElementById('tq-time-entry');
+  if(!el){
+    el=document.createElement('div');
+    el.id='tq-time-entry';
+    el.className='tq-time-entry-overlay';
+    document.body.appendChild(el);
+  }
+  const unknown=tourniquetTimeUnknown(tq);
+  const limb=escAttr(tq.limbLabel||tourniquetLimbMeta(tq.limb).label);
+  el.innerHTML=`<div class="tq-time-entry-card" role="dialog" aria-label="שעת הנחת החסם">
+    <div style="font-size:16px;font-weight:900">${unknown?'הזן שעת הנחה':'תקן שעת הנחה'}</div>
+    <div style="font-size:13px;color:var(--muted);margin-top:4px">${escAttr(p.visualId||p.id)} · ${limb} · כפי שנכתבה על הגוף (4 ספרות)</div>
+    <input type="text" id="tq-time-entry-input" inputmode="numeric" maxlength="4" placeholder="למשל 0910" value="${unknown?'':escAttr(tq.timeCode||'')}"
+      style="width:100%;margin-top:12px;font-family:var(--mono);font-size:22px;letter-spacing:6px;text-align:center" autocomplete="off">
+    <div id="tq-time-entry-error" style="min-height:18px;font-size:12px;color:var(--orange);margin-top:6px"></div>
+    <div class="tq-alert-actions">
+      <button class="tq-alert-btn primary" data-tq-time-action="save" onclick="saveTourniquetEnteredTime()">שמור שעה</button>
+      <button class="tq-alert-btn" data-tq-time-action="skip" onclick="closeTourniquetTimeEntry()">${unknown?'השאר ללא שעה':'ביטול'}</button>
+    </div>
+  </div>`;
+  setTimeout(()=>document.getElementById('tq-time-entry-input')?.focus(), 0);
+}
+function closeTourniquetTimeEntry(){
+  _tqTimeEntry=null;
+  document.getElementById('tq-time-entry')?.remove();
+}
+function saveTourniquetEnteredTime(code){
+  const target=_tqTimeEntry; if(!target) return;
+  const p=patients.find(x=>x.id===target.patientId);
+  const tq=p ? activeTourniquets(p).find(t=>t.id===target.tourniquetId) : null;
+  if(!tq || !canEnterTourniquetTime(tq)){ closeTourniquetTimeEntry(); return; }
+  const value=String(code ?? document.getElementById('tq-time-entry-input')?.value ?? '').trim();
+  const errorEl=document.getElementById('tq-time-entry-error');
+  const now=Date.now();
+  const parsed=C5Rules.parseTourniquetTimeCode(value, now);
+  if(!parsed.ok){
+    if(errorEl) errorEl.textContent=parsed.reason==='future' ? tourniquetFutureTimeMessage(value, parsed) : 'שעה לא תקינה — 4 ספרות, 0000-2359';
+    return;
+  }
+  if(parsed.needsConfirm && !confirm(tourniquetOldTimeQuestion(parsed))) return;
+  const previous={appliedAt:tq.appliedAt||null, timeSource:tourniquetTimeUnknown(tq)?'unknown':(tq.timeSource||'phone'), timeCode:tq.timeCode||null};
+  tq.appliedAt=parsed.appliedAtMs;
+  tq.timeCode=value;
+  tq.timeSource='entered';
+  tq.timeUnknown=false;
+  tq.timeEnteredAt=now;
+  tq.timeHistory=tq.timeHistory||[];
+  tq.timeHistory.push({at:now, from:previous.timeSource==='unknown'?null:previous.appliedAt, to:parsed.appliedAtMs, by:currentMedicName(), role:tourniquetConversionRole()});
+  // Levels already passed are seen; the next one alerts as usual (even when the new time is later).
+  tq.timeAlertedLevel=tourniquetStageAt(tq, now)||null;
+  tq.timeAlertOpen=null;
+  tq.timeAlertSnooze=null;
+  syncLegacyTourniquetAlias(p);
+  if(!activeTourniquets(p).some(tourniquetTimeUnknown)) p.assessmentDebt=(p.assessmentDebt||[]).filter(x=>x!=='tourniquet_time_unknown');
+  const limb=tq.limbLabel||tourniquetLimbMeta(tq.limb).label;
+  const minutes=parsed.minutesAgo;
+  const detail=`${tq.id} · ${limb} · שעת הנחה ${value.slice(0,2)}:${value.slice(2)} (+${minutes} דק׳)${previous.timeSource==='entered'?` · תוקן מ-${previous.timeCode?previous.timeCode.slice(0,2)+':'+previous.timeCode.slice(2):'?'}`:''}`;
+  p.events=p.events||[];
+  p.events.unshift({type:'TOURNIQUET_TIME_RECORDED',time:nowT(),detail,warn:false});
+  saveLocalEvent({type:'TOURNIQUET_TIME_RECORDED',detail:`${p.visualId||p.id} · ${detail}`,warn:false,patient_id:p.id,
+    payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb:tq.serverLimb||tourniquetLimbKey(tq.limb),time_code:value,
+      application_time:new Date(parsed.appliedAtMs).toISOString(),
+      previous_application_time:previous.appliedAt?new Date(previous.appliedAt).toISOString():null,
+      previous_time_source:previous.timeSource,time_entered_at:new Date(now).toISOString(),siteId:p.siteId}});
+  saveDemoState();
+  closeTourniquetTimeEntry();
+  renderTourniquetTimeAlert();
+  rerenderAfterTourniquetFix(p);
+  const pastCritical=tqAlertRank(tq.timeAlertedLevel)>=tqAlertRank('critical');
+  toast(pastCritical ? `שעת הנחה נשמרה · עברו ${minutes} דק׳ · המרה: ${tourniquetConversionCheck(tq).allowed?'מותרת לך':'פראמדיק / רופא בלבד'}` : `שעת הנחה נשמרה · +${minutes} דק׳`);
+}
+// Sweep (owner, 2026-11-08): a tourniquet recorded in the sweep is either placed now by this medic
+// (the phone's time, as before) or was already on the patient (time from the body, or unknown; no
+// tourniquet is taken from this medic's bag).
+function askSweepTourniquetOrigin(limb){
+  let el=document.getElementById('tq-origin');
+  if(!el){
+    el=document.createElement('div');
+    el.id='tq-origin';
+    el.className='tq-time-entry-overlay';
+    document.body.appendChild(el);
+  }
+  const key=escAttr(limb);
+  el.innerHTML=`<div class="tq-time-entry-card" role="dialog" aria-label="מי הניח את החסם">
+    <div style="font-size:16px;font-weight:900">חסם עורקים · ${escAttr(tourniquetLimbMeta(limb).label)}</div>
+    <div class="tq-alert-actions stacked">
+      <button class="tq-alert-btn primary" data-tq-origin="now" onclick="chooseSweepTourniquetOrigin('${key}',false)">הונח עכשיו (שעת הטלפון)</button>
+      <button class="tq-alert-btn" data-tq-origin="pre" onclick="chooseSweepTourniquetOrigin('${key}',true)">היה על הפצוע (הונח לפני שהגעתי)</button>
+      <button class="tq-alert-btn" data-tq-origin="cancel" onclick="document.getElementById('tq-origin')?.remove()">ביטול</button>
+    </div>
+  </div>`;
+}
+function chooseSweepTourniquetOrigin(limb, preExisting){
+  document.getElementById('tq-origin')?.remove();
+  const p=activeSweepPatient();
+  recordSweepTourniquetWithLimb(limb, {preExisting});
+  if(!preExisting || !p) return;
+  const tq=activeTourniquets(p).slice(-1)[0];
+  if(tq) openTourniquetTimeEntry(p.id, tq.id);
 }
 function markSweepTourniquetEffectiveness(tourniquetId, effectiveness){
   const p=activeSweepPatient(); if(!p) return;
@@ -9239,9 +9447,9 @@ function addSweepTourniquetSameLimb(sourceId){
 function addSweepTourniquetDifferentLimb(){
   recordSweepTreatment('tourniquet',{reasonForAdditional:'different_limb',placementRelation:'different_limb'});
 }
-function recordSweepTourniquetWithLimb(limb){
+function recordSweepTourniquetWithLimb(limb, opts={}){
   const p=activeSweepPatient(); if(!p) return;
-  recordSweepTreatment('tourniquet',{limb});
+  recordSweepTreatment('tourniquet',{limb, preExisting:!!opts.preExisting});
   const updated=activeSweepPatient(); if(!updated) return;
   const list=ensureTourniquetArray(updated);
   const tq=list[list.length-1];
@@ -9264,7 +9472,8 @@ function renderSweepTourniquetCard(tq){
   const limb=tq.limbLabel||tourniquetLimbMeta(tq.limb).label;
   const ineffective=tq.status==='ineffective' || tq.effectiveness==='bleeding_continues';
   return `<div class="sweep-tq-card ${ineffective?'ineffective':''}">
-    <div class="sweep-tq-title">${tq.id} · ${limb} · חסם ${tq.sequenceOnLimb||1} בגפה · +${elapsedMinutes(tq.appliedAt)} דק׳</div>
+    <div class="sweep-tq-title">${tq.id} · ${limb} · חסם ${tq.sequenceOnLimb||1} בגפה · ${tourniquetTimeUnknown(tq)?`<span style="color:var(--orange)">שעת הנחה לא ידועה</span> · לפחות +${elapsedMinutes(tq.appliedAt)} דק׳`:`+${elapsedMinutes(tq.appliedAt)} דק׳`}</div>
+    ${canEnterTourniquetTime(tq)&&activeSweepPatient()?`<button class="demo-mini-btn" data-tq-time-entry-sweep="${escAttr(tq.id)}" style="width:100%;margin:6px 0;${tourniquetTimeUnknown(tq)?'border-color:var(--orange);color:var(--orange);font-weight:900':''}" onclick="openTourniquetTimeEntry('${escAttr(activeSweepPatient().id)}','${escAttr(tq.id)}')">${tourniquetTimeUnknown(tq)?'הזן שעת הנחה (כפי שנכתבה על הגוף)':'תקן שעת הנחה'}</button>`:''}
     <div class="sweep-tq-sub">סטטוס: ${tourniquetStatusLabel(tq)}${tq.placementRelation==='above_previous'?`<br>נוסף מעל ${tq.sourceTourniquetId||'החסם הקודם'} בגלל דימום ממשיך.`:tq.placementRelation==='different_limb'?'<br>נוסף עבור גפה אחרת.':''}</div>
     <div class="sweep-tq-actions">
       <button class="demo-mini-btn" onclick="markSweepTourniquetEffectiveness('${tq.id}','effective')">יעיל · דימום נשלט</button>
@@ -9410,7 +9619,7 @@ function renderMstartSweep(){
            <button class="demo-mini-btn" onclick="addSweepTourniquetDifferentLimb()">+ חסם בגפה נוספת</button>`
         : `<div style="font-size:12px;color:var(--muted);margin-bottom:10px">הנח חסם אם יש דימום מסכן חיים. אם לא — דלג למטה.</div>
            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-             ${Object.entries(limbLabels).map(([key,label])=>`<button class="tap-btn" style="min-height:60px;font-size:14px;border-color:var(--red)" onclick="recordSweepTourniquetWithLimb('${key}')">${label}</button>`).join('')}
+             ${Object.entries(limbLabels).map(([key,label])=>`<button class="tap-btn" style="min-height:60px;font-size:14px;border-color:var(--red)" onclick="askSweepTourniquetOrigin('${key}')">${label}</button>`).join('')}
            </div>
            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
              <button class="tap-btn triage-yellow" onclick="recordSweepTreatment('pressure_bandage')">חבישת לחץ בלבד</button>
@@ -11323,8 +11532,8 @@ function startNewPatient(mode='extended'){
   spo2Active = false;
   flowSpo2Unavailable = false;
   doses = {morphine:5, fluids:500};
-  tqData = {time:null, limbs:new Set()};
-  quickTqData = {applied:false, time:null, limbs:new Set()};
+  tqData = {time:null, timeTyped:false, limbs:new Set()};
+  quickTqData = {applied:false, time:null, timeTyped:false, limbs:new Set()};
 
   // Reset all UI
   document.querySelectorAll('.tap-btn,.avpu-btn,.chip,.bp-btn,.limb-btn,.body-hotspot,.march-clear').forEach(b=>b.classList.remove('selected','ok','issue','managed'));
@@ -11747,7 +11956,10 @@ function toggleChip(btn, key){
   if(state.interventions.has(key) && ['tourniquet','morphine','iv','fluids','airway_mgmt','cpr','atq'].includes(key)){
     projectPatientStatus('stabilizing', key==='tourniquet'?'TOURNIQUET_APPLIED':'INTERVENTION_LOGGED');
   }
-  if(key==='tourniquet'&&state.interventions.has('tourniquet')&&!tqData.time) setTQTimeNow();
+  if(key==='tourniquet'&&state.interventions.has('tourniquet')){
+    if(!tqData.time && !tqData.timeTyped) setTQTimeNow();
+    else syncFlowTourniquetSupply(); // a time typed from the body: not from this medic's bag
+  }
   if(['morphine','atq'].includes(key)) maybeWarnHighRiskMedication(key);
   updatePediatricTreatmentUi();
   renderLocalStockPanel();
@@ -11866,7 +12078,9 @@ function setTQTimeNow(){
   const t=n.getHours().toString().padStart(2,'0')+n.getMinutes().toString().padStart(2,'0');
   document.getElementById('tourniquet-time-input').value=t;
   tqData.time=t;
+  tqData.timeTyped=false;
   updateTQDisplay(t);
+  syncFlowTourniquetSupply();
 }
 function isValidTimeCode(val){
   if(!/^\d{4}$/.test(val||'')) return false;
@@ -11874,20 +12088,35 @@ function isValidTimeCode(val){
   return hh>=0 && hh<=23 && mm>=0 && mm<=59;
 }
 function onTQTimeInput(val){
+  const wasFromBag=flowTourniquetFromBag(tqData);
+  tqData.timeTyped=true;
   if(val.length===4&&isValidTimeCode(val)){ tqData.time=val; updateTQDisplay(val); }
   else { tqData.time=null; document.getElementById('tq-time-display').textContent=''; }
+  if(wasFromBag) syncFlowTourniquetSupply();
 }
 function validateTQTimeInput(showToast=false){
   const el=document.getElementById('tourniquet-time-input');
   const val=el?.value||'';
   if(!val) return true;
-  const ok=isValidTimeCode(val);
-  if(!ok){
-    tqData.time=null;
-    document.getElementById('tq-time-display').textContent='שעה לא תקינה — השתמש בפורמט HHMM, 0000-2359';
-    if(showToast) toast('שעת חסם לא תקינה');
+  return checkFlowTourniquetTime(val, tqData, document.getElementById('tq-time-display'), showToast);
+}
+// A typed time (the one written on the body) goes through the same day rule as the patient screen
+// (C5Rules.parseTourniquetTimeCode, owner 2026-11-08): later than the phone's clock by more than
+// 5 minutes is refused, more than 12 hours ago needs a confirmation. Refused or not confirmed: the
+// field is cleared, which leaves the time unknown.
+function checkFlowTourniquetTime(val, src, displayEl, showToast){
+  const parsed=C5Rules.parseTourniquetTimeCode(val);
+  let message='';
+  if(!parsed.ok) message=parsed.reason==='future' ? tourniquetFutureTimeMessage(val, parsed) : 'שעה לא תקינה — השתמש בפורמט HHMM, 0000-2359';
+  else if(parsed.needsConfirm && src.confirmedTimeCode!==val){
+    if(confirm(tourniquetOldTimeQuestion(parsed))) src.confirmedTimeCode=val;
+    else message='השעה לא אושרה — הזן שוב או השאר ריק (ללא שעה)';
   }
-  return ok;
+  if(!message) return true;
+  src.time=null;
+  if(displayEl) displayEl.textContent=message;
+  if(showToast) toast(parsed.reason==='future' ? 'שעת חסם מאוחרת מהשעה בטלפון' : 'שעת חסם לא תקינה');
+  return false;
 }
 function updateTQDisplay(val){ document.getElementById('tq-time-display').textContent=`שעת הנחה: ${val.slice(0,2)}:${val.slice(2)}`; }
 function toggleLimb(btn, key){
@@ -12144,8 +12373,17 @@ function queueIntakeClinicalEventsAtSave(patientId){
 }
 
 function queueInventoryBeforeSave(patientId){
-  reconcileSupplySource('quick:tq', 'tourniquets', quickTqData.applied ? 1 : 0, patientId);
-  ['tourniquet','bandage','hemostatic','blanket','morphine','atq','fluids'].forEach(key=>reconcileSupplyForIntervention(key, state.interventions.has(key)?null:0, patientId));
+  reconcileSupplySource('quick:tq', 'tourniquets', quickTqData.applied && flowTourniquetFromBag(quickTqData) ? 1 : 0, patientId);
+  ['tourniquet','bandage','hemostatic','blanket','morphine','atq','fluids'].forEach(key=>reconcileSupplyForIntervention(key,
+    !state.interventions.has(key) || (key==='tourniquet' && !flowTourniquetFromBag(tqData)) ? 0 : null, patientId));
+}
+// A tourniquet ticked in the New Patient form comes from this medic's bag only when it was placed
+// now (the phone's time, "עכשיו"). A time typed from the body, or an emptied time field, means it
+// was already on the patient: the first responder's tourniquet, not this medic's (owner, 2026-11-13).
+function flowTourniquetFromBag(src){ return !!src?.time && !src.timeTyped; }
+function syncFlowTourniquetSupply(){
+  if(quickTqData.applied) reconcileSupplySource('quick:tq', 'tourniquets', flowTourniquetFromBag(quickTqData) ? 1 : 0);
+  if(state.interventions?.has('tourniquet')) reconcileSupplyForIntervention('tourniquet', flowTourniquetFromBag(tqData) ? null : 0);
 }
 
 function buildLocStr(){
@@ -14308,7 +14546,7 @@ function renderAar(){
 // ═══════════════════════════════════════════════
 //  QUICK TOURNIQUET (step 3)
 // ═══════════════════════════════════════════════
-let quickTqData = { applied: false, time: null, limbs: new Set() };
+let quickTqData = { applied: false, time: null, timeTyped: false, limbs: new Set() };
 
 function toggleQuickTQ(btn, applied) {
   quickTqData.applied = applied;
@@ -14318,9 +14556,9 @@ function toggleQuickTQ(btn, applied) {
   btn.classList.add('selected');
   document.getElementById('quick-tq-panel').style.display = applied ? 'block' : 'none';
   if (applied) {
-    reconcileSupplySource('quick:tq', 'tourniquets', 1);
     projectPatientStatus('stabilizing','TOURNIQUET_APPLIED',{source:'quick_patient_flow'});
-    if (!quickTqData.time) setQuickTQTimeNow();
+    if (!quickTqData.time && !quickTqData.timeTyped) setQuickTQTimeNow();
+    else syncFlowTourniquetSupply();
   } else {
     reconcileSupplySource('quick:tq', 'tourniquets', 0);
   }
@@ -14333,10 +14571,14 @@ function setQuickTQTimeNow() {
   const t = n.getHours().toString().padStart(2,'0') + n.getMinutes().toString().padStart(2,'0');
   document.getElementById('quick-tq-time').value = t;
   quickTqData.time = t;
+  quickTqData.timeTyped = false;
+  syncFlowTourniquetSupply();
   document.getElementById('quick-tq-display').textContent = `שעת הנחה: ${t.slice(0,2)}:${t.slice(2)}`;
 }
 
 function onQuickTQTimeInput(val) {
+  const wasFromBag = flowTourniquetFromBag(quickTqData);
+  quickTqData.timeTyped = true;
   if (val.length === 4 && isValidTimeCode(val)) {
     quickTqData.time = val;
     document.getElementById('quick-tq-display').textContent = `שעת הנחה: ${val.slice(0,2)}:${val.slice(2)}`;
@@ -14344,19 +14586,14 @@ function onQuickTQTimeInput(val) {
     quickTqData.time = null;
     document.getElementById('quick-tq-display').textContent = '';
   }
+  if (wasFromBag) syncFlowTourniquetSupply();
 }
 
 function validateQuickTQTime(showToast=false) {
   const el=document.getElementById('quick-tq-time');
   const val=el?.value||'';
   if(!val) return true;
-  const ok=isValidTimeCode(val);
-  if(!ok){
-    quickTqData.time=null;
-    document.getElementById('quick-tq-display').textContent='שעה לא תקינה — השתמש בפורמט HHMM, 0000-2359';
-    if(showToast) toast('שעת חסם לא תקינה');
-  }
-  return ok;
+  return checkFlowTourniquetTime(val, quickTqData, document.getElementById('quick-tq-display'), showToast);
 }
 
 function toggleQuickLimb(btn, key) {
@@ -15794,7 +16031,13 @@ async function pullProjectedPatientState(incidentId){
   try{ tqResult=await client.from('tourniquets').select(SERVER_TOURNIQUET_COLUMNS).eq('incident_id', incidentId).eq('is_active', true); }
   catch(e){ return; }
   if(tqResult.error || !tqResult.data) return;
-  applyServerTourniquets(tqResult.data, incidentId);
+  // database/081 columns, read on their own so a server without 081 still gives the tourniquets.
+  let timeMeta=null;
+  try{
+    const m=await client.from('tourniquets').select(SERVER_TOURNIQUET_TIME_COLUMNS).eq('incident_id', incidentId).eq('is_active', true);
+    if(!m.error && Array.isArray(m.data)) timeMeta=m.data;
+  }catch(e){}
+  applyServerTourniquets(tqResult.data, incidentId, timeMeta);
 }
 // ── Rescue chain patient board (database/074) ──
 // rpc / rcc cannot read the patients table, the tourniquets table or clinical events. Their
@@ -15861,30 +16104,51 @@ function applyRescuePatientBoard(rows, incidentId){
 // Applied only to patients this device received from another device: a patient created here
 // keeps its own, richer tourniquet records (effectiveness, later limb correction, notes).
 const SERVER_TOURNIQUET_COLUMNS='id,patient_id,limb,applied_at,is_active,tourniquet_status';
+// How the start time was set (database/081): 'phone', 'entered' (from the body, with when it was
+// entered) or 'unknown' (already on the patient, no time yet).
+const SERVER_TOURNIQUET_TIME_COLUMNS='id,time_source,time_entered_at';
 // One patient's active tourniquets from server rows (SERVER_TOURNIQUET_COLUMNS).
-function serverTourniquetRecords(rows, patientId){
+function serverTourniquetRecords(rows, patientId, timeMeta=null){
+  const metaById=new Map((timeMeta||[]).map(m=>[m.id, m]));
   return rows.filter(r=>r.patient_id===patientId && r.is_active!==false).map(r=>{
     const meta=tourniquetLimbMeta(r.limb);
     // tourniquet_status comes from TOURNIQUET_REASSESSMENT (effectiveness check, V2.99.42).
     const effectiveness=r.tourniquet_status==='bleeding_continues'?'bleeding_continues':r.tourniquet_status==='effective'?'effective':'unknown';
-    return {id:`SRV-${r.id}`, appliedAt:Date.parse(r.applied_at)||null, limb:meta.key, limbLabel:meta.label, side:meta.side, bodyPart:meta.bodyPart,
+    const tq={id:`SRV-${r.id}`, appliedAt:Date.parse(r.applied_at)||null, limb:meta.key, limbLabel:meta.label, side:meta.side, bodyPart:meta.bodyPart,
       appliedBy:'(מכשיר אחר)', source:'server', status:effectiveness==='bleeding_continues'?'ineffective':'active', effectiveness, reasonForAdditional:null, note:''};
+    const time=metaById.get(r.id);
+    if(time && ['phone','entered','unknown'].includes(time.time_source)){
+      tq.timeSource=time.time_source;
+      tq.timeUnknown=time.time_source==='unknown';
+      const enteredAt=Date.parse(time.time_entered_at||'');
+      if(time.time_source==='entered' && Number.isFinite(enteredAt)) tq.timeEnteredAt=enteredAt;
+      if(time.time_source==='entered' && tq.appliedAt){ const d=new Date(tq.appliedAt); tq.timeCode=String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0'); }
+    }
+    return tq;
   }).filter(t=>t.appliedAt);
 }
-function applyServerTourniquets(rows, incidentId){
+function applyServerTourniquets(rows, incidentId, timeMeta=null){
   const site=INCIDENT_ID_TO_SITE[incidentId];
   const pending=patientsWithPendingLocalEdits();
   let changed=false;
   for(const p of patients){
     if(!p.sourcedFromRemote || pending.has(p.id)) continue; // local edit wins until pushed
     if(site && p.siteId && p.siteId!==site) continue;
-    const next=serverTourniquetRecords(rows, p.id);
-    const key=list=>JSON.stringify((list||[]).filter(t=>t.source==='server').map(t=>[t.id,t.limb,t.appliedAt,t.effectiveness]));
+    const next=serverTourniquetRecords(rows, p.id, timeMeta);
+    const key=list=>JSON.stringify((list||[]).filter(t=>t.source==='server').map(t=>[t.id,t.limb,t.appliedAt,t.effectiveness,t.timeSource||null]));
     if(key(p.tourniquets)===key(next) && (p.tourniquets||[]).every(t=>t.source==='server')) continue;
     // Clear the legacy p.tourniquet alias first: ensureTourniquetArray() rebuilds an empty
     // list from it, which would bring back a tourniquet the server has released.
     // Keep each tourniquet's last time alert, so a refreshed server row does not alert again.
-    next.forEach(t=>{ const prev=(p.tourniquets||[]).find(x=>x.id===t.id); if(!prev) return; ['timeAlertedLevel','timeAlertOpen','timeAlertSnooze'].forEach(k=>{ if(prev[k]!=null) t[k]=prev[k]; }); });
+    // A start time entered from the body (here or on another phone, owner 2026-11-08): the levels
+    // already passed when it was entered are seen, on this phone too, so they do not alert here.
+    next.forEach(t=>{
+      const prev=(p.tourniquets||[]).find(x=>x.id===t.id);
+      const moved=!prev || prev.appliedAt!==t.appliedAt;
+      if(prev && !moved){ ['timeAlertedLevel','timeAlertOpen','timeAlertSnooze'].forEach(k=>{ if(prev[k]!=null) t[k]=prev[k]; }); return; }
+      if(t.timeSource!=='entered' && prev){ ['timeAlertedLevel','timeAlertOpen','timeAlertSnooze'].forEach(k=>{ if(prev[k]!=null) t[k]=prev[k]; }); return; }
+      if(t.timeSource==='entered') t.timeAlertedLevel=tourniquetStageAt(t, t.timeEnteredAt||Date.now())||null;
+    });
     p.tourniquet=null;
     p.tourniquets=next;
     syncLegacyTourniquetAlias(p);
