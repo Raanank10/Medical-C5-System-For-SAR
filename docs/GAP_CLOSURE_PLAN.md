@@ -16,7 +16,7 @@ Update the status table at the bottom of this file in the same PR that finishes 
 
 - `index.html` is the only prototype file (WP-14 removed the `demo/rescue-app.html` copy, D5).
 - Bump `APP_VERSION` and the visible version labels together, one version per merged PR. `check_repo.py` fails if they disagree.
-- New SQL goes in a new numbered file, starting at `database/047_...`. Never edit an applied migration. Every new trigger function: `SECURITY DEFINER`, `set search_path`, and `revoke execute ... from public, anon, authenticated` (see `046`). Run `get_advisors` after applying.
+- New SQL goes in a new numbered file (round 1 started at `database/047_...`; for round 2 see "Numbering in this round"). Never edit an applied migration. Every new trigger function: `SECURITY DEFINER`, `set search_path`, and `revoke execute ... from public, anon, authenticated` (see `046`). Run `get_advisors` after applying.
 - Any new event type must be added in four places at once: the `event_type` enum (migration), `ROLE_ALLOWED_EVENT_TYPES` in `supabase/functions/sync-log/index.ts`, `SYNC_ELIGIBLE_EVENT_TYPES` in the HTML, and the contract list from WP-1.
 - Deploy order when a WP has server parts: migration, then `sync-log` Edge Function, then client. The client must keep working if the migration is not applied yet (separate queries, tolerate missing columns), as `044` did.
 - Clinical, sync-conflict and RLS changes are never auto-merged. The owner verifies them live against the real accounts (CLAUDE.md, "Safety and data policy").
@@ -351,6 +351,261 @@ Add a CI job running `npm ci`, then every `scripts/browser_*.js` with the pre-in
 
 ---
 
+## Round 2: gaps from the V2.99.71 feature map (2026-11-14)
+
+The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71), the open PR #128 and the live project (read-only queries). Most of round 1 is built and has run on phones (202 events, 27 patients, 11 tourniquets, 5 stored reports, 28 server watchdog alerts live). What is left is below, one WP per new conversation, same rules as above.
+
+**Numbering in this round.** PR #128 takes V2.99.72 and `database/080`, `081`. The first WP of this round to merge takes V2.99.73 and `database/082`; after that, take the next free version and file number from `main` right before merging, not when starting (parallel sessions have collided on both several times: #110, #119, #120, #125, #126, #127).
+
+**Order.**
+1. WP-19 and WP-20 first. They are independent of each other.
+2. WP-21 (the live two-phone run) after both, so it tests the fixed stock path and the 100-minute alert.
+3. WP-22 after WP-19, so the rejected stock movements can be resent instead of closed.
+4. WP-23 to WP-27, one at a time (they all touch `index.html`; owner decisions from 2026-10-23).
+5. WP-29 after WP-20 (it replaces the same server function).
+6. WP-28, WP-30, WP-31 and WP-33 wait for an owner answer; ask it first in the session.
+7. WP-32 and WP-34 to WP-37 any time.
+
+| Round 2 WP | Title | Priority | Needs from the owner first |
+| --- | --- | --- | --- |
+| WP-19 | Stock movements reach the server | P1 | - |
+| WP-20 | Finish PR #128 and apply 079-081 | P1 | 2 answers on #128 |
+| WP-21 | Live two-phone run (WP-0 part 2) | P1 | people and two phones |
+| WP-22 | Close or resend the open sync rejections | P2 | approval per group |
+| WP-23 | Injury time editable in the field | P2 | - (decided 2026-10-23) |
+| WP-24 | CC "fulfilled by company" / "closed" synced | P2 | - (decided 2026-10-23) |
+| WP-25 | Medic incident type and mismatch report synced | P2 | - (decided 2026-10-23) |
+| WP-26 | PC deterioration review request synced | P2 | - (decided 2026-10-23) |
+| WP-27 | CC moves a site's patients to another platoon | P2 | one design question |
+| WP-28 | The 27 never-sent event types | P2 | build / keep / remove per type |
+| WP-29 | Dead Man's Switch on the server | P2 | recipients |
+| WP-30 | Telegram critical alerts (B1) | P2 | the 19 alert answers, a bot |
+| WP-31 | MARCH completion rule and hands-on PC | P2 | clinical criteria |
+| WP-32 | Evacuation point leftovers (WP-18) | P2 | - |
+| WP-33 | CC all-incidents: what counts as an alert | P3 | one answer |
+| WP-34 | Test gaps: AAR screen, analytics pytest in CI | P3 | - |
+| WP-35 | Record what is applied live | P3 | - |
+| WP-36 | Demo constants in signed-in paths | P3 | - |
+| WP-37 | External report unlink tombstone | P3 | - |
+
+---
+
+### WP-19: Stock movements reach the server (P1, found 2026-11-13)
+
+**Why.** No medic-bag stock movement has ever been stored. `inventory_ledger_v12` has 0 rows live, so logistics and CC see no incident-wide burn rate and no bag counts (WP-9 works only in stubbed tests). `SUPPLY_CONSUMED` (18 stored) is audit only by design, so it does not count.
+
+**Evidence.**
+- `consumeFieldSupply()` (`index.html` ~17247) builds `INVENTORY_LEDGER_MOVEMENT` with `patient_id: state.patientDraftId || patientId` (~17285). `freshState()` (~4846) always sets `patientDraftId` to `draft-<time>-<id>`, so every movement carries a draft id, also when a saved patient is open.
+- `saveLocalEvent()` (~14415) copies `payload_json.patient_id` to the top-level `patient_id`, so the event row gets a non-UUID patient id and the insert fails: 19 rows in `sync_ingestion_errors`, Oct 22-25, `MALFORMED_EVENT_ENVELOPE`, `invalid input syntax for type uuid: "draft-..."`.
+- Intake: `savePatient()` calls `queueInventoryBeforeSave(newId)` (~12244), where `newId` is the visible number (`P004-DK`), not `patientUuid`, and before `PATIENT_CREATED` is queued.
+- `LOCAL_STOCKOUT_WARNING` (~17299) and `SUPPLY_CONSUMED` (~17260) use `patientId || state.patientDraftId`, so they hit the same problem whenever `patientId` is missing or is a visible number.
+- The server side is fine: `project_inventory_movement()` (`database/062` ~112) already keeps a payload patient id only when it is a real patient.
+
+**Steps.**
+1. Write the failing browser test first (extend `scripts/browser_inventory_sync_test.js`): a medic uses a bandage on a saved patient, and a tourniquet during intake of a new patient; assert every pushed event has a UUID `patient_id` or none, and the stub server stores both movements.
+2. Movements on a saved patient: top-level and payload `patient_id` = that patient's UUID. Keep the draft or visible number only as `patient_context` for display.
+3. Movements during intake: send them after `PATIENT_CREATED` with the new UUID (the pattern `queueTourniquetAppliedEvent` uses), or with no patient id if the order cannot be kept. Pass `patientUuid`, not `newId`, to `queueInventoryBeforeSave`.
+4. Apply the same rule to `SUPPLY_CONSUMED` and `LOCAL_STOCKOUT_WARNING`.
+5. A movement with no patient (PC truck issue, logistics receipt) is unchanged.
+6. Already-queued bad movements on phones: on load, rewrite an unsynced movement's draft `patient_id` to the saved patient's UUID if the phone can map it, else drop the patient id and keep the movement. Never drop the movement itself.
+
+**Verify.** The new test fails on `main` and passes after. Full `npm test`. Live after merge: one medic uses supplies on two patients; `select count(*) from inventory_ledger_v12` rises and no new `sync_ingestion_errors` rows appear.
+
+**Done when.** Every bag movement from every entry path is stored live, and the logistics board shows the incident-wide burn rate from server rows.
+
+---
+
+### WP-20: Finish PR #128 and apply 079-081 (P1)
+
+**Why.** The phone raises the 100-minute tourniquet decision alert (V2.99.70) but the server watchdog does not: `database/079` is not applied (checked live 2026-11-13: `run_clinical_watchdog` has no `TOURNIQUET_TIME_DECISION`). PR #128 (time written on the body, V2.99.72) is ready but waits on two owner answers.
+
+**Steps.**
+1. Ask the owner the two open questions from the PR #128 session: (a) the day rule for a typed body time (up to 5 min ahead of the phone clock = now; 5-60 min ahead refused; more than 1 h ahead read as yesterday, asking first past 12 h); (b) whether a typed time still takes a tourniquet from the medic's bag (recommendation: no, the tourniquet may come from another kit).
+2. Apply the answers on the PR branch, rebase on `main`, run every test, wait for the owner's merge.
+3. After merge, in this order: `database/079`, `080`, `081` (each through `apply_migration`, or by the owner in the SQL editor; record which), then redeploy `sync-log` from `main`'s file (live is v16; the new one must contain every change since v16). `get_advisors` after each step.
+4. Live check, rolled back: a tourniquet 101 minutes old gets `TOURNIQUET_TIME_DECISION`, its `WARNING` is resolved, and the next run does not raise it again.
+
+**Done when.** #128 is merged, 079-081 and the new `sync-log` are live, and the status table says so.
+
+---
+
+### WP-21: Live two-phone run (P1, WP-0 part 2)
+
+**Why.** Only 1 event reached the server in the 14 days before 2026-11-13. V2.99.67 to 72 have never pushed a record. WP-0 part 2 has never run, and it is the Phase 4 gate (with field Session 2).
+
+**Steps.** This is mostly the owner's run; the session prepares it and reads the results.
+1. Before: read-only counts for a new incident (events by type, `patients`, `tourniquets`, `inventory_ledger_v12`, `watchdog_alerts`, `sync_ingestion_errors`).
+2. The owner runs WP-0 part 2 (section "Part 2" below) with a real `medic` and a real `pc` account, not admin, plus: one MSTART sweep of 3 casualties; a second medic account with the same initials creating a patient offline (WP-17); evacuation-point arrival marked by the PC (WP-18); one tourniquet left past 60 minutes with the network off (D1), then snoozed once; a conversion to direct pressure; one stock use per patient (WP-19); install the PWA on one Android and one iPhone and reload offline (WP-10); open one `handover-consume` link (T6).
+3. After: rerun the queries; list every rejection with its cause; write the results into "Baseline results" and mark each round-2 WP confirmed, changed or not needed.
+
+**Done when.** The results are in this file and every red item has a WP.
+
+---
+
+### WP-22: Close or resend the open sync rejections (P2)
+
+**Why.** 55 rejections are open live and none has ever been closed, although closing exists since V2.99.55 (`database/071`). An always-full panel hides new problems.
+
+**Groups (live, 2026-11-13).**
+
+| Group | Rows | Cause | Proposal |
+| --- | --- | --- | --- |
+| August RLS / role tests (`TEST-DEVICE-*`, `P-TEST-001`) | 8 | deliberate test cases | close, reason "test data" |
+| Oct 17-18 admin phone tests (`PHONE-SPSZ`, `PHONE-LTKE`) | 10 | 5 creates refused by RLS for admin (fixed by `047`), 5 follow-ups failed the foreign key | close, "not recoverable", note the fix |
+| Oct 20 sweep, `PHONE-SPSZ` | 18 | 9 patients on a duplicate `TMP-001` and their 9 location updates (fixed by WP-17) | resend from that phone if it still has them; else close "not recoverable" |
+| Oct 22-25 stock movements | 19 | draft patient id (WP-19) | after WP-19, let the phones resend; close what remains |
+
+**Steps.** Re-run the grouping query first (counts drift). Present the table to the owner and get approval per group. The owner closes them from the command panel, or approves `resolve_sync_ingestion_error()` calls run as a command account; never `delete` and never a direct `update` that bypasses the audited function. The rows themselves stay (audit history).
+
+**Done when.** The panel shows only rejections that still need someone, each closed one has a reason, and nothing was deleted.
+
+---
+
+### WP-23: Injury time editable in the field (P2, owner 2026-10-23)
+
+**Why.** Owner decision 2026-10-23 (feature-map session): injury time starts as the alert time and the medic can change it in the field. Today it is never captured, so golden-hour figures in the stored report use the event's own time. The server already applies `PATIENT_T_INJURY_UPDATED` (`database/013` ~161 sets `patients.t_injury`), and the type is in `SYNC_ELIGIBLE_EVENT_TYPES`, but nothing sends it (event contract: synced, never emitted).
+
+**Steps.**
+1. Patient creation: set `t_injury` to the incident's alert time (or the time the medic opened the incident) and send it in the create payload; check what `013` reads on create.
+2. Patient screen: an "שעת פציעה" row with a time picker (same pattern and day rule as the body-time entry in #128, so medics learn one control). Sends `PATIENT_T_INJURY_UPDATED` with `payload_json.t_injury` (ISO).
+3. Other phones and the stored report read `patients.t_injury`; show "שעת פציעה (משוערת)" until someone edits it.
+4. Who may edit: medic, paramedic, physician, PC (ask the owner whether CC too).
+
+**Verify.** New browser test across two phones; check `068`'s report uses `t_injury` for golden-hour figures. Timing logic: owner reviews (CLAUDE.md, clinically relevant timing).
+
+---
+
+### WP-24: CC "fulfilled by company" / "closed" synced (P2, owner 2026-10-23)
+
+**Why.** WP-6 left them local: the CC's decision never reaches the medic, PC or logistics. A medic's `RESUPPLY_REQUEST_ESCALATED_CC` is also still projected at the `medic_to_pc` level (`033`).
+
+**Steps.** Copy WP-6 (`database/059`): new enum values or reasons for the two CC outcomes, resolved by `supply_request_id`, only cc/chamal/admin change the row to those statuses; add the types to the four places (enum, `sync-log`, `SYNC_ELIGIBLE_EVENT_TYPES`, contract); fix the escalation level while there. Client: emit with the server id; the medic, PC and logistics boards follow.
+
+**Verify.** Extend `scripts/browser_resupply_decision_sync_test.js` (medic, PC, CC, logistics). Live RLS impersonation, rolled back; `get_advisors`.
+
+---
+
+### WP-25: Medic incident type and mismatch report synced (P2, owner 2026-10-23)
+
+**Why.** WP-8 follow-up: a signed-in medic's incident-type pick stays on the phone, and `INCIDENT_TYPE_MISMATCH_REPORTED` (event contract `known_gaps`) never reaches the PC or rescue.
+
+**Steps.**
+1. Decide with the owner in one question: is the medic's pick a proposal (the PC or RCC confirms) or does it set `incidents.incident_type` when none is set? Recommendation: proposal only; site authority stays with rpc/rcc (`060`).
+2. Sync `INCIDENT_TYPE_MISMATCH_REPORTED`; project it into `incident_site_authority` (or a small table) and show it on the PC and RCC boards until handled.
+3. Remove the type from `known_gaps`.
+
+**Verify.** Extend `scripts/browser_rescue_site_authority_test.js`.
+
+---
+
+### WP-26: PC deterioration review request synced (P2, owner 2026-10-23)
+
+**Why.** `PC_REVIEW_REQUESTED_FOR_DETERIORATION` stays on the phone (WP-5 `known_gaps`). A medic asking the PC to look at a worsening patient is lost if the PC is on another phone.
+
+**Steps.** Decide the shape with the owner: a `medical_resource_requests` row with resource type `pc_review` (reuses `052`, its RLS and status flow; recommended) or its own event and table. Then the four places, the PC strip shows it as an alert line, the PC closes it.
+
+**Verify.** Extend `scripts/browser_reinforcement_sync_test.js` (medic, PC).
+
+---
+
+### WP-27: CC moves a site's patients to another platoon (P2, owner 2026-10-23)
+
+**Why.** Owner 2026-10-23: the CC moves a site's patients from one platoon to another (example: platoon A hands over to B for rest). Today `PATIENT_REASSIGNED_BETWEEN_PLATOONS` / `_WITHIN_PLATOON` are demo-only (`index.html` ~8052, `known_gaps` WP-7).
+
+**Open design question (ask first).** One incident belongs to one platoon (`045`, `053`). Moving a whole site = changing the incident's platoon (a CC version of `set_incident_platoon`, plus membership for the new platoon's medics and PC). Moving some patients only = splitting the site into two incidents. Recommendation: whole site only; splitting is a merge in reverse and much larger.
+
+**Steps (whole site).** A `SECURITY DEFINER` RPC for cc/chamal/admin: sets the incident's platoon, adds the new platoon's PC and medics as members, keeps the old ones as read-only until they leave or the owner decides, writes an audited event. The incident-opened banner logic (`064`) informs the new platoon's RPC. Client: CC action on the incident row; both platoons' boards follow.
+
+**Verify.** RLS impersonation for old PC, new PC, both medics, rolled back; extend `scripts/browser_platoon_security_test.js`. RLS change: owner verifies live, never auto-merged.
+
+---
+
+### WP-28: The 27 never-sent event types (P2, needs the owner's list)
+
+**Why.** 34 synced types are never written by the phone; 7 are lifecycle types the server writes itself, so 27 are allowed but unused (list in the event contract: `synced` minus what `index.html` emits). They mislead new sessions into assuming features exist.
+
+**Steps.**
+1. Show the owner the list from the 2026-10-23 session (notes, command/AAR notes, voice memo, SABCDE, minimal triage, patient identified, injury update, JumpSTART x2, MSTART suggested, tourniquet context, two safety records, two conflict records, watchdog resolved, 8 old inventory types, `MEDIC_SITE_CLOSE_REQUESTED`, plus `DEAD_MAN_SWITCH_ESCALATED` on the server list). Proposal: remove the 8 old inventory types, the two conflict records and `DEAD_MAN_SWITCH_ESCALATED`; keep the rest as owed; build `NOTE_ADDED`, `PATIENT_IDENTIFIED` and `MEDIC_SITE_CLOSE_REQUESTED` as later WPs.
+2. Remove: take each out of `SYNC_ELIGIBLE_EVENT_TYPES`, the contract's `synced` list and `ROLE_ALLOWED_EVENT_TYPES` in `sync-log`. Leave the enum values (Postgres cannot drop one safely, and old rows may use them). Add a contract section `server_accepts_unused` if a type stays allowed but unused, with the WP that will build it.
+3. Each "build" answer becomes its own WP in this file.
+
+**Verify.** `check_repo.py` passes; deploy `sync-log` from `main`'s file.
+
+---
+
+### WP-29: Dead Man's Switch on the server (P2)
+
+**Why.** If a medic's phone goes silent, only phones that are open notice (`isDeviceSilent`, 10 min, `src/domain/rules.js` ~204). Heartbeats are already on the server (`device_presence`, 17 rows live), so the minute job can raise it (WP-12 "not built").
+
+**Depends on.** WP-20: `081` replaces `app.run_clinical_watchdog()` again; start from 081's body, not 072's or 079's.
+
+**Steps.** In the watchdog: for each open incident, a medic/paramedic member whose `device_presence.last_heartbeat_at` is older than 10 minutes while they have patients not handed over raises one `DEAD_MAN_SWITCH` alert (dedupe per device per silence), resolved by the next heartbeat. Ask the owner who sees it (proposal: PC and CC of the incident). Client: list it like the other server alerts, marked "(שרת)", only when the phone does not already show its own. Then decide in WP-28 whether `DEAD_MAN_SWITCH_ESCALATED` stays.
+
+**Verify.** Rolled-back live run: stale heartbeat raises, a fresh one resolves, second run idempotent; extend `scripts/browser_server_watchdog_test.js`. Threshold change rules apply (CLAUDE.md).
+
+---
+
+### WP-30: Telegram critical alerts (P2, B1, needs the owner's answers)
+
+**Why.** B1 (owner 2026-10-21): an extra channel for critical alerts when no phone is open. The phone's own offline alert stays primary.
+
+**Before starting.** The owner answers yes / no and recipients for each of the 19 alerts listed in the 2026-10-23 session (11 the server already knows, 8 phone-only). Build only the yes answers the server knows; phone-only ones need their own WP first.
+
+**Steps.** A bot created by the owner; its token stored as an Edge Function secret (never in the repo or chat); a table of Telegram chat ids per profile, filled by a `/start` link flow; an Edge Function or `pg_net` call from the watchdog that sends "critical alert, incident X, open the app" with no patient details (privacy review); retries without duplicates; an opt-out. Privacy review update in the same PR.
+
+**Verify.** A test bot and a test chat; rolled-back trigger runs; no patient field in any message.
+
+---
+
+### WP-31: MARCH completion rule and hands-on PC (P2, B2, clinical)
+
+**Why.** The MARCH-PAWS step shipped (V2.99.62, V2.99.69), but `marchStatus()` in `src/domain/rules.js` does not exist, so nothing says when a letter is complete, and a PC who goes hands-on has no MARCH flow.
+
+**Steps.** Get the owner's completion criteria per letter first (clinical sign-off; do not invent them). Then `marchStatus(patient)` in `rules.js` with tests in `tests/domain-rules.test.js`, inlined in `index.html` (the drift check enforces it), the letter strip reads it, then the PC hands-on entry. Never auto-merged.
+
+---
+
+### WP-32: Evacuation point leftovers (P2, WP-18)
+
+**Steps.** (1) `get_rescue_patient_board()` (`database/074`) returns moving vs arrived instead of "בפינוי" for both, without colours (074's rule). (2) The stored report (`068`) adds waiting time at the evacuation point: count, median, longest, from `evac_point_arrived_at` to handover. (3) Truck stock per evacuation point stays out until the owner asks.
+
+**Verify.** Extend `scripts/browser_evac_point_arrival_test.js` and `scripts/browser_incident_close_report_test.js`; rolled-back live check of both functions.
+
+---
+
+### WP-33: CC all-incidents: what counts as an alert (P3, one answer)
+
+Ask the owner (open in the 2026-11-08 PC/CC session): on the all-incidents page, does a red patient alone count as an alert ("פצוע אדום")? Recommendation: no, only a red patient with a real problem (no evacuation status, tourniquet past 120 min, trapped with no medic contact); the tables already show red counts. Inside an incident nothing changes. Extend `scripts/browser_command_panel_test.js`.
+
+---
+
+### WP-34: Test gaps (P3)
+
+1. The AAR screen has no interaction test (`PRODUCTION_READINESS.md`): add `scripts/browser_aar_screen_test.js` for the live AAR view and the stored report list.
+2. The analytics `pytest` suite is not in CI: a third CI job that sets up Python, installs `analytics/c5_sentinel_sar_analytics_v1_1/requirements.txt` and runs `python -m pytest` there. Keep it separate from the fast `repo-check`.
+
+---
+
+### WP-35: Record what is applied live (P3)
+
+**Why.** Files applied in the SQL editor are missing from the live migration list (checked 2026-11-13: `042`, `053`, `073`, `074`, `075`, `077` and others exist live as objects but have no migration row), and live names differ from repo numbers. Nobody can tell from the live history what is applied.
+
+**Steps.** Read-only: for each `database/0NN_*.sql`, probe one object it creates (function, column, policy, enum value) and record applied / not applied, the live migration name if any, and who applied it, in a new table in `docs/ARCHITECTURE.md` "Backend Deployment Status" (or a new `docs/LIVE_SCHEMA_STATUS.md` added to `REQUIRED_PATHS`). No writes to the database. This is the input for Phase 4C.
+
+---
+
+### WP-36: Demo constants in signed-in paths (P3)
+
+`'SITE_A'` (60 uses) and `'PLT-A'` (25 uses) still appear in `index.html`. Classify each use as demo-only or signed-in, fix the signed-in ones to use real ids, and list what stays. Same method as WP-7 step 3.
+
+---
+
+### WP-37: External report unlink tombstone (P3)
+
+`database/069` (header, "Known limit"): an unlink leaves no tombstone, so a link recorded offline before an unlink but pushed after it comes back. Fix: compare the event's phone time with the latest unlink for that pair and ignore older links; record the ignored one. Extend `scripts/browser_external_report_link_test.js`; rolled-back live check.
+
+---
+
 ## Tracks outside this plan's PRs
 
 These need a decision, people or money rather than a code change in this repo. Listed so nothing is lost:
@@ -393,6 +648,25 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-17 Lost patients on a duplicate number | P0 | Client done (V2.99.51); `sync-log` deployed live as v13 on 2026-10-22 = the live v12 (D9, `database/068`, in `main` since V2.99.52) plus WP-17. Whoever deploys `sync-log` next must start from a file that has both; live two-phone check pending | this PR | found by the 2026-10-22 feature-map audit from live `sync_ingestion_errors`; ids carry the registrant's initials (owner decision); the server renames a clash instead of dropping the patient |
 | WP-18 Evacuation point arrival | P2 | Done (V2.99.66): 076 + 077 + 078 live, `sync-log` v16, verified rolled back 2026-10-24; real two-phone check pending | #120, this PR | `PATIENT_EVAC_POINT_ARRIVED` (medic/paramedic/physician/PC), earliest phone time wins, moving vs arrived on every board with waiting minutes, no alert (owner). Open: rescue board wording, waiting time in the stored report, truck stock per evacuation point (gap 3) |
 | Tourniquet 100 min + remind me later | P1 | Client done (V2.99.70); `database/079` written, tested on local PostgreSQL 16, not applied live | this PR | owner 2026-10-26: alerts at 45/60/100/120 min, then every hour (3 h ... 6 h and on, phone only); banner buttons "open patient" / "remind me in N min" (5x2, 5x2, 2x1, 1x1), chip while put off, comes back vibrating; delays sent as `WATCHDOG_ALERT` reasons `tourniquet_snoozed` / `tourniquet_alert_opened`; PC/CC strip line, last delay vibrates PC/CC. "המרה ללחץ ישיר" on the patient screen: medic / PC up to 120 min, paramedic up to 4 h, physician up to 6 h (owner 2026-11-08), sent as `TOURNIQUET_RELEASED` reason `converted_direct_pressure`; phone-side check only |
+| WP-19 Stock movements reach the server | P1 | Not started | | found 2026-11-13: 0 ledger rows live, 19 rejections for a `draft-` patient id |
+| WP-20 Finish #128, apply 079-081 | P1 | Waiting on 2 owner answers | #128 | then 079, 080, 081, `sync-log` from main |
+| WP-21 Live two-phone run | P1 | Not started | | WP-0 part 2 plus WP-17/18/19, D1 offline, WP-10 install, T6 |
+| WP-22 Open sync rejections | P2 | Not started | | 55 open, 0 ever closed; after WP-19 |
+| WP-23 Injury time editable | P2 | Not started | | owner 2026-10-23; server already applies `PATIENT_T_INJURY_UPDATED` |
+| WP-24 CC fulfilled / closed synced | P2 | Not started | | owner 2026-10-23 (WP-6 remainder) |
+| WP-25 Medic incident type + mismatch | P2 | Not started | | owner 2026-10-23 (WP-8 follow-up) |
+| WP-26 PC deterioration review | P2 | Not started | | owner 2026-10-23 (WP-5 `known_gaps`) |
+| WP-27 CC moves a site to another platoon | P2 | Not started, 1 design question | | owner 2026-10-23 (WP-7 remainder); RLS |
+| WP-28 27 never-sent event types | P2 | Waiting on owner's list | | |
+| WP-29 Dead Man's Switch on the server | P2 | Not started, after WP-20 | | builds on 081's watchdog |
+| WP-30 Telegram alerts (B1) | P2 | Waiting on owner's 19 answers | | |
+| WP-31 MARCH completion + hands-on PC | P2 | Waiting on clinical criteria | | B2 |
+| WP-32 Evacuation point leftovers | P2 | Not started | | WP-18 remainder |
+| WP-33 CC all-incidents alert rule | P3 | Waiting on 1 owner answer | | |
+| WP-34 Test gaps | P3 | Not started | | AAR screen test, analytics pytest in CI |
+| WP-35 Record what is applied live | P3 | Not started | | read-only |
+| WP-36 Demo constants | P3 | Not started | | `SITE_A` x60, `PLT-A` x25 |
+| WP-37 Unlink tombstone | P3 | Not started | | `database/069` known limit |
 
 ## Revisions after #73 (2026-10-19)
 
