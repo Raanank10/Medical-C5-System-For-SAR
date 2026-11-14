@@ -47,10 +47,11 @@
   };
   // A tourniquet time read from the 4 digits written on the body (owner, 2026-11-08). There is no
   // date, so the day is inferred: up to 5 minutes after the phone's clock counts as "just now" (a
-  // first responder's watch running a little fast); 5 to 60 minutes after it is refused as later
-  // than the phone's clock (a typo or a wrong watch, never silently read as almost a day ago); later
-  // than that it is yesterday (2350 entered at 00:20). A time more than 12 hours ago, either way, is
-  // accepted only after the medic confirms it, which shows how long that would be.
+  // first responder's watch running a little fast); 5 to 60 minutes after it is not read at all,
+  // the medic is asked (owner, 2026-11-14): type it again (a typo or a wrong watch), yesterday at
+  // that time (reported here as yesterdayAtMs / yesterdayMinutesAgo), or no time; later than that it
+  // is yesterday (2350 entered at 00:20). A time more than 12 hours ago, either way, is accepted only
+  // after the medic confirms it, which shows how long that would be.
   const TOURNIQUET_TIME_FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
   const TOURNIQUET_TIME_FUTURE_REFUSE_MS = 60 * 60 * 1000;
   const TOURNIQUET_TIME_CONFIRM_AFTER_MS = 12 * 60 * 60 * 1000;
@@ -280,8 +281,8 @@
     return day.getTime();
   }
 
-  // { ok, appliedAtMs, minutesAgo, needsConfirm } or { ok: false, reason: 'format' | 'future',
-  // aheadMinutes }.
+  // { ok, appliedAtMs, minutesAgo, needsConfirm }, { ok: false, reason: 'format' } or
+  // { ok: false, reason: 'future', aheadMinutes, yesterdayAtMs, yesterdayMinutesAgo }.
   function parseTourniquetTimeCode(code, nowMs = Date.now()) {
     const text = String(code == null ? "" : code).trim();
     if (!/^\d{4}$/.test(text)) return { ok: false, reason: "format" };
@@ -298,10 +299,11 @@
     if (todayMs - nowMs <= TOURNIQUET_TIME_FUTURE_TOLERANCE_MS) {
       return { ok: true, appliedAtMs: nowMs, minutesAgo: 0, needsConfirm: false };
     }
-    if (todayMs - nowMs <= TOURNIQUET_TIME_FUTURE_REFUSE_MS) {
-      return { ok: false, reason: "future", aheadMinutes: Math.ceil((todayMs - nowMs) / 60000) };
-    }
     day.setDate(day.getDate() - 1);
+    if (todayMs - nowMs <= TOURNIQUET_TIME_FUTURE_REFUSE_MS) {
+      return { ok: false, reason: "future", aheadMinutes: Math.ceil((todayMs - nowMs) / 60000),
+        yesterdayAtMs: day.getTime(), yesterdayMinutesAgo: Math.floor((nowMs - day.getTime()) / 60000) };
+    }
     const age = nowMs - day.getTime();
     return { ok: true, appliedAtMs: day.getTime(), minutesAgo: Math.floor(age / 60000), needsConfirm: age > TOURNIQUET_TIME_CONFIRM_AFTER_MS };
   }

@@ -2790,10 +2790,11 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   };
   // A tourniquet time read from the 4 digits written on the body (owner, 2026-11-08). There is no
   // date, so the day is inferred: up to 5 minutes after the phone's clock counts as "just now" (a
-  // first responder's watch running a little fast); 5 to 60 minutes after it is refused as later
-  // than the phone's clock (a typo or a wrong watch, never silently read as almost a day ago); later
-  // than that it is yesterday (2350 entered at 00:20). A time more than 12 hours ago, either way, is
-  // accepted only after the medic confirms it, which shows how long that would be.
+  // first responder's watch running a little fast); 5 to 60 minutes after it is not read at all,
+  // the medic is asked (owner, 2026-11-14): type it again (a typo or a wrong watch), yesterday at
+  // that time (reported here as yesterdayAtMs / yesterdayMinutesAgo), or no time; later than that it
+  // is yesterday (2350 entered at 00:20). A time more than 12 hours ago, either way, is accepted only
+  // after the medic confirms it, which shows how long that would be.
   const TOURNIQUET_TIME_FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
   const TOURNIQUET_TIME_FUTURE_REFUSE_MS = 60 * 60 * 1000;
   const TOURNIQUET_TIME_CONFIRM_AFTER_MS = 12 * 60 * 60 * 1000;
@@ -3023,8 +3024,8 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     return day.getTime();
   }
 
-  // { ok, appliedAtMs, minutesAgo, needsConfirm } or { ok: false, reason: 'format' | 'future',
-  // aheadMinutes }.
+  // { ok, appliedAtMs, minutesAgo, needsConfirm }, { ok: false, reason: 'format' } or
+  // { ok: false, reason: 'future', aheadMinutes, yesterdayAtMs, yesterdayMinutesAgo }.
   function parseTourniquetTimeCode(code, nowMs = Date.now()) {
     const text = String(code == null ? "" : code).trim();
     if (!/^\d{4}$/.test(text)) return { ok: false, reason: "format" };
@@ -3041,10 +3042,11 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     if (todayMs - nowMs <= TOURNIQUET_TIME_FUTURE_TOLERANCE_MS) {
       return { ok: true, appliedAtMs: nowMs, minutesAgo: 0, needsConfirm: false };
     }
-    if (todayMs - nowMs <= TOURNIQUET_TIME_FUTURE_REFUSE_MS) {
-      return { ok: false, reason: "future", aheadMinutes: Math.ceil((todayMs - nowMs) / 60000) };
-    }
     day.setDate(day.getDate() - 1);
+    if (todayMs - nowMs <= TOURNIQUET_TIME_FUTURE_REFUSE_MS) {
+      return { ok: false, reason: "future", aheadMinutes: Math.ceil((todayMs - nowMs) / 60000),
+        yesterdayAtMs: day.getTime(), yesterdayMinutesAgo: Math.floor((nowMs - day.getTime()) / 60000) };
+    }
     const age = nowMs - day.getTime();
     return { ok: true, appliedAtMs: day.getTime(), minutesAgo: Math.floor(age / 60000), needsConfirm: age > TOURNIQUET_TIME_CONFIRM_AFTER_MS };
   }
@@ -8531,9 +8533,10 @@ function tourniquetEntriesFromState(){
   const src=quickTqData.applied ? quickTqData : state.interventions.has('tourniquet') ? tqData : null;
   if(!src) return [];
   const now=Date.now();
-  const parsed=src.time ? C5Rules.parseTourniquetTimeCode(src.time, now) : null;
-  const known=!!(parsed && parsed.ok);
-  const appliedAt=known ? parsed.appliedAtMs : now;
+  const resolved=src.time && src.resolvedTimeCode===src.time && Number.isFinite(src.resolvedAppliedAt); // "yesterday" chosen
+  const parsed=src.time && !resolved ? C5Rules.parseTourniquetTimeCode(src.time, now) : null;
+  const known=resolved || !!(parsed && parsed.ok);
+  const appliedAt=resolved ? src.resolvedAppliedAt : known ? parsed.appliedAtMs : now;
   const timeSource=!known ? 'unknown' : src.timeTyped ? 'entered' : 'phone';
   const limbs=[...(src.limbs||[])].map(l=>FLOW_LIMB_TO_TOURNIQUET_LIMB[l]||tourniquetLimbKey(l));
   return (limbs.length?limbs:['unknown']).map((limb,i)=>{
@@ -9290,8 +9293,34 @@ function convertTourniquetToDirectPressure(patientId, tourniquetId){
 // on, and the next level alerts as usual. The entry is sent as TOURNIQUET_TIME_RECORDED, which moves
 // the server row's applied_at (database/081) so other phones and the server watchdog follow it.
 function tourniquetHhmm(ms){ return new Date(ms).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}); }
-function tourniquetFutureTimeMessage(code, parsed){
-  return `השעה ${code.slice(0,2)}:${code.slice(2)} מאוחרת ב-${parsed.aheadMinutes} דק׳ מהשעה בטלפון (${tourniquetHhmm(Date.now())}). בדוק את השעה שנכתבה על הגוף.`;
+function tourniquetAgoText(minutes){
+  const h=Math.floor(minutes/60), m=minutes%60;
+  return h ? `${h} שעות ו-${m} דק׳` : `${m} דק׳`;
+}
+// A time 5-60 minutes after the phone's clock (owner, 2026-11-14): never refused, never guessed.
+// Three buttons: type it again, yesterday at that time, or no time.
+function showTourniquetAheadChoice(code, parsed, {onRetype, onYesterday, onUnknown, unknownLabel='השאר ללא שעה'}){
+  let el=document.getElementById('tq-time-ahead');
+  if(!el){
+    el=document.createElement('div');
+    el.id='tq-time-ahead';
+    el.className='tq-time-entry-overlay';
+    el.style.zIndex='660';
+    document.body.appendChild(el);
+  }
+  const hhmm=`${code.slice(0,2)}:${code.slice(2)}`;
+  el.innerHTML=`<div class="tq-time-entry-card" role="dialog" aria-label="שעת חסם מאוחרת מהשעה בטלפון">
+    <div style="font-size:15px;font-weight:900">השעה ${hhmm} מאוחרת ב-${parsed.aheadMinutes} דק׳ מהשעה בטלפון (${tourniquetHhmm(Date.now())}). מה נכון?</div>
+    <div class="tq-alert-actions stacked">
+      <button class="tq-alert-btn primary" data-tq-ahead="retype">הקלד שוב</button>
+      <button class="tq-alert-btn" data-tq-ahead="yesterday">אתמול ${hhmm} (לפני ${tourniquetAgoText(parsed.yesterdayMinutesAgo)})</button>
+      <button class="tq-alert-btn" data-tq-ahead="unknown">${unknownLabel}</button>
+    </div>
+  </div>`;
+  const pick=(fn)=>()=>{ el.remove(); if(fn) fn(); };
+  el.querySelector('[data-tq-ahead="retype"]').onclick=pick(onRetype);
+  el.querySelector('[data-tq-ahead="yesterday"]').onclick=pick(onYesterday);
+  el.querySelector('[data-tq-ahead="unknown"]').onclick=pick(onUnknown);
 }
 function tourniquetOldTimeQuestion(parsed){
   const h=Math.floor(parsed.minutesAgo/60), m=parsed.minutesAgo%60;
@@ -9341,19 +9370,35 @@ function saveTourniquetEnteredTime(code){
   const errorEl=document.getElementById('tq-time-entry-error');
   const now=Date.now();
   const parsed=C5Rules.parseTourniquetTimeCode(value, now);
+  if(!parsed.ok && parsed.reason==='future'){
+    // Later than the phone's clock: the medic chooses (owner, 2026-11-14).
+    if(errorEl) errorEl.textContent='';
+    const unknown=tourniquetTimeUnknown(tq);
+    showTourniquetAheadChoice(value, parsed, {
+      onRetype:()=>{ const input=document.getElementById('tq-time-entry-input'); if(input){ input.value=''; input.focus(); } },
+      onYesterday:()=>applyTourniquetEnteredTime(p, tq, value, parsed.yesterdayAtMs, parsed.yesterdayMinutesAgo),
+      onUnknown:()=>closeTourniquetTimeEntry(),
+      unknownLabel:unknown ? 'השאר ללא שעה' : 'השאר את השעה הקודמת'
+    });
+    return;
+  }
   if(!parsed.ok){
-    if(errorEl) errorEl.textContent=parsed.reason==='future' ? tourniquetFutureTimeMessage(value, parsed) : 'שעה לא תקינה — 4 ספרות, 0000-2359';
+    if(errorEl) errorEl.textContent='שעה לא תקינה — 4 ספרות, 0000-2359';
     return;
   }
   if(parsed.needsConfirm && !confirm(tourniquetOldTimeQuestion(parsed))) return;
+  applyTourniquetEnteredTime(p, tq, value, parsed.appliedAtMs, parsed.minutesAgo);
+}
+function applyTourniquetEnteredTime(p, tq, value, appliedAtMs, minutesAgo){
+  const now=Date.now();
   const previous={appliedAt:tq.appliedAt||null, timeSource:tourniquetTimeUnknown(tq)?'unknown':(tq.timeSource||'phone'), timeCode:tq.timeCode||null};
-  tq.appliedAt=parsed.appliedAtMs;
+  tq.appliedAt=appliedAtMs;
   tq.timeCode=value;
   tq.timeSource='entered';
   tq.timeUnknown=false;
   tq.timeEnteredAt=now;
   tq.timeHistory=tq.timeHistory||[];
-  tq.timeHistory.push({at:now, from:previous.timeSource==='unknown'?null:previous.appliedAt, to:parsed.appliedAtMs, by:currentMedicName(), role:tourniquetConversionRole()});
+  tq.timeHistory.push({at:now, from:previous.timeSource==='unknown'?null:previous.appliedAt, to:appliedAtMs, by:currentMedicName(), role:tourniquetConversionRole()});
   // Levels already passed are seen; the next one alerts as usual (even when the new time is later).
   tq.timeAlertedLevel=tourniquetStageAt(tq, now)||null;
   tq.timeAlertOpen=null;
@@ -9361,13 +9406,13 @@ function saveTourniquetEnteredTime(code){
   syncLegacyTourniquetAlias(p);
   if(!activeTourniquets(p).some(tourniquetTimeUnknown)) p.assessmentDebt=(p.assessmentDebt||[]).filter(x=>x!=='tourniquet_time_unknown');
   const limb=tq.limbLabel||tourniquetLimbMeta(tq.limb).label;
-  const minutes=parsed.minutesAgo;
+  const minutes=minutesAgo;
   const detail=`${tq.id} · ${limb} · שעת הנחה ${value.slice(0,2)}:${value.slice(2)} (+${minutes} דק׳)${previous.timeSource==='entered'?` · תוקן מ-${previous.timeCode?previous.timeCode.slice(0,2)+':'+previous.timeCode.slice(2):'?'}`:''}`;
   p.events=p.events||[];
   p.events.unshift({type:'TOURNIQUET_TIME_RECORDED',time:nowT(),detail,warn:false});
   saveLocalEvent({type:'TOURNIQUET_TIME_RECORDED',detail:`${p.visualId||p.id} · ${detail}`,warn:false,patient_id:p.id,
     payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb:tq.serverLimb||tourniquetLimbKey(tq.limb),time_code:value,
-      application_time:new Date(parsed.appliedAtMs).toISOString(),
+      application_time:new Date(appliedAtMs).toISOString(),
       previous_application_time:previous.appliedAt?new Date(previous.appliedAt).toISOString():null,
       previous_time_source:previous.timeSource,time_entered_at:new Date(now).toISOString(),siteId:p.siteId}});
   saveDemoState();
@@ -12106,8 +12151,24 @@ function validateTQTimeInput(showToast=false){
 // field is cleared, which leaves the time unknown.
 function checkFlowTourniquetTime(val, src, displayEl, showToast){
   const parsed=C5Rules.parseTourniquetTimeCode(val);
+  if(src.resolvedTimeCode===val && Number.isFinite(src.resolvedAppliedAt)) return true; // already chosen as yesterday
+  if(!parsed.ok && parsed.reason==='future'){
+    // Later than the phone's clock: the medic chooses (owner, 2026-11-14).
+    const input=document.getElementById(src===quickTqData ? 'quick-tq-time' : 'tourniquet-time-input');
+    src.time=null;
+    showTourniquetAheadChoice(val, parsed, {
+      onRetype:()=>{ if(input){ input.value=''; input.focus(); } if(displayEl) displayEl.textContent=''; },
+      onYesterday:()=>{
+        src.time=val; src.timeTyped=true; src.resolvedTimeCode=val; src.resolvedAppliedAt=parsed.yesterdayAtMs;
+        if(displayEl) displayEl.textContent=`שעת הנחה: אתמול ${val.slice(0,2)}:${val.slice(2)} (לפני ${tourniquetAgoText(parsed.yesterdayMinutesAgo)})`;
+        syncFlowTourniquetSupply();
+      },
+      onUnknown:()=>{ if(input) input.value=''; src.time=null; src.timeTyped=true; if(displayEl) displayEl.textContent='ללא שעה'; syncFlowTourniquetSupply(); }
+    });
+    return false;
+  }
   let message='';
-  if(!parsed.ok) message=parsed.reason==='future' ? tourniquetFutureTimeMessage(val, parsed) : 'שעה לא תקינה — השתמש בפורמט HHMM, 0000-2359';
+  if(!parsed.ok) message='שעה לא תקינה — השתמש בפורמט HHMM, 0000-2359';
   else if(parsed.needsConfirm && src.confirmedTimeCode!==val){
     if(confirm(tourniquetOldTimeQuestion(parsed))) src.confirmedTimeCode=val;
     else message='השעה לא אושרה — הזן שוב או השאר ריק (ללא שעה)';
@@ -12115,7 +12176,7 @@ function checkFlowTourniquetTime(val, src, displayEl, showToast){
   if(!message) return true;
   src.time=null;
   if(displayEl) displayEl.textContent=message;
-  if(showToast) toast(parsed.reason==='future' ? 'שעת חסם מאוחרת מהשעה בטלפון' : 'שעת חסם לא תקינה');
+  if(showToast) toast('שעת חסם לא תקינה');
   return false;
 }
 function updateTQDisplay(val){ document.getElementById('tq-time-display').textContent=`שעת הנחה: ${val.slice(0,2)}:${val.slice(2)}`; }

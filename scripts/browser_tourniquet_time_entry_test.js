@@ -2,7 +2,7 @@
 // Network off, Playwright's fake clock, vibration calls recorded.
 // 1. Sweep: "היה על הפצוע" records the tourniquet with no time (time_source 'unknown'), takes no
 //    tourniquet from the medic's bag and opens the time entry; "הונח עכשיו" keeps the phone's time.
-// 2. A time later than the phone's clock by more than 5 minutes is refused with the agreed message.
+// 2. A time 5-60 minutes later than the phone's clock asks: type again / yesterday / no time.
 // 3. With no time: conversion is blocked for everyone and the "שעת חסם לא ידועה" debt is shown.
 // 4. Entering a time 70 minutes ago from the patient screen: no banner, no vibration; the levels
 //    already passed are seen; TOURNIQUET_TIME_RECORDED is queued; the next level (100) alerts.
@@ -10,7 +10,7 @@
 // 6. Another phone's tourniquet with an entered time does not alert here for levels passed at entry,
 //    and one the server marks 'unknown' cannot be converted here.
 // 7. New Patient form: a typed time is 'entered' (passed levels seen), "עכשיו" is 'phone', an empty
-//    field is 'unknown', and a time later than the phone's clock is refused.
+//    field is 'unknown', and a time later than the phone's clock asks (yesterday or no time work).
 // 8. New Patient forms' bag stock: only "עכשיו" takes a tourniquet from the medic's bag.
 //
 // Runs in CI through scripts/run_tests.js; also runs on its own.
@@ -81,14 +81,21 @@ async function main() {
     assert(r.supply === 0, `a tourniquet already on the patient must not come from the medic's bag (got ${r.supply})`);
     assert(r.applied.length === 1 && r.applied[0].time_source === 'unknown', `TOURNIQUET_APPLIED must say time_source unknown (got ${JSON.stringify(r.applied)})`);
 
-    // 2. 25 minutes later than the phone's clock: refused.
+    // 2. 25 minutes later than the phone's clock: the medic chooses (type again / yesterday / no
+    //    time); "type again" clears the field and changes nothing.
     await page.fill('#tq-time-entry-input', await page.evaluate(() => codeAgo(-25)));
     await page.click('#tq-time-entry [data-tq-time-action="save"]');
-    r = await page.evaluate((id) => ({ error: document.getElementById('tq-time-entry-error')?.textContent || '', unknown: tourniquetTimeUnknown(activeTourniquets(patients.find((x) => x.id === id))[0]) }), P1);
-    assert(r.error.includes('מאוחרת ב-25 דק׳') && r.error.includes('בדוק את השעה שנכתבה על הגוף') && r.unknown, `a later time must be refused (got ${JSON.stringify(r)})`);
+    r = await page.evaluate((id) => ({ text: document.getElementById('tq-time-ahead')?.textContent || '', unknown: tourniquetTimeUnknown(activeTourniquets(patients.find((x) => x.id === id))[0]) }), P1);
+    assert(r.text.includes('מאוחרת ב-25 דק׳') && r.text.includes('מה נכון') && r.text.includes('הקלד שוב') && r.text.includes('אתמול') && r.text.includes('לפני 23 שעות ו-35 דק׳') && r.text.includes('השאר ללא שעה') && r.unknown,
+      `a later time must ask, with three choices (got ${JSON.stringify(r)})`);
+    await page.click('#tq-time-ahead [data-tq-ahead="retype"]');
+    r = await page.evaluate((id) => ({ choice: !!document.getElementById('tq-time-ahead'), entry: !!document.getElementById('tq-time-entry'), input: document.getElementById('tq-time-entry-input')?.value, unknown: tourniquetTimeUnknown(activeTourniquets(patients.find((x) => x.id === id))[0]) }), P1);
+    assert(!r.choice && r.entry && r.input === '' && r.unknown, `"type again" must clear the field and keep the entry open (got ${JSON.stringify(r)})`);
 
-    // 3. Left with no time.
-    await page.click('#tq-time-entry [data-tq-time-action="skip"]');
+    // 3. Left with no time: from the choice, "השאר ללא שעה" closes the entry.
+    await page.fill('#tq-time-entry-input', await page.evaluate(() => codeAgo(-25)));
+    await page.click('#tq-time-entry [data-tq-time-action="save"]');
+    await page.click('#tq-time-ahead [data-tq-ahead="unknown"]');
     r = await page.evaluate((id) => {
       const p = patients.find((x) => x.id === id);
       return { open: !!document.getElementById('tq-time-entry'), check: tourniquetConversionCheck(activeTourniquets(p)[0]), debt: assessmentDebtForPatient(p).includes('tourniquet_time_unknown') };
@@ -186,14 +193,38 @@ async function main() {
       quickTqData.time = codeAgo(70); quickTqData.timeTyped = true;
       const typed = tourniquetEntriesFromState()[0];
       out.typed = typed.timeSource; out.typedSeen = typed.timeAlertedLevel; out.typedMin = Math.round((Date.now() - typed.appliedAt) / 60000);
-      quickTqData.time = codeAgo(-25);
-      out.futureOk = checkFlowTourniquetTime(codeAgo(-25), quickTqData, display, false);
-      out.futureMsg = display.textContent; out.futureCleared = quickTqData.time === null;
+      // a later time: asks; "yesterday" keeps that time as yesterday
+      const ahead = codeAgo(-25);
+      quickTqData.time = ahead;
+      out.futureOk = checkFlowTourniquetTime(ahead, quickTqData, display, false);
+      out.futureAsked = document.getElementById('tq-time-ahead')?.textContent || '';
+      document.querySelector('#tq-time-ahead [data-tq-ahead="yesterday"]').click();
+      const y = tourniquetEntriesFromState()[0];
+      out.yesterdaySource = y.timeSource; out.yesterdayMin = Math.round((Date.now() - y.appliedAt) / 60000); out.yesterdayDisplay = display.textContent;
+      out.recheck = checkFlowTourniquetTime(ahead, quickTqData, display, false);
+      // and "no time" leaves it unknown
+      quickTqData = { applied: true, time: ahead, timeTyped: true, limbs: new Set(['rl']) };
+      checkFlowTourniquetTime(ahead, quickTqData, display, false);
+      document.querySelector('#tq-time-ahead [data-tq-ahead="unknown"]').click();
+      out.unknownSource = tourniquetEntriesFromState()[0].timeSource;
       quickTqData = { applied: false, time: null, timeTyped: false, limbs: new Set() };
       return out;
     });
     assert(r.empty === 'unknown' && r.now === 'phone' && r.typed === 'entered' && r.typedSeen === 'warn' && r.typedMin === 70, `form time sources (got ${JSON.stringify(r)})`);
-    assert(r.futureOk === false && r.futureMsg.includes('מאוחרת ב-25 דק׳') && r.futureCleared, `a later time in the form is refused (got ${JSON.stringify(r)})`);
+    assert(r.futureOk === false && r.futureAsked.includes('מאוחרת ב-25 דק׳') && r.yesterdaySource === 'entered' && r.yesterdayMin === 1415 && r.yesterdayDisplay.includes('אתמול') && r.recheck === true && r.unknownSource === 'unknown',
+      `a later time in the form asks; yesterday and no time both work (got ${JSON.stringify(r)})`);
+
+    // 7b. The patient screen's "yesterday" choice saves yesterday's time (P1: an entered time, so editable).
+    r = await page.evaluate((id) => {
+      document.getElementById('tq-time-alert')?.remove();
+      const p = patients.find((x) => x.id === id);
+      const tq = activeTourniquets(p)[0];
+      openTourniquetTimeEntry(id, tq.id);
+      saveTourniquetEnteredTime(codeAgo(-30));
+      document.querySelector('#tq-time-ahead [data-tq-ahead="yesterday"]').click();
+      return { min: Math.round((Date.now() - tq.appliedAt) / 60000), source: tq.timeSource, open: !!document.getElementById('tq-time-entry') };
+    }, P1);
+    assert(r.min === 1410 && r.source === 'entered' && !r.open, `"yesterday" on the patient screen must save yesterday's time (got ${JSON.stringify(r)})`);
 
     // 8. Bag stock in the New Patient forms (owner, 2026-11-13): only "עכשיו" (placed now) takes a
     //    tourniquet from the medic's bag; a typed time or an emptied field gives it back.

@@ -375,10 +375,10 @@ assert.equal(rules.tourniquetAlertToRaise("critical", "hours_4"), null);
   // a watch up to 5 minutes fast counts as just now
   assert.deepEqual(parse("1422"), { ok: true, appliedAtMs: now, minutesAgo: 0, needsConfirm: false });
   assert.deepEqual(parse("1425"), { ok: true, appliedAtMs: now, minutesAgo: 0, needsConfirm: false });
-  // later than that: refused, never read as almost a day ago
-  assert.deepEqual(parse("1426"), { ok: false, reason: "future", aheadMinutes: 6 });
-  assert.deepEqual(parse("1445"), { ok: false, reason: "future", aheadMinutes: 25 });
-  assert.deepEqual(parse("1520"), { ok: false, reason: "future", aheadMinutes: 60 });
+  // 5-60 min later: not read; the medic chooses (type again / yesterday, offered here / no time)
+  assert.deepEqual(parse("1426"), { ok: false, reason: "future", aheadMinutes: 6, yesterdayAtMs: new Date(2026, 10, 7, 14, 26).getTime(), yesterdayMinutesAgo: 1434 });
+  assert.deepEqual(parse("1445"), { ok: false, reason: "future", aheadMinutes: 25, yesterdayAtMs: new Date(2026, 10, 7, 14, 45).getTime(), yesterdayMinutesAgo: 1415 });
+  assert.deepEqual(parse("1520"), { ok: false, reason: "future", aheadMinutes: 60, yesterdayAtMs: new Date(2026, 10, 7, 15, 20).getTime(), yesterdayMinutesAgo: 1380 });
   // more than an hour later: yesterday, and asked about because it is more than 12 h ago
   assert.deepEqual(parse("1600"), { ok: true, appliedAtMs: new Date(2026, 10, 7, 16, 0).getTime(), minutesAgo: 1340, needsConfirm: true });
   // 13 h ago across midnight: asked about, not refused
@@ -388,7 +388,7 @@ assert.equal(rules.tourniquetAlertToRaise("critical", "hours_4"), null);
   assert.equal(parse("0220").needsConfirm, false); // exactly 12 h
   // across midnight: 2350 entered at 00:20 is yesterday, 30 minutes ago
   assert.deepEqual(parse("2350", at(0, 20)), { ok: true, appliedAtMs: new Date(2026, 10, 7, 23, 50).getTime(), minutesAgo: 30, needsConfirm: false });
-  assert.deepEqual(parse("0030", at(0, 20)), { ok: false, reason: "future", aheadMinutes: 10 });
+  assert.deepEqual(parse("0030", at(0, 20)), { ok: false, reason: "future", aheadMinutes: 10, yesterdayAtMs: new Date(2026, 10, 7, 0, 30).getTime(), yesterdayMinutesAgo: 1430 });
   // yesterday afternoon seen early in the morning, within 12 h: fine
   assert.deepEqual(parse("1500", at(1, 0)), { ok: true, appliedAtMs: new Date(2026, 10, 7, 15, 0).getTime(), minutesAgo: 600, needsConfirm: false });
   for (const bad of ["", null, undefined, "930", "09:30", "2400", "1260", "abcd", "12345"]) {
