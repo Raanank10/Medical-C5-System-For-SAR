@@ -358,18 +358,18 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 **Numbering in this round.** PR #128 takes V2.99.72 and `database/080`, `081`. The first WP of this round to merge takes V2.99.73 and `database/082`; after that, take the next free version and file number from `main` right before merging, not when starting (parallel sessions have collided on both several times: #110, #119, #120, #125, #126, #127).
 
 **Order.**
-1. WP-19 and WP-20 first. They are independent of each other.
+1. WP-19 first. (WP-20 is done: #128 merged, 079-081 and `sync-log` v17 live.)
 2. WP-21 (the live two-phone run) after both, so it tests the fixed stock path and the 100-minute alert.
 3. WP-22 after WP-19, so the rejected stock movements can be resent instead of closed.
 4. WP-23 to WP-27, one at a time (they all touch `index.html`; owner decisions from 2026-10-23).
-5. WP-29 after WP-20 (it replaces the same server function).
+5. WP-29 builds on 081's `run_clinical_watchdog()` (live since WP-20).
 6. WP-28, WP-30, WP-31 and WP-33 wait for an owner answer; ask it first in the session.
 7. WP-32 and WP-34 to WP-37 any time.
 
 | Round 2 WP | Title | Priority | Needs from the owner first |
 | --- | --- | --- | --- |
 | WP-19 | Stock movements reach the server | P1 | - |
-| WP-20 | Finish PR #128 and apply 079-081 | P1 | 2 answers on #128 |
+| WP-20 | Finish PR #128 and apply 079-081 | P1 | - (done 2026-11-17) |
 | WP-21 | Live two-phone run (WP-0 part 2) | P1 | people and two phones |
 | WP-22 | Close or resend the open sync rejections | P2 | approval per group |
 | WP-23 | Injury time editable in the field | P2 | - (decided 2026-10-23) |
@@ -416,6 +416,8 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 ---
 
 ### WP-20: Finish PR #128 and apply 079-081 (P1)
+
+**Done (checked live 2026-11-17).** #128 merged (V2.99.72) with both answers (a typed time later than the phone's clock is asked about, not refused; a tourniquet with a typed time does not come from the bag). Live: `run_clinical_watchdog` raises `TOURNIQUET_TIME_DECISION` (079), the `TOURNIQUET_TIME_RECORDED` enum value (080), 081's functions, `tourniquets.time_source` column and `trg_tourniquet_time_events` trigger, and `sync-log` v17. Not seen yet: step 4's check on a real tourniquet; it runs as part of WP-21. The text below is the original plan.
 
 **Why.** The phone raises the 100-minute tourniquet decision alert (V2.99.70) but the server watchdog does not: `database/079` is not applied (checked live 2026-11-13: `run_clinical_watchdog` has no `TOURNIQUET_TIME_DECISION`). PR #128 (time written on the body, V2.99.72) is ready but waits on two owner answers.
 
@@ -647,9 +649,10 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-15 Unused server tables | P3 | Done 2026-10-22: 070 live, verified | this PR | 9 tables to schema `archive` with their rows (nothing dropped; `aar_reports` stays, WP-16): `device_sync_state`, `experiment_observer_notes`, `high_risk_override_confirmations`, `patient_edit_conflicts`, `sync_event_dependencies`, `supply_request_items`, `treatment_catalog`, `treatment_inventory_items`, `realtime_outbox` (19 rows); outbox writes stopped (`apply_event_projection_and_outbox` keeps its `conflict_log` part, `trg_draft_incident_approval_outbox` disabled, not dropped); `merge_incident()` edited from its live definition to drop its statements on those tables; analytics export no longer fetches `device_sync_state` |
 | WP-17 Lost patients on a duplicate number | P0 | Client done (V2.99.51); `sync-log` deployed live as v13 on 2026-10-22 = the live v12 (D9, `database/068`, in `main` since V2.99.52) plus WP-17. Whoever deploys `sync-log` next must start from a file that has both; live two-phone check pending | this PR | found by the 2026-10-22 feature-map audit from live `sync_ingestion_errors`; ids carry the registrant's initials (owner decision); the server renames a clash instead of dropping the patient |
 | WP-18 Evacuation point arrival | P2 | Done (V2.99.66): 076 + 077 + 078 live, `sync-log` v16, verified rolled back 2026-10-24; real two-phone check pending | #120, this PR | `PATIENT_EVAC_POINT_ARRIVED` (medic/paramedic/physician/PC), earliest phone time wins, moving vs arrived on every board with waiting minutes, no alert (owner). Open: rescue board wording, waiting time in the stored report, truck stock per evacuation point (gap 3) |
-| Tourniquet 100 min + remind me later | P1 | Client done (V2.99.70); `database/079` written, tested on local PostgreSQL 16, not applied live | this PR | owner 2026-10-26: alerts at 45/60/100/120 min, then every hour (3 h ... 6 h and on, phone only); banner buttons "open patient" / "remind me in N min" (5x2, 5x2, 2x1, 1x1), chip while put off, comes back vibrating; delays sent as `WATCHDOG_ALERT` reasons `tourniquet_snoozed` / `tourniquet_alert_opened`; PC/CC strip line, last delay vibrates PC/CC. "המרה ללחץ ישיר" on the patient screen: medic / PC up to 120 min, paramedic up to 4 h, physician up to 6 h (owner 2026-11-08), sent as `TOURNIQUET_RELEASED` reason `converted_direct_pressure`; phone-side check only |
+| Tourniquet 100 min + remind me later | P1 | Done (V2.99.70): `database/079` live, checked 2026-11-17 (WP-20) | #126 | owner 2026-10-26: alerts at 45/60/100/120 min, then every hour (3 h ... 6 h and on, phone only); banner buttons "open patient" / "remind me in N min" (5x2, 5x2, 2x1, 1x1), chip while put off, comes back vibrating; delays sent as `WATCHDOG_ALERT` reasons `tourniquet_snoozed` / `tourniquet_alert_opened`; PC/CC strip line, last delay vibrates PC/CC. "המרה ללחץ ישיר" on the patient screen: medic / PC up to 120 min, paramedic up to 4 h, physician up to 6 h (owner 2026-11-08), sent as `TOURNIQUET_RELEASED` reason `converted_direct_pressure`; phone-side check only |
+| Tourniquet time from the body | P1 | Done (V2.99.72): `database/080` + `081` live, `sync-log` v17 live, checked 2026-11-17 (WP-20) | #128 | owner 2026-11-08: sweep asks "הונח עכשיו / היה על הפצוע"; enter / correct the time written on the body (all medical roles and admin, history kept); 5 min tolerance, 5-60 min later asks (type again / yesterday / no time), over 12 h asks; passed levels silent on every phone and the server; no time = nobody converts; admin converts with the physician's limits |
 | WP-19 Stock movements reach the server | P1 | Not started | | found 2026-11-13: 0 ledger rows live, 19 rejections for a `draft-` patient id |
-| WP-20 Finish #128, apply 079-081 | P1 | Waiting on 2 owner answers | #128 | then 079, 080, 081, `sync-log` from main |
+| WP-20 Finish #128, apply 079-081 | P1 | Done: 079, 080, 081 and `sync-log` v17 live, checked 2026-11-17 | #128 | 100-minute check on a real tourniquet runs in WP-21 |
 | WP-21 Live two-phone run | P1 | Not started | | WP-0 part 2 plus WP-17/18/19, D1 offline, WP-10 install, T6 |
 | WP-22 Open sync rejections | P2 | Not started | | 55 open, 0 ever closed; after WP-19 |
 | WP-23 Injury time editable | P2 | Not started | | owner 2026-10-23; server already applies `PATIENT_T_INJURY_UPDATED` |
@@ -658,7 +661,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-26 PC deterioration review | P2 | Not started | | owner 2026-10-23 (WP-5 `known_gaps`) |
 | WP-27 CC moves a site to another platoon | P2 | Not started, 1 design question | | owner 2026-10-23 (WP-7 remainder); RLS |
 | WP-28 27 never-sent event types | P2 | Waiting on owner's list | | |
-| WP-29 Dead Man's Switch on the server | P2 | Not started, after WP-20 | | builds on 081's watchdog |
+| WP-29 Dead Man's Switch on the server | P2 | Not started | | builds on 081's watchdog (live) |
 | WP-30 Telegram alerts (B1) | P2 | Waiting on owner's 19 answers | | |
 | WP-31 MARCH completion + hands-on PC | P2 | Waiting on clinical criteria | | B2 |
 | WP-32 Evacuation point leftovers | P2 | Not started | | WP-18 remainder |
