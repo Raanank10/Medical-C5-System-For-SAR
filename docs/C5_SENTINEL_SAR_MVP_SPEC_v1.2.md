@@ -193,12 +193,15 @@ T_injury = T₀ by default
 
 For simplicity, most clinical timers should use `T_injury`. Since `T_injury` defaults to `T₀`, this preserves clinical semantics while allowing future per-patient injury-time overrides.
 
-Future option:
+Per-patient override (built in V2.99.76, WP-23, `database/085`):
 
 ```text
-A Medic may override T_injury for an individual patient if injury time is known to differ.
-Any override is logged as PATIENT_T_INJURY_UPDATED.
+A medic, paramedic, physician, PC or admin (not CC) may override T_injury for an individual
+patient when the injury time is known to differ. Any override is logged as PATIENT_T_INJURY_UPDATED.
+Until someone enters it, T_injury is shown as an estimate ("משוערת").
 ```
+
+The command watchdog's Golden Hour and Crush Syndrome rows, the MIST handover and the stored after-action report count from `T_injury`. On the server the newest entry by phone time wins, so an older entry pushed late by an offline phone does not overwrite a newer correction.
 
 ### Site Guard and Patient Creation
 
