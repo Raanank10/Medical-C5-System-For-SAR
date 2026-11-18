@@ -1001,7 +1001,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9975</div>
+      <div class="demo-kicker">Demo V2.9976</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1098,7 +1098,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9975</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9976</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1108,7 +1108,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9975</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9976</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3400,7 +3400,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.75';
+const APP_VERSION = '2.99.76';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -7813,22 +7813,18 @@ function commandAlertGroups(alerts){
     return g;
   }).sort((x,y)=>x.rank-y.rank || x.oldest-y.oldest);
 }
-// In the CC all-incidents view the group carries its incident and that incident's patient: no
-// "בטיפול" there (the patient is not on this phone), a tap opens the incident.
 function commandAlertLineHtml(group){
-  const inc=group.incident||null;
-  const p=inc ? group.patient : group.patientId ? patients.find(x=>x.id===group.patientId) : null;
+  const p=group.patientId ? patients.find(x=>x.id===group.patientId) : null;
   const prefix=p ? `${p.visualId||p.id} — ` : '';
   const short=a=>String(a.title||'').startsWith(prefix) ? String(a.title).slice(prefix.length) : String(a.title||'');
   const first=group.alerts[0];
   const rest=[...new Set(group.alerts.slice(1).map(short))].filter(t=>t!==short(first)).join(' · ');
   const cls=group.rank===0?'crit':group.rank===1?'high':'med';
-  const open=inc?` onclick="enterIncidentFromPicker('${escAttr(inc.id)}')"`:p?` onclick="openPatientFromAlert('${p.id}')"`:'';
-  const ack=p&&!inc?`<button class="ack-btn" onclick="event.stopPropagation();acknowledgeAlert('${p.id}')">בטיפול</button>`:'';
-  const where=inc?`${inc.visual_id||''} · ${inc.location_name||''} · `:'';
-  return `<div class="cmd-strip-alert ${cls}" data-alert-group="${escAttr(group.key)}"${inc?` data-incident-alerts="${escAttr(inc.id)}"`:''}${open}>
+  const open=p?` onclick="openPatientFromAlert('${p.id}')"`:'';
+  const ack=p?`<button class="ack-btn" onclick="event.stopPropagation();acknowledgeAlert('${p.id}')">בטיפול</button>`:'';
+  return `<div class="cmd-strip-alert ${cls}" data-alert-group="${escAttr(group.key)}"${open}>
     <span class="cmd-strip-alert-id">${p?escAttr(p.visualId||p.id):'מוקד'}</span>
-    <div style="flex:1;min-width:0"><div class="cmd-strip-alert-title">${p?`${escAttr(TRIAGE_LABELS[p.triage]||'')} · `:''}${escAttr(short(first))}</div><div class="cmd-strip-alert-sub">${escAttr(where+(rest||first.detail||''))}</div></div>${ack}
+    <div style="flex:1;min-width:0"><div class="cmd-strip-alert-title">${p?`${escAttr(TRIAGE_LABELS[p.triage]||'')} · `:''}${escAttr(short(first))}</div><div class="cmd-strip-alert-sub">${escAttr(rest||first.detail||'')}</div></div>${ack}
   </div>`;
 }
 function commandLongestTourniquet(pts){
@@ -9930,7 +9926,9 @@ function patientAlertObjects(pts){
       const reason=(p.deterioration&&p.deterioration.length)?p.deterioration.join(' · '):TRIAGE_LABELS[p.triage]||'שינוי קריטי';
       pushAlert(alerts,{...base,id:`clinical-${p.id}`,type:'CRITICAL_CLINICAL_ACTION',severity:'critical',owner:'medic',audience:['medic','pc'],escalatesTo:'pc',escalateAfterMin:5,actionRequired:'update_vitals',scope:'patient',category:'urgent',title:`${p.visualId||p.id} — הידרדרות / מיון קריטי`,detail:reason});
     }
-    if(p.triage==='red'){
+    // Until a vehicle takes the patient (owner, 2026-11-18): at the extraction site and at the
+    // evacuation point the red patient is still the platoon's to evacuate; after it, no alert.
+    if(p.triage==='red' && !LOCATION_BOARD_EVACUATED_STATUSES.has(p.patientStatus)){
       pushAlert(alerts,{...base,id:`pc-red-${p.id}`,type:'RED_CASUALTY_CREATED',severity:'high',owner:'pc',audience:['pc','chamal','cc'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'request_evac',scope:'patient',category:'urgent',title:`${p.visualId||p.id} — פצוע אדום`,detail:`${p.location} · ${p.injury||'פציעה לא צוינה'}`});
     }
     if(p.triage==='red' && !['evacuating','evacuated','handed_over'].includes(p.patientStatus)){
@@ -14238,26 +14236,36 @@ function ccOverviewTotals(){
   _openIncidents.forEach(inc=>{ const c=_allIncidentTriage[inc.id]; if(c) Object.keys(total).forEach(k=>{ total[k]+=c.onSite[k]; }); });
   return total;
 }
-// Strip in the all-incidents view: the alert lines of every open incident (ccOverviewAlertGroups),
-// top line plus "+N" as inside an incident, each line naming its incident; tap opens it.
+// Strip in the all-incidents view (WP-33, owner 2026-11-18): one line per incident with alerts,
+// coloured by its worst alert: how many patients / requests have alerts, the most urgent one and
+// "(+N)" for the rest. A tap opens the incident, where every alert has its own line.
+function ccOverviewIncidentLineHtml({inc, groups}){
+  const top=groups[0], first=top.alerts[0];
+  const p=top.patient;
+  const prefix=p ? `${p.visualId||p.id} — ` : '';
+  const title=String(first.title||'').startsWith(prefix) ? String(first.title).slice(prefix.length) : String(first.title||'');
+  const cls=top.rank===0?'crit':top.rank===1?'high':'med';
+  const n=groups.length;
+  return `<div class="cmd-strip-alert ${cls}" data-incident-alerts="${escAttr(inc.id)}" onclick="enterIncidentFromPicker('${escAttr(inc.id)}')">
+    <span class="cmd-strip-alert-id">${escAttr(inc.visual_id||'')}</span>
+    <div style="flex:1;min-width:0"><div class="cmd-strip-alert-title">${escAttr(inc.location_name||'')} · ${n===1?'התראה אחת':`${n} התראות`}</div><div class="cmd-strip-alert-sub">${escAttr(title)}${p?` · ${escAttr(p.visualId||p.id)}`:''}${n>1?` (+${n-1})`:''}</div></div>
+  </div>`;
+}
 function renderCcOverviewStrip(){
   const contact=serverContactState();
   const t=ccOverviewTotals();
   const cell=(n,label,color)=>`<div class="cmd-strip-count" style="border-top-color:${color}"><b>${n}</b>${label}</div>`;
-  const groups=ccOverviewAlertGroups();
-  const shown=commandStripExpanded ? groups : groups.slice(0,1);
-  const more=groups.length>1 ? `<button class="cmd-strip-chip cmd-strip-more" onclick="toggleCommandStrip()">${commandStripExpanded?'סגור ▴':`+${groups.length-1} התראות ▾`}</button>` : '';
+  const incidents=ccOverviewIncidentAlerts();
   const source=_allIncidentAlertsAt
-    ? `<div class="cmd-strip-alert-sub" data-cc-overview-alert-source style="padding:4px 2px 0;white-space:normal;font-size:12px">${groups.length?'':'אין התראות פתוחות באירועים · '}לפי נתוני השרת · עודכן ${escAttr(timeAgoLabel(_allIncidentAlertsAt))} · מה שטרם נשלח מהשטח לא מופיע</div>`
+    ? `<div class="cmd-strip-alert-sub" data-cc-overview-alert-source style="padding:4px 2px 0;white-space:normal;font-size:12px">${incidents.length?'':'אין התראות פתוחות באירועים · '}לפי נתוני השרת · עודכן ${escAttr(timeAgoLabel(_allIncidentAlertsAt))} · מה שטרם נשלח מהשטח לא מופיע</div>`
     : '<div class="cmd-strip-alert-sub" data-cc-overview-alert-source style="padding:6px 2px;font-size:12px">טרם התקבלו התראות מהשרת</div>';
   return `<div class="cmd-strip" id="command-status-strip">
     <div class="cmd-strip-row">
       <span id="role-strip-conn" class="cmd-conn ${contact.level}">${escAttr(serverContactLabel(contact))}</span>
       <span class="cmd-strip-chip">כל האירועים · ${_openIncidents.length} פתוחים</span>
-      ${more}
     </div>
     <div class="cmd-strip-counts">${cell(t.red,'אדום','var(--red)')}${cell(t.yellow,'צהוב','var(--yellow)')}${cell(t.green,'ירוק','var(--green)')}${cell(t.black,'שחור','var(--muted)')}${cell(t.pending,'טרם מוין','var(--muted)')}</div>
-    <div class="cmd-strip-alerts${commandStripExpanded?' expanded':''}">${shown.map(commandAlertLineHtml).join('')}${source}</div>
+    <div class="cmd-strip-alerts">${incidents.map(ccOverviewIncidentLineHtml).join('')}${source}</div>
   </div>`;
 }
 function renderCcOverviewPanel(){
@@ -15081,6 +15089,15 @@ function ccOverviewAlertGroups(nowMs=Date.now()){
     commandAlertGroups(alerts).forEach(g=>out.push({...g, key:`${inc.id}|${g.key}`, incident:inc, patient:g.patientId?d.patients.find(p=>p.id===g.patientId)||null:null}));
   });
   return out.sort((x,y)=>x.rank-y.rank || x.oldest-y.oldest);
+}
+// The same groups per incident (WP-33): incidents with alerts, worst first, then by how many.
+function ccOverviewIncidentAlerts(nowMs=Date.now()){
+  const byInc=new Map();
+  ccOverviewAlertGroups(nowMs).forEach(g=>{
+    if(!byInc.has(g.incident.id)) byInc.set(g.incident.id, {inc:g.incident, groups:[]});
+    byInc.get(g.incident.id).groups.push(g);
+  });
+  return [...byInc.values()].sort((x,y)=>x.groups[0].rank-y.groups[0].rank || y.groups.length-x.groups.length);
 }
 async function enterIncidentContextAfterLogin(){
   pollIncidentOpenAlerts(); // D10: command sees incidents opened in the field right after sign-in
