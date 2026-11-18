@@ -475,6 +475,22 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 
 **Verify.** New browser test across two phones; check `068`'s report uses `t_injury` for golden-hour figures. Timing logic: owner reviews (CLAUDE.md, clinically relevant timing).
 
+**Evidence re-checked 2026-11-18, three corrections.** (a) `013` does not set `t_injury` on create: `sync-log` inserts the patients row with `t_injury` = the create event's `local_timestamp` and reads nothing from the payload, so step 1's "send it in the create payload" would have done nothing without a `sync-log` deploy. (b) `068`'s report has no golden-hour figure and never reads `t_injury`; it measures from incident open. (c) The phone's command watchdog rows "Golden Hour" and "Crush Syndrome" were labelled `T_injury +45m` but counted from the phone's registration of the patient. Also: the live `project_patient_state()` applied `PATIENT_T_INJURY_UPDATED` in arrival order, so an offline phone's older entry pushed late would overwrite a newer correction.
+
+**Decided (owner, 2026-11-18).** CC may not change the injury time. All three clocks follow it: the command watchdog rows, a "שעת פציעה" line in MIST, and golden-hour figures in the stored report. The MIST mechanism/injuries bug found on the way is fixed in the same PR.
+
+**Done (V2.99.73, `database/082`; no `sync-log` change).**
+1. `patients.t_injury_source` (`event_time` = the old fallback and every existing row, kept as it is; `incident_open`; `entered`) plus who, which role, which event and the phone time of the winning entry.
+2. The create event (`PATIENT_CREATED`, `QUICK_PATIENT_CREATED`, `FIRST_RESPONDER_REPORT`) gives the row the incident's `t_injury_default` (the alert time, = `t_zero` from `open_incident()`), source `incident_open`. Done by a trigger, not by the create payload, so no `sync-log` deploy.
+3. `PATIENT_T_INJURY_UPDATED` moved out of `project_patient_state()` (edited in place like `047`, fails if the branch text is not found exactly once) into `app.project_patient_t_injury()`: medic/paramedic/physician/pc/admin only (second gate after `sync-log`), a parseable time not more than 5 minutes after the entry nor 26 hours before it, newest entry by phone time wins. The event stays in the log either way.
+4. `app.build_incident_aar()` gains `golden_hour` (edited in place): entered vs estimated, handed over within / after 60 minutes of injury, median injury-to-handover overall and for red, still not handed over past 60 minutes, one row per patient by temporary number. Reports already stored stay as they were; the next close stores a new version.
+5. Client: "שעת פציעה" row on the patient screen with the tourniquet body-time control (`C5Rules.parseTourniquetTimeCode`: same day rule, 5 min tolerance, 5-60 min later asks, over 12 h confirms), "(משוערת)" until entered; `pullInjuryTimes` (own query, so a database without 082 breaks nothing); the phone keeps its own entry until the server holds one at least as new. Golden Hour / Crush watchdog rows, MIST text, the MIST summary in `PATIENT_HANDED_OVER` (`injury_time`, `injury_time_estimated`) and the report screen (golden-hour box, "מפציעה עד מסירה" column; older reports say they have none) read it. MIST mechanism is now the incident's likely mechanism (no per-patient mechanism field exists) and injuries the marked body zones; before, both read `p.injury`.
+6. `supabase/functions/handover-consume` shows the injury time on the receiving page; **not deployed** (file only).
+
+**Verify.** `scripts/browser_injury_time_test.js` (two medics, PC, CC on one fake backend that mirrors 082). `082` ran on a local PostgreSQL 16 against the live text of both edited functions (md5 of `prosrc` equal to live, 2026-11-18): 12 scenarios (default on create, entry, older entry pushed late ignored, CC ignored, too late / bad / 27 h old ignored, 4 min ahead accepted, a later create event does not reset, rows without a create event stay `event_time`, report figures, no event changed). **Not applied live yet**: the session's apply was blocked; the owner applies `082` in the SQL editor.
+
+**Not done / found on the way.** `siteData.lastMechanism` is overwritten with the last full-flow patient's body-zone labels at save (`savePatient`, `effectiveInjury`), so the quick-flow patients that follow inherit those labels as their "injury"; not fixed here.
+
 ---
 
 ### WP-24: CC "fulfilled by company" / "closed" synced (P2, owner 2026-10-23)
@@ -655,7 +671,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-20 Finish #128, apply 079-081 | P1 | Done: 079, 080, 081 and `sync-log` v17 live, checked 2026-11-17 | #128 | 100-minute check on a real tourniquet runs in WP-21 |
 | WP-21 Live two-phone run | P1 | Not started | | WP-0 part 2 plus WP-17/18/19, D1 offline, WP-10 install, T6 |
 | WP-22 Open sync rejections | P2 | Not started | | 55 open, 0 ever closed; after WP-19 |
-| WP-23 Injury time editable | P2 | Not started | | owner 2026-10-23; server already applies `PATIENT_T_INJURY_UPDATED` |
+| WP-23 Injury time editable | P2 | Done in this PR (V2.99.73, `database/082`); 082 not applied live yet (owner applies) | this PR | owner 2026-10-23 and 2026-11-18: CC may not edit; watchdog rows, MIST and stored report follow the injury time; newest entry by phone time wins; `handover-consume` change not deployed |
 | WP-24 CC fulfilled / closed synced | P2 | Not started | | owner 2026-10-23 (WP-6 remainder) |
 | WP-25 Medic incident type + mismatch | P2 | Not started | | owner 2026-10-23 (WP-8 follow-up) |
 | WP-26 PC deterioration review | P2 | Not started | | owner 2026-10-23 (WP-5 `known_gaps`) |

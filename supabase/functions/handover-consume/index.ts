@@ -172,7 +172,7 @@ Deno.serve(async (req: Request) => {
 
   const mist = (sourceEvent?.payload_json as Record<string, unknown> | undefined)?.mist_summary as
     | Record<string, string>
-    | undefined;
+    | undefined; // injury_time_estimated (WP-23) arrives as a JSON boolean: read it with String()
 
   const bodyHtml = `
     <div class="row"><span class="label">פצוע</span><br>${escapeHtml(patient?.visual_id ?? tokenRow.patient_id)} · ${escapeHtml(patient?.current_triage ?? "—")}</div>
@@ -180,6 +180,7 @@ Deno.serve(async (req: Request) => {
     ${
     mist
       ? `<div class="row"><span class="label">MIST</span><br>
+         ${mist.injury_time ? `שעת פציעה: ${escapeHtml(new Date(mist.injury_time).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jerusalem" }))}${String(mist.injury_time_estimated) === "true" ? " (משוערת)" : ""}<br>` : ""}
          מנגנון: ${escapeHtml(mist.mechanism ?? "—")}<br>
          פציעות: ${escapeHtml(mist.injuries ?? "—")}<br>
          סימנים: ${escapeHtml(mist.signs ?? "—")}<br>
