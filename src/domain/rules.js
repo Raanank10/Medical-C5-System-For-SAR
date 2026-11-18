@@ -214,6 +214,22 @@
     return { allowed: true, limitMs, reason: null };
   }
 
+  // Who may cancel a resupply request, and when (WP-24, repo owner 2026-11-18; database/084 holds
+  // the same rule on the server). cc, chamal and admin: any open request (requested, dispatched,
+  // in transit). pc: only while the request still waits at its own level (medic_to_pc, requested).
+  // Never once the PC truck has issued it (approved), never after delivery or a cancel.
+  const SUPPLY_CANCEL_REASONS = ["not_needed", "duplicate", "supplied_otherwise", "other"];
+  function supplyRequestCancelAllowed(role, status, level) {
+    if (["cc", "chamal", "admin"].includes(role)) return ["requested", "dispatched", "in_transit"].includes(status);
+    if (role === "pc") return status === "requested" && level === "medic_to_pc";
+    return false;
+  }
+  // A reason from the list; "other" needs a note that is not blank.
+  function supplyCancelReasonValid(reason, note) {
+    if (!SUPPLY_CANCEL_REASONS.includes(reason)) return false;
+    return reason !== "other" || String(note || "").trim().length > 0;
+  }
+
   function isDeviceSilent(lastSeenMs, nowMs = Date.now()) {
     return !lastSeenMs || nowMs - lastSeenMs > DEVICE_SILENCE_MS;
   }
@@ -541,6 +557,9 @@
     supplyBurnRatePer10Min,
     supplyCriticalThreshold,
     supplyRiskTier,
+    SUPPLY_CANCEL_REASONS,
+    supplyCancelReasonValid,
+    supplyRequestCancelAllowed,
     timeCodeToTodayMs,
     tourniquetAlertRank,
     tourniquetConversionAllowed,

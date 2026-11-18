@@ -8,7 +8,11 @@
 //   approve / escalate only from pc/cc/admin; approve only from 'requested'; escalate only from
 //   request_level 'medic_to_pc'
 // - get_supply_request_queue(): every member of the incident reads every row.
-// It proves client behavior only; database/059 itself is exercised against real Postgres.
+// - WP-24 (database/084): SUPPLY_REQUEST_CANCELLED by server id only, with a reason (and a note for
+//   'other'); cc/chamal/admin while requested / dispatched / in transit, pc only while requested at
+//   medic_to_pc; never approved, delivered or cancelled; nothing moves a cancelled row.
+// It proves client behavior only; database/059 and 084 themselves are exercised against real
+// Postgres (scripts/rls_test_084_supply_request_cancel.sql).
 //
 // Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_resupply_decision_sync_test.js
@@ -42,9 +46,10 @@ const userById = (id) => Object.values(USERS).find((u) => u.id === id);
 const CREATE = ['SUPPLY_REQUEST_CREATED', 'RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE', 'RESUPPLY_REQUEST_ESCALATED_CC'];
 const DECIDE = ['RESUPPLY_APPROVED_FROM_PC_TRUCK', 'PC_TRUCK_RESUPPLY_UNAVAILABLE_ESCALATED', 'RESUPPLY_ESCALATED_TO_CC'];
 const MOVE = ['SUPPLY_REQUEST_DISPATCHED', 'SUPPLY_REQUEST_IN_TRANSIT', 'SUPPLY_REQUEST_RECEIVED'];
+const CANCEL = 'SUPPLY_REQUEST_CANCELLED';
 const MEDIC_SUPPLY = ['SUPPLY_REQUEST_CREATED', 'SUPPLY_CONSUMED', 'SUPPLY_USE_CANCELLED', 'INVENTORY_LEDGER_MOVEMENT', 'LOCAL_STOCKOUT_WARNING', 'RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE', 'RESUPPLY_REQUEST_ESCALATED_CC', 'SUPPLY_REQUEST_RECEIVED']; // sync-log v18 (WP-38)
 const LOGISTICS = [...CREATE, ...DECIDE, ...MOVE, 'SUPPLY_CONSUMED', 'SUPPLY_USE_CANCELLED', 'INVENTORY_LEDGER_MOVEMENT', 'LOCAL_STOCKOUT_WARNING'];
-const ALLOWED = { medic: MEDIC_SUPPLY, pc: LOGISTICS, cc: LOGISTICS, logistics_officer: LOGISTICS };
+const ALLOWED = { medic: MEDIC_SUPPLY, pc: [...LOGISTICS, CANCEL], cc: [...LOGISTICS, CANCEL], logistics_officer: LOGISTICS };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 let nextId = 1;
 
@@ -76,13 +81,23 @@ function projectSupply(server, evt, actorId) {
     return;
   }
   if (DECIDE.includes(evt.type) && !['pc', 'cc', 'admin'].includes(u.role)) return;
+  if (evt.type === CANCEL) {
+    const row = UUID.test(p.supply_request_id || '') && server.supply_requests.find((r) => r.id === p.supply_request_id && r.incident_id === evt.incident_id);
+    const note = String(p.note || '').trim() || null;
+    if (!row || !['not_needed', 'duplicate', 'supplied_otherwise', 'other'].includes(p.reason) || (p.reason === 'other' && !note)) return;
+    const may = (['cc', 'chamal', 'admin'].includes(u.role) && ['requested', 'dispatched', 'in_transit'].includes(row.status))
+      || (u.role === 'pc' && row.status === 'requested' && row.request_level === 'medic_to_pc');
+    if (may) Object.assign(row, { status: 'cancelled', cancel_reason: p.reason, cancel_note: note, cancelled_by: actorId, cancelled_at: evt.local_timestamp, updated_at: evt.local_timestamp });
+    return;
+  }
   const row = UUID.test(p.supply_request_id || '')
     ? server.supply_requests.find((r) => r.id === p.supply_request_id && r.incident_id === evt.incident_id)
     : server.supply_requests.find((r) => r.origin_device_id === evt.device_id && r.origin_client_request_id === (p.id || p.request_id) && r.incident_id === evt.incident_id);
   if (!row) return;
   const at = evt.local_timestamp;
   if (evt.type === 'RESUPPLY_APPROVED_FROM_PC_TRUCK') { if (row.status === 'requested') Object.assign(row, { status: 'approved', approved_by_pc: actorId, updated_at: at }); }
-  else if (DECIDE.includes(evt.type)) { if (row.request_level === 'medic_to_pc') Object.assign(row, { request_level: 'pc_to_logo', updated_at: at }); }
+  else if (DECIDE.includes(evt.type)) { if (row.request_level === 'medic_to_pc' && !['delivered', 'cancelled'].includes(row.status)) Object.assign(row, { request_level: 'pc_to_logo', updated_at: at }); }
+  else if (evt.type === 'SUPPLY_REQUEST_IN_TRANSIT') { if (['requested', 'approved', 'dispatched'].includes(row.status)) Object.assign(row, { status: 'in_transit', updated_at: at }); }
   else if (evt.type === 'SUPPLY_REQUEST_DISPATCHED') { if (['requested', 'approved'].includes(row.status)) Object.assign(row, { status: 'dispatched', assigned_runner_name: p.runner_name || row.assigned_runner_name, updated_at: at }); }
   else if (evt.type === 'SUPPLY_REQUEST_RECEIVED') { if (row.status !== 'cancelled') Object.assign(row, { status: 'delivered', updated_at: at }); }
 }
@@ -349,11 +364,112 @@ async function checkFile(browser, file) {
   assert(reqE.status === 'approved', `${rel}: the local board's approval must reach the server (got ${reqE.status})`);
   assert(SERVER.events.some((e) => e.type === 'RESUPPLY_APPROVED_FROM_PC_TRUCK' && e.payload_json.supply_request_id === reqE.id), `${rel}: the local board must send the server id it has pulled`);
 
+
+  // ── WP-24: command cancels a request; the CC holds no stock, so there is no "fulfilled by company" ──
+  // 10. The CC board lists the escalated request B from the shared queue, with a cancel and none of
+  //     the old local-only buttons; the PC no longer gets a cancel once it escalated B.
+  await pullQueue(cc.page);
+  let ccBoard = await cc.page.evaluate(() => renderCcResupplyCommandBoard());
+  assert(ccBoard.includes(`openSupplyCancelModal('${reqB.id}'`), `${rel}: the CC must be offered a cancel on the escalated request`);
+  for (const gone of ['fulfilled_by_company', 'אשר השלמה פלוגתית', 'נתב בין רכבים', 'סמן לא זמין', "updateResupplyStatus("]) {
+    assert(!ccBoard.includes(gone), `${rel}: the CC board must not offer the local-only "${gone}" any more`);
+  }
+  assert((ccBoard.match(new RegExp(`openSupplyCancelModal\\('${reqB.id}'`, 'g')) || []).length === 1, `${rel}: the escalated request must be listed once on the CC board`);
+  await pullQueue(pc.page);
+  html = await pcBoard(pc.page);
+  assert(!html.includes(`openSupplyCancelModal('${reqB.id}'`), `${rel}: the PC must not cancel a request it already escalated`);
+
+  // 11. Logistics dispatches B; the CC sees the runner, then cancels: no reason or "other" without a
+  //     note is refused on the phone and sends nothing; "other" with a note goes out with the server id.
+  await logo.page.evaluate(([id, inc]) => { showDispatchRunnerModal(id, inc); document.getElementById('dispatch-runner-name').value = 'רץ בדיקה'; document.getElementById('dispatch-runner-eta').value = '12'; submitDispatchRunner(); }, [reqB.id, INC1]);
+  await syncAll(logo.page);
+  assert(reqB.status === 'dispatched', `${rel}: logistics' dispatch must reach the server (got ${reqB.status})`);
+  await pullQueue(cc.page);
+  ccBoard = await cc.page.evaluate(() => renderCcResupplyCommandBoard());
+  assert(ccBoard.includes('נשלח') && ccBoard.includes('רץ בדיקה'), `${rel}: the CC must see logistics' real status and runner`);
+  const cancelsBefore = SERVER.events.filter((e) => e.type === CANCEL).length;
+  await cc.page.evaluate(([id, inc]) => openSupplyCancelModal(id, inc), [reqB.id, INC1]);
+  assert(await cc.page.locator('#supply-cancel-modal').isVisible(), `${rel}: the cancel sheet must open`);
+  await cc.page.click('#supply-cancel-submit');
+  assert(await cc.page.locator('#supply-cancel-error').isVisible(), `${rel}: a cancel without a reason must be refused on the phone`);
+  await cc.page.click('#supply-cancel-reason-grid [data-reason="other"]');
+  await cc.page.click('#supply-cancel-submit');
+  assert(await cc.page.locator('#supply-cancel-modal').isVisible(), `${rel}: "other" without a note must be refused`);
+  await cc.page.fill('#supply-cancel-note', 'הכוח עבר לאתר אחר');
+  await cc.page.click('#supply-cancel-submit');
+  assert(!(await cc.page.locator('#supply-cancel-modal').isVisible()), `${rel}: the sheet must close after a valid cancel`);
+  // A pull before the push must not bring the cancel button back.
+  await cc.page.evaluate(([id, inc]) => { const row = _supplyRequestQueue[inc].find((r) => r.id === id); row.status = 'dispatched'; }, [reqB.id, INC1]);
+  ccBoard = await cc.page.evaluate(() => renderCcResupplyCommandBoard());
+  assert(!ccBoard.includes(`openSupplyCancelModal('${reqB.id}'`) && ccBoard.includes('החלטה ממתינה לשליחה לשרת'), `${rel}: an unsent cancel must not offer the button again`);
+  await syncAll(cc.page);
+  const cancelEvt = SERVER.events.filter((e) => e.type === CANCEL);
+  assert(cancelEvt.length === cancelsBefore + 1 && cancelEvt[cancelEvt.length - 1].payload_json.supply_request_id === reqB.id, `${rel}: exactly one cancel must be sent, with the server id`);
+  assert(reqB.status === 'cancelled' && reqB.cancel_reason === 'other' && reqB.cancel_note === 'הכוח עבר לאתר אחר' && reqB.cancelled_by === CC, `${rel}: the CC's cancel must reach the server row (got ${JSON.stringify(reqB)})`);
+
+  // 12. Logistics sees it cancelled with the reason and is not asked to deliver it; the medic's own
+  //     request follows, with the reason; a late "received" changes nothing.
+  await pullQueue(logo.page);
+  const logoQueue = await logo.page.evaluate(() => { renderLogisticsOfficer(); return document.getElementById('logistics-real-queue')?.innerHTML || ''; });
+  assert(logoQueue.includes('בוטל') && logoQueue.includes('אחר · הכוח עבר לאתר אחר'), `${rel}: logistics must see the cancel and its reason`);
+  const logoB = await logo.page.evaluate(([id, inc]) => supplyRequestDispatchActions(_supplyRequestQueue[inc].find((r) => r.id === id), inc), [reqB.id, INC1]);
+  assert(!logoB.includes('markSupplyRequestInTransit') && !logoB.includes('markSupplyRequestDelivered') && !logoB.includes('showDispatchRunnerModal'), `${rel}: logistics must not be asked to move a cancelled request`);
+  await pullQueue(m1.page);
+  const ownB = await m1.page.evaluate((id) => { const r = reinforcementRequests.find((x) => x.id === id); return { status: r.status, text: resupplyStatusText(r), open: isRequestOpen(r) }; }, localB);
+  assert(ownB.status === 'cancelled' && ownB.text.includes('הכוח עבר לאתר אחר') && !ownB.open, `${rel}: the medic must see the cancel and its reason (got ${JSON.stringify(ownB)})`);
+  await logo.page.evaluate((id) => saveLocalEvent({ type: 'SUPPLY_REQUEST_RECEIVED', detail: 'test', payload_json: { supply_request_id: id } }), reqB.id);
+  await syncAll(logo.page);
+  assert(reqB.status === 'cancelled', `${rel}: a late "received" must not reopen a cancelled request`);
+
+  // 13. The PC cancels a medic's request that still waits at its level ("rarely used", owner).
+  const localF = await medicRequest(m1.page, [{ item: 'tourniquets', quantity: 1 }]);
+  await syncAll(m1.page);
+  const reqF = SERVER.supply_requests.find((r) => r.origin_client_request_id === localF && r.requester_id === MEDIC);
+  await pullQueue(pc.page);
+  html = await pcBoard(pc.page);
+  assert(html.includes(`openSupplyCancelModal('${reqF.id}'`) && html.includes(`decideRemoteSupplyRequest('${reqF.id}','${INC1}','approve')`), `${rel}: the PC must get approve, escalate and cancel on a new request`);
+  await pc.page.evaluate(([id, inc]) => { openSupplyCancelModal(id, inc); pickSupplyCancelReason('duplicate'); submitSupplyCancel(); }, [reqF.id, INC1]);
+  await syncAll(pc.page);
+  assert(reqF.status === 'cancelled' && reqF.cancel_reason === 'duplicate' && reqF.cancelled_by === PC, `${rel}: the PC's cancel must reach the server (got ${JSON.stringify(reqF)})`);
+
+  // 14. Never once the PC truck issued it: an approved request has no cancel for the PC or the CC.
+  const localG = await medicRequest(m1.page, [{ item: 'pressureDressings', quantity: 1 }]);
+  await syncAll(m1.page);
+  const reqG = SERVER.supply_requests.find((r) => r.origin_client_request_id === localG && r.requester_id === MEDIC);
+  await pullQueue(pc.page);
+  await pc.page.evaluate(([id, inc]) => decideRemoteSupplyRequest(id, inc, 'approve'), [reqG.id, INC1]);
+  await syncAll(pc.page);
+  assert(reqG.status === 'approved', `${rel}: request G must be approved from the truck`);
+  await pullQueue(pc.page); await pullQueue(cc.page);
+  assert(!(await pcBoard(pc.page)).includes(`openSupplyCancelModal('${reqG.id}'`), `${rel}: the PC must not cancel what its truck already issued`);
+  assert(!(await cc.page.evaluate(() => renderCcResupplyCommandBoard())).includes(`openSupplyCancelModal('${reqG.id}'`), `${rel}: the CC must not cancel what the PC truck already issued`);
+  await cc.page.evaluate((id) => saveLocalEvent({ type: 'SUPPLY_REQUEST_CANCELLED', detail: 'test', payload_json: { supply_request_id: id, reason: 'not_needed' } }), reqG.id);
+  await syncAll(cc.page);
+  assert(reqG.status === 'approved', `${rel}: a forged cancel of an approved request must change nothing (got ${reqG.status})`);
+
+  // 15. Not for logistics or a medic: no button, and the server refuses the event by role.
+  const localH = await medicRequest(m1.page, [{ item: 'ivKits', quantity: 1 }]);
+  await syncAll(m1.page);
+  const reqH = SERVER.supply_requests.find((r) => r.origin_client_request_id === localH && r.requester_id === MEDIC);
+  await pullQueue(m2.page); await pullQueue(logo.page);
+  assert(!(await pcBoard(m2.page)).includes('openSupplyCancelModal('), `${rel}: a medic must not get a cancel button`);
+  assert(!(await logo.page.evaluate(() => { renderLogisticsOfficer(); return document.getElementById('logistics-real-queue')?.innerHTML || ''; })).includes('openSupplyCancelModal('), `${rel}: logistics must not get a cancel button`);
+  await logo.page.evaluate((id) => saveLocalEvent({ type: 'SUPPLY_REQUEST_CANCELLED', detail: 'test', payload_json: { supply_request_id: id, reason: 'not_needed' } }), reqH.id);
+  await syncAll(logo.page);
+  assert(reqH.status === 'requested', `${rel}: a logistics officer's cancel must change nothing`);
+  const refused = SERVER.rejected.filter((x) => x.type === CANCEL && x.role === 'logistics_officer');
+  assert(refused.length === 1, `${rel}: sync-log must refuse logistics' cancel by role (got ${JSON.stringify(SERVER.rejected)})`);
+  SERVER.rejected = SERVER.rejected.filter((x) => !(x.type === CANCEL && x.role === 'logistics_officer'));
+
+  // 16. Signed in, the command panel's resupply cards are read only (their buttons changed one phone).
+  const panel = await cc.page.evaluate(() => { let el = document.getElementById('cmd-reinforcement-requests'); if (!el) { el = document.createElement('div'); el.id = 'cmd-reinforcement-requests'; document.body.appendChild(el); } reinforcementRequests.unshift({ id: 'REQ-SUP-T', type: 'resupply', status: 'escalated_to_cc', urgency: 'high', items: [{ item: 'tourniquets', quantity: 1 }], targetLocation: 'מוקד', siteId: 'SITE_A', createdAt: new Date().toISOString() }); renderReinforcementPanel(); return el.innerHTML; });
+  assert(panel.includes('החלטות על בקשות ציוד בלשונית הציוד') && !panel.includes("updateResupplyStatus('REQ-SUP-T'"), `${rel}: signed in, the command panel must not change a resupply request on this phone only`);
+
   assert(SERVER.rejected.length === 0, `${rel}: no event may be rejected by role (got ${JSON.stringify(SERVER.rejected)})`);
   const errors = [...m1.errors, ...pc.errors, ...cc.errors, ...logo.errors, ...m2.errors];
   assert(errors.length === 0, `${rel}: page errors: ${errors.join(' | ')}`);
   for (const c of contexts) await c.close();
-  console.log(`${rel}: PC resupply decisions cross-device browser test passed`);
+  console.log(`${rel}: PC resupply decisions and command cancel (WP-24) cross-device browser test passed`);
 }
 
 (async () => {

@@ -27,13 +27,14 @@ for (const rel of files) {
   assert(/setInterval\(\(\)=>\{ if\(currentUser\) pullSupplyRequestQueueAll\(\); \}, 45000\)/.test(html), `${rel}: must poll the real queue on the same 45s cadence as sync/command-state pulls`);
   assert(html.includes('let _supplyRequestQueue={}'), `${rel}: _supplyRequestQueue store must exist`);
   assert(html.includes('function formatSupplyRequestRow(r)'), `${rel}: formatSupplyRequestRow() must exist`);
-  assert(html.includes('function renderRealSupplyQueueRoleSection(incidentId)'), `${rel}: renderRealSupplyQueueRoleSection() must exist`);
+  assert(html.includes('function renderRealSupplyQueueRoleSection(incidentId, opts={})'), `${rel}: renderRealSupplyQueueRoleSection() must exist`);
 
   // All three call sites: logistics (own DOM element), pc board, cc board.
   assert(html.includes('id="logistics-real-queue"'), `${rel}: logistics screen must have a real-queue container`);
   assert(html.includes("document.getElementById('logistics-real-queue')"), `${rel}: renderLogisticsOfficer must populate the real-queue container`);
   assert(/renderPcResupplyBoard\(\)\{[\s\S]*?renderRealSupplyQueueRoleSection\(SITE_TO_INCIDENT_ID\[currentSiteId\(\)\]\)/.test(html), `${rel}: renderPcResupplyBoard must append the real queue section`);
-  assert(/renderCcResupplyCommandBoard\(\)\{[\s\S]*?renderRealSupplyQueueRoleSection\(SITE_TO_INCIDENT_ID\[currentSiteId\(\)\]\)/.test(html), `${rel}: renderCcResupplyCommandBoard must append the real queue section`);
+  // WP-24 (V2.99.75): the CC board lists escalated rows in its own section and appends the rest.
+  assert(/renderCcResupplyCommandBoard\(\)\{[\s\S]*?renderRealSupplyQueueRoleSection\(incidentId, \{levels:\['medic_to_pc'\]\}\)/.test(html), `${rel}: renderCcResupplyCommandBoard must append the real queue section`);
 
   console.log(`${rel}: Demo V2.9919 logistics resupply queue pull/read smoke passed`);
 }
