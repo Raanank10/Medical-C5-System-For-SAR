@@ -47,7 +47,7 @@ for (const rel of files) {
 
   // Reachable from both eligible screens.
   assert(html.includes('id="logistics-kit-templates-link"') && html.includes("goTo('kit-templates')"), `${rel}: logistics screen must link to kit templates`);
-  assert(/renderRealSupplyQueueRoleSection\(incidentId\)\{[\s\S]*?goTo\('kit-templates'\)/.test(html), `${rel}: pc/cc's shared real-queue section must also link to kit templates`);
+  assert(/renderRealSupplyQueueRoleSection\(incidentId, opts=\{\}\)\{[\s\S]*?goTo\('kit-templates'\)/.test(html), `${rel}: pc/cc's shared real-queue section must also link to kit templates`);
 
   // Screen routing wired into both goTo() and refreshActiveScreenData().
   assert(html.includes("if(screen==='kit-templates') renderKitTemplates();"), `${rel}: goTo() must route to renderKitTemplates()`);
