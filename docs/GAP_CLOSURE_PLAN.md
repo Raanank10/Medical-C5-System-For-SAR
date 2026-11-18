@@ -633,6 +633,20 @@ Ask the owner (open in the 2026-11-08 PC/CC session): on the all-incidents page,
 
 **Done when.** A delivered resupply raises that medic's bag on the phone and on the logistics board, once.
 
+**Decided (owner, 2026-11-18).** The bag goes up when the medic confirms receipt on their own phone, not when the PC marks it delivered. A partial delivery adds what arrived: the receipt sheet starts from what was asked and the medic corrects it.
+
+**Found while building.** The medic had no receipt step at all: `SUPPLY_REQUEST_RECEIVED` was sent only by the PC ("סמן נמסר") and logistics, and `sync-log` did not let a medic send it. The server (059) accepted it from anyone with no role check, so a request read "delivered" on every board while the bag never moved.
+
+**Done (V2.99.74, needs `database/082` and `sync-log` v18 live).**
+1. Medic: the action panel lists the medic's own open requests ("ציוד בדרך אליך" / "נמסר · ממתין לאישור קבלה") with "קיבלתי". The sheet is prefilled with what was asked (a "כמה שאפשר" line starts at 1), - / + per item; nothing is added until "אישור קבלה". `confirmResupplyReceipt()` adds to `medicBag()`, sends one `INVENTORY_LEDGER_MOVEMENT` `resupply_received` per item (no patient, `supply_request_ref`), then `SUPPLY_REQUEST_RECEIVED` with `received_items`, `requested_items` and `partial`. Once: a second confirmation does nothing.
+2. PC and logistics "סמן נמסר" keep sending `SUPPLY_REQUEST_RECEIVED`; it now means handed over. The PC/CC open board keeps the request as "נמסר · ממתין לאישור החובש" until the receipt, then shows "התקבל אצל החובש" with any partial line ("חסמים 2 מתוך 3").
+3. `database/082`: `supply_requests.received_at` / `received_by` / `received_items_json`; `project_supply_request_event()` records the receipt only from the requester (first wins), ignores a medic or paramedic marking someone else's request, and keeps the first delivery time. Rows already delivered get `received_at = delivered_at`, so they do not show as waiting. Checked on a throwaway Postgres 16: backfill, PC handover, another medic's attempt, the requester's partial receipt, a second receipt, a malformed payload (event still stored), a receipt before any PC step.
+4. `sync-log` v18: `SUPPLY_REQUEST_RECEIVED` added to `MEDIC_SUPPLY_EVENTS` (medic, paramedic).
+
+**Verify.** `scripts/browser_inventory_sync_test.js` step 7 fails on the WP-19 branch and passes after; `scripts/browser_resupply_decision_sync_test.js` now expects the medic to see the PC's delivery as waiting for receipt. Full `npm test` 79/79. Live, after the owner applies 082 and deploys `sync-log` v18: a medic asks, the PC approves and marks delivered, the medic confirms 2 of 3; `select received_at, received_items_json from supply_requests` shows the receipt and `inventory_ledger_v12` one `resupply_received` row per item for that medic. Order matters: deploy `sync-log` v18 with or before the client, or the medic's receipt is refused (`FORBIDDEN_ACTOR_ROLE`) while the bag already rose on the phone.
+
+**Not covered.** A request the medic never confirms (phone lost) stays "ממתין לאישור החובש" on the PC/CC boards; there is no command override to close it. WP-24 (CC "fulfilled by company") will need the same rule: it marks handed over, the medic confirms.
+
 ---
 
 ## Tracks outside this plan's PRs
@@ -697,7 +711,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-35 Record what is applied live | P3 | Not started | | read-only |
 | WP-36 Demo constants | P3 | Not started | | `SITE_A` x60, `PLT-A` x25 |
 | WP-37 Unlink tombstone | P3 | Not started | | `database/069` known limit |
-| WP-38 Resupply raises the medic's bag | P2 | Not started, 1 design question | | owner 2026-11-18, found in WP-19 |
+| WP-38 Resupply raises the medic's bag | P2 | Done in code (V2.99.74): `database/082` and `sync-log` v18 not applied live yet | this PR | owner 2026-11-18: the medic confirms, by what arrived; the PC's / logistics' "delivered" = handed over, waiting for the medic |
 
 ## Revisions after #73 (2026-10-19)
 

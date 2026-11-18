@@ -53,7 +53,8 @@ const userById = (id) => Object.values(USERS).find((u) => u.id === id);
 const CREATE = ['SUPPLY_REQUEST_CREATED', 'RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE', 'RESUPPLY_REQUEST_ESCALATED_CC'];
 const DECIDE = ['RESUPPLY_APPROVED_FROM_PC_TRUCK', 'PC_TRUCK_RESUPPLY_UNAVAILABLE_ESCALATED', 'RESUPPLY_ESCALATED_TO_CC'];
 const MOVE = ['SUPPLY_REQUEST_DISPATCHED', 'SUPPLY_REQUEST_IN_TRANSIT', 'SUPPLY_REQUEST_RECEIVED'];
-const MEDIC_SUPPLY = ['SUPPLY_REQUEST_CREATED', 'SUPPLY_CONSUMED', 'SUPPLY_USE_CANCELLED', 'INVENTORY_LEDGER_MOVEMENT', 'LOCAL_STOCKOUT_WARNING', 'RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE', 'RESUPPLY_REQUEST_ESCALATED_CC'];
+// sync-log v18 (WP-38): the medic confirms receipt with SUPPLY_REQUEST_RECEIVED.
+const MEDIC_SUPPLY = ['SUPPLY_REQUEST_CREATED', 'SUPPLY_CONSUMED', 'SUPPLY_USE_CANCELLED', 'INVENTORY_LEDGER_MOVEMENT', 'LOCAL_STOCKOUT_WARNING', 'RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE', 'RESUPPLY_REQUEST_ESCALATED_CC', 'SUPPLY_REQUEST_RECEIVED'];
 const LOGISTICS = [...CREATE, ...DECIDE, ...MOVE, 'SUPPLY_CONSUMED', 'SUPPLY_USE_CANCELLED', 'INVENTORY_LEDGER_MOVEMENT', 'LOCAL_STOCKOUT_WARNING'];
 const ALLOWED = { medic: MEDIC_SUPPLY, pc: LOGISTICS, cc: LOGISTICS, logistics_officer: LOGISTICS };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -87,6 +88,7 @@ function projectSupply(server, evt, actorId) {
       id: `aaaaaaaa-0000-4000-8000-${String(nextId++).padStart(12, '0')}`, incident_id: evt.incident_id, requester_id: actorId,
       status: 'requested', request_level: 'medic_to_pc', items_json: p.items || [], notes: p.freeText || null,
       approved_by_pc: null, assigned_runner_name: null, eta_minutes: null, requested_at: evt.local_timestamp,
+      delivered_at: null, received_at: null, received_by: null, received_items_json: null,
       updated_at: evt.local_timestamp, origin_device_id: evt.device_id, origin_client_request_id: clientId,
     });
     return;
@@ -100,7 +102,15 @@ function projectSupply(server, evt, actorId) {
   if (evt.type === 'RESUPPLY_APPROVED_FROM_PC_TRUCK') { if (row.status === 'requested') Object.assign(row, { status: 'approved', approved_by_pc: actorId, updated_at: at }); }
   else if (DECIDE.includes(evt.type)) { if (row.request_level === 'medic_to_pc') Object.assign(row, { request_level: 'pc_to_logo', updated_at: at }); }
   else if (evt.type === 'SUPPLY_REQUEST_DISPATCHED') { if (['requested', 'approved'].includes(row.status)) Object.assign(row, { status: 'dispatched', assigned_runner_name: p.runner_name || row.assigned_runner_name, updated_at: at }); }
-  else if (evt.type === 'SUPPLY_REQUEST_RECEIVED') { if (row.status !== 'cancelled') Object.assign(row, { status: 'delivered', updated_at: at }); }
+  else if (evt.type === 'SUPPLY_REQUEST_RECEIVED') {
+    // database/082 (WP-38): delivered by anyone allowed; received only by the requester, first wins;
+    // a medic/paramedic marking someone else's request changes nothing.
+    if (row.status === 'cancelled') return;
+    const own = actorId === row.requester_id;
+    if (['medic', 'paramedic'].includes(u.role) && !own) return;
+    Object.assign(row, { status: 'delivered', delivered_at: row.delivered_at || at, updated_at: at });
+    if (own && !row.received_at) Object.assign(row, { received_at: at, received_by: actorId, received_items_json: Array.isArray(p.received_items) ? p.received_items : null });
+  }
 }
 
 const ITEMS = ['tourniquets', 'pressureDressings', 'hemostaticGauze', 'airwayEquipment', 'ivKits', 'blankets', 'batteryPacks'];
@@ -453,6 +463,68 @@ async function checkFile(browser, file) {
   const bad = SERVER.events.filter((e) => STOCK_TYPES.includes(e.type) && ((e.patient_id != null && !UUID.test(e.patient_id))
     || (e.payload_json?.patient_id != null && !UUID.test(e.payload_json.patient_id)) || /draft-|P\d{3}/.test(String(e.payload_json?.patient_context || ''))));
   assert(bad.length === 0, `${rel}: stock events must carry a uuid patient or none (got ${JSON.stringify(bad.map((e) => [e.type, e.patient_id, e.payload_json]))})`);
+
+  // 7. WP-38 (owner 2026-11-18): a resupply delivered to a medic raises the bag only when the medic
+  //    confirms it, by what arrived (partial allowed), once; the PC's "delivered" alone does not.
+  const pullQ = (page) => page.evaluate(() => Promise.all(Object.values(SITE_TO_INCIDENT_ID).map((id) => pullSupplyRequestQueue(id)))).then(() => page.waitForTimeout(200));
+  await pullInv(logo.page);
+  const burnLogo0 = await burn(logo.page, 'tourniquets');
+  const m2bag0 = (await bagOf(m2.page)).tourniquets;
+  const localR = await m2.page.evaluate(() => createResupplyRequest({ items: [{ item: 'tourniquets', quantity: 3 }], urgency: 'high', reason: 'manual_request', note: 'נגמרו' }).id);
+  await syncAll(m2.page);
+  const reqR = SERVER.supply_requests.find((r) => r.requester_id === MEDIC2 && r.origin_client_request_id === localR);
+  assert(reqR, `${rel}: the second medic's request must reach the server`);
+  // 7a. PC approves from the truck (truck -3) and marks it delivered: the row is delivered, not received.
+  await pullQ(pc.page);
+  const truck0 = await pc.page.evaluate(() => pcTruckStock.tourniquets);
+  await pc.page.evaluate(([id, inc]) => decideRemoteSupplyRequest(id, inc, 'approve'), [reqR.id, INC1]);
+  await syncAll(pc.page);
+  await pullQ(pc.page);
+  await pc.page.evaluate(([id, inc]) => decideRemoteSupplyRequest(id, inc, 'delivered'), [reqR.id, INC1]);
+  await syncAll(pc.page);
+  assert((await pc.page.evaluate(() => pcTruckStock.tourniquets)) === truck0 - 3, `${rel}: the truck is debited once by 3`);
+  assert(reqR.status === 'delivered' && !reqR.received_at, `${rel}: the PC's "delivered" marks the row delivered, not received (got ${JSON.stringify(reqR)})`);
+  await pullQ(pc.page);
+  const pcOpen = await pc.page.evaluate((inc) => renderRealSupplyQueueRoleSection(inc), INC1);
+  assert(pcOpen.includes('ממתין לאישור החובש'), `${rel}: until the medic confirms, the PC board must show the request as waiting for the medic`);
+  // 7b. The medic's phone shows it waiting for receipt, with a "received" button; the bag has not moved.
+  await pullQ(m2.page);
+  const ownR = await m2.page.evaluate((id) => reinforcementRequests.find((r) => r.id === id)?.status, localR);
+  assert(ownR === 'awaiting_receipt', `${rel}: the medic must see the delivery as waiting for their confirmation (got ${ownR})`);
+  assert((await bagOf(m2.page)).tourniquets === m2bag0, `${rel}: a delivery the medic has not confirmed must not raise the bag`);
+  const panel = await m2.page.evaluate(() => renderMedicActionPanel());
+  assert(panel.includes(`openResupplyReceiptSheet('${localR}')`) && panel.includes('קיבלתי'), `${rel}: the medic must be offered "קיבלתי" on the incoming request`);
+  // 7c. Another medic cannot confirm someone else's request: the event is kept, the row is unchanged.
+  await m1.page.evaluate((sid) => saveLocalEvent({ type: 'SUPPLY_REQUEST_RECEIVED', detail: 'forged', payload_json: { supply_request_id: sid, received_items: [{ item: 'tourniquets', quantity: 9 }] } }), reqR.id);
+  await syncAll(m1.page);
+  assert(!reqR.received_at, `${rel}: another medic's receipt must not mark the request received (got ${JSON.stringify(reqR)})`);
+  // 7d. The medic opens the sheet (prefilled 3), corrects to 2 (one did not arrive) and confirms.
+  await m2.page.evaluate((id) => openResupplyReceiptSheet(id), localR);
+  const pre = await m2.page.evaluate(() => document.querySelector('#receipt-qty-tourniquets')?.textContent);
+  assert(pre === '3', `${rel}: the receipt sheet must be prefilled with what was asked (got ${pre})`);
+  await m2.page.click('#receipt-minus-tourniquets');
+  await m2.page.click('#receipt-confirm-btn');
+  assert((await bagOf(m2.page)).tourniquets === m2bag0 + 2, `${rel}: the bag must rise by what arrived, +2 (got ${(await bagOf(m2.page)).tourniquets}, before ${m2bag0})`);
+  await syncAll(m2.page);
+  const recRows = SERVER.ledger.filter((r) => r.actor_id === MEDIC2 && r.movement_type === 'resupply_received');
+  assert(recRows.length === 1 && recRows[0].item_type === 'tourniquets' && recRows[0].quantity_delta === 2 && recRows[0].stock_after === m2bag0 + 2
+    && recRows[0].patient_id === null && recRows[0].stock_owner === 'medic_bag', `${rel}: one resupply_received movement into the medic's bag, no patient (got ${JSON.stringify(recRows)})`);
+  assert(reqR.received_by === MEDIC2 && JSON.stringify(reqR.received_items_json) === JSON.stringify([{ item: 'tourniquets', quantity: 2 }]), `${rel}: the server row must record the medic's receipt by what arrived (got ${JSON.stringify(reqR)})`);
+  // 7e. Once: no second confirmation, no second movement, the button is gone.
+  const again = await m2.page.evaluate((id) => confirmResupplyReceipt(id, [{ item: 'tourniquets', quantity: 2 }]), localR);
+  await syncAll(m2.page);
+  assert(again === false && SERVER.ledger.filter((r) => r.actor_id === MEDIC2 && r.movement_type === 'resupply_received').length === 1, `${rel}: a receipt is confirmed once`);
+  assert(!(await m2.page.evaluate(() => renderMedicActionPanel())).includes(`openResupplyReceiptSheet('${localR}')`), `${rel}: a received request must not offer "קיבלתי" again`);
+  // 7f. Logistics: the bag's new count, and neither the truck issue nor the receipt is consumption.
+  await pullInv(logo.page);
+  const m2Holder = (await logo.page.evaluate(() => incidentStockHolders())).find((h) => h.owner === 'medic_bag' && h.actorId === MEDIC2 && h.item === 'tourniquets');
+  assert(m2Holder && m2Holder.stock === m2bag0 + 2, `${rel}: logistics must see the medic's bag raised once (got ${JSON.stringify(m2Holder)})`);
+  assert((await burn(logo.page, 'tourniquets')) === burnLogo0, `${rel}: the truck issue and the receipt are not counted in the burn rate (before ${burnLogo0}, after ${await burn(logo.page, 'tourniquets')})`);
+  // 7g. The PC sees the receipt, partial, and the request leaves the open board.
+  await pullQ(pc.page);
+  const pcAfter = await pc.page.evaluate(([inc, id]) => ({ open: renderRealSupplyQueueRoleSection(inc), sub: formatSupplyRequestRow(_supplyRequestQueue[inc].find((r) => r.id === id)).sub }), [INC1, reqR.id]);
+  assert(!pcAfter.open.includes('ממתין לאישור החובש') && pcAfter.sub.includes('התקבל אצל החובש') && pcAfter.sub.includes('2 מתוך 3'), `${rel}: the PC must see the partial receipt (got ${pcAfter.sub})`);
+  assert(SERVER.rejected.length === 0, `${rel}: no WP-38 event may be refused (got ${JSON.stringify(SERVER.rejected)})`);
 
   const errors = [...m1.errors, ...m2.errors, ...logo.errors, ...pc.errors];
   assert(errors.length === 0, `${rel}: page errors: ${errors.join(' | ')}`);

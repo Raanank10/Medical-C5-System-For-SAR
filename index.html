@@ -1001,7 +1001,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9973</div>
+      <div class="demo-kicker">Demo V2.9974</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1098,7 +1098,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9973</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9974</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1108,7 +1108,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9973</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9974</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2147,6 +2147,18 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 </div>
 
 <!-- ══════════════════════ MEDIC RESUPPLY REQUEST MODAL ══ -->
+<div class="modal-overlay hidden" id="resupply-receipt-modal" onclick="if(event.target.id==='resupply-receipt-modal') hideResupplyReceiptSheet()">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="field-label">מה קיבלת בפועל?</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.55;margin-bottom:14px">הכמויות כפי שביקשת. תקן לפי מה שהגיע בפועל. רק זה נוסף לתיק ונשלח ללוגיסטיקה.</div>
+    <div id="resupply-receipt-lines" style="display:grid;gap:8px;margin-bottom:14px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button class="btn-primary" id="receipt-confirm-btn" onclick="submitResupplyReceipt()">אישור קבלה</button>
+      <button class="btn-secondary" onclick="hideResupplyReceiptSheet()">ביטול</button>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay hidden" id="resupply-modal" onclick="closeResupplyModal(event)">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
@@ -3351,7 +3363,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.73';
+const APP_VERSION = '2.99.74';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3560,6 +3572,9 @@ const REINFORCEMENT_STATUS_LABELS = {
   sent_from_truck:'נשלח מהרכב',
   collected_by_medic:'נאסף על ידי חובש',
   delivered:'נמסר',
+  in_transit:'בדרך אליך',
+  awaiting_receipt:'נמסר · ממתין לאישור קבלה',
+  received:'התקבל אצל החובש',
   unavailable_at_truck:'לא זמין ברכב',
   escalated_to_cc:'הוסלם למ״פ רפואה',
   fulfilled_by_company:'הושלם מהפלוגה',
@@ -6334,6 +6349,7 @@ function renderMedicActionPanel(){
         <button class="demo-mini-btn" onclick="openMedicResupplySheet()" style="background:var(--surface2);border-color:var(--border);color:var(--muted)">חסר לי ציוד</button>
       </div>
       ${renderMedicStockWarnings()}
+      ${renderMedicIncomingResupply()}
       <div class="role-row" style="margin-top:10px">
         <div class="role-row-title">עדכון מוקד / צפי נפגעים</div>
         <div class="role-row-sub">כתובת, סוג מבנה, ETA, מחולצים לפני הגעה ומקור דיווח. ניתן לתקן מאוחר יותר.</div>
@@ -13503,10 +13519,10 @@ function defaultResupplyLocation(){
   return `${siteData.name||siteData.address||'מוקד פעיל'} · ${zoneLabel()}`;
 }
 function resupplyRequestOpenStatuses(){
-  return ['pending_pc','approved_from_truck','sent_from_truck','collected_by_medic','unavailable_at_truck','escalated_to_cc','fulfilled_by_company'];
+  return ['pending_pc','approved_from_truck','sent_from_truck','collected_by_medic','unavailable_at_truck','escalated_to_cc','fulfilled_by_company','in_transit','awaiting_receipt'];
 }
 function isRequestOpen(r){
-  return !['arrived','resolved','cancelled','denied','delivered','closed'].includes(r.status);
+  return !['arrived','resolved','cancelled','denied','delivered','closed','received'].includes(r.status);
 }
 function resupplyItemsText(req){
   return (req.items||[]).map(x=>`${supplyLabel(x.item,true)} x${x.quantity==='unknown'?'כמה שאפשר':x.quantity}`).join(' · ');
@@ -14979,7 +14995,7 @@ async function pullAllIncidentAlertData(client, ids, patientRows){
       patients:pts,
       watchdog:wdRows ? wdRows.filter(a=>a.incident_id===id && a.patient_id && SERVER_WATCHDOG_TYPES.includes(a.alert_type) && a.payload_json?.source==='server_watchdog') : keep('watchdog'),
       requests:reqRows ? reqRows.filter(r=>r.incident_id===id).map(overviewRequestFromRow).filter(Boolean) : keep('requests'),
-      supply:supplyLists[i] ? supplyLists[i].filter(r=>r.request_level==='pc_to_logo' && !['delivered','cancelled'].includes(r.status)) : keep('supply')
+      supply:supplyLists[i] ? supplyLists[i].filter(r=>r.request_level==='pc_to_logo' && supplyRowOpen(r)) : keep('supply')
     };
   });
   _allIncidentAlertData=out;
@@ -16921,7 +16937,12 @@ function applyServerSupplyDecisionsToOwnRequests(rows){
     const req=reinforcementRequests.find(r=>r.type==='resupply' && r.id===row.origin_client_request_id);
     if(!req) return;
     let next=null;
-    if(row.status==='delivered' && !['delivered','closed','collected_by_medic'].includes(req.status)) next='delivered';
+    // WP-38: "delivered" on the server is the PC's or logistics' word that it was handed over; the
+    // bag rises only when this medic confirms (confirmResupplyReceipt). A receipt is never undone.
+    if(req.status==='received' || req.receivedAt) next=null;
+    else if(row.status==='delivered' && row.received_at) next='received';
+    else if(row.status==='delivered' && req.status!=='awaiting_receipt') next='awaiting_receipt';
+    else if(['dispatched','in_transit'].includes(row.status) && !['in_transit','awaiting_receipt'].includes(req.status)) next='in_transit';
     else if(req.status==='pending_pc' && row.status==='approved') next='approved_from_truck';
     else if(req.status==='pending_pc' && row.request_level==='pc_to_logo') next='escalated_to_cc';
     if(!next) return;
@@ -17038,10 +17059,23 @@ const SUPPLY_REQUEST_LEVEL_LABELS = {
   pc_to_logo:'חוג״ד ← לוגיסטיקה',
   logo_direct_to_medic:'לוגיסטיקה ← חובש (ישיר)'
 };
+// WP-38: "delivered" without a receipt = handed over, the medic has not confirmed it yet (the bag
+// rises only on the medic's confirmation). database/082 sets received_at for older delivered rows.
+function supplyRowAwaitingReceipt(r){ return r.status==='delivered' && !r.received_at; }
+function supplyRowOpen(r){ return r.status!=='cancelled' && (r.status!=='delivered' || supplyRowAwaitingReceipt(r)); }
+function supplyReceiptText(r){
+  const asked={}; (r.items_json||[]).forEach(x=>{ const k=normalizeSupplyItem(x.item); asked[k]=(asked[k]||0)+(Number(x.quantity)||0); });
+  const got=Array.isArray(r.received_items_json)?r.received_items_json:null;
+  if(!got) return 'התקבל אצל החובש';
+  const parts=got.map(x=>{ const k=normalizeSupplyItem(x.item); const q=Number(x.quantity)||0; return asked[k] && q!==asked[k] ? `${supplyLabel(k,true)} ${q} מתוך ${asked[k]}` : `${supplyLabel(k,true)} ${q}`; });
+  return `התקבל אצל החובש${parts.length?` (${parts.join(' · ')})`:''}`;
+}
 function formatSupplyRequestRow(r){
   const items=(r.items_json||[]).map(x=>`${supplyLabel(x.item,true)} x${x.quantity}`).join(' · ')||'—';
   // Approved while still at the medic->PC level = the PC fills it from its own truck (WP-6).
-  const status=r.status==='approved' && r.request_level==='medic_to_pc' ? 'אושר מרכב חוג״ד' : (SUPPLY_REQUEST_STATUS_LABELS[r.status]||r.status);
+  const status=r.status==='approved' && r.request_level==='medic_to_pc' ? 'אושר מרכב חוג״ד'
+    : r.status==='delivered' ? (r.received_at ? supplyReceiptText(r) : 'נמסר · ממתין לאישור החובש')
+    : (SUPPLY_REQUEST_STATUS_LABELS[r.status]||r.status);
   const level=SUPPLY_REQUEST_LEVEL_LABELS[r.request_level]||r.request_level;
   const runner=r.assigned_runner_name?` · רץ: ${r.assigned_runner_name}${Number.isFinite(r.eta_minutes)?` · ETA ${r.eta_minutes} דק׳`:''}`:'';
   const when=r.requested_at?new Date(r.requested_at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):'';
@@ -17050,7 +17084,7 @@ function formatSupplyRequestRow(r){
 // Shared by pc/cc's role-dashboard boards (roleRow/roleSection idiom). Open requests only -
 // these two boards are "what needs action," not a full history; logistics shows the full queue.
 function renderRealSupplyQueueRoleSection(incidentId){
-  const rows=(_supplyRequestQueue[incidentId]||[]).filter(r=>!['delivered','cancelled'].includes(r.status));
+  const rows=(_supplyRequestQueue[incidentId]||[]).filter(supplyRowOpen);
   const body=rows.map(r=>{ const f=formatSupplyRequestRow(r); return roleRow(f.title,f.sub,pcSupplyDecisionActions(r, incidentId)); }).join('');
   const kitLink=canManageKitTemplates()?`<div style="padding:0 16px 10px"><button class="demo-mini-btn" onclick="goTo('kit-templates')">ניהול קיטים מוגדרים מראש</button></div>`:'';
   return roleSection('תור בקשות ציוד — Real-time · כל המכשירים', body || roleRow('אין בקשות ציוד פתוחות בתור האמיתי','נתון חוצה-מכשירים מ-supply_requests, לא מה-outbox המקומי')) + kitLink;
@@ -17101,7 +17135,7 @@ function decideRemoteSupplyRequest(requestId, incidentId, decision){
   }else if(decision==='delivered'){
     saveLocalEvent({type:'SUPPLY_REQUEST_RECEIVED',detail:`נמסר מרכב חוג״ד · ${text}`,warn:false,payload_json:{supply_request_id:requestId}});
     updateLocalSupplyRequestOptimistic(incidentId, requestId, {status:'delivered', delivered_at:new Date().toISOString()});
-    toast('סומן כנמסר');
+    toast('סומן נמסר · ממתין לאישור החובש');
   }
   saveDemoState();
   if(document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard(activeRoleDashboard);
@@ -17190,7 +17224,7 @@ function markSupplyRequestInTransit(requestId, incidentId){
 function markSupplyRequestDelivered(requestId, incidentId){
   saveLocalEvent({type:'SUPPLY_REQUEST_RECEIVED',detail:`נמסר · ${requestId}`,warn:false,payload_json:{supply_request_id:requestId}});
   updateLocalSupplyRequestOptimistic(incidentId, requestId, {status:'delivered', delivered_at:new Date().toISOString()});
-  toast('סומן כנמסר');
+  toast('סומן נמסר · ממתין לאישור החובש');
   renderLogisticsOfficer();
 }
 
@@ -17535,6 +17569,95 @@ function restockMedicBag(){
   renderLocalStockPanel();
   if(typeof renderDashboard==='function') renderDashboard();
   toast('התיק חודש · המלאי עודכן ונשלח');
+  return true;
+}
+// ── WP-38 (owner 2026-11-18): a resupply delivered to the medic raises the bag ──
+// The bag rises only when the medic confirms receipt on their own phone: the items are in their
+// hands only then. The PC's or logistics' "delivered" marks it handed over and waiting for the
+// medic (supply_requests.status 'delivered', received_at null). The sheet starts from what was
+// asked; the medic corrects it to what arrived (a partial delivery adds only what came). One
+// resupply_received movement per item into this medic's bag (no patient, not consumption, so the
+// burn rate is unchanged; the PC truck's issue is the truck's own movement), then
+// SUPPLY_REQUEST_RECEIVED with what arrived (database/082 records it only from the requester).
+// Confirmed once: a second confirmation changes nothing.
+function canConfirmResupplyReceipt(r){
+  // A request marked 'delivered' on this phone (demo, PC and medic on one device) still waits for the receipt.
+  return r && r.type==='resupply' && r.requestedById===currentMedicId() && !r.receivedAt && (isRequestOpen(r) || r.status==='delivered');
+}
+function renderMedicIncomingResupply(){
+  const own=(reinforcementRequests||[]).filter(canConfirmResupplyReceipt);
+  if(!own.length) return '';
+  const rows=own.map(r=>{
+    const waiting=['awaiting_receipt','in_transit','approved_from_truck','sent_from_truck'].includes(r.status);
+    return `<div class="role-row" style="margin-top:8px;${r.status==='awaiting_receipt'?'border-color:var(--orange)':''}">
+      <div class="role-row-title">${waiting?'ציוד בדרך אליך':'בקשת ציוד פתוחה'} · ${resupplyItemsText(r)}</div>
+      <div class="role-row-sub">${REINFORCEMENT_STATUS_LABELS[r.status]||r.status} · התיק לא עודכן עד שתאשר קבלה</div>
+      <button class="demo-mini-btn" style="margin-top:8px" onclick="openResupplyReceiptSheet('${r.id}')">קיבלתי</button>
+    </div>`;
+  }).join('');
+  return rows;
+}
+let resupplyReceiptDraft=null;
+function openResupplyReceiptSheet(requestId){
+  const req=(reinforcementRequests||[]).find(r=>r.id===requestId);
+  if(!canConfirmResupplyReceipt(req)){ toast('הבקשה כבר אושרה או נסגרה'); return; }
+  const qty={};
+  (req.items||[]).forEach(x=>{ const k=normalizeSupplyItem(x.item); if(!(k in SUPPLY_BASELINE)) return; qty[k]=(qty[k]||0)+(Number(x.quantity)>0?Number(x.quantity):1); });
+  resupplyReceiptDraft={requestId, qty};
+  renderResupplyReceiptLines();
+  document.getElementById('resupply-receipt-modal')?.classList.remove('hidden');
+}
+function renderResupplyReceiptLines(){
+  const el=document.getElementById('resupply-receipt-lines'); if(!el || !resupplyReceiptDraft) return;
+  el.innerHTML=Object.entries(resupplyReceiptDraft.qty).map(([k,q])=>`<div style="display:grid;grid-template-columns:1fr 48px 40px 48px;gap:8px;align-items:center">
+    <span style="font-weight:800">${supplyLabel(k)}</span>
+    <button class="tap-btn" id="receipt-minus-${k}" onclick="adjustResupplyReceipt('${k}',-1)">−</button>
+    <strong id="receipt-qty-${k}" style="text-align:center;font-family:var(--mono);font-size:18px">${q}</strong>
+    <button class="tap-btn" id="receipt-plus-${k}" onclick="adjustResupplyReceipt('${k}',1)">+</button>
+  </div>`).join('') || '<div class="role-row-sub">אין פריטי תיק בבקשה הזו</div>';
+}
+function adjustResupplyReceipt(item, d){
+  if(!resupplyReceiptDraft || !(item in resupplyReceiptDraft.qty)) return;
+  resupplyReceiptDraft.qty[item]=Math.max(0, Math.min(99, resupplyReceiptDraft.qty[item]+d));
+  renderResupplyReceiptLines();
+}
+function hideResupplyReceiptSheet(){ document.getElementById('resupply-receipt-modal')?.classList.add('hidden'); }
+function submitResupplyReceipt(){
+  if(!resupplyReceiptDraft) return false;
+  const items=Object.entries(resupplyReceiptDraft.qty).map(([item,quantity])=>({item,quantity}));
+  const ok=confirmResupplyReceipt(resupplyReceiptDraft.requestId, items);
+  if(ok){ hideResupplyReceiptSheet(); resupplyReceiptDraft=null; }
+  return ok;
+}
+function confirmResupplyReceipt(requestId, items){
+  const req=(reinforcementRequests||[]).find(r=>r.id===requestId);
+  if(!canConfirmResupplyReceipt(req)) return false;
+  const received=(items||[]).map(x=>({item:normalizeSupplyItem(x.item), quantity:Math.max(0, Math.round(Number(x.quantity)||0))}))
+    .filter(x=>x.item in SUPPLY_BASELINE && x.quantity>0);
+  if(!received.length){ toast('לא סומן שום פריט שהתקבל'); return false; }
+  const bag=medicBag();
+  const at=new Date().toISOString();
+  received.forEach(({item, quantity})=>{
+    bag[item]=(bag[item]??0)+quantity;
+    saveLocalEvent({type:'INVENTORY_LEDGER_MOVEMENT', detail:`התקבל מבקשת ציוד: ${supplyLabel(item)} +${quantity}`, warn:false,
+      payload_json:{item_type:item, movement_type:'resupply_received', quantity_delta:quantity, restock:'resupply_delivered', supply_request_ref:req.id,
+        patient_id:null, local_stock_after:bag[item], stock_seq:nextLedgerSeq(), battery_at_log:null}});
+  });
+  const asked=(req.items||[]).filter(x=>normalizeSupplyItem(x.item) in SUPPLY_BASELINE);
+  const partial=asked.some(x=>{ const got=received.find(y=>y.item===normalizeSupplyItem(x.item)); return !got || (Number(x.quantity)>0 && got.quantity<Number(x.quantity)); });
+  saveLocalEvent({type:'SUPPLY_REQUEST_RECEIVED', detail:`התקבל אצל החובש · ${received.map(x=>`${supplyLabel(x.item,true)} ${x.quantity}`).join(' · ')}${partial?' · חלקי':''}`, warn:partial,
+    payload_json:withServerSupplyRequestId({request_id:req.id, received_items:received, requested_items:req.items||[], partial}, req.id)});
+  req.receivedAt=at;
+  req.receivedItems=received;
+  req.statusHistory=req.statusHistory||[];
+  req.statusHistory.push({status:'received', previous:req.status, at, by:getDeviceId()});
+  req.status='received';
+  req.updatedAt=at;
+  persistMedicBags();
+  saveDemoState();
+  renderLocalStockPanel();
+  if(document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard(activeRoleDashboard);
+  toast(partial?'התקבל חלקית · התיק עודכן ונשלח':'התקבל · התיק עודכן ונשלח');
   return true;
 }
 function showOwnInventory(){
