@@ -397,7 +397,7 @@
 
   // Statuses a patient's record must not be silently overwritten out of once reached.
   // Deliberately excludes "evacuating": a patient the rescuers moved to the site's evacuation
-  // point (נקודת פינוי) is still under the platoon commander's supervision, waiting for an
+  // point (נאפ״ל, נקודת איסוף פלוגתית) is still under the platoon commander's supervision, waiting for an
   // ambulance and the final handover to MDA, so status must still be able to advance from there
   // to "handed_over".
   const FINAL_PATIENT_STATUSES = new Set([

@@ -667,6 +667,8 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 
 **Verify.** `scripts/browser_evac_point_arrival_test.js`, `scripts/browser_command_panel_test.js` and the smoke scripts that assert the wording; `browser_mobile_layout_test.js` for the shorter labels.
 
+**Done (V2.99.77).** Every UI string: "נאפ״ל" in buttons ("יצא לנאפ״ל", "הגיע לנאפ״ל"), statuses, board lines, the stage cards, advice and toasts; the full "נקודת איסוף פלוגתית" on the PC site card's section title, the toast after "יצא לנאפ״ל" and the event detail. Written with gershayim (״) like חוג״ד and מד״א. Tests updated; `database/076`/`077` comments left as applied.
+
 ---
 
 ### WP-40: 30 minutes waiting at the נאפ"ל alerts the PC and CC (P2, owner 2026-11-18)
@@ -755,7 +757,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-35 Record what is applied live | P3 | Not started | | read-only |
 | WP-36 Demo constants | P3 | Not started | | `SITE_A` x60, `PLT-A` x25 |
 | WP-37 Unlink tombstone | P3 | Not started | | `database/069` known limit |
-| WP-39 Evacuation point = נאפ"ל | P2 | Not started | | owner 2026-11-18; reverses WP-18's "נקודת פינוי" |
+| WP-39 Evacuation point = נאפ"ל | P2 | Done (V2.99.77), no SQL | this PR | owner 2026-11-18; reverses WP-18's "נקודת פינוי"; one per site |
 | WP-40 30 min at the נאפ"ל alert | P2 | Not started | | owner 2026-11-18; PC + CC |
 | WP-41 Medic banner: patient to the נאפ"ל | P2 | Not started | | owner 2026-11-18; 15 s or tap |
 | WP-38 Resupply raises the medic's bag | P2 | Done (V2.99.74): `database/082` applied live by the owner, `sync-log` v18 deployed 2026-11-18; live two-phone check pending | #132 | owner 2026-11-18: the medic confirms, by what arrived; the PC's / logistics' "delivered" = handed over, waiting for the medic |
