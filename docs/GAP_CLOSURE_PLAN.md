@@ -365,6 +365,16 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 5. WP-29 builds on 081's `run_clinical_watchdog()` (live since WP-20).
 6. WP-28, WP-30, WP-31 and WP-33 wait for an owner answer; ask it first in the session.
 7. WP-32 and WP-34 to WP-37 any time.
+
+**Status check 2026-11-18 (evening).** `main` is V2.99.74 with `database/082` (WP-38) the highest file; live: `082` applied, `sync-log` v18. Done: WP-19 (#130), WP-20 (#128), WP-38 (#132, #135). In progress: WP-22 (its session waits for the owner to approve the closing groups; 55 still open, 0 closed), WP-23 (#131), WP-24 (#133), WP-25 (#134). None of the three open PRs is applied live. Their numbers collide with `main` and with each other:
+
+| PR | WP | Claims | Against `main` | Next free if merged in this order |
+| --- | --- | --- | --- | --- |
+| #133 | WP-24 | V2.99.75, `083`, `084` | merges clean; `084` starts from WP-38's live `project_supply_request_event()` body (keeps the receipt logic) | keep V2.99.75, `083`, `084` |
+| #131 | WP-23 | V2.99.73, `082` | conflicts; `082` and V2.99.73 already taken | V2.99.76, `085` |
+| #134 | WP-25 | V2.99.74, `082`, `083` | conflicts; `082`, `083` and V2.99.74 taken | V2.99.77, `086`, `087` |
+
+Merge one at a time; each session renumbers from `main` right before its merge (the rule above), applies its SQL only after renumbering, and redeploys `sync-log` from `main`'s file (live v18 has WP-38). WP-19's fix is merged but no phone has pushed a stock movement since (live `inventory_ledger_v12` still 0 rows; last event 2026-11-18 12:19 UTC, before the merge); that check is part of WP-21.
 8. WP-38 after WP-19 (owner 2026-11-18); WP-24 touches the same flow.
 
 | Round 2 WP | Title | Priority | Needs from the owner first |
@@ -695,10 +705,10 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-19 Stock movements reach the server | P1 | Client done (V2.99.73), no SQL; database check rolled back 2026-11-18; real-phone push pending (owner) | this PR | every stock event has a uuid patient or none; New Patient form stock sent after the create, net; abandoned form sent with no patient; bag per user, kept over new patients and reloads, below 0 allowed, "התיק חודש" (owner 2026-11-18) |
 | WP-20 Finish #128, apply 079-081 | P1 | Done: 079, 080, 081 and `sync-log` v17 live, checked 2026-11-17 | #128 | 100-minute check on a real tourniquet runs in WP-21 |
 | WP-21 Live two-phone run | P1 | Not started | | WP-0 part 2 plus WP-17/18/19, D1 offline, WP-10 install, T6 |
-| WP-22 Open sync rejections | P2 | Not started | | 55 open, 0 ever closed; after WP-19 |
-| WP-23 Injury time editable | P2 | Not started | | owner 2026-10-23; server already applies `PATIENT_T_INJURY_UPDATED` |
-| WP-24 CC fulfilled / closed synced | P2 | Not started | | owner 2026-10-23 (WP-6 remainder) |
-| WP-25 Medic incident type + mismatch | P2 | Not started | | owner 2026-10-23 (WP-8 follow-up) |
+| WP-22 Open sync rejections | P2 | In progress: waiting for the owner to approve the closing groups (2026-11-18); 0 of 55 closed live | | 55 open, 0 ever closed; after WP-19 |
+| WP-23 Injury time editable | P2 | PR #131 open, not live; must renumber (`082`, V2.99.73 taken) | | owner 2026-10-23; server already applies `PATIENT_T_INJURY_UPDATED` |
+| WP-24 CC fulfilled / closed synced | P2 | PR #133 open, not live (V2.99.75, `083`-`084`); scope changed to "command cancels a request", no CC "fulfilled by company" | | owner 2026-10-23 (WP-6 remainder) |
+| WP-25 Medic incident type + mismatch | P2 | PR #134 open, not live; must renumber (`082`-`083`, V2.99.74 taken) | | owner 2026-10-23 (WP-8 follow-up) |
 | WP-26 PC deterioration review | P2 | Not started | | owner 2026-10-23 (WP-5 `known_gaps`) |
 | WP-27 CC moves a site to another platoon | P2 | Not started, 1 design question | | owner 2026-10-23 (WP-7 remainder); RLS |
 | WP-28 27 never-sent event types | P2 | Waiting on owner's list | | |
