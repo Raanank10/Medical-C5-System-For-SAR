@@ -189,8 +189,9 @@ async function checkDemo(browser, rel, file) {
     patients.push({ ...base, id: 'b2', visualId: 'P006', triage: 'green', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', trapStatus: 'trapped' });
     patients.push({ ...base, id: 'b3', visualId: 'P007', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', trapStatus: 'trapped' });
     patients.push({ ...base, id: 'b4', visualId: 'P008', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', trapStatus: 'access_blocked', accessibility: 'blocked' });
-    ensureSiteStatusFields('SITE_A').incidentType = 'missile_strike_structural_collapse';
-    ensureSiteStatusFields('SITE_B').incidentType = 'mass_shooting';
+    // Several types per incident since WP-25: set the list, not the single field.
+    setSiteIncidentTypes(ensureSiteStatusFields('SITE_A'), ['missile_strike_structural_collapse'], {});
+    setSiteIncidentTypes(ensureSiteStatusFields('SITE_B'), ['mass_shooting'], {});
     goTo('demo'); startRoleDashboard('rcc');
   });
   // 1. Overview: one row per incident, counts by priority / stage, no colour, responsibilities hidden.

@@ -68,8 +68,8 @@ for (const rel of files) {
   assert(/async function refreshIncidentContext\(\)\{[\s\S]{0,250}?await pullIncidentAssignmentState\(\);/.test(html), `${rel}: the 45s incident refresh must also pull the assignment`);
 
   // Incident type: server is the rescue/opening authority and reaches every phone.
-  assert(html.includes("if(currentUser && activeIncident && siteId==='SITE_A') writeIncidentTypeToServer(activeIncident.id, type, role);"), `${rel}: rescue's incident type must be written to the server when signed in`);
-  assert(/function applyServerIncidentType\(row\)\{[\s\S]{0,200}?if\(_pendingIncidentTypeWrites\[row\.id\]\) return;/.test(html), `${rel}: a pending local rescue write must not be overwritten by an older server value`);
+  assert(html.includes("if(currentUser && activeIncident && siteId==='SITE_A') queueIncidentTypeChange(activeIncident.id, type, had?'remove':'add', role);"), `${rel}: rescue's incident type must be written to the server when signed in`);
+  assert(/function applyServerIncidentType\(row\)\{[\s\S]{0,1800}?for\(const op of pendingIncidentTypeOps\(row\.id\)\)/.test(html), `${rel}: a pending local type change must stay on top of an older server value (WP-25)`);
   assert(/function myIncidentAssignment\(\)\{[\s\S]{0,250}?a\.incidentId===activeIncident\.id \? a : null;/.test(html), `${rel}: the Movement screen only uses an assignment for the incident the medic is in`);
 
   // Unchanged guarantees (from V2.99.30 cross-device assignment).

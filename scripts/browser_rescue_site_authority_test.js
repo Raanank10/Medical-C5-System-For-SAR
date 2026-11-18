@@ -7,7 +7,13 @@
 // - project_incident_site_authority() (database/060): only rpc/rcc/admin change the state; the
 //   first T0 wins; the newest building status wins; the first site clear wins
 // - incident_site_authority RLS: every member of the incident reads it.
-// It proves client behavior only; database/060 itself is exercised against real Postgres.
+// - WP-25 (database/089-090): several incident types per incident. Anyone adds a type; removing
+//   follows the ladder rescue > PC/CC > medics against whoever added it (a medic only their own).
+//   A medic's tap on someone else's type is a "not right" report that PC/CC/rescue keep or
+//   accept (remove) by the same ladder. Boards send one change at a time (change_incident_type),
+//   so a stale phone never drops a type someone else added. A medic whose type is removed is
+//   told. A CC phone and a second medic join for this part.
+// It proves client behavior only; database/060 and 086 themselves are exercised against real Postgres.
 //
 // Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_rescue_site_authority_test.js
@@ -23,6 +29,8 @@ const RPC = '11111111-1111-4111-8111-111111111111';
 const RCC = '22222222-2222-4222-8222-222222222222';
 const PC = '33333333-3333-4333-8333-333333333333';
 const MEDIC = '44444444-4444-4444-8444-444444444444';
+const CC = '55555555-5555-4555-8555-555555555555';
+const MEDIC2 = '66666666-6666-4666-8666-666666666666';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -33,21 +41,27 @@ const USERS = {
   'rcc@test': { id: RCC, role: 'rcc', display_name: '<b>מ"פ</b> חילוץ' },
   'pc@test': { id: PC, role: 'pc', display_name: 'חוג"ד בדיקה' },
   'medic@test': { id: MEDIC, role: 'medic', display_name: 'חובש בדיקה' },
+  'cc@test': { id: CC, role: 'cc', display_name: 'מ"פ רפואה בדיקה' },
+  'medic2@test': { id: MEDIC2, role: 'medic', display_name: 'חובשת שנייה' },
 };
 const BLANKET = ['cc', 'chamal', 'admin', 'rpc', 'rcc', 'physician'];
 const userById = (id) => Object.values(USERS).find((u) => u.id === id);
 const SITE = ['OFFICIAL_INCIDENT_OPENED_BY_RESCUE', 'BUILDING_STATUS_UPDATED', 'SITE_CLEAR_CONFIRMED'];
-const ALLOWED = { rpc: SITE, rcc: SITE, pc: SITE, medic: [] };
+const TYPE_REPORT = ['INCIDENT_TYPE_SET_BY_MEDIC', 'INCIDENT_TYPE_MISMATCH_REPORTED'];
+const TYPES = ['missile_strike_structural_collapse', 'mass_shooting', 'vehicle_accident', 'explosion'];
+const ALLOWED = { rpc: SITE, rcc: SITE, pc: SITE, cc: SITE, medic: TYPE_REPORT };
 const BUILDING = ['stable', 'unstable', 'progressive_collapse', 'safe_to_enter'];
 
 function newServer() {
   const now = new Date().toISOString();
   return {
-    incidents: [{ id: INC1, visual_id: 'INC-TEST-1', status: 'active', location_name: 'מוקד בדיקה 1', address: null, incident_type: null, metadata: {} }],
-    members: [RPC, RCC, PC, MEDIC].map((id) => ({ incident_id: INC1, profile_id: id, role_at_incident: userById(id).role, assigned_by: null, created_at: now })),
+    incidents: [{ id: INC1, visual_id: 'INC-TEST-1', status: 'active', location_name: 'מוקד בדיקה 1', address: null, incident_type: null, incident_types: [], metadata: {} }],
+    members: [RPC, RCC, PC, MEDIC, CC, MEDIC2].map((id) => ({ incident_id: INC1, profile_id: id, role_at_incident: userById(id).role, assigned_by: null, created_at: now })),
     patients: [],
     events: [],
     site: {},
+    typeReports: [],
+    refusedTypeWrites: [],
     rejected: [],
   };
 }
@@ -71,6 +85,83 @@ function projectSite(server, evt, actorId) {
   }
 }
 
+// Ports of database/090: the ladder per type, the medic's event, change_incident_type, resolve.
+const tier = (r) => (['rpc', 'rcc', 'admin'].includes(r) ? 3 : ['pc', 'cc', 'chamal'].includes(r) ? 2 : ['medic', 'paramedic', 'physician'].includes(r) ? 1 : 0);
+const stampOf = (u, at) => ({ role: u.role, profile_id: u.id, by_label: u.display_name, at: at || new Date().toISOString() });
+function mayRemove(inc, type, u) {
+  const t = tier(u.role);
+  if (t === 0) return false;
+  if (t === 3) return true;
+  const by = ((inc.metadata || {}).incident_types_set_by || {})[type] || {};
+  if (t === 2) return tier(by.role) <= 2;
+  return tier(by.role) === 1 && by.profile_id === u.id;
+}
+function setTypes(server, inc, next, u, at) {
+  const old = inc.incident_types || [];
+  const meta = inc.metadata || (inc.metadata = {});
+  const setBy = { ...(meta.incident_types_set_by || {}) };
+  const removed = { ...(meta.incident_types_removed || {}) };
+  next.filter((t) => !old.includes(t)).forEach((t) => { setBy[t] = stampOf(u, at); });
+  old.filter((t) => !next.includes(t)).forEach((t) => { delete setBy[t]; removed[t] = stampOf(u, at); });
+  inc.metadata = { ...meta, incident_types_set_by: setBy, incident_types_removed: removed, incident_type_set_by: next[0] ? setBy[next[0]] : undefined };
+  inc.incident_types = next;
+  inc.incident_type = next[0] || null;
+  for (const t of old.filter((x) => !next.includes(x))) {
+    for (const r of server.typeReports.filter((x) => x.incident_id === inc.id && !x.resolved_at && x.reported_type === t)) Object.assign(r, { resolved_at: new Date().toISOString(), resolution: 'matched', resolved_by_role: u.role, resolved_by_name: u.display_name });
+  }
+}
+function projectTypeReport(server, evt, actorId) {
+  const u = userById(actorId);
+  if (!TYPE_REPORT.includes(evt.type) || tier(u.role) !== 1) return;
+  const p = evt.payload_json || {};
+  const type = p.reportedType;
+  if (!TYPES.includes(type)) return;
+  const action = evt.type === 'INCIDENT_TYPE_SET_BY_MEDIC' && p.action === 'remove' ? 'remove' : 'add';
+  const inc = server.incidents.find((i) => i.id === evt.incident_id);
+  const types = inc.incident_types || [];
+  const mine = server.typeReports.filter((r) => r.incident_id === inc.id && r.reported_by === actorId && r.reported_type === type && !r.resolved_at);
+  const close = (resolution) => mine.forEach((x) => Object.assign(x, { resolved_at: new Date().toISOString(), resolution, resolved_by_role: u.role, resolved_by_name: u.display_name }));
+  if (action === 'add') {
+    close('superseded');
+    if (types.includes(type)) return;
+    const rm = ((inc.metadata || {}).incident_types_removed || {})[type];
+    if (rm && Date.parse(evt.local_timestamp) < Date.parse(rm.at)) return;
+    setTypes(server, inc, [...types, type], u, evt.local_timestamp);
+    return;
+  }
+  if (!types.includes(type)) { close('matched'); return; }
+  if (!mayRemove(inc, type, u)) {
+    close('superseded');
+    server.typeReports.push({ id: `rep-${server.typeReports.length + 1}`, incident_id: inc.id, reported_by: actorId, reported_by_role: u.role, reported_by_name: u.display_name,
+      reported_type: type, types_at_report: [...types], reported_at: evt.local_timestamp, resolved_at: null, resolved_by_role: null, resolved_by_name: null, resolution: null });
+    return;
+  }
+  setTypes(server, inc, types.filter((t) => t !== type), u, evt.local_timestamp);
+}
+function changeType(server, u, p) {
+  const inc = server.incidents.find((i) => i.id === p.p_incident_id);
+  if (!inc || tier(u.role) === 0) return { data: null, error: { code: '42501', message: `role ${u.role} may not change the incident type` } };
+  const types = inc.incident_types || [];
+  if (p.p_action === 'add' && !types.includes(p.p_type)) setTypes(server, inc, [...types, p.p_type], u);
+  if (p.p_action === 'remove' && types.includes(p.p_type)) {
+    if (!mayRemove(inc, p.p_type, u)) { server.refusedTypeWrites.push({ role: u.role, type: p.p_type }); return { data: null, error: { code: '42501', message: `role ${u.role} may not remove incident type ${p.p_type} (added at a higher level)` } }; }
+    setTypes(server, inc, types.filter((t) => t !== p.p_type), u);
+  }
+  return { data: { incident_types: inc.incident_types, metadata: inc.metadata }, error: null };
+}
+function resolveTypeReport(server, u, p) {
+  if (!['pc', 'cc', 'rpc', 'rcc', 'admin'].includes(u.role)) return { data: null, error: { code: '42501', message: 'only pc, cc, rpc, rcc or admin may close an incident type report' } };
+  const r = server.typeReports.find((x) => x.id === p.p_id);
+  if (!r) return { data: null, error: { message: 'not found' } };
+  if (r.resolved_at) return { data: { id: r.id, changed: false, resolution: r.resolution }, error: null };
+  const inc = server.incidents.find((i) => i.id === r.incident_id);
+  const present = (inc.incident_types || []).includes(r.reported_type);
+  if (p.p_action === 'accept' && present && !mayRemove(inc, r.reported_type, u)) return { data: null, error: { code: '42501', message: `role ${u.role} may not remove incident type (added at a higher level)` } };
+  Object.assign(r, { resolved_at: new Date().toISOString(), resolution: p.p_action === 'accept' ? 'accepted' : 'kept_current', resolved_by_role: u.role, resolved_by_name: u.display_name });
+  if (p.p_action === 'accept' && present) setTypes(server, inc, inc.incident_types.filter((t) => t !== r.reported_type), u);
+  return { data: { id: r.id, changed: true, resolution: r.resolution, incident_types: inc.incident_types }, error: null };
+}
+
 function push(server, userId, body) {
   const u = userById(userId);
   const accepted = []; const rejected = [];
@@ -80,6 +171,7 @@ function push(server, userId, body) {
     const evt = { ...e, device_id: body.device_id, incident_id: body.incident_id, actor_id: userId };
     server.events.push(evt);
     projectSite(server, evt, userId);
+    projectTypeReport(server, evt, userId);
     accepted.push({ local_event_id: e.local_event_id });
   }
   return { accepted, duplicates: [], rejected, blocked_dependency: [], high_risk_flags: [], field_conflicts: [] };
@@ -97,6 +189,8 @@ function handle(server, req) {
     const p = req.params || {};
     if (req.name === 'list_open_incidents') return { data: clone(server.incidents.filter((i) => i.status === 'active').map((i) => ({ ...i, patient_count: 0, is_member: server.members.some((m) => m.incident_id === i.id && m.profile_id === u.id) }))), error: null };
     if (req.name === 'join_incident') return { data: { id: p.p_incident_id }, error: null };
+    if (req.name === 'resolve_incident_type_report') return resolveTypeReport(server, u, p);
+    if (req.name === 'change_incident_type') return changeType(server, u, p);
     if (req.name === 'get_incident_command_state') { const inc = server.incidents.find((i) => i.id === p.p_incident_id); return { data: inc ? { incident_id: inc.id, status: inc.status, state_json: {} } : null, error: null }; }
     return { data: null, error: null };
   }
@@ -106,7 +200,17 @@ function handle(server, req) {
   }
   if (req.table === 'incidents') {
     const vis = server.incidents.filter((i) => canSee(i) && match(i));
-    if (req.op === 'update') return { data: [], error: null };
+    if (req.op === 'update') {
+      // incidents_update RLS (database/045); the type only changes through change_incident_type here.
+      if (!['pc', 'cc', 'chamal', 'admin', 'rpc', 'rcc', 'physician'].includes(u.role)) return { data: [], error: null };
+      const { incident_type: _t, incident_types: _ts, metadata, ...rest } = req.payload || {};
+      for (const inc of vis) {
+        const keep = inc.metadata || {};
+        Object.assign(inc, rest);
+        if (metadata) inc.metadata = { ...metadata, incident_types_set_by: keep.incident_types_set_by, incident_types_removed: keep.incident_types_removed, incident_type_set_by: keep.incident_type_set_by };
+      }
+      return { data: vis.map((i) => ({ id: i.id })), error: null };
+    }
     const data = req.single ? (vis[0] || null) : vis;
     return { data: clone(data), error: req.single && !data ? { message: 'no rows' } : null };
   }
@@ -114,6 +218,12 @@ function handle(server, req) {
     // incident_site_authority_read (database/060): members of the incident.
     const rows = Object.values(server.site).filter((r) => canSee(server.incidents.find((i) => i.id === r.incident_id))).filter(match);
     return { data: clone(req.single ? (rows[0] || null) : rows), error: null };
+  }
+  if (req.table === 'incident_type_reports') {
+    // incident_type_reports_read (database/090): members of the incident.
+    const rows = server.typeReports.filter((r) => canSee(server.incidents.find((i) => i.id === r.incident_id))).filter(match)
+      .sort((a, b) => Date.parse(b.reported_at) - Date.parse(a.reported_at));
+    return { data: clone(rows), error: null };
   }
   if (req.table === 'incident_memberships') {
     if (req.op === 'upsert') return { data: null, error: null };
@@ -274,11 +384,139 @@ async function checkFile(browser, file) {
   await pullSite(rpc.page);
   assert((await siteState(rpc.page)).building === 'safe_to_enter', `${rel}: the RPC's phone must follow the newer RCC status`);
 
+  // 5. WP-25. Several types. Two medics on an empty incident: one adds shooting, the other adds
+  //    explosion (a suicide bomber who opened fire and then exploded). Both stay, each with who added it.
+  const cc = await phone();
+  await login(cc.page, 'cc@test');
+  await enter(cc.page);
+  const medic2 = await phone();
+  await login(medic2.page, 'medic2@test');
+  await enter(medic2.page);
+  const inc = SERVER.incidents[0];
+  const addedBy = (t) => (((inc.metadata || {}).incident_types_set_by || {})[t] || {});
+  const typePull = async (page) => { await page.evaluate(async () => { const c = getSupabaseClient(); await pullActiveIncidentRow(c); await pullIncidentTypeReports(c); }); await page.waitForTimeout(150); };
+  const note = (page) => page.evaluate(() => { renderEnrouteIncidentContext(); return document.getElementById('enroute-incident-type-note')?.textContent || ''; });
+  const board = (page, role) => page.evaluate((r) => { renderRoleDashboard(r); return document.getElementById('screen-role-dashboard')?.innerText || ''; }, role);
+  const buttons = (page) => page.evaluate(() => [...document.querySelectorAll('[data-type-report-action]')].map((b) => b.dataset.typeReportAction));
+  const typeButton = (page, t) => page.evaluate((x) => { const b = document.querySelector(`[data-command-incident-type="${x}"]`); return b ? { on: b.dataset.on === '1', disabled: b.disabled } : null; }, t);
+  const tap = (page, t) => page.evaluate((x) => { hideIncidentTypeBriefModal(); selectEnrouteIncidentType(x); hideIncidentTypeBriefModal(); }, t);
+  const localTypes = (page) => page.evaluate(() => siteIncidentTypes('SITE_A'));
+  const sameSet = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
+
+  await tap(medic.page, 'mass_shooting');
+  let n = await note(medic.page);
+  assert(n.includes('ממתין לשליחה'), `${rel}: before the push the medic's note must say it is queued (got ${n})`);
+  await syncAll(medic.page);
+  await typePull(medic2.page);
+  await tap(medic2.page, 'explosion');
+  await syncAll(medic2.page);
+  assert(sameSet(inc.incident_types, ['mass_shooting', 'explosion']) && addedBy('mass_shooting').profile_id === MEDIC && addedBy('explosion').profile_id === MEDIC2,
+    `${rel}: both medics' types must be on the incident with who added each (got ${JSON.stringify(inc.incident_types)})`);
+  assert(SERVER.typeReports.length === 0, `${rel}: adding a type is never a report`);
+  await typePull(medic.page);
+  assert(sameSet(await localTypes(medic.page), ['mass_shooting', 'explosion']), `${rel}: the first medic's phone must show both types`);
+  assert((await medic.page.evaluate(() => incidentTypeLabel('SITE_A'))).includes('ירי המוני + פיצוץ'), `${rel}: the label must carry both types`);
+  for (const [ph, role] of [[pc, 'pc'], [cc, 'cc']]) {
+    await typePull(ph.page);
+    const b = await board(ph.page, role);
+    assert(b.includes('ירי המוני') && b.includes('פיצוץ') && b.includes('חובש בדיקה (חובש)') && b.includes('חובשת שנייה (חובש)'), `${rel}: the ${role} board must show both types and who added each`);
+    const sh = await typeButton(ph.page, 'mass_shooting');
+    assert(sh.on && !sh.disabled, `${rel}: ${role} may remove a medic's type`);
+  }
+
+  // 6. The second medic taps the first medic's type: not removed, a "not right" report instead.
+  //    PC/CC/rescue see it; PC/CC may remove (a medic added it) or keep. The CC keeps it.
+  await tap(medic2.page, 'mass_shooting');
+  n = await note(medic2.page);
+  assert(n.includes('דיווחת') && n.includes('ירי המוני'), `${rel}: the second medic's note must say they reported it (got ${n})`);
+  await typePull(medic2.page); // a pull while the report is still unsent must not hide someone else's type
+  assert((await localTypes(medic2.page)).includes('mass_shooting'), `${rel}: an unsent "not right" report must not hide the type on that phone`);
+  await syncAll(medic2.page);
+  let open = SERVER.typeReports.filter((r) => !r.resolved_at);
+  assert(inc.incident_types.includes('mass_shooting') && open.length === 1 && open[0].reported_type === 'mass_shooting' && open[0].reported_by === MEDIC2,
+    `${rel}: another medic's tap must be a report, not a removal (got ${JSON.stringify(inc.incident_types)}, ${JSON.stringify(open)})`);
+  for (const [ph, role] of [[pc, 'pc'], [cc, 'cc'], [rpc, 'rpc'], [rcc, 'rcc']]) {
+    await typePull(ph.page);
+    const b = await board(ph.page, role);
+    assert(b.includes('בקשה להסיר סוג אירוע') && b.includes('חובשת שנייה'), `${rel}: the ${role} board must show the report`);
+    const acts = await buttons(ph.page);
+    assert(acts.includes('accept') && acts.includes('keep'), `${rel}: ${role} may remove or keep a medic's type (got ${acts})`);
+  }
+  const pcAlerts = await pc.page.evaluate(() => buildAlertObjects().filter((a) => a.type === 'INCIDENT_TYPE_MISMATCH').map((a) => a.title));
+  assert(pcAlerts.length === 1 && pcAlerts[0].includes('בקשה להסיר'), `${rel}: the PC strip must carry one line (got ${JSON.stringify(pcAlerts)})`);
+  await board(cc.page, 'cc');
+  await cc.page.evaluate(() => document.querySelector('[data-type-report-action="keep"]').click());
+  await cc.page.waitForTimeout(400);
+  assert(open[0].resolution === 'kept_current' && inc.incident_types.includes('mass_shooting'), `${rel}: the CC's keep closes it and the type stays`);
+  await typePull(medic2.page);
+  n = await note(medic2.page);
+  assert(n.includes('נבדק') && n.includes('הסוג נשאר'), `${rel}: the second medic must see the report was reviewed (got ${n})`);
+
+  // 7. The first medic removes their own type: gone everywhere.
+  await tap(medic.page, 'mass_shooting');
+  await syncAll(medic.page);
+  assert(sameSet(inc.incident_types, ['explosion']), `${rel}: a medic must remove a type they added (got ${JSON.stringify(inc.incident_types)})`);
+
+  // 8. A stale PC phone (has not seen a new type) adds one: the type it never saw survives.
+  await tap(medic.page, 'vehicle_accident');
+  await syncAll(medic.page);
+  assert(inc.incident_types.includes('vehicle_accident'), `${rel}: the medic's new type must be on the server`);
+  await pc.page.evaluate(() => commandSetIncidentType('missile_strike_structural_collapse'));
+  await pc.page.waitForTimeout(500);
+  assert(sameSet(inc.incident_types, ['explosion', 'vehicle_accident', 'missile_strike_structural_collapse']), `${rel}: a stale PC phone must not drop a type it had not seen (got ${JSON.stringify(inc.incident_types)})`);
+  assert(addedBy('missile_strike_structural_collapse').role === 'pc', `${rel}: the PC's type is stamped PC`);
+  // The PC removes the second medic's explosion: that medic is told.
+  await typePull(pc.page);
+  await pc.page.evaluate(() => commandSetIncidentType('explosion'));
+  await pc.page.waitForTimeout(500);
+  assert(!inc.incident_types.includes('explosion'), `${rel}: the PC may remove a medic's type`);
+  await medic2.page.evaluate(() => { window.__toasts = []; const t = window.toast; window.toast = (m) => { window.__toasts.push(m); return t(m); }; });
+  await typePull(medic2.page);
+  const toasts = await medic2.page.evaluate(() => window.__toasts);
+  assert(toasts.some((m) => m.includes('שהוספת הוסר ע״י') && m.includes('פיצוץ')), `${rel}: the medic must be told their type was removed (got ${JSON.stringify(toasts)})`);
+  n = await note(medic2.page);
+  assert(n.includes('שהוספת הוסר ע״י'), `${rel}: the Movement screen must say who removed it (got ${n})`);
+
+  // 9. Rescue adds a type: PC/CC cannot remove it, not from the button, not through the server;
+  //    a medic's report on it can only be kept by PC; rescue removes it.
+  await typePull(rcc.page);
+  await rcc.page.evaluate(() => { rescueSetIncidentType('rcc', 'mass_shooting', 'SITE_A'); hideIncidentTypeBriefModal(); });
+  await rcc.page.waitForTimeout(500);
+  assert(inc.incident_types.includes('mass_shooting') && addedBy('mass_shooting').role === 'rcc', `${rel}: rescue adds a type`);
+  await typePull(pc.page);
+  await board(pc.page, 'pc');
+  let sh = await typeButton(pc.page, 'mass_shooting');
+  assert(sh.on && sh.disabled, `${rel}: the PC's button for rescue's type must be locked`);
+  await pc.page.evaluate(() => commandSetIncidentType('mass_shooting'));
+  await pc.page.waitForTimeout(300);
+  assert(inc.incident_types.includes('mass_shooting'), `${rel}: the PC's button must not remove rescue's type`);
+  await pc.page.evaluate(() => queueIncidentTypeChange(activeIncident.id, 'mass_shooting', 'remove', 'pc'));
+  await pc.page.waitForTimeout(500);
+  assert(inc.incident_types.includes('mass_shooting') && SERVER.refusedTypeWrites.some((w) => w.role === 'pc'), `${rel}: the server must refuse a PC removing rescue's type`);
+  assert((await localTypes(pc.page)).includes('mass_shooting'), `${rel}: after the refusal the PC's phone must show the type again`);
+  await typePull(medic.page);
+  await tap(medic.page, 'mass_shooting');
+  await syncAll(medic.page);
+  await typePull(pc.page);
+  await board(pc.page, 'pc');
+  let acts = await buttons(pc.page);
+  assert(acts.includes('keep') && !acts.includes('accept'), `${rel}: over rescue's type the PC may only keep (got ${acts})`);
+  await typePull(rpc.page);
+  await board(rpc.page, 'rpc');
+  acts = await buttons(rpc.page);
+  assert(acts.includes('accept'), `${rel}: rescue may remove rescue's type`);
+  await rpc.page.evaluate(() => document.querySelector('[data-type-report-action="accept"]').click());
+  await rpc.page.waitForTimeout(400);
+  assert(!inc.incident_types.includes('mass_shooting'), `${rel}: the RPC's accept must remove the type`);
+  await typePull(medic.page);
+  n = await note(medic.page);
+  assert(n.includes('הוסר') && n.includes('לפי הדיווח שלך'), `${rel}: the medic must see their report led to the removal (got ${n})`);
+
   assert(SERVER.rejected.length === 0, `${rel}: no event may be rejected by role (got ${JSON.stringify(SERVER.rejected)})`);
-  const errors = [...rpc.errors, ...pc.errors, ...medic.errors, ...rcc.errors];
+  const errors = [...rpc.errors, ...pc.errors, ...medic.errors, ...rcc.errors, ...cc.errors, ...medic2.errors];
   assert(errors.length === 0, `${rel}: page errors: ${errors.join(' | ')}`);
   for (const c of contexts) await c.close();
-  console.log(`${rel}: rescue site authority cross-device browser test passed`);
+  console.log(`${rel}: rescue site authority + several incident types with the authority ladder (WP-25) cross-device browser test passed`);
 }
 
 (async () => {
