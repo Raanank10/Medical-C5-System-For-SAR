@@ -427,6 +427,36 @@ assert.equal(rules.tourniquetSnoozeOption("toString", 0), null);
   assert.deepEqual(rules.serverContactFreshness(now + 5000, now), { level: "fresh", ageMs: 0 });
 }
 
+// Cancelling a resupply request (WP-24, owner 2026-11-18; the same rule as database/084).
+{
+  const can = rules.supplyRequestCancelAllowed;
+  for (const role of ["cc", "chamal", "admin"]) {
+    for (const level of ["medic_to_pc", "pc_to_logo"]) {
+      assert.equal(can(role, "requested", level), true, `${role} requested ${level}`);
+      assert.equal(can(role, "dispatched", level), true, `${role} dispatched ${level}`);
+      assert.equal(can(role, "in_transit", level), true, `${role} in_transit ${level}`);
+      // The PC truck already issued it; delivered and cancelled are final.
+      for (const status of ["approved", "delivered", "cancelled"]) assert.equal(can(role, status, level), false, `${role} ${status}`);
+    }
+  }
+  assert.equal(can("pc", "requested", "medic_to_pc"), true);
+  assert.equal(can("pc", "requested", "pc_to_logo"), false); // once escalated, command above decides
+  for (const status of ["approved", "dispatched", "in_transit", "delivered", "cancelled"]) assert.equal(can("pc", status, "medic_to_pc"), false, `pc ${status}`);
+  for (const role of ["medic", "paramedic", "physician", "logistics_officer", "rpc", "rcc", "", undefined]) {
+    assert.equal(can(role, "requested", "medic_to_pc"), false, String(role));
+  }
+  const valid = rules.supplyCancelReasonValid;
+  assert.deepEqual(rules.SUPPLY_CANCEL_REASONS, ["not_needed", "duplicate", "supplied_otherwise", "other"]);
+  assert.equal(valid("not_needed"), true);
+  assert.equal(valid("duplicate", ""), true);
+  assert.equal(valid("supplied_otherwise", null), true);
+  assert.equal(valid("other", "הכוח עבר אתר"), true);
+  assert.equal(valid("other", "   "), false);
+  assert.equal(valid("other"), false);
+  assert.equal(valid("bogus", "x"), false);
+  assert.equal(valid(undefined), false);
+}
+
 // database/074: the rescue chain sees evacuation priority, never the colour.
 assert.equal(rules.rescueEvacPriority("red", false), "urgent");
 assert.equal(rules.rescueEvacPriority("green", true), "urgent"); // active tourniquet

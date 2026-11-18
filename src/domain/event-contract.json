@@ -82,7 +82,8 @@
     "LOCAL_STOCKOUT_WARNING",
     "SUPPLY_CONSUMED",
     "SUPPLY_USE_CANCELLED",
-    "MSTART_SWEEP_COMPLETED"
+    "MSTART_SWEEP_COMPLETED",
+    "SUPPLY_REQUEST_CANCELLED"
   ],
   "local_only": {
     "Patient-card timeline entry shown on this device only; the clinical fact itself is sent by a synced event or is display text": [
