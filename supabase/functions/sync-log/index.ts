@@ -144,11 +144,13 @@ const SYSTEM_EVENTS = [
 // while requesting resupply from the PC truck (submitMedicResupplyRequest) -
 // listed individually rather than spreading SUPPLY_LOGISTICS_EVENTS, since
 // medic/paramedic never approve/dispatch/transfer stock, only consume it and
-// request more.
+// request more. WP-38 (v18): they confirm receipt of their own request with
+// SUPPLY_REQUEST_RECEIVED; database/082 records it only from the requester.
 const MEDIC_SUPPLY_EVENTS = [
   "SUPPLY_REQUEST_CREATED", "SUPPLY_CONSUMED", "SUPPLY_USE_CANCELLED",
   "INVENTORY_LEDGER_MOVEMENT", "LOCAL_STOCKOUT_WARNING",
   "RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE", "RESUPPLY_REQUEST_ESCALATED_CC",
+  "SUPPLY_REQUEST_RECEIVED",
 ];
 
 const ROLE_ALLOWED_EVENT_TYPES: Record<string, string[]> = {

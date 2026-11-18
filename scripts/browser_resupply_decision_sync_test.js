@@ -42,7 +42,7 @@ const userById = (id) => Object.values(USERS).find((u) => u.id === id);
 const CREATE = ['SUPPLY_REQUEST_CREATED', 'RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE', 'RESUPPLY_REQUEST_ESCALATED_CC'];
 const DECIDE = ['RESUPPLY_APPROVED_FROM_PC_TRUCK', 'PC_TRUCK_RESUPPLY_UNAVAILABLE_ESCALATED', 'RESUPPLY_ESCALATED_TO_CC'];
 const MOVE = ['SUPPLY_REQUEST_DISPATCHED', 'SUPPLY_REQUEST_IN_TRANSIT', 'SUPPLY_REQUEST_RECEIVED'];
-const MEDIC_SUPPLY = ['SUPPLY_REQUEST_CREATED', 'SUPPLY_CONSUMED', 'SUPPLY_USE_CANCELLED', 'INVENTORY_LEDGER_MOVEMENT', 'LOCAL_STOCKOUT_WARNING', 'RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE', 'RESUPPLY_REQUEST_ESCALATED_CC'];
+const MEDIC_SUPPLY = ['SUPPLY_REQUEST_CREATED', 'SUPPLY_CONSUMED', 'SUPPLY_USE_CANCELLED', 'INVENTORY_LEDGER_MOVEMENT', 'LOCAL_STOCKOUT_WARNING', 'RESUPPLY_REQUESTED_PC_TRUCK_AVAILABLE', 'RESUPPLY_REQUEST_ESCALATED_CC', 'SUPPLY_REQUEST_RECEIVED']; // sync-log v18 (WP-38)
 const LOGISTICS = [...CREATE, ...DECIDE, ...MOVE, 'SUPPLY_CONSUMED', 'SUPPLY_USE_CANCELLED', 'INVENTORY_LEDGER_MOVEMENT', 'LOCAL_STOCKOUT_WARNING'];
 const ALLOWED = { medic: MEDIC_SUPPLY, pc: LOGISTICS, cc: LOGISTICS, logistics_officer: LOGISTICS };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -282,7 +282,8 @@ async function checkFile(browser, file) {
   const logoActions = await logo.page.evaluate(([inc]) => _supplyRequestQueue[inc].map((r) => supplyRequestDispatchActions(r, inc)).join(''), [INC1]);
   assert(logoActions.includes('לא נדרש משלוח לוגיסטי') && !logoActions.includes('showDispatchRunnerModal'), `${rel}: logistics must not be asked to dispatch what the PC truck fills`);
 
-  // 5. PC marks it delivered; the medic sees it delivered.
+  // 5. PC marks it delivered; the medic sees it handed over and waiting for their receipt
+  //    (WP-38: only the medic's "קיבלתי" closes it and raises the bag).
   await pullQueue(pc.page);
   html = await pcBoard(pc.page);
   assert(html.includes(`decideRemoteSupplyRequest('${reqA.id}','${INC1}','delivered')`), `${rel}: an approved request must offer "delivered" to the PC`);
@@ -291,7 +292,7 @@ async function checkFile(browser, file) {
   assert(reqA.status === 'delivered', `${rel}: the delivery must reach the server (got ${reqA.status})`);
   await pullQueue(m1.page);
   own = await ownResupply(m1.page);
-  assert(own.find((r) => r.id === localA).status === 'delivered', `${rel}: the medic must see the delivery`);
+  assert(own.find((r) => r.id === localA).status === 'awaiting_receipt', `${rel}: the medic must see the delivery waiting for their receipt (got ${JSON.stringify(own)})`);
 
   // 6. A second request the PC escalates: logistics sees it at the PC->logistics level and may dispatch.
   const localB = await medicRequest(m1.page, [{ item: 'ivKits', quantity: 1 }]);
