@@ -365,6 +365,7 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 5. WP-29 builds on 081's `run_clinical_watchdog()` (live since WP-20).
 6. WP-28, WP-30, WP-31 and WP-33 wait for an owner answer; ask it first in the session.
 7. WP-32 and WP-34 to WP-37 any time.
+8. WP-38 after WP-19 (owner 2026-11-18); WP-24 touches the same flow.
 
 | Round 2 WP | Title | Priority | Needs from the owner first |
 | --- | --- | --- | --- |
@@ -387,6 +388,7 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 | WP-35 | Record what is applied live | P3 | - |
 | WP-36 | Demo constants in signed-in paths | P3 | - |
 | WP-37 | External report unlink tombstone | P3 | - |
+| WP-38 | A resupply delivered to a medic raises the bag | P2 | one design question |
 
 ---
 
@@ -412,6 +414,19 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 **Verify.** The new test fails on `main` and passes after. Full `npm test`. Live after merge: one medic uses supplies on two patients; `select count(*) from inventory_ledger_v12` rises and no new `sync_ingestion_errors` rows appear.
 
 **Done when.** Every bag movement from every entry path is stored live, and the logistics board shows the incident-wide burn rate from server rows.
+
+**Found while re-checking (2026-11-17).** The plan's evidence held, with three additions: (1) the ledger movement used `state.patientDraftId||patientId`, so the draft id won even on a saved patient; (2) in the New Patient form the stock is used the moment a box is ticked, not at save, so `queueInventoryBeforeSave(patientUuid)` alone would have fixed almost nothing; (3) the bag itself reset to `SUPPLY_BASELINE` on every new patient (`freshState()`) and on every reload, so once rows landed the board's bag counts (latest `stock_after`) would have been wrong from the second patient on. Live (2026-11-17): of the 19 rejected movements, 14 are in incidents now closed and 5 (one phone, `PHONE-SPSZ`) in an open one; the phone's "שלח שוב" finds rejections by patient, so none can be resent: they go to WP-22.
+
+**Decided (owner, 2026-11-18).** A form left without saving sends its stock with no patient (the items left the bag). The bag is on the medic: every use lowers it, also below 0 (in an MCI there is neither time nor equipment to treat everyone, and treatment is never blocked); nothing refills it but a manual "התיק חודש"; one bag per signed-in user on a phone; the starting bag stays the demo list for now. A resupply delivered to the medic does not raise the bag yet: WP-38. The 19 old rejections are left to WP-22.
+
+**Done (V2.99.73, client only, no SQL).**
+1. Every stock event (`INVENTORY_LEDGER_MOVEMENT`, `SUPPLY_CONSUMED`, `SUPPLY_USE_CANCELLED`, `LOCAL_STOCKOUT_WARNING`) carries the saved patient's uuid or no patient (`serverPatientIdFor`: a uuid, or a saved form's draft id / visible number mapped through `tempPatientId` / `visualId`). The ledger payload no longer carries `patient_context`.
+2. New Patient form: the in-form events stay on the phone (`heldForForm`, the `FLOW_EVENTS_SENT_AT_SAVE` pattern); `savePatient()` sends one `SUPPLY_CONSUMED` + `INVENTORY_LEDGER_MOVEMENT` per supply line, net, after `PATIENT_CREATED`, with the new uuid and the time of first use (`sendFormSupply`). A new form over an unsaved one sends the old form's lines with no patient (`freshPatientState`). The burn rate on the phone counts held lines meanwhile. The empty-bag warning is sent at once.
+3. MSTART and immediate-action tourniquets: the movement comes after the patient's `QUICK_PATIENT_CREATED`, with its uuid.
+4. Queued movements from an older version: before each push, a non-uuid patient is mapped to the saved patient when the phone knows it (and its create is not still queued behind), else removed; the movement is always kept (`repairQueuedStockEvents`). Events the server already refused are left alone (WP-22).
+5. The bag (`medicBag()`, `MEDIC_BAG_KEY`, encrypted like the outbox) is per signed-in user, survives new patients and reloads, may go below 0. "התיק חודש" (patient summary row, and the low-stock chip row) fills each item back to `SUPPLY_BASELINE` and sends one `resupply_received` movement per item, no patient; it is not consumption.
+
+**Verify.** `scripts/browser_inventory_sync_test.js` part 6. Its fake server now refuses a non-uuid or unknown `patient_id` like `events.patient_id`; on `main` the test fails at its first check (0 ledger rows, every movement refused) and passes on this branch. Breaking each fix in turn (no send at save, no send for an abandoned form, bag reset per patient, no repair) fails the test. Full `npm test`. Live (2026-11-18, rolled back, nothing persisted): `sync-log` cannot be reached from the session's network (proxy refuses the tunnel), so the check ran in the database as a real medic account: the events the fixed phone sends (a create, a form line with the patient's uuid, an abandoned form's line with no patient, a "התיק חודש" `resupply_received`) gave 3 `inventory_ledger_v12` rows, medic bag, right patient and count; the old client's `draft-...` patient id still fails with `invalid input syntax for type uuid`, exactly the live rejections. `sync-log` gates these by event type only. Still to see: a push from real phones (the owner's run, then `select count(*) from inventory_ledger_v12` rises and no new `sync_ingestion_errors`).
 
 ---
 
@@ -455,7 +470,7 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 | August RLS / role tests (`TEST-DEVICE-*`, `P-TEST-001`) | 8 | deliberate test cases | close, reason "test data" |
 | Oct 17-18 admin phone tests (`PHONE-SPSZ`, `PHONE-LTKE`) | 10 | 5 creates refused by RLS for admin (fixed by `047`), 5 follow-ups failed the foreign key | close, "not recoverable", note the fix |
 | Oct 20 sweep, `PHONE-SPSZ` | 18 | 9 patients on a duplicate `TMP-001` and their 9 location updates (fixed by WP-17) | resend from that phone if it still has them; else close "not recoverable" |
-| Oct 22-25 stock movements | 19 | draft patient id (WP-19) | after WP-19, let the phones resend; close what remains |
+| Oct 22-25 stock movements | 19 | draft patient id (WP-19) | cannot be resent (14 in closed incidents; "שלח שוב" finds rejections by patient, and these have none): close, "not recoverable, fixed in WP-19 (V2.99.73)" |
 
 **Steps.** Re-run the grouping query first (counts drift). Present the table to the owner and get approval per group. The owner closes them from the command panel, or approves `resolve_sync_ingestion_error()` calls run as a command account; never `delete` and never a direct `update` that bypasses the audited function. The rows themselves stay (audit history).
 
@@ -608,6 +623,18 @@ Ask the owner (open in the 2026-11-08 PC/CC session): on the all-incidents page,
 
 ---
 
+### WP-38: A resupply delivered to a medic raises the bag (P2, owner 2026-11-18)
+
+**Why.** Since WP-19 the medic's bag only goes down: every use lowers it and only a manual "התיק חודש" fills it. When the PC issues items from the truck to a medic (`pc_truck_issued`, WP-6/WP-9) the truck's count goes down, but the medic's bag does not go up on any phone, so the bag reads lower than it is and logistics sees a shortage that was already covered. Safe side (warns early, never late), but wrong.
+
+**Ask the owner first.** When does the bag go up: when the PC marks the request delivered, or only when the medic confirms receipt on the phone (recommended: the medic confirms, the items are in their hands only then; until then the request shows as on the way)? And for a partial delivery, by what was delivered, not what was asked.
+
+**Steps.** A test first (extend `scripts/browser_inventory_sync_test.js`): PC issues 2 tourniquets for a medic's request, the medic confirms, the medic's phone shows +2 and the server gets one `resupply_received` movement into that medic's bag, no patient; the truck's issue and the bag's receipt are not counted twice in the burn rate. Then the receipt on the medic's phone (`SUPPLY_REQUEST_RECEIVED` already exists, WP-6), adding to `medicBag()` and sending the movement. Check against WP-24 (CC "fulfilled by company"), which touches the same flow.
+
+**Done when.** A delivered resupply raises that medic's bag on the phone and on the logistics board, once.
+
+---
+
 ## Tracks outside this plan's PRs
 
 These need a decision, people or money rather than a code change in this repo. Listed so nothing is lost:
@@ -651,7 +678,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-18 Evacuation point arrival | P2 | Done (V2.99.66): 076 + 077 + 078 live, `sync-log` v16, verified rolled back 2026-10-24; real two-phone check pending | #120, this PR | `PATIENT_EVAC_POINT_ARRIVED` (medic/paramedic/physician/PC), earliest phone time wins, moving vs arrived on every board with waiting minutes, no alert (owner). Open: rescue board wording, waiting time in the stored report, truck stock per evacuation point (gap 3) |
 | Tourniquet 100 min + remind me later | P1 | Done (V2.99.70): `database/079` live, checked 2026-11-17 (WP-20) | #126 | owner 2026-10-26: alerts at 45/60/100/120 min, then every hour (3 h ... 6 h and on, phone only); banner buttons "open patient" / "remind me in N min" (5x2, 5x2, 2x1, 1x1), chip while put off, comes back vibrating; delays sent as `WATCHDOG_ALERT` reasons `tourniquet_snoozed` / `tourniquet_alert_opened`; PC/CC strip line, last delay vibrates PC/CC. "המרה ללחץ ישיר" on the patient screen: medic / PC up to 120 min, paramedic up to 4 h, physician up to 6 h (owner 2026-11-08), sent as `TOURNIQUET_RELEASED` reason `converted_direct_pressure`; phone-side check only |
 | Tourniquet time from the body | P1 | Done (V2.99.72): `database/080` + `081` live, `sync-log` v17 live, checked 2026-11-17 (WP-20) | #128 | owner 2026-11-08: sweep asks "הונח עכשיו / היה על הפצוע"; enter / correct the time written on the body (all medical roles and admin, history kept); 5 min tolerance, 5-60 min later asks (type again / yesterday / no time), over 12 h asks; passed levels silent on every phone and the server; no time = nobody converts; admin converts with the physician's limits |
-| WP-19 Stock movements reach the server | P1 | Not started | | found 2026-11-13: 0 ledger rows live, 19 rejections for a `draft-` patient id |
+| WP-19 Stock movements reach the server | P1 | Client done (V2.99.73), no SQL; database check rolled back 2026-11-18; real-phone push pending (owner) | this PR | every stock event has a uuid patient or none; New Patient form stock sent after the create, net; abandoned form sent with no patient; bag per user, kept over new patients and reloads, below 0 allowed, "התיק חודש" (owner 2026-11-18) |
 | WP-20 Finish #128, apply 079-081 | P1 | Done: 079, 080, 081 and `sync-log` v17 live, checked 2026-11-17 | #128 | 100-minute check on a real tourniquet runs in WP-21 |
 | WP-21 Live two-phone run | P1 | Not started | | WP-0 part 2 plus WP-17/18/19, D1 offline, WP-10 install, T6 |
 | WP-22 Open sync rejections | P2 | Not started | | 55 open, 0 ever closed; after WP-19 |
@@ -670,6 +697,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-35 Record what is applied live | P3 | Not started | | read-only |
 | WP-36 Demo constants | P3 | Not started | | `SITE_A` x60, `PLT-A` x25 |
 | WP-37 Unlink tombstone | P3 | Not started | | `database/069` known limit |
+| WP-38 Resupply raises the medic's bag | P2 | Not started, 1 design question | | owner 2026-11-18, found in WP-19 |
 
 ## Revisions after #73 (2026-10-19)
 
