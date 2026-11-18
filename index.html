@@ -1001,7 +1001,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9972</div>
+      <div class="demo-kicker">Demo V2.9973</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1098,7 +1098,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9972</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9973</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1108,7 +1108,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9972</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9973</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3351,7 +3351,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.72';
+const APP_VERSION = '2.99.73';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3443,6 +3443,25 @@ const SYNC_ELIGIBLE_EVENT_TYPES = new Set([
   'MSTART_SWEEP_COMPLETED'
 ]);
 const SUPPLY_BASELINE = Object.freeze({tourniquets:3, pressureDressings:4, hemostaticGauze:2, airwayEquipment:2, ivKits:1, blankets:2, batteryPacks:1});
+// The medic's own bag (WP-19, owner 2026-11-18). The bag is on the medic, not on a patient: every
+// use lowers it, and a new patient, a saved form or a reload never refills it (before V2.99.73 each
+// new patient reset it to SUPPLY_BASELINE). It may go below 0: treatment is never blocked, and in an
+// MCI there is not enough for everyone. Only "התיק חודש" (restockMedicBag) fills it back to
+// SUPPLY_BASELINE. One bag per signed-in user on this phone (another user here gets their own),
+// 'local' in demo mode; stored encrypted like the rest of the clinical data.
+const MEDIC_BAG_KEY = 'c5_medic_bags_v1';
+let medicBags = {};
+function medicBag(){
+  const key=_demoSandbox ? '__sandbox' : handlerKey();
+  const bag=medicBags[key] || (medicBags[key]={...SUPPLY_BASELINE});
+  Object.keys(SUPPLY_BASELINE).forEach(item=>{ if(!Number.isFinite(bag[item])) bag[item]=SUPPLY_BASELINE[item]; });
+  return bag;
+}
+function persistMedicBags(){
+  if(_demoSandbox) return Promise.resolve();
+  const {__sandbox, ...bags}=medicBags;
+  return queuedSecureSetItem(MEDIC_BAG_KEY, JSON.stringify(bags));
+}
 const PC_TRUCK_BASELINE = Object.freeze({tourniquets:20, pressureDressings:30, hemostaticGauze:15, airwayEquipment:10, ivKits:8, blankets:25, batteryPacks:6});
 const COMPANY_STOCK_BASELINE = Object.freeze({tourniquets:80, pressureDressings:120, hemostaticGauze:50, airwayEquipment:35, ivKits:30, blankets:120, batteryPacks:20});
 const SUPPLY_LABELS = {
@@ -3469,7 +3488,8 @@ const DEMO_KEYS_TO_PURGE = Object.freeze([
   OBSERVER_NOTES_KEY,
   CONFLICT_LOG_KEY,
   ACTIVE_RECOVERY_KEY,
-  OUTBOX_KEY
+  OUTBOX_KEY,
+  MEDIC_BAG_KEY
 ]);
 const ROLE_LABELS = {medic:'פעולת חובש', pc:'החלטת חוג"ד', cc:'סיכון מ״פ רפואה', logistics:'לוגיסטיקה', chamal:'מערכת', rpc:'מ״מ חילוץ', rcc:'מ״פ חילוץ', admin:'מנהל מערכת', physician:'רופא', paramedic:'פראמדיק'};
 const ACTION_LABELS = {
@@ -3995,7 +4015,7 @@ function getNextAction(p={}, role='medic'){
   const stale=isVitalsOverdue(p);
   const status=normalizeTrapStatus(p);
   const openSupply=(reinforcementRequests||[]).some(r=>r.type==='resupply' && isRequestOpen(r) && (r.linkedPatientId===p.id || r.requestedByName===currentMedicName()));
-  const lowSupply=lowStockEntries(state.localStockCache).some(x=>x.value<=x.threshold);
+  const lowSupply=lowStockEntries(medicBag()).some(x=>x.value<=x.threshold);
   if(role==='cc'){
     if(p.platoonOverloaded) return 'העבר חובש / משאב';
     if(p.resourcePendingTooLong || (p.triage==='red' && p.tourniquet)) return 'הקצה משאב / פינוי';
@@ -4213,6 +4233,7 @@ async function hydrateSecureCaches(){
   try{ _outboxCache=JSON.parse(await secureGetItem(OUTBOX_KEY)||'[]'); }catch(e){ _outboxCache=[]; }
   try{ _conflictLogCache=JSON.parse(await secureGetItem(CONFLICT_LOG_KEY)||'[]'); }catch(e){ _conflictLogCache=[]; }
   try{ _observerNotesCache=JSON.parse(await secureGetItem(OBSERVER_NOTES_KEY)||'[]'); }catch(e){ _observerNotesCache=[]; }
+  try{ const bags=JSON.parse(await secureGetItem(MEDIC_BAG_KEY)||'{}'); medicBags=(bags && typeof bags==='object' && !Array.isArray(bags))?bags:{}; }catch(e){ medicBags={}; }
 }
 function resetLocalPinAndWipe(){
   if(!confirm('פעולה זו תמחק את כל הנתונים המקומיים במכשיר זה (כולל פצועים שטרם סונכרנו לשרת) ותאפס את קוד הגישה. נתונים שכבר סונכרנו לשרת אינם בסכנה ויטענו מחדש בכניסה הבאה. פעולה זו בלתי הפיכה. להמשיך?')) return;
@@ -4900,7 +4921,7 @@ function freshState(){
     injury:null, injuryZones:new Set(), patientStatus:'identified',
     rapidWalking:null, rapidMajorBleeding:null, rapidAutoFilled:false,
     interventions:new Set(), marchClear:new Set(), triage:null,
-    needsFullAssessment:true, localEvents:[], localStockCache:{...SUPPLY_BASELINE}, supplyMovements:{}, pediatricOverrides:{}, pendingMedicationOverride:null,
+    needsFullAssessment:true, localEvents:[], supplyMovements:{}, pediatricOverrides:{}, pendingMedicationOverride:null,
     vitalsMedicName:'', txMedicName:''
   };
 }
@@ -5011,7 +5032,7 @@ function hydrateActiveDraft(snapshot){
   state.interventions=new Set(snapshot.state.interventions||[]);
   state.marchClear=new Set(snapshot.state.marchClear||[]);
   state.injuryZones=new Set(snapshot.state.injuryZones||[]);
-  state.localStockCache={...SUPPLY_BASELINE, ...(snapshot.state.localStockCache||{})};
+  delete state.localStockCache; // the bag is medicBag(), not part of a patient draft (WP-19)
   state.supplyMovements=snapshot.state.supplyMovements||{};
   flowVitals={...EMPTY_VITALS, ...(snapshot.flowVitals||{})};
   countedVitals=new Set(snapshot.countedVitals||[]);
@@ -5831,6 +5852,7 @@ function safeScopedDemoReset({confirmReset=false, preserveFieldMode=true}={}){
   const fieldMode=preserveFieldMode ? localStorage.getItem('rescue_field_mode') : null;
   try{
     DEMO_KEYS_TO_PURGE.forEach(key=>localStorage.removeItem(key));
+    medicBags={};
     if(preserveFieldMode && fieldMode!==null) localStorage.setItem('rescue_field_mode', fieldMode);
   }catch(e){}
   return true;
@@ -7253,7 +7275,7 @@ function sweepSessionsForBoard(){
 }
 function renderSweepBoardForPc(){
   ensureSiteReadiness();
-  const supplyGaps=lowStockEntries(state.localStockCache).map(x=>supplyLabel(x.key||x.item||x[0],true)).join(' · ') || 'אין חוסר ציוד אישי מדווח';
+  const supplyGaps=lowStockEntries(medicBag()).map(x=>supplyLabel(x.key||x.item||x[0],true)).join(' · ') || 'אין חוסר ציוד אישי מדווח';
   const activeZones=[...new Set(patients.filter(p=>p.phase==='mstart_sweep').map(p=>p.zone||p.locDetail||'אזור לא צוין'))];
   const activeRows=activeZones.map(zone=>{
     const list=patients.filter(p=>p.phase==='mstart_sweep' && (p.zone||p.locDetail||'אזור לא צוין')===zone);
@@ -9606,7 +9628,7 @@ function completeMstartSweep(){
   activeSweepPatientId=null;
   activeRoleDashboard='medic';
   saveDemoState();
-  const low=lowStockEntries(state.localStockCache);
+  const low=lowStockEntries(medicBag());
   toast(`סריקת MSTART הסתיימה. נצרכו בסריקה: ${consumedText}${low.length?' · ציוד נמוך — מומלץ לבקש השלמה מהרכב':''}`);
   goTo('role-dashboard');
 }
@@ -10382,11 +10404,12 @@ function saveImmediateCasualtyAndContinue(){
   };
   actionLabels.forEach(text=>p.events.unshift({type:text.includes('חסם')?'TOURNIQUET_APPLIED':'LIFE_SAVING_ACTION_RECORDED',time:t,detail:text,warn:true}));
   patients.unshift(p);
-  if(isTq) reconcileSupplySource(`mstart:${id}:tq`, 'tourniquets', 1);
   if(triage==='black') createDeathCertificationRequest(p);
   // QUICK_PATIENT_CREATED actually creates the server-side patients row; queue it before the
   // IMMEDIATE_FIELD_ASSESSMENT event below, which references the same patient_id.
   saveLocalEvent({type:'QUICK_PATIENT_CREATED',detail:`${visualId} נפתח בסריקת MSTART`,warn:false,patient_id:id,payload_json:{visual_id:visualId,triage}});
+  // After the create, with this patient's uuid (WP-19; it went out first, with a draft id).
+  if(isTq) reconcileSupplySource(`mstart:${id}:tq`, 'tourniquets', 1, id);
   if(isTq){
     const limb={right_upper:'right_arm',left_upper:'left_arm',right_lower:'right_leg',left_lower:'left_leg'}[im.tqLimb]||'unknown';
     const meta=tourniquetLimbMeta(limb);
@@ -10398,7 +10421,7 @@ function saveImmediateCasualtyAndContinue(){
   actions.forEach((key, i)=>queueTreatmentEvent(id, key, actionLabels[i], {source:'mstart_immediate'}));
   saveLocalEvent({type:'IMMEDIATE_FIELD_ASSESSMENT',detail:`${visualId} נפתח בסריקת MSTART`,warn:['red','black'].includes(triage),patient_id:id,payload_json:{triage,site:siteData.name,zone:zoneLabel(),immediate:im,life_saving_actions:actions,tourniquet_limb:isTq?tqLimbLabel:null}});
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
-  state=freshState(); state.flowMode='quick';
+  state=freshPatientState(); state.flowMode='quick';
   renderDashboard(); renderAlerts();
   toast(`${visualId} נשמר · אפשר לעבור לפצוע הבא`);
   goTo('dashboard');
@@ -10446,10 +10469,11 @@ function createImmediateInterventionPatient(kind='tourniquet'){
     ]
   };
   patients.unshift(p);
-  if(isTq) reconcileSupplySource(`immediate:${id}:tq`, 'tourniquets', 1);
   // QUICK_PATIENT_CREATED actually creates the server-side patients row; queue it before the
   // treatment event below, which references the same patient_id.
   saveLocalEvent({type:'QUICK_PATIENT_CREATED',detail:`${visualId} נפתח מפעולה מצילת חיים`,warn:false,patient_id:id,payload_json:{visual_id:visualId,triage:'red'}});
+  // After the create, with this patient's uuid (WP-19; it went out first, with a draft id).
+  if(isTq) reconcileSupplySource(`immediate:${id}:tq`, 'tourniquets', 1, id);
   if(isTq) saveLocalEvent({type:'TOURNIQUET_APPLIED',detail:label,warn:true,patient_id:id,payload_json:{source:'medic_immediate_action',auto_triage:'red'}});
   else queueTreatmentEvent(id, kind, label, {source:'medic_immediate_action', auto_triage:'red'});
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
@@ -10721,7 +10745,7 @@ function arriveAtSite(){
     payload_json:{site_name:siteData.name,address:siteData.address,eta:siteData.eta,zone:siteData.currentZone,floor_hint:siteData.floorHint,apartment_hint:siteData.apartmentHint,building_type:siteData.buildingType,building_involved:enrouteBuildingInvolved(),incident_type:ensureSiteStatusFields(currentSiteId()).incidentType,incident_details:(siteData.incidentDetails||{})[ensureSiteStatusFields(currentSiteId()).incidentType]||null,initial_evacuation:siteData.initialEvacuation,expected_casualties:siteData.expectedCasualties,visible_to:['חוג"ד','חמ"ל','מ״פ רפואה']}
   });
   lastSyncAt=Date.now(); demoSyncMode='fresh'; saveDemoState();
-  state=freshState();
+  state=freshPatientState();
   state.flowMode='quick';
   state.locFree=[siteData.address,siteData.floorHint,siteData.apartmentHint].filter(Boolean).join(' · ');
   goTo('sweep');
@@ -11567,7 +11591,7 @@ function buildVitalsTable(history){
 // ═══════════════════════════════════════════════
 // LEGACY_FULL_ASSESSMENT_DO_NOT_DELETE_WITHOUT_TESTS
 function startNewPatient(mode='extended'){
-  state = freshState();
+  state = freshPatientState();
   state.flowMode = mode;
   state.needsFullAssessment = mode === 'quick';
   flowVitals = {...EMPTY_VITALS};
@@ -12522,7 +12546,7 @@ function renderSummary(){
     <div class="summary-row"><span class="summary-key">מצב</span><span class="summary-val">${STATUS_LABELS[state.patientStatus]||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">טיפולים שניתנו</span><span class="summary-val">${intStr||'ללא'}</span></div>
     ${state.flowMode!=='quick' && state.triage!=='black'?`<div class="summary-row" style="align-items:flex-start"><span class="summary-key">MARCH-PAWS</span><span class="summary-val" style="font-size:12px;line-height:1.7">${marchReviewSummaryHtml(marchReviewFromState())}</span></div>`:''}
-    <div class="summary-row"><span class="summary-key">מלאי אישי</span><span class="summary-val"><button class="demo-mini-btn" style="padding:7px 10px;margin:0" onclick="showOwnInventory()">הצג מלאי שלי</button></span></div>
+    <div class="summary-row"><span class="summary-key">מלאי אישי</span><span class="summary-val"><button class="demo-mini-btn" style="padding:7px 10px;margin:0" onclick="showOwnInventory()">הצג מלאי שלי</button> <button class="demo-mini-btn" style="padding:7px 10px;margin:0" onclick="restockMedicBag()">התיק חודש</button></span></div>
     <div class="summary-row" style="align-items:flex-start"><span class="summary-key">העברה לא מקוונת</span><span class="summary-val"><textarea id="offline-transport-payload" readonly style="height:68px;direction:ltr;font-family:var(--mono);font-size:10px;margin-bottom:8px">${lastTacticalPayload}</textarea><button class="demo-mini-btn" style="padding:7px 10px;margin:0" onclick="copyTacticalDataString()">העתק payload</button></span></div>
     <div class="summary-row"><span class="summary-key">חתימת טיפול</span><span class="summary-val device-id">${deviceId}</span></div>
     <div class="summary-row"><span class="summary-key">זמן פתיחה</span><span class="summary-val" style="font-family:var(--mono)">${nowT()}</span></div>`;
@@ -12541,7 +12565,9 @@ function savePatient(){
   const t=nowT();
   const vitalsCapture=vitalsCapturePayload('flow');
   queueMedicationEventsBeforeSave();
-  queueInventoryBeforeSave(newId);
+  // No patient id here: the patient does not exist on the server yet. The lines stay held and
+  // sendFormSupply() below sends them after PATIENT_CREATED (WP-19; was the visible number).
+  queueInventoryBeforeSave(null);
   const effectiveStatus=state.patientStatus || 'identified';
   const effectiveInjury=state.injury || siteData.lastMechanism || (siteData.likelyMechanisms||[]).join(' / ') || 'לא תועד';
   if(effectiveInjury && effectiveInjury!=='לא תועד') siteData.lastMechanism=effectiveInjury;
@@ -12585,7 +12611,7 @@ function savePatient(){
     assignedMedicId:userIdFromMedic(deviceId),
     assignedPlatoonId:'PLT-A',
     tempPatientId:draftId,
-    stockSnapshot:{...(state.localStockCache||{})},
+    stockSnapshot:{...medicBag()},
     lastTouchedBy:deviceId,
     lastModifiedAt:new Date().toISOString(),
     confirmedClinical:true,
@@ -12640,6 +12666,7 @@ function savePatient(){
     tqEntries.forEach(tq=>queueTourniquetAppliedEvent(savedPatient, tq, {source:'patient_flow'}));
   }
   queueIntakeClinicalEventsAtSave(patientUuid);
+  sendFormSupply(patientUuid);
   if(savedPatient.triage==='black' || savedPatient.patientStatus==='deceased'){
     createDeathCertificationRequest(savedPatient);
   }
@@ -13155,7 +13182,7 @@ function duplicateCandidates(pts){
   return pairs.slice(0,4);
 }
 function inventoryReadModel(pts){
-  const latestStock=[...pts].reverse().find(p=>p.stockSnapshot)?.stockSnapshot || state.localStockCache || SUPPLY_BASELINE;
+  const latestStock=[...pts].reverse().find(p=>p.stockSnapshot)?.stockSnapshot || medicBag();
   return {...SUPPLY_BASELINE, ...latestStock};
 }
 function logisticsCompanies(){
@@ -13355,7 +13382,7 @@ function patientMatchesBoardFilter(p){
   if(patientBoardFilter==='no_vitals') return p.needsFullAssessment || assessmentDebtList(p).includes('missing_vitals');
   if(patientBoardFilter==='stale') return isVitalsOverdue(p);
   if(patientBoardFilter==='unknown_identity') return p.identityStatus==='unknown' || !p.fullName || p.fullName==='לא מזוהה';
-  if(patientBoardFilter==='low_supplies') return lowStockEntries(state.localStockCache).length>0;
+  if(patientBoardFilter==='low_supplies') return lowStockEntries(medicBag()).length>0;
   if(patientBoardFilter==='zone') return (p.zone||p.locDetail)===zoneLabel();
   return true;
 }
@@ -13515,7 +13542,7 @@ function createResupplyRequest({items, linkedPatientId=null, urgency='high', rea
     reason,
     reasonCodes:[reason],
     sourcePreference:'pc_truck_first',
-    medicStockSnapshot:{...(state.localStockCache||{})},
+    medicStockSnapshot:{...medicBag()},
     pcTruckStockSnapshot:{...pcTruckStock},
     truckAvailability:availability.available?'available':'missing',
     truckMissingItems:availability.missing.map(x=>x.item),
@@ -14726,6 +14753,8 @@ function saveLocalEvent(event){
   // the server could never place them. savePatient() sends patient-scoped versions instead
   // (V2.99.34); the in-flow entries stay in the local log only.
   if(FLOW_EVENTS_SENT_AT_SAVE.has(entry.type) && !entry.patient_id){ entry.synced=true; entry.localOnly=true; }
+  // Stock used in the New Patient form, the same way (WP-19): savePatient() sends it after the create.
+  if(entry.heldForForm){ entry.synced=true; entry.localOnly=true; } else delete entry.heldForForm;
   state.localEvents.push(entry);
   if(_demoSandbox) return; // sandboxed demo events never reach the outbox
   saveActiveRecoveryState(activeScreenId());
@@ -15711,6 +15740,7 @@ async function syncPush(){
   reconcileLocationSync();
   const client=getSupabaseClient();
   if(!client) return;
+  repairQueuedStockEvents();
   const outbox=getOutbox();
   const pending=outbox.filter(e=>!e.synced && SYNC_ELIGIBLE_EVENT_TYPES.has(e.type));
   if(!pending.length) return;
@@ -16938,10 +16968,10 @@ function incidentConsumptionEvents(){
     type:'SUPPLY_CONSUMED', local_timestamp:x.occurred_at||x.created_at, warn:Number(x.stock_after)<=0, remote:x.device_id!==getDeviceId(),
     payload_json:{item_type:x.item_type, quantity_delta:Number(x.quantity_delta), patient_id:x.patient_id||null}
   }));
-  const local=getOutbox().filter(e=>!e.synced && e.type==='INVENTORY_LEDGER_MOVEMENT' && (!e.incident_id || e.incident_id===incId)
+  const local=getOutbox().filter(e=>(!e.synced || e.heldForForm) && e.type==='INVENTORY_LEDGER_MOVEMENT' && (!e.incident_id || e.incident_id===incId)
     && !e.payload_json?.destination_node && !e.payload_json?.source_node && Number(e.payload_json?.quantity_delta)<0).map(e=>({
     type:'SUPPLY_CONSUMED', local_timestamp:e.local_timestamp, warn:!!e.warn, remote:false,
-    payload_json:{item_type:e.payload_json.item_type, quantity_delta:Number(e.payload_json.quantity_delta), patient_id:e.payload_json.patient_context||e.payload_json.patient_id||null}
+    payload_json:{item_type:e.payload_json.item_type, quantity_delta:Number(e.payload_json.quantity_delta), patient_id:e.payload_json.patient_id||null}
   }));
   return [...server, ...local];
 }
@@ -17462,10 +17492,9 @@ function supplyLabel(itemType, short=false){
 }
 function localStock(itemType){
   itemType=normalizeSupplyItem(itemType);
-  state.localStockCache={...SUPPLY_BASELINE, ...(state.localStockCache||{})};
-  return state.localStockCache[itemType] ?? 0;
+  return medicBag()[itemType] ?? 0;
 }
-function lowStockEntries(stock=state.localStockCache){
+function lowStockEntries(stock=medicBag()){
   const merged={...SUPPLY_BASELINE, ...(stock||{})};
   return Object.entries(SUPPLY_LABELS).map(([key,label])=>({key,label,value:merged[key]??0, threshold:SUPPLY_LOW_THRESHOLDS[key]??1}))
     .filter(x=>x.value<=x.threshold);
@@ -17473,8 +17502,7 @@ function lowStockEntries(stock=state.localStockCache){
 function renderLocalStockPanel(){
   const el=document.getElementById('tx-stock-grid');
   if(!el) return;
-  state.localStockCache={...SUPPLY_BASELINE, ...(state.localStockCache||{})};
-  const entries=lowStockEntries(state.localStockCache);
+  const entries=lowStockEntries(medicBag());
   // Nothing low: one line instead of sample counts, so the MARCH letters start higher (V2.99.69).
   const title=document.getElementById('tx-stock-title');
   if(title) title.textContent=entries.length?'אזהרות ציוד אישי — לא חוסם טיפול':'ציוד אישי: אין חוסרים קריטיים';
@@ -17486,13 +17514,100 @@ function renderLocalStockPanel(){
   }).join('');
 }
 function renderMedicStockWarnings(){
-  const entries=lowStockEntries(state.localStockCache);
+  const entries=lowStockEntries(medicBag());
   if(!entries.length) return '';
-  return `<div class="chip-row" style="margin-top:10px">${entries.map(({key,value})=>`<button class="chip ${value<=0?'selected':''}" onclick="openMedicResupplySheet(null,'${value<=0?'stock_empty':'stock_low'}','${key}')">${supplyLabel(key,true)}: ${value}</button>`).join('')}</div>`;
+  return `<div class="chip-row" style="margin-top:10px">${entries.map(({key,value})=>`<button class="chip ${value<=0?'selected':''}" onclick="openMedicResupplySheet(null,'${value<=0?'stock_empty':'stock_low'}','${key}')">${supplyLabel(key,true)}: ${value}</button>`).join('')}<button class="chip" onclick="restockMedicBag()">התיק חודש</button></div>`;
+}
+// "התיק חודש" (owner 2026-11-18): the medic refilled the bag. Each item goes back to the starting
+// list, and the server gets one movement per item (resupply_received into the medic bag, no
+// patient), so logistics sees the new count. Not consumption: it never changes the burn rate.
+function restockMedicBag(){
+  const bag=medicBag();
+  const lines=Object.keys(SUPPLY_BASELINE).map(item=>({item, delta:SUPPLY_BASELINE[item]-(bag[item]??0)})).filter(x=>x.delta>0);
+  if(!lines.length){ toast('התיק מלא · אין מה לחדש'); return false; }
+  if(!confirm(`התיק חודש? ${lines.map(x=>`${supplyLabel(x.item,true)} +${x.delta}`).join(' · ')}`)) return false;
+  lines.forEach(({item, delta})=>{
+    bag[item]=SUPPLY_BASELINE[item];
+    saveLocalEvent({type:'INVENTORY_LEDGER_MOVEMENT', detail:`התיק חודש: ${supplyLabel(item)} +${delta}`, warn:false,
+      payload_json:{item_type:item, movement_type:'resupply_received', quantity_delta:delta, restock:'bag_restocked', patient_id:null, local_stock_after:bag[item], stock_seq:nextLedgerSeq(), battery_at_log:null}});
+  });
+  persistMedicBags();
+  renderLocalStockPanel();
+  if(typeof renderDashboard==='function') renderDashboard();
+  toast('התיק חודש · המלאי עודכן ונשלח');
+  return true;
 }
 function showOwnInventory(){
   const line=Object.entries(SUPPLY_LABELS).map(([key,label])=>`${label}: ${localStock(key)}`).join(' · ');
   toast(line || 'אין נתוני מלאי');
+}
+// Patient on a stock event (WP-19): the saved patient's server uuid, or none. A draft id
+// ("draft-...") or a visible number ("P004-DK") is never a server patient id: the server refused
+// every such event (live: 19 rejections Oct 22-25, 0 ledger rows ever). A saved form's draft id
+// maps to its patient through tempPatientId.
+const SERVER_PATIENT_ID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const STOCK_EVENT_TYPES=new Set(['INVENTORY_LEDGER_MOVEMENT','SUPPLY_CONSUMED','SUPPLY_USE_CANCELLED','LOCAL_STOCKOUT_WARNING']);
+function serverPatientIdFor(id){
+  if(!id) return null;
+  const s=String(id);
+  if(SERVER_PATIENT_ID_RE.test(s)) return s;
+  const p=patients.find(x=>x.tempPatientId===s || x.visualId===s);
+  return p && SERVER_PATIENT_ID_RE.test(String(p.id)) ? p.id : null;
+}
+// Stock used in the New Patient form, before the patient exists. The in-form events stay on this
+// phone (heldForForm), like the other FLOW_EVENTS_SENT_AT_SAVE; savePatient() sends one movement
+// per line, net (a tick and untick cancel out), after PATIENT_CREATED with the new uuid. With
+// patientId=null the form was left without saving: the items still left the bag, so they are sent
+// with no patient (owner 2026-11-18), never dropped.
+function sendFormSupply(patientId){
+  const draftId=state.patientDraftId;
+  const outbox=getOutbox();
+  const held=outbox.filter(e=>e.heldForForm && e.heldForForm===draftId);
+  const lines=Object.entries(state.supplyMovements||{}).filter(([key,m])=>/^(tx|quick):/.test(key) && (m?.qty||0)>0);
+  held.forEach(e=>{ e.heldForForm=null; e.replacedAtFormSave=true; });
+  lines.forEach(([key,m])=>{
+    const item=normalizeSupplyItem(m.itemType);
+    const qty=m.qty;
+    const after=medicBag()[item] ?? 0;
+    const firstAt=held.find(e=>e.type==='INVENTORY_LEDGER_MOVEMENT' && e.payload_json?.form_line===key)?.local_timestamp;
+    const at=firstAt || new Date().toISOString();
+    saveLocalEvent({type:'SUPPLY_CONSUMED', local_timestamp:at, detail:`${supplyLabel(item)} נצרך · נותר ${after}`, warn:after<=(SUPPLY_LOW_THRESHOLDS[item] ?? 1),
+      payload_json:{item, item_type:item, quantity_delta:-qty, linkedPatientId:patientId||null, patient_id:patientId||null, siteId:currentSiteId(), zone:zoneLabel(),
+        performedBy:currentMedicName(), occurredAt:at, medic_stock_after:after, form_line:key, ...(patientId?{}:{form_abandoned:true})}});
+    saveLocalEvent({type:'INVENTORY_LEDGER_MOVEMENT', local_timestamp:at, detail:`Inventory ledger: ${item} ${-qty}`, warn:after<=0,
+      payload_json:{item_type:item, movement_type:'treatment_consumed', quantity_delta:-qty, patient_id:patientId||null, form_line:key,
+        ...(patientId?{}:{form_abandoned:true}), local_stock_after:after, stock_seq:nextLedgerSeq(), battery_at_log:null}});
+    delete state.supplyMovements[key];
+  });
+  if(held.length && !lines.length) persistOutbox();
+}
+// A new patient form replaces the old one: an unsaved form's stock is sent first (no patient).
+function freshPatientState(){
+  if(state?.supplyMovements) sendFormSupply(null);
+  return freshState();
+}
+// WP-19 step 6: stock events queued by an older version carry a draft id or a visible number.
+// Before each push, map one to the saved patient's uuid when this phone knows it (and the
+// patient's create is not still waiting behind it), else send it with no patient. The movement
+// itself is never dropped. Events the server already refused stay as they are (WP-22).
+function repairQueuedStockEvents(){
+  const outbox=getOutbox();
+  let changed=false;
+  outbox.forEach((e,i)=>{
+    if(e.synced || e.syncRejected || e.heldForForm || !STOCK_EVENT_TYPES.has(e.type)) return;
+    const raw=e.patient_id || e.payload_json?.patient_id || e.payload_json?.patientId || null;
+    if(!raw || SERVER_PATIENT_ID_RE.test(String(raw))) return;
+    let pid=serverPatientIdFor(raw);
+    if(pid && outbox.some((c,j)=>j>i && !c.synced && PATIENT_CREATE_SYNC_TYPES.has(c.type) && c.patient_id===pid)) pid=null;
+    const payload={...(e.payload_json||{}), patient_id:pid};
+    delete payload.patientId; delete payload.patient_context;
+    if('linkedPatientId' in payload) payload.linkedPatientId=pid;
+    e.payload_json=payload;
+    e.patient_id=pid;
+    changed=true;
+  });
+  if(changed) persistOutbox();
+  return changed;
 }
 // How a supply movement names its patient on screen: the patient number, or "הפצוע בתיעוד" for
 // the patient still being documented (an internal draft-... id never reaches the screen).
@@ -17540,9 +17655,12 @@ function adjustSupplyMovement(use, qtyDelta){
 function cancelSupplyUse(){
   if(!pendingSupplyUse) return;
   const use=pendingSupplyUse;
-  consumeFieldSupply(use.item, use.qty, use.patientId, 'correction_reversed', {silentPopup:true});
+  consumeFieldSupply(use.item, use.qty, use.patientId, 'correction_reversed', {silentPopup:true, formDraft:use.formDraft, movementKey:use.movementKey||undefined});
   adjustSupplyMovement(use, -use.qty);
-  saveLocalEvent({type:'SUPPLY_USE_CANCELLED',detail:`בוטל שימוש בציוד: ${supplyLabel(use.item)} · ${supplyPatientLabel(use.patientId)}`,warn:false,payload_json:use});
+  const pid=serverPatientIdFor(use.patientId);
+  saveLocalEvent({type:'SUPPLY_USE_CANCELLED',detail:`בוטל שימוש בציוד: ${supplyLabel(use.item)} · ${supplyPatientLabel(use.patientId)}`,warn:false,
+    heldForForm:!pid && use.formDraft ? state.patientDraftId : null,
+    payload_json:{item:use.item, qty:use.qty, zone:use.zone, before:use.before, after:use.after, movementKey:use.movementKey||null, patient_id:pid}});
   hideSupplyUsedBanner();
   toast('שימוש בציוד בוטל במלאי המקומי');
 }
@@ -17553,7 +17671,7 @@ function changeSupplyUseQuantity(){
   const diff=nextQty-use.qty;
   use.qty=nextQty;
   if(diff!==0){
-    consumeFieldSupply(use.item, -diff, use.patientId, 'quantity_corrected', {silentPopup:true});
+    consumeFieldSupply(use.item, -diff, use.patientId, 'quantity_corrected', {silentPopup:true, formDraft:use.formDraft, movementKey:use.movementKey||undefined});
     adjustSupplyMovement(use, diff);
   }
   use.after=localStock(use.item);
@@ -17571,18 +17689,24 @@ let _lastLedgerSeq=0;
 function nextLedgerSeq(){ _lastLedgerSeq=Math.max(Date.now()*1000, _lastLedgerSeq+1); return _lastLedgerSeq; }
 function consumeFieldSupply(itemType, quantityDelta, patientId=null, movementType='treatment_consumed', meta={}){
   itemType=normalizeSupplyItem(itemType);
-  if(!state.localStockCache) state.localStockCache={};
+  const bag=medicBag();
   const delta=Number(quantityDelta)||0;
-  const before=state.localStockCache[itemType] ?? SUPPLY_BASELINE[itemType] ?? 0;
-  state.localStockCache[itemType]=(state.localStockCache[itemType] ?? SUPPLY_BASELINE[itemType] ?? 0)+delta;
-  const after=state.localStockCache[itemType];
+  const before=bag[itemType] ?? 0;
+  bag[itemType]=before+delta;
+  const after=bag[itemType];
+  persistMedicBags();
   const lowThreshold=SUPPLY_LOW_THRESHOLDS[itemType] ?? 1;
+  // WP-19: a server uuid or no patient on every stock event. In the New Patient form (its supply
+  // lines tx:* / quick:*, or a banner correction of one) the patient does not exist yet: the events
+  // stay on this phone and savePatient() sends them with the new uuid (sendFormSupply).
+  const serverPid=serverPatientIdFor(patientId);
+  const heldForForm=!serverPid && (!!meta.formDraft || /^(tx|quick):/.test(meta.movementKey||'')) ? state.patientDraftId : null;
   const payload={
     item:itemType,
     item_type:itemType,
     quantity_delta:delta,
-    linkedPatientId:patientId||state.patientDraftId,
-    patient_id:patientId||state.patientDraftId,
+    linkedPatientId:serverPid,
+    patient_id:serverPid,
     siteId:meta.siteId||currentSiteId(),
     zone:meta.zone||zoneLabel(),
     performedBy:meta.performedBy||currentMedicName(),
@@ -17590,25 +17714,27 @@ function consumeFieldSupply(itemType, quantityDelta, patientId=null, movementTyp
     medic_stock_after:after
   };
   if(delta<0){
-    saveLocalEvent({type:'SUPPLY_CONSUMED',detail:`${supplyLabel(itemType)} נצרך · נותר ${after}`,warn:after<=lowThreshold,payload_json:payload});
-    const p=patients.find(x=>x.id===(patientId||state.patientDraftId));
+    saveLocalEvent({type:'SUPPLY_CONSUMED',detail:`${supplyLabel(itemType)} נצרך · נותר ${after}`,warn:after<=lowThreshold,heldForForm,payload_json:payload});
+    // On screen: the patient this phone knows (any id); on the server only the uuid (above).
+    const p=patients.find(x=>x.id===serverPid) || (patientId && patients.find(x=>x.id===patientId)) || null;
     if(p){
       p.events=p.events||[];
       p.events.unshift({type:'SUPPLY_CONSUMED',time:nowT(),detail:`${supplyLabel(itemType)} · נותר ${after}`,warn:after<=lowThreshold,confirmed:!!meta.silentPopup});
       p.unsyncedEvents=(p.unsyncedEvents||0)+1;
     }
-    if(!meta.silentPopup) showSupplyUsedBanner({item:itemType, qty:Math.abs(delta), patientId:patientId||state.patientDraftId, zone:meta.zone||zoneLabel(), before, after, movementKey:meta.movementKey||null});
+    if(!meta.silentPopup) showSupplyUsedBanner({item:itemType, qty:Math.abs(delta), patientId:p?.id || serverPid || (heldForForm ? state.patientDraftId : null), formDraft:!!heldForForm, zone:meta.zone||zoneLabel(), before, after, movementKey:meta.movementKey||null});
   }
   saveLocalEvent({
     type:'INVENTORY_LEDGER_MOVEMENT',
     detail:`Inventory ledger: ${itemType} ${delta}`,
     warn:after <= 0,
+    heldForForm,
     payload_json:{
       item_type:itemType,
       movement_type:movementType,
       quantity_delta:delta,
-      patient_id:state.patientDraftId||patientId,
-      patient_context:patientId||state.patientDraftId,
+      patient_id:serverPid,
+      ...(meta.movementKey ? {form_line:meta.movementKey} : {}),
       local_stock_after:after,
       stock_seq:nextLedgerSeq(),
       battery_at_log:null
@@ -17617,13 +17743,14 @@ function consumeFieldSupply(itemType, quantityDelta, patientId=null, movementTyp
   renderLocalStockPanel();
   if(after <= 0){
     if(!meta.silentWarnings) toast(`ציוד אזל — בקש השלמה עכשיו · ${supplyLabel(itemType,true)}. נרשם טיפול למרות שמלאי מקומי 0`);
+    // The bag is empty now: sent at once, also from the New Patient form (no patient yet then).
     saveLocalEvent({
       type:'LOCAL_STOCKOUT_WARNING',
       detail:`ציוד אזל אצל חובש: ${supplyLabel(itemType)}`,
       warn:true,
-      payload_json:{item_type:itemType, local_stock_after:state.localStockCache[itemType], patient_id:patientId||state.patientDraftId}
+      payload_json:{item_type:itemType, local_stock_after:after, patient_id:serverPid}
     });
-    if(!meta.suppressAutoResupply) createAutoResupplySuggestion(itemType, patientId, 'stock_empty', itemType==='tourniquets'?'immediate':'high');
+    if(!meta.suppressAutoResupply) createAutoResupplySuggestion(itemType, serverPid, 'stock_empty', itemType==='tourniquets'?'immediate':'high');
   }else if(after <= lowThreshold){
     if(!meta.silentWarnings) toast(`ציוד נמוך — בקש השלמה מהחוג״ד · ${supplyLabel(itemType,true)}: ${after}`);
   }

@@ -12,6 +12,13 @@
 // Checks: logistics sees the burn rate of both medics together, each medic bag's and the PC
 // truck's current stock, nothing counted twice (server + unsent on the same phone), and the PC
 // truck's issue on an approved request reaching logistics, and no patient reaching logistics.
+// WP-19 (V2.99.73): the fake also enforces events.patient_id like the real table (a uuid that is a
+// patient on the server, else the event is refused: live, every medic movement was refused for a
+// "draft-..." patient id, 0 ledger rows). Checked: a movement on a saved patient carries its uuid;
+// stock used in the New Patient form is sent after PATIENT_CREATED with the new uuid, net per line;
+// an abandoned form's stock is sent with no patient; the MSTART / immediate-action tourniquet comes
+// after the patient's create; the medic's bag is not refilled by a new patient or a reload, goes below
+// 0, and only "התיק חודש" fills it; a movement queued by an older version is repaired, never dropped.
 // It proves client behavior only; database/062 itself is exercised against real Postgres.
 //
 // Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
@@ -50,6 +57,10 @@ const MEDIC_SUPPLY = ['SUPPLY_REQUEST_CREATED', 'SUPPLY_CONSUMED', 'SUPPLY_USE_C
 const LOGISTICS = [...CREATE, ...DECIDE, ...MOVE, 'SUPPLY_CONSUMED', 'SUPPLY_USE_CANCELLED', 'INVENTORY_LEDGER_MOVEMENT', 'LOCAL_STOCKOUT_WARNING'];
 const ALLOWED = { medic: MEDIC_SUPPLY, pc: LOGISTICS, cc: LOGISTICS, logistics_officer: LOGISTICS };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SUPPLY_FAMILY = new Set([...MEDIC_SUPPLY, ...LOGISTICS]);
+const CLINICAL_ROLES = ['medic', 'paramedic', 'pc', 'physician', 'admin'];
+const PATIENT_CREATES = ['PATIENT_CREATED', 'QUICK_PATIENT_CREATED'];
+const STOCK_TYPES = ['INVENTORY_LEDGER_MOVEMENT', 'SUPPLY_CONSUMED', 'SUPPLY_USE_CANCELLED', 'LOCAL_STOCKOUT_WARNING'];
 let nextId = 1;
 
 function newServer() {
@@ -106,17 +117,29 @@ function projectInventory(server, evt, actorId) {
   if (owner === 'pc_truck' && !['pc', 'cc', 'logistics_officer', 'admin'].includes(role)) return;
   if (server.ledger.some((r) => r.device_id === evt.device_id && r.local_event_id === evt.local_event_id)) return;
   const after = Number(p.local_stock_after ?? p.pc_truck_stock_after);
+  // database/062: the payload's patient is kept only when it is a real patient.
+  const cand = p.patient_id || p.patient_context || null;
+  const patient = cand && UUID.test(cand) && server.patients.some((x) => x.id === cand) ? cand : null;
   server.ledger.push({ incident_id: evt.incident_id, actor_id: actorId, item_type: p.item_type, movement_type: MOVES[p.movement_type], quantity_delta: delta,
     stock_owner: owner, stock_after: Number.isInteger(after) ? after : null, device_id: evt.device_id, local_event_id: evt.local_event_id,
-    patient_id: p.patient_context || p.patient_id || null, occurred_at: evt.local_timestamp, created_at: new Date().toISOString(), stock_seq: p.stock_seq == null ? null : String(p.stock_seq) });
+    patient_id: patient, occurred_at: evt.local_timestamp, created_at: new Date().toISOString(), stock_seq: p.stock_seq == null ? null : String(p.stock_seq) });
 }
 
 function push(server, userId, body) {
   const u = userById(userId);
   const accepted = []; const rejected = [];
   for (const e of body.events || []) {
-    if (!u || !(ALLOWED[u.role] || []).includes(e.type)) { rejected.push({ local_event_id: e.local_event_id, terminal: true, error_code: 'FORBIDDEN_ACTOR_ROLE' }); server.rejected.push({ role: u?.role, type: e.type }); continue; }
+    const allowed = SUPPLY_FAMILY.has(e.type) ? (ALLOWED[u?.role] || []).includes(e.type) : CLINICAL_ROLES.includes(u?.role);
+    if (!u || !allowed) { rejected.push({ local_event_id: e.local_event_id, terminal: true, error_code: 'FORBIDDEN_ACTOR_ROLE' }); server.rejected.push({ role: u?.role, type: e.type }); continue; }
     if (server.events.some((x) => x.device_id === body.device_id && x.local_event_id === e.local_event_id)) { accepted.push({ local_event_id: e.local_event_id }); continue; }
+    if (PATIENT_CREATES.includes(e.type) && UUID.test(e.patient_id || '') && !server.patients.some((x) => x.id === e.patient_id)) server.patients.push({ id: e.patient_id, incident_id: body.incident_id });
+    // events.patient_id is a uuid foreign key to patients(id): a draft id or a visible number fails
+    // the insert (live: MALFORMED_EVENT_ENVELOPE, "invalid input syntax for type uuid").
+    if (e.patient_id != null && !(UUID.test(e.patient_id) && server.patients.some((x) => x.id === e.patient_id))) {
+      rejected.push({ local_event_id: e.local_event_id, terminal: true, error_code: 'MALFORMED_EVENT_ENVELOPE' });
+      server.rejected.push({ role: u.role, type: e.type, patient_id: e.patient_id });
+      continue;
+    }
     const evt = { ...e, device_id: body.device_id, incident_id: body.incident_id, actor_id: userId };
     server.events.push(evt);
     projectSupply(server, evt, userId);
@@ -253,6 +276,13 @@ async function pullAll(page) {
   for (let i = 0; i < 2; i++) { await page.evaluate(() => pullProjectedPatientStateAll()); await page.waitForTimeout(350); }
 }
 let SERVER = null;
+async function unlockAfterReload(page) {
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#screen-pin-gate.active', { timeout: 5000 });
+  await page.fill('#pin-gate-unlock-input', PIN); await page.click('#pin-gate-unlock-btn');
+  await page.waitForFunction(() => !!currentUser, null, { timeout: 5000 });
+  await page.waitForTimeout(400);
+}
 
 async function pullInv(page) {
   await page.evaluate(() => Promise.all(Object.values(SITE_TO_INCIDENT_ID).map((id) => pullIncidentInventory(id))));
@@ -336,6 +366,93 @@ async function checkFile(browser, file) {
   await logo.page.evaluate(() => saveLocalEvent({ type: 'INVENTORY_LEDGER_MOVEMENT', detail: 'test', payload_json: { item_type: 'ivKits', movement_type: 'treatment_consumed', quantity_delta: -1, local_stock_after: 0 } }));
   await syncAll(logo.page);
   assert(SERVER.ledger.length === before, `${rel}: a logistics officer's medic-bag movement must not reach the ledger`);
+
+  // 6. WP-19: every stock event from every entry path is stored, with a real patient or none.
+  const p = m1.page;
+  const bagOf = (page) => page.evaluate(() => ({ ...medicBag() }));
+  const stockRows = (fn) => SERVER.ledger.filter((r) => r.actor_id === MEDIC && fn(r));
+  const bag0 = await bagOf(p);
+  // 6a. New Patient form: bandage, hemostatic ticked, unticked and ticked again, then saved.
+  const saved = await p.evaluate(() => {
+    if (!siteData.name) siteData.name = 'מוקד בדיקה';
+    startNewPatient('extended');
+    const draft = state.patientDraftId;
+    state.triage = 'yellow'; state.trapStatus = 'not_trapped'; state.injury = 'פגיעת רסיס';
+    const chip = () => document.createElement('button');
+    toggleChip(chip(), 'bandage');
+    const h = chip(); toggleChip(h, 'hemostatic'); toggleChip(h, 'hemostatic'); toggleChip(h, 'hemostatic');
+    const heldSent = getOutbox().filter((e) => ['INVENTORY_LEDGER_MOVEMENT', 'SUPPLY_CONSUMED'].includes(e.type) && !e.synced).length;
+    savePatient();
+    const pt = patients.find((x) => x.tempPatientId === draft);
+    return { draft, uuid: pt && pt.id, heldSent };
+  });
+  assert(saved.uuid && UUID.test(saved.uuid), `${rel}: the form must save a patient with a uuid (got ${JSON.stringify(saved)})`);
+  assert(saved.heldSent === 0, `${rel}: stock used in the New Patient form must wait for the save, not go out with a draft id (${saved.heldSent} queued)`);
+  await syncAll(p);
+  const formRows = stockRows((r) => r.patient_id === saved.uuid);
+  const formItems = formRows.map((r) => `${r.item_type}:${r.quantity_delta}`).sort();
+  assert(JSON.stringify(formItems) === JSON.stringify(['hemostaticGauze:-1', 'pressureDressings:-1']), `${rel}: the form's stock must reach the ledger once per line, net, with the new patient (got ${JSON.stringify(formItems)})`);
+  const order = SERVER.events.map((e) => e.type + ':' + (e.patient_id || ''));
+  const createAt = order.findIndex((x) => x.startsWith('PATIENT_CREATED:' + saved.uuid) || x.startsWith('QUICK_PATIENT_CREATED:' + saved.uuid));
+  const firstMove = order.findIndex((x) => x === 'INVENTORY_LEDGER_MOVEMENT:' + saved.uuid);
+  assert(createAt >= 0 && firstMove > createAt, `${rel}: the form's movements must be sent after the patient's create (create ${createAt}, movement ${firstMove})`);
+  // 6b. A later use on the saved patient carries its uuid on the event and the ledger row.
+  await p.evaluate((id) => consumeFieldSupply('pressureDressings', -1, id, 'treatment_consumed', { silentPopup: true, silentWarnings: true, suppressAutoResupply: true }), saved.uuid);
+  await syncAll(p);
+  assert(stockRows((r) => r.patient_id === saved.uuid && r.item_type === 'pressureDressings').length === 2, `${rel}: a use on a saved patient must reach the ledger with that patient`);
+  // 6c. An abandoned form: the item left the bag, so it is sent with no patient (owner 2026-11-18).
+  const before6c = stockRows((r) => r.item_type === 'blankets').length;
+  await p.evaluate(() => { startNewPatient('extended'); toggleChip(document.createElement('button'), 'blanket'); startNewPatient('extended'); });
+  await syncAll(p);
+  const blanketRows = stockRows((r) => r.item_type === 'blankets');
+  assert(blanketRows.length === before6c + 1 && blanketRows[blanketRows.length - 1].patient_id === null && blanketRows[blanketRows.length - 1].quantity_delta === -1, `${rel}: an abandoned form's stock must be sent once with no patient (got ${JSON.stringify(blanketRows)})`);
+  // 6d. Immediate-action tourniquet: the movement comes after the patient's create, with its uuid.
+  const imm = await p.evaluate(() => { createImmediateInterventionPatient('tourniquet'); return patients[0].id; });
+  await syncAll(p);
+  assert(stockRows((r) => r.patient_id === imm && r.item_type === 'tourniquets').length === 1, `${rel}: the immediate-action tourniquet must reach the ledger with its patient`);
+  // 6e. A movement queued by an older version (draft id / visible number) is repaired, not dropped.
+  const queuedBefore = SERVER.ledger.length;
+  await p.evaluate(([draft]) => {
+    saveLocalEvent({ type: 'INVENTORY_LEDGER_MOVEMENT', detail: 'old', payload_json: { item_type: 'ivKits', movement_type: 'treatment_consumed', quantity_delta: -1, patient_id: draft, local_stock_after: 0, stock_seq: nextLedgerSeq() } });
+    saveLocalEvent({ type: 'INVENTORY_LEDGER_MOVEMENT', detail: 'old', payload_json: { item_type: 'ivKits', movement_type: 'treatment_consumed', quantity_delta: -1, patient_id: 'draft-1-unknown', local_stock_after: 0, stock_seq: nextLedgerSeq() } });
+  }, [saved.draft]);
+  await syncAll(p);
+  const repaired = SERVER.ledger.slice(queuedBefore).filter((r) => r.item_type === 'ivKits').map((r) => r.patient_id);
+  assert(repaired.length === 2 && repaired.includes(saved.uuid) && repaired.includes(null), `${rel}: older queued movements must be mapped to the saved patient or sent with none (got ${JSON.stringify(repaired)})`);
+  // 6f. The bag is on the medic: no refill by a new patient or a reload; below 0 is allowed.
+  const bag1 = await bagOf(p);
+  assert(bag1.pressureDressings === bag0.pressureDressings - 2 && bag1.hemostaticGauze === bag0.hemostaticGauze - 1 && bag1.blankets === bag0.blankets - 1,
+    `${rel}: uses on several patients must all come off the same bag (before ${JSON.stringify(bag0)}, after ${JSON.stringify(bag1)})`);
+  await unlockAfterReload(p);
+  const bag2 = await bagOf(p);
+  assert(JSON.stringify(bag2) === JSON.stringify(bag1), `${rel}: a reload must not refill the bag (before ${JSON.stringify(bag1)}, after ${JSON.stringify(bag2)})`);
+  const stored = await p.evaluate(() => { const raw = localStorage.getItem(MEDIC_BAG_KEY) || ''; return { encrypted: raw.includes('"ct"'), plain: raw.includes('pressureDressings') }; });
+  assert(stored.encrypted && !stored.plain, `${rel}: the bag must be stored encrypted (${JSON.stringify(stored)})`);
+  await enter(p);
+  const tqLeft = bag2.tourniquets;
+  for (let i = 0; i <= tqLeft; i++) await use(p, 'tourniquets', 1);
+  assert((await bagOf(p)).tourniquets === -1, `${rel}: the bag goes below 0, treatment is never blocked`);
+  await syncAll(p);
+  const lastTq = stockRows((r) => r.item_type === 'tourniquets').pop();
+  assert(lastTq.stock_after === -1, `${rel}: the server must see the bag at -1 (got ${JSON.stringify(lastTq)})`);
+  // 6g. "התיק חודש" fills the bag back to the starting list and tells the server; not consumption.
+  await pullInv(p);
+  const burnBefore = await burn(p, 'tourniquets');
+  await p.evaluate(() => restockMedicBag());
+  await syncAll(p);
+  const full = await bagOf(p);
+  const baseline = await p.evaluate(() => ({ ...SUPPLY_BASELINE }));
+  assert(JSON.stringify(full) === JSON.stringify(baseline), `${rel}: "התיק חודש" must fill the bag (got ${JSON.stringify(full)})`);
+  const restock = stockRows((r) => r.movement_type === 'resupply_received' && r.stock_owner === 'medic_bag' && r.item_type === 'tourniquets').pop();
+  assert(restock && restock.quantity_delta === baseline.tourniquets + 1 && restock.stock_after === baseline.tourniquets, `${rel}: the restock must reach the ledger (got ${JSON.stringify(restock)})`);
+  await pullInv(p);
+  assert((await burn(p, 'tourniquets')) === burnBefore, `${rel}: a restock is not consumption`);
+  assert(await p.evaluate((id) => Object.keys(medicBags).includes(id), MEDIC), `${rel}: the bag belongs to the signed-in user`);
+  // 6h. Nothing refused, and no stock event ever left the phone with a patient that is not a uuid.
+  assert(SERVER.rejected.length === 0, `${rel}: no event may be refused (got ${JSON.stringify(SERVER.rejected)})`);
+  const bad = SERVER.events.filter((e) => STOCK_TYPES.includes(e.type) && ((e.patient_id != null && !UUID.test(e.patient_id))
+    || (e.payload_json?.patient_id != null && !UUID.test(e.payload_json.patient_id)) || /draft-|P\d{3}/.test(String(e.payload_json?.patient_context || ''))));
+  assert(bad.length === 0, `${rel}: stock events must carry a uuid patient or none (got ${JSON.stringify(bad.map((e) => [e.type, e.patient_id, e.payload_json]))})`);
 
   const errors = [...m1.errors, ...m2.errors, ...logo.errors, ...pc.errors];
   assert(errors.length === 0, `${rel}: page errors: ${errors.join(' | ')}`);

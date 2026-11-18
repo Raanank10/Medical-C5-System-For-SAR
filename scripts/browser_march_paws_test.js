@@ -98,7 +98,7 @@ async function main() {
       hState: document.getElementById('march-state-h').textContent,
       cClearSelected: document.getElementById('march-clear-c').classList.contains('selected'),
       progress: document.getElementById('march-progress').textContent,
-      gauze: state.localStockCache.hemostaticGauze,
+      gauze: medicBag().hemostaticGauze,
     }));
     assert(JSON.stringify(taps.review) === JSON.stringify({ m: 'treated', a: 'treated', r: 'treated', c: 'treated', h: 'clear', p: null, ab: null, w: null, s: 'treated' }),
       `letter review after taps, got ${JSON.stringify(taps.review)}`);

@@ -90,17 +90,17 @@ async function main() {
     b = await banner();
     assert(b.shown && b.warn && b.text.includes('מלאי נמוך'), `gauze 2 -> 1 is low: banner warns, got ${JSON.stringify(b)}`);
     await page.click('#supply-used-banner button[onclick="changeSupplyUseQuantity()"]');
-    let st = await page.evaluate(() => ({ stock: state.localStockCache.hemostaticGauze, mv: state.supplyMovements['tx:hemostatic'].qty }));
+    let st = await page.evaluate(() => ({ stock: medicBag().hemostaticGauze, mv: state.supplyMovements['tx:hemostatic'].qty }));
     b = await banner();
     assert(st.stock === 0 && st.mv === 2 && b.text.includes('×2') && b.text.includes('מלאי אזל'), `quantity 2: stock 0, movement 2, banner "×2" and empty, got ${JSON.stringify(st)} "${b.text}"`);
     await page.clock.runFor(10000);
     assert((await banner()).shown, 'an empty-stock warning stays until closed');
     await page.click('#supply-used-banner button[onclick="cancelSupplyUse()"]');
-    st = await page.evaluate(() => ({ stock: state.localStockCache.hemostaticGauze, mv: state.supplyMovements['tx:hemostatic'].qty }));
+    st = await page.evaluate(() => ({ stock: medicBag().hemostaticGauze, mv: state.supplyMovements['tx:hemostatic'].qty }));
     assert(st.stock === 2 && st.mv === 0, `cancel returns both: stock 2, movement 0, got ${JSON.stringify(st)}`);
     assert(!(await banner()).shown, 'cancel closes the banner');
     await page.click('#march-sec-m .chip[data-tx="hemostatic"]'); // unselect
-    st = await page.evaluate(() => state.localStockCache.hemostaticGauze);
+    st = await page.evaluate(() => medicBag().hemostaticGauze);
     assert(st === 2, `unselecting after a cancel must not return the gauze twice, got ${st}`);
 
     // 4. Close button; a saved patient is named by its number.
