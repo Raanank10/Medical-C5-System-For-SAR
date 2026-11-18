@@ -637,7 +637,7 @@ Ask the owner (open in the 2026-11-08 PC/CC session): on the all-incidents page,
 
 **Found while building.** The medic had no receipt step at all: `SUPPLY_REQUEST_RECEIVED` was sent only by the PC ("סמן נמסר") and logistics, and `sync-log` did not let a medic send it. The server (059) accepted it from anyone with no role check, so a request read "delivered" on every board while the bag never moved.
 
-**Done (V2.99.74, needs `database/082` and `sync-log` v18 live).**
+**Done (V2.99.74). Live 2026-11-18:** `database/082` applied by the owner (checked read-only: 3 new columns, the new `project_supply_request_event()`, no delivered row left without `received_at`); `sync-log` v18 deployed (version 18, JWT check on, same file as `main`).
 1. Medic: the action panel lists the medic's own open requests ("ציוד בדרך אליך" / "נמסר · ממתין לאישור קבלה") with "קיבלתי". The sheet is prefilled with what was asked (a "כמה שאפשר" line starts at 1), - / + per item; nothing is added until "אישור קבלה". `confirmResupplyReceipt()` adds to `medicBag()`, sends one `INVENTORY_LEDGER_MOVEMENT` `resupply_received` per item (no patient, `supply_request_ref`), then `SUPPLY_REQUEST_RECEIVED` with `received_items`, `requested_items` and `partial`. Once: a second confirmation does nothing.
 2. PC and logistics "סמן נמסר" keep sending `SUPPLY_REQUEST_RECEIVED`; it now means handed over. The PC/CC open board keeps the request as "נמסר · ממתין לאישור החובש" until the receipt, then shows "התקבל אצל החובש" with any partial line ("חסמים 2 מתוך 3").
 3. `database/082`: `supply_requests.received_at` / `received_by` / `received_items_json`; `project_supply_request_event()` records the receipt only from the requester (first wins), ignores a medic or paramedic marking someone else's request, and keeps the first delivery time. Rows already delivered get `received_at = delivered_at`, so they do not show as waiting. Checked on a throwaway Postgres 16: backfill, PC handover, another medic's attempt, the requester's partial receipt, a second receipt, a malformed payload (event still stored), a receipt before any PC step.
@@ -711,7 +711,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-35 Record what is applied live | P3 | Not started | | read-only |
 | WP-36 Demo constants | P3 | Not started | | `SITE_A` x60, `PLT-A` x25 |
 | WP-37 Unlink tombstone | P3 | Not started | | `database/069` known limit |
-| WP-38 Resupply raises the medic's bag | P2 | Done in code (V2.99.74): `database/082` and `sync-log` v18 not applied live yet | this PR | owner 2026-11-18: the medic confirms, by what arrived; the PC's / logistics' "delivered" = handed over, waiting for the medic |
+| WP-38 Resupply raises the medic's bag | P2 | Done (V2.99.74): `database/082` applied live by the owner, `sync-log` v18 deployed 2026-11-18; live two-phone check pending | #132 | owner 2026-11-18: the medic confirms, by what arrived; the PC's / logistics' "delivered" = handed over, waiting for the medic |
 
 ## Revisions after #73 (2026-10-19)
 
