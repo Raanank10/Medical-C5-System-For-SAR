@@ -476,6 +476,10 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 
 **Done when.** The panel shows only rejections that still need someone, each closed one has a reason, and nothing was deleted.
 
+**Re-checked (2026-11-18).** Still 55 open, the same four groups (8 / 10 / 18 / 19), but every one is now in a closed incident, including the 5 stock movements that were in an open one on 2026-11-17. So `resolve_sync_ingestion_error()` lets only admin close them (`app.can_read_incident_patients`, D9), and the in-app panel cannot reach them: it loads rejections only for the incidents the phone has open. Closing changes no screen; it ends the open backlog and, by the nightly job `redact-resolved-sync-error-payloads` (03:15 UTC, `database/028`), deletes each closed row's stored copy (`raw_payload`), logged in `retention_actions`. The row stays.
+
+**Done (2026-11-19, owner approved all four groups 2026-11-18).** One transaction, `resolve_sync_ingestion_error()` called once per row as the admin account ("Test Admin"), aborting if any row fell outside the four groups or any count had changed: A (8) `test_data`; B (10), C (18) and D (19) `not_recoverable`, each with a note naming the cause and its fix (`database/047`, WP-17, WP-19). Group C was not resent: its incident is closed and its stored report written. Checked after: 55 rows, 0 open, every one with a reason and a "WP-22" note, closed by the same account; no row deleted or edited outside the function.
+
 ---
 
 ### WP-23: Injury time editable in the field (P2, owner 2026-10-23)
@@ -716,7 +720,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-19 Stock movements reach the server | P1 | Client done (V2.99.73), no SQL; database check rolled back 2026-11-18; real-phone push pending (owner) | this PR | every stock event has a uuid patient or none; New Patient form stock sent after the create, net; abandoned form sent with no patient; bag per user, kept over new patients and reloads, below 0 allowed, "התיק חודש" (owner 2026-11-18) |
 | WP-20 Finish #128, apply 079-081 | P1 | Done: 079, 080, 081 and `sync-log` v17 live, checked 2026-11-17 | #128 | 100-minute check on a real tourniquet runs in WP-21 |
 | WP-21 Live two-phone run | P1 | Not started | | WP-0 part 2 plus WP-17/18/19, D1 offline, WP-10 install, T6 |
-| WP-22 Open sync rejections | P2 | Not started | | 55 open, 0 ever closed; after WP-19 |
+| WP-22 Open sync rejections | P2 | Done 2026-11-19: 55 closed with reasons (8 test data, 47 not recoverable), 0 open, rows kept | this PR | all in closed incidents, so admin only; stored copies removed by the nightly privacy job |
 | WP-23 Injury time editable | P2 | Done in this PR (V2.99.76, `database/085`); 085 not applied live yet (owner applies) | this PR | owner 2026-10-23 and 2026-11-18: CC may not edit; watchdog rows, MIST and stored report follow the injury time; newest entry by phone time wins; `handover-consume` change not deployed |
 | WP-24 Command cancels a resupply request | P2 | Client done (V2.99.75); `database/083` + `084` written, tested on local PostgreSQL 16, not applied live; `sync-log` needs `SUPPLY_REQUEST_CANCELLED` deployed | this PR | rescoped 2026-11-18: CC holds no stock, so no "fulfilled by company"; medic's escalation stays with the PC; cancel with a reason (cc/chamal/admin while open, PC before escalation); direct writes to `supply_requests` closed |
 | WP-25 Medic incident type + mismatch | P2 | Not started | | owner 2026-10-23 (WP-8 follow-up) |
