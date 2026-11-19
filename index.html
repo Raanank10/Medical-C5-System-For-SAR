@@ -624,6 +624,7 @@ input[type=range]{width:100%;accent-color:var(--orange);}
 .rcc-row-detail td{text-align:right !important;padding-top:0;font-family:var(--sans);}
 .rcc-incidents-table .rcc-group-head{color:var(--orange);border-bottom:1px solid var(--orange) !important;padding-bottom:2px;}
 .rcc-extract-btn{width:100%;margin-top:8px;border-color:var(--green) !important;color:var(--green) !important;font-weight:900;}
+.rcc-extract-blocked{margin-top:8px;padding:9px 10px;border-radius:9px;border:1px dashed var(--accent);color:var(--accent);font-size:13px;font-weight:800;text-align:center;}
 .rcc-trapped-line{font-size:11px;font-weight:800;color:var(--orange);margin-top:3px;line-height:1.35;}
 .rcc-incidents-table thead th{font-size:10.5px;line-height:1.25;padding-left:2px;padding-right:2px;}
 .rcc-incidents-table td{padding-left:2px;padding-right:2px;}
@@ -7477,9 +7478,12 @@ function sortedPatientsByEvacPriority(list=patients){
 // The casualty goes to the evacuation point to meet a medic for the MIST handover: no longer
 // trapped, on the way to the נאפ״ל (evacuating, not arrived; the medic or PC marks the arrival,
 // WP-18). database/085 projects PATIENT_EXTRACTED the same way on the server.
+// A trapped casualty no medic has sorted yet (priority "טרם מוין") may not be extracted before a
+// medic checks them (owner, 2026-11-19); database/086 ignores such an extraction on the server too.
+function rescueExtractionNeedsMedic(p){ return rescuePriorityOf(p)==='pending'; }
 function rescueMarkExtracted(patientId){
   const p=patients.find(x=>x.id===patientId);
-  if(!p || !isTrappedForRescue(p)) return;
+  if(!p || !isTrappedForRescue(p) || rescueExtractionNeedsMedic(p)) return;
   if(!confirm(`${p.visualId||p.id} חולץ?\nהפצוע יועבר לנאפ״ל לפגוש חובש ולמסירת MIST.`)) return;
   const role=rescueCmdRole();
   const now=Date.now();
@@ -7504,7 +7508,9 @@ function renderRescueEvacOrderPanel(pts, title){
       <div class="role-row-sub">${rescueIdentityLine(p)}</div>
       <div class="role-row-sub" style="margin-top:2px;color:var(--muted)">${p.location||'אזור לא תועד'} · ${TRAP_LABELS[p.trapStatus]||'לא תועד'} · ${RESCUE_STAGE_LABELS[rescueEvacStage(p)]}${p.extractedAt?` · חולץ ${new Date(p.extractedAt).toTimeString().slice(0,5)}`:''}</div>
       ${isRccViewer() && isTrappedForRescue(p) && rescueEvacStage(p)==='on_site'
-        ? `<button class="demo-mini-btn rcc-extract-btn" data-rescue-extract="${escAttr(p.id)}" onclick="rescueMarkExtracted('${escAttr(p.id)}')">✓ חולץ — להעביר לנאפ״ל</button>`:''}
+        ? (rescueExtractionNeedsMedic(p)
+          ? `<div class="rcc-extract-blocked" data-rescue-extract-blocked="${escAttr(p.id)}">⚕ טרם מוין — נדרשת בדיקת חובש לפני חילוץ</div>`
+          : `<button class="demo-mini-btn rcc-extract-btn" data-rescue-extract="${escAttr(p.id)}" onclick="rescueMarkExtracted('${escAttr(p.id)}')">✓ חולץ — להעביר לנאפ״ל</button>`):''}
     </div>`;
   }).join('');
   return roleSection(title, rows || roleRow('אין פצועים ברשימה',''));

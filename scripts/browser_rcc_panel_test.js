@@ -270,6 +270,13 @@ async function checkDemo(browser, rel, file) {
   // 5. "חולץ" (owner, 2026-11-19): a trapped casualty extracted by the rescue chain goes to the
   // נאפ״ל to meet a medic: no longer trapped, on the way to the evacuation point, sent as PATIENT_EXTRACTED.
   assert(!(await page.locator('[data-rescue-extract="b1"]').count()), `${rel}: no "חולץ" for a casualty who is not trapped`);
+  // Owner, 2026-11-19: an unsorted trapped casualty is not extracted before a medic checks them.
+  for (const id of ['b3', 'b4']) {
+    assert(!(await page.locator(`[data-rescue-extract="${id}"]`).count()) && (await page.locator(`[data-rescue-extract-blocked="${id}"]`).count()) === 1,
+      `${rel}: ${id} (טרם מוין) has no "חולץ", only the medic-check note`);
+  }
+  await page.evaluate(() => rescueMarkExtracted('b3'));
+  assert((await page.evaluate(() => patients.find((x) => x.id === 'b3').trapStatus)) === 'trapped', `${rel}: rescueMarkExtracted refuses an unsorted casualty`);
   await page.click('[data-rescue-extract="b2"]');
   const ext = await page.evaluate(() => {
     const p = patients.find((x) => x.id === 'b2');
