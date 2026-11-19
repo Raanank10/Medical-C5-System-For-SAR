@@ -1,17 +1,17 @@
-// Real-browser test of WP-23 (V2.99.76, database/085): injury time, editable in the field.
+// Real-browser test of WP-23 (V2.99.76, database/088): injury time, editable in the field.
 // Two medics, a PC and a CC (four tabs, one browser context) share one fake backend in this Node
 // process, the harness of scripts/browser_evac_point_arrival_test.js. The fake mirrors
-// database/085: the create event gives the patient the incident's alert time ('incident_open');
+// database/088: the create event gives the patient the incident's alert time ('incident_open');
 // PATIENT_T_INJURY_UPDATED is applied for medic/paramedic/physician/pc/admin only, within 5 minutes
 // after and 26 hours before the entry, and the newest entry by phone time wins. It proves client
-// behavior only; the SQL itself was tested on a local PostgreSQL (see the 085 header).
+// behavior only; the SQL itself was tested on a local PostgreSQL (see the 088 header).
 //
 // Checks: estimated time shown as "(משוערת)" from T0; the 4-digit entry (same control as the
 // tourniquet body time) sends the event and the server marks it entered; other phones show it; an
 // older entry pushed late by an offline phone does not win; CC gets no edit button and the server
 // would refuse its event; the command watchdog's Golden Hour row counts from the injury time; MIST
 // says the injury time and no longer repeats the injuries as the mechanism; the stored report shows
-// the golden-hour box (and says so when a report has none); a database without 085 breaks nothing.
+// the golden-hour box (and says so when a report has none); a database without 088 breaks nothing.
 //
 // Runs in CI through scripts/run_tests.js; also runs on its own.
 // Run: npm install && node scripts/browser_injury_time_test.js
@@ -81,12 +81,12 @@ function push(server, userId, body) {
     if (e.patient_id && !p) { rejected.push({ local_event_id: e.local_event_id, terminal: false }); continue; }
     server.events.push({ ...e, device_id: body.device_id, incident_id: body.incident_id, actor_id: userId });
     const ts = Date.parse(e.local_timestamp);
-    // database/085: the create event gives a row still at 'event_time' the incident's alert time.
+    // database/088: the create event gives a row still at 'event_time' the incident's alert time.
     if (p && ['PATIENT_CREATED', 'QUICK_PATIENT_CREATED'].includes(e.type) && p.t_injury_source === 'event_time' && !p.t_injury_recorded_at) {
       const inc = server.incidents.find((i) => i.id === p.incident_id);
       if (inc?.t_injury_default) { p.t_injury = inc.t_injury_default; p.t_injury_source = 'incident_open'; p.version++; }
     }
-    // database/085: medical roles only, a parseable time not more than 5 min after the entry nor
+    // database/088: medical roles only, a parseable time not more than 5 min after the entry nor
     // 26 h before it, and the newest entry by phone time wins.
     if (p && e.type === 'PATIENT_T_INJURY_UPDATED') {
       const at = Math.min(ts, Date.now());
@@ -172,7 +172,7 @@ function handle(server, req) {
     if (req.limit) vis = vis.slice(0, req.limit);
     return { data: clone(req.single ? (vis[0] || null) : vis), error: null };
   }
-  if (req.table === 'patients' && server.before085 && String(req.columns || '').includes('t_injury_source')) {
+  if (req.table === 'patients' && server.before088 && String(req.columns || '').includes('t_injury_source')) {
     return { data: null, error: { message: 'column patients.t_injury_source does not exist' } };
   }
   if (req.table === 'patients' || req.table === 'external_reports') {
@@ -297,10 +297,10 @@ async function checkFile(browser, file) {
   let sp = SERVER.patients.find((p) => p.id === id);
   assert(sp && sp.t_injury_source === 'incident_open' && sp.t_injury === T0, `${rel}: the server gives the new patient the alert time (got ${JSON.stringify(sp && { s: sp.t_injury_source, t: sp.t_injury })})`);
 
-  // A database without 085: the injury-time query fails on its own and nothing else breaks.
-  SERVER.before085 = true;
+  // A database without 088: the injury-time query fails on its own and nothing else breaks.
+  SERVER.before088 = true;
   await pullAll(m1.page);
-  SERVER.before085 = false;
+  SERVER.before088 = false;
 
   // Medic 1 enters the time from the field: 50 minutes ago.
   const code50 = await hhmmAgo(m1.page, 50);
@@ -373,7 +373,7 @@ async function checkFile(browser, file) {
     `${rel}: CC gets no injury-time edit button (owner, 2026-11-18)`);
   assert(!SERVER.rejected.length, `${rel}: no event may be rejected (got ${JSON.stringify(SERVER.rejected)})`);
 
-  // Stored report: the golden-hour box, and a report stored before 085 says it has none.
+  // Stored report: the golden-hour box, and a report stored before 088 says it has none.
   const report = (gh) => ({ reports: [{ version: 1, generated_at: new Date().toISOString(), report: { incident: { visual_id: 'INC-TEST-1' }, patients: { total: 1 }, tourniquets: {},
     patient_rows: [{ visual_id: 'P001', triage: 'red', status: 'handed_over', minutes_from_open: 2, minutes_to_handover: 40 }], ...(gh ? { golden_hour: gh } : {}) } }], late_records_after_close: 0 });
   await cc.page.evaluate((r) => { _incidentReports = r; _incidentReportVersion = 1; renderIncidentReport(); }, report({ basis: 'injury_to_handover', injury_time_entered: 1, injury_time_estimated: 0, handed_over_within_60: 0, handed_over_after_60: 1,

@@ -15584,7 +15584,7 @@ function renderIncidentReport(){
     ? `<label class="demo-strip-sub" for="incident-report-version">גרסה:</label> <select id="incident-report-version" onchange="_incidentReportVersion=Number(this.value);renderIncidentReport()">${reports.map(x=>`<option value="${x.version}" ${x.version===chosen.version?'selected':''}>גרסה ${x.version} · ${fmt(x.generated_at)}</option>`).join('')}</select>`
     : `<span class="demo-strip-sub">גרסה ${escAttr(chosen.version)} · נשמר ${fmt(chosen.generated_at)}</span>`;
   const late=Number(data.late_records_after_close||0);
-  // Golden hour (WP-23, database/085): minutes from injury to handover. Reports stored before 085
+  // Golden hour (WP-23, database/088): minutes from injury to handover. Reports stored before 088
   // have no golden_hour part; the box says so instead of showing zeros.
   const gh=rep.golden_hour||null;
   const ghByVisual=new Map((gh?.patient_rows||[]).map(r=>[r.visual_id, r]));
@@ -16855,7 +16855,7 @@ function applyEvacPointArrivals(rows){
   }
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
-// ── Injury time (WP-23, database/085; repo owner 2026-10-23 and 2026-11-18) ──
+// ── Injury time (WP-23, database/088; repo owner 2026-10-23 and 2026-11-18) ──
 // Injury time starts as the incident's alert time (T0, the server's t_injury_default) and medical
 // staff change it in the field with the same 4-digit control as the tourniquet body time. Medic,
 // paramedic, physician, PC and admin may change it; CC may not (owner, 2026-11-18). It is shown as
@@ -16880,7 +16880,7 @@ function incidentAlertTimeMs(p){
   return Date.parse(s?.t0||'');
 }
 // {ms, source, estimated}: an entered or server time first, then the alert time, then (no T0
-// known) the registration time, which is what the server held before 085.
+// known) the registration time, which is what the server held before 088.
 function patientInjuryTime(p){
   const own=Number(p?.tInjury);
   if(Number.isFinite(own) && own>0 && INJURY_TIME_SOURCE_LABELS[p.tInjurySource]) return {ms:own, source:p.tInjurySource, estimated:p.tInjurySource!=='entered'};
@@ -16989,7 +16989,7 @@ async function pullInjuryTimes(incidentId){
   const client=getSupabaseClient();
   if(!client) return;
   let result;
-  // Its own query: until 085 is applied t_injury_source does not exist and the query errors,
+  // Its own query: until 088 is applied t_injury_source does not exist and the query errors,
   // which must not break any other pull.
   try{ result=await client.from('patients').select(INJURY_TIME_COLUMNS).eq('incident_id', incidentId); }
   catch(e){ return; }

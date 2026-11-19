@@ -1,4 +1,4 @@
--- Injury time, editable in the field (WP-23, repo owner 2026-10-23 and 2026-11-18). Apply after 084.
+-- Injury time, editable in the field (WP-23, repo owner 2026-10-23 and 2026-11-18). Does not depend on PR #141 (085-087) or PR #134; works before or after #141's 085 (already live).
 --
 -- Owner's rules: injury time starts as the incident's alert time and a medic can change it in the
 -- field. Medic, paramedic, physician, PC and admin may change it; CC may not (2026-11-18). The
@@ -29,7 +29,8 @@
 --      later than now) and not more than 26 hours before it (the phone's day rule gives at most 24 h),
 --      and the entry is the newest by phone time: an older entry pushed late by an offline phone does
 --      not overwrite a newer correction. The event stays in the log either way.
--- 4. app.build_incident_aar(): adds 'golden_hour' from app.build_incident_aar_golden_hour(): how many
+-- 4. The report gains 'golden_hour' from app.build_incident_aar_golden_hour() (in
+--    app.build_incident_aar(), or in app.build_incident_aar_ext() once PR #141's 085 renamed it): how many
 --    injury times were entered vs estimated, handed over within / after 60 minutes of injury, the
 --    median minutes from injury to handover (overall and for red), patients still not handed over
 --    more than 60 minutes after injury when the report was made, and one row per patient (temporary
@@ -37,7 +38,7 @@
 --    stores a new version (database/068).
 -- No RLS change: the new columns are read through the existing patients policies, only the trigger
 -- writes them. Tested on a local PostgreSQL 16 with stand-in tables, starting from the live text of
--- project_patient_state() and build_incident_aar() (md5 of prosrc checked equal, 2026-11-18).
+-- project_patient_state() and the AAR wrapper (md5 of prosrc checked equal; re-tested 2026-11-19 both with and without PR #141's rename to build_incident_aar_ext).
 
 alter table patients
   add column if not exists t_injury_source text not null default 'event_time',
@@ -58,10 +59,10 @@ declare
   v_pattern text := '  elsif new\.type = ''PATIENT_T_INJURY_UPDATED'' then\n    update patients\n    set t_injury = coalesce\(\(new\.payload_json->>''t_injury''\)::timestamptz, t_injury\),\n        updated_at = now\(\),\n        version = version \+ 1\n    where id = new\.patient_id;\n\n';
 begin
   if (select count(*) from regexp_matches(v_def, v_pattern, 'g')) <> 1 then
-    raise exception 'database/085: expected exactly one PATIENT_T_INJURY_UPDATED branch in project_patient_state()';
+    raise exception 'database/088: expected exactly one PATIENT_T_INJURY_UPDATED branch in project_patient_state()';
   end if;
   execute regexp_replace(v_def, v_pattern,
-    '  -- PATIENT_T_INJURY_UPDATED: app.project_patient_t_injury() (database/085).' || chr(10) || chr(10));
+    '  -- PATIENT_T_INJURY_UPDATED: app.project_patient_t_injury() (database/088).' || chr(10) || chr(10));
 end
 $do$;
 
@@ -180,17 +181,36 @@ $$;
 
 revoke execute on function app.build_incident_aar_golden_hour(uuid) from public, anon, authenticated;
 
+-- The base call lives in app.build_incident_aar() until the rescue-board migration
+-- (085_rescue_board_evac_point, PR #141) renames that function to app.build_incident_aar_ext() and
+-- wraps it. So the edit goes to whichever app.build_incident_aar* function holds the base call, and
+-- fails unless exactly one does.
 do $do$
 declare
-  v_def text := pg_get_functiondef('app.build_incident_aar(uuid)'::regprocedure);
   v_old text := 'select app.build_incident_aar_base(p_incident_id) || jsonb_build_object(';
   v_new text := 'select app.build_incident_aar_base(p_incident_id) || app.build_incident_aar_golden_hour(p_incident_id) || jsonb_build_object(';
+  v_def text;
+  v_found int := 0;
+  v_target text;
+  r record;
 begin
-  if (length(v_def) - length(replace(v_def, v_old, ''))) / length(v_old) <> 1 then
-    raise exception 'database/085: expected exactly one base call in app.build_incident_aar()';
+  for r in select p.oid, p.oid::regprocedure::text as sig from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'app' and p.proname in ('build_incident_aar', 'build_incident_aar_ext') loop
+    v_def := pg_get_functiondef(r.oid);
+    if position('build_incident_aar_golden_hour' in v_def) > 0 then
+      raise exception 'database/088: % already calls the golden-hour part', r.sig;
+    end if;
+    v_found := v_found + (length(v_def) - length(replace(v_def, v_old, ''))) / length(v_old);
+    if position(v_old in v_def) > 0 then v_target := r.sig; end if;
+  end loop;
+  if v_found <> 1 then
+    raise exception 'database/088: expected exactly one base call in app.build_incident_aar() / app.build_incident_aar_ext(), found %', v_found;
   end if;
-  execute replace(v_def, v_old, v_new);
+  execute replace(pg_get_functiondef(v_target::regprocedure), v_old, v_new);
 end
 $do$;
 
 revoke execute on function app.build_incident_aar(uuid) from public, anon, authenticated;
+do $$ begin
+  execute 'revoke execute on function app.build_incident_aar_ext(uuid) from public, anon, authenticated';
+exception when undefined_function then null; end $$;
