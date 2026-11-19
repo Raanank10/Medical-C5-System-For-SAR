@@ -80,7 +80,10 @@ const PATIENT_CREATE_EVENT_TYPES = ["PATIENT_CREATED", "QUICK_PATIENT_CREATED", 
 // "חולץ" (owner 2026-11-19): the rescue chain marks a trapped casualty extracted; database/085
 // sets access free and sends the patient to the evacuation point (status evacuating) to meet a
 // medic for the MIST handover. Rescue chain only: medics record access and status themselves.
-const RESCUE_EXTRACTION_EVENTS = ["PATIENT_EXTRACTED"];
+// "בקש חובש לבדיקה" (same day): they call a medic before an extraction 086 keeps from them, and
+// may cancel their own call. database/087 creates only resourceType 'extraction_medic' for them;
+// 052 handles the status updates (command acknowledges / closes, the requester cancels).
+const RESCUE_EXTRACTION_EVENTS = ["PATIENT_EXTRACTED", "MEDICAL_REINFORCEMENT_REQUESTED", "MEDICAL_REINFORCEMENT_STATUS_UPDATED"];
 const SITE_AUTHORITY_EVENTS = [
   "OFFICIAL_INCIDENT_OPENED_BY_RESCUE", "INCIDENT_CLOSE_TOGGLED",
   "BUILDING_STATUS_UPDATED", "SITE_CLEAR_CONFIRMED",

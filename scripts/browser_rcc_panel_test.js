@@ -277,6 +277,12 @@ async function checkDemo(browser, rel, file) {
   }
   await page.evaluate(() => rescueMarkExtracted('b3'));
   assert((await page.evaluate(() => patients.find((x) => x.id === 'b3').trapStatus)) === 'trapped', `${rel}: rescueMarkExtracted refuses an unsorted casualty`);
+  // "בקש חובש לבדיקה": a medical request linked to the casualty, once.
+  await page.click('[data-rescue-request-medic="b3"]');
+  const req = await page.evaluate(() => reinforcementRequests.filter((r) => r.resourceType === 'extraction_medic').map((r) => `${r.linkedPatientIds[0]}:${r.reasonCodes[0]}:${r.urgency}`));
+  assert(JSON.stringify(req) === '["b3:unsorted_trapped:high"]', `${rel}: extraction medic request (got ${JSON.stringify(req)})`);
+  assert(await page.locator('[data-rescue-medic-requested="b3"]').count() === 1 && !(await page.locator('[data-rescue-request-medic="b3"]').count()), `${rel}: the button becomes "בקשה לחובש נשלחה"`);
+  assert((await page.evaluate(() => getOutbox().filter((e) => e.type === 'MEDICAL_REINFORCEMENT_REQUESTED' && e.payload_json.resourceType === 'extraction_medic').length)) === 1, `${rel}: request queued for sync`);
   await page.click('[data-rescue-extract="b2"]');
   const ext = await page.evaluate(() => {
     const p = patients.find((x) => x.id === 'b2');
@@ -292,6 +298,32 @@ async function checkDemo(browser, rel, file) {
   assert(JSON.stringify(rowB) === '["0","0","2","2","0","0","4"]', `${rel}: site B after the extraction (got ${JSON.stringify(rowB)})`);
   const extB = await page.evaluate(() => document.querySelector('[data-rcc-incident-detail="SITE_B"] [data-rcc-extracted]')?.textContent || '');
   assert(extB.includes('חולצו עד כה: 1 מתוך 3'), `${rel}: extracted so far counts it (got ${extB})`);
+
+  // 6. Trapped 60 minutes or more (from T0): a medic is present and records the extraction
+  // (crush syndrome), whatever the priority. The rescue chain sees no "חולץ", only the call.
+  await page.evaluate(() => {
+    patients.push({ events: [], location: 'בניין 7', patientStatus: 'in_treatment', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', trapStatus: 'trapped', vitals: {}, createdAt: new Date().toISOString(), id: 'b5', visualId: 'P009', triage: 'red' });
+    ensureSiteStatusFields('SITE_B').t0 = new Date(Date.now() - 70 * 60000).toISOString();
+  });
+  await page.click('[data-rcc-incident-row="SITE_B"]');
+  const long = await page.evaluate(() => ({ need: document.querySelector('[data-rescue-extract-blocked="b5"]')?.dataset.rescueExtractNeed, button: !!document.querySelector('[data-rescue-extract="b5"]'),
+    text: document.querySelector('[data-rescue-extract-blocked="b5"]')?.textContent || '' }));
+  assert(long.need === 'medic_present' && !long.button && long.text.includes('תסמונת מעיכה'), `${rel}: 70 min trapped, urgent: medic present only (got ${JSON.stringify(long)})`);
+  await page.click('[data-rescue-request-medic="b5"]');
+  assert((await page.evaluate(() => reinforcementRequests.find((r) => r.linkedPatientIds[0] === 'b5')?.urgency)) === 'immediate', `${rel}: long entrapment call is immediate`);
+
+  // The medic's phone: the call is a banner; the medic present marks the extraction.
+  await page.evaluate(() => { goTo('dashboard'); renderMedicExtractionBanner(); });
+  const calls = await page.evaluate(() => [...document.querySelectorAll('[data-medic-extraction-call]')].length);
+  assert(calls === 2, `${rel}: both calls on the medic's banner (got ${calls})`);
+  await page.evaluate(() => openPatient('b5'));
+  await page.waitForSelector('[data-medic-extract="b5"]', { timeout: 3000 });
+  await page.click('[data-medic-extract="b5"]');
+  const med = await page.evaluate(() => { const p = patients.find((x) => x.id === 'b5'); return { trap: p.trapStatus, status: p.patientStatus, stage: rescueEvacStage(p) }; });
+  assert(med.trap === 'not_trapped' && med.status === 'evacuating' && med.stage === 'moving', `${rel}: medic extraction: freed, on the way to the נאפ״ל (got ${JSON.stringify(med)})`);
+  await page.evaluate(() => { goTo('dashboard'); renderMedicExtractionBanner(); });
+  assert((await page.evaluate(() => [...document.querySelectorAll('[data-medic-extraction-call]')].length)) === 1, `${rel}: the medic's own casualty leaves the banner`);
+  await page.evaluate(() => { goTo('role-dashboard'); startRoleDashboard('rcc'); });
   assert(!errors.length, `${rel}: page errors: ${errors.join(' | ')}`);
   await context.close();
 }

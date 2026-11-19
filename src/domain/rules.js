@@ -499,6 +499,20 @@
     return "pending";
   }
 
+  // Who may extract a trapped casualty (owner, 2026-11-19). The rescue chain (rpc / rcc) marks an
+  // extraction itself only when a medic has sorted the casualty and the entrapment is short. Not
+  // yet sorted: a medic checks first ("medic_check"). Trapped for 60 minutes or more: a medic is
+  // present at the release and records the extraction ("medic_present"), for crush syndrome
+  // (fluids before release, a tourniquet if needed, cardiac monitoring). Long entrapment wins
+  // over unsorted, since it asks for more. trappedMinutes counts from the incident's start unless
+  // recorded otherwise. database/086 applies the same rule on the server.
+  const LONG_ENTRAPMENT_MINUTES = 60;
+  function rescueExtractionRequirement(priority, trappedMinutes) {
+    if (Number.isFinite(trappedMinutes) && trappedMinutes >= LONG_ENTRAPMENT_MINUTES) return "medic_present";
+    if (priority !== "urgent" && priority !== "not_urgent") return "medic_check";
+    return null;
+  }
+
   return {
     AVPU_RANK,
     DEVICE_SILENCE_MS,
@@ -551,6 +565,8 @@
     serverContactFreshness,
     RESCUE_PRIORITIES,
     rescueEvacPriority,
+    LONG_ENTRAPMENT_MINUTES,
+    rescueExtractionRequirement,
     suggestedSweepColor,
     suggestMstartTriage,
     supplyBurnAlertLevel,

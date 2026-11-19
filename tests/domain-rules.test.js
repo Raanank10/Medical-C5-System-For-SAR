@@ -461,6 +461,16 @@ assert.equal(rules.tourniquetSnoozeOption("toString", 0), null);
 assert.equal(rules.rescueEvacPriority("red", false), "urgent");
 assert.equal(rules.rescueEvacPriority("green", true), "urgent"); // active tourniquet
 assert.equal(rules.rescueEvacPriority("yellow", false), "not_urgent");
+// Extraction by the rescue chain (owner, 2026-11-19): unsorted needs a medic's check; 60 minutes
+// trapped or more needs a medic present (crush syndrome), whatever the priority.
+assert.equal(rules.LONG_ENTRAPMENT_MINUTES, 60);
+assert.equal(rules.rescueExtractionRequirement("urgent", 10), null);
+assert.equal(rules.rescueExtractionRequirement("not_urgent", 59), null);
+assert.equal(rules.rescueExtractionRequirement("pending", 10), "medic_check");
+assert.equal(rules.rescueExtractionRequirement(undefined, null), "medic_check");
+assert.equal(rules.rescueExtractionRequirement("not_urgent", 60), "medic_present");
+assert.equal(rules.rescueExtractionRequirement("pending", 90), "medic_present");
+assert.equal(rules.rescueExtractionRequirement("urgent", NaN), null);
 assert.equal(rules.rescueEvacPriority("green", false), "not_urgent");
 assert.equal(rules.rescueEvacPriority("black", false), "not_urgent");
 // Not sorted yet is never "not urgent".
