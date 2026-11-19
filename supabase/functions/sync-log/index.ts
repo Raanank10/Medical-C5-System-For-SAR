@@ -77,6 +77,10 @@ const FIRST_RESPONDER_EVENTS = ["FIRST_RESPONDER_REPORT"];
 // ROLE_ALLOWED_EVENT_TYPES below), so without this they could never create a patient at all
 // despite patients_insert RLS explicitly granting them that.
 const PATIENT_CREATE_EVENT_TYPES = ["PATIENT_CREATED", "QUICK_PATIENT_CREATED", "FIRST_RESPONDER_REPORT"];
+// "חולץ" (owner 2026-11-19): the rescue chain marks a trapped casualty extracted; database/085
+// sets access free and sends the patient to the evacuation point (status evacuating) to meet a
+// medic for the MIST handover. Rescue chain only: medics record access and status themselves.
+const RESCUE_EXTRACTION_EVENTS = ["PATIENT_EXTRACTED"];
 const SITE_AUTHORITY_EVENTS = [
   "OFFICIAL_INCIDENT_OPENED_BY_RESCUE", "INCIDENT_CLOSE_TOGGLED",
   "BUILDING_STATUS_UPDATED", "SITE_CLEAR_CONFIRMED",
@@ -163,8 +167,8 @@ const ROLE_ALLOWED_EVENT_TYPES: Record<string, string[]> = {
   cc: [...INCIDENT_COMMAND_EVENTS, ...SITE_AUTHORITY_EVENTS, ...SUPPLY_LOGISTICS_EVENTS, ...EXTERNAL_REPORT_EVENTS, ...EVACUATION_TRACKING_EVENTS, ...PRE_EVACUATION_EVENTS, ...MEDICAL_REQUEST_EVENTS, ...SUPPLY_CANCEL_EVENTS, ...SYSTEM_EVENTS],
   chamal: [...INCIDENT_COMMAND_EVENTS, ...SITE_AUTHORITY_EVENTS, ...EXTERNAL_REPORT_EVENTS, ...EVACUATION_TRACKING_EVENTS, ...MEDICAL_REQUEST_EVENTS, ...SUPPLY_CANCEL_EVENTS, ...SYSTEM_EVENTS],
   logistics_officer: [...SUPPLY_LOGISTICS_EVENTS, ...SYSTEM_EVENTS],
-  rpc: [...FIRST_RESPONDER_EVENTS, ...SITE_AUTHORITY_EVENTS, ...SYSTEM_EVENTS],
-  rcc: [...FIRST_RESPONDER_EVENTS, ...SITE_AUTHORITY_EVENTS, ...SUPPLY_LOGISTICS_EVENTS.filter((t) => t === "SUPPLY_REQUEST_CREATED"), ...SYSTEM_EVENTS],
+  rpc: [...FIRST_RESPONDER_EVENTS, ...SITE_AUTHORITY_EVENTS, ...RESCUE_EXTRACTION_EVENTS, ...SYSTEM_EVENTS],
+  rcc: [...FIRST_RESPONDER_EVENTS, ...SITE_AUTHORITY_EVENTS, ...RESCUE_EXTRACTION_EVENTS, ...SUPPLY_LOGISTICS_EVENTS.filter((t) => t === "SUPPLY_REQUEST_CREATED"), ...SYSTEM_EVENTS],
   // Not a literal mirror of cc: cc itself has no CLINICAL_EVENTS access today,
   // which would leave physician unable to write PATIENT_TRIAGE_UPDATED/
   // PATIENT_STATUS_UPDATED and defeat the point of the F3 role-authority

@@ -30,6 +30,13 @@
 -- Fifth: a FIRST_RESPONDER_REPORT (the rescue chain's only way to report a casualty) marked
 -- "trapped" sets the new patient's access_status, which nothing projected before.
 --
+-- Sixth: "חולץ" (owner, 2026-11-19). The RPC / RCC mark a trapped casualty extracted with a new
+-- event, PATIENT_EXTRACTED (sync-log allows it for rpc and rcc only). It sets access_status 'free'
+-- and sends the patient to the evacuation point to meet a medic for the MIST handover: an on-site
+-- status becomes 'evacuating' with no arrival yet (077: on the way to the נאפ״ל). A patient already
+-- evacuating, handed over, evacuated or deceased keeps its status. It is not clinical data: the
+-- rescue chain never sees or sets triage.
+--
 -- New output columns change the return type, so the function is dropped and created again;
 -- the grants are restated. The client reads the column only when it is present: before this file
 -- is applied the RCC message says "בפינוי לנאפ״ל" on 'evacuating' instead of "הגיע לנאפ״ל".
@@ -37,6 +44,7 @@
 -- A new enum value cannot be used in the transaction that adds it; nothing below casts to it (all
 -- comparisons are on text), so it can sit inside the same file.
 alter type access_status add value if not exists 'blocked';
+alter type event_type add value if not exists 'PATIENT_EXTRACTED';
 
 begin;
 
@@ -53,7 +61,8 @@ as $$
                  where e.patient_id = p_patient_id
                    and (e.payload_json->>'trap_status' in ('trapped', 'access_blocked')
                         or e.payload_json->>'access_status' in ('trapped', 'partial', 'blocked')
-                        or e.payload_json->>'trapped' = 'true'))
+                        or e.payload_json->>'trapped' = 'true'
+                        or e.type::text = 'PATIENT_EXTRACTED'))
 $$;
 revoke execute on function app.rescue_patient_was_trapped(uuid, text) from public, anon, authenticated;
 
@@ -197,5 +206,44 @@ revoke execute on function app.project_first_responder_access() from public, ano
 drop trigger if exists trg_project_first_responder_access on events;
 create trigger trg_project_first_responder_access after insert on events
   for each row when (new.type::text = 'FIRST_RESPONDER_REPORT') execute function app.project_first_responder_access();
+
+-- "חולץ": freed, on the way to the evacuation point.
+create or replace function app.project_patient_extracted()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $function$
+declare
+  v_status text;
+begin
+  if new.patient_id is null or new.actor_role::text not in ('rpc', 'rcc', 'admin') then
+    return new;
+  end if;
+  select current_status::text into v_status from patients where id = new.patient_id;
+  if v_status is null then
+    return new;
+  end if;
+  if v_status in ('evacuating', 'handed_over', 'evacuated', 'self_evacuated', 'closed', 'deceased') then
+    -- Already on the way, out or dead: only the access changes.
+    update patients
+       set access_status = 'free', access_recorded_at = new.local_timestamp, updated_at = now(), version = version + 1
+     where id = new.patient_id;
+  else
+    update patients
+       set access_status = 'free', access_recorded_at = new.local_timestamp,
+           current_status = 'evacuating', status_recorded_at = new.local_timestamp,
+           status_set_by_role = new.actor_role, status_set_by_event_id = new.id,
+           evac_point_arrived_at = null, evac_point_arrived_role = null,
+           updated_at = now(), version = version + 1
+     where id = new.patient_id;
+  end if;
+  return new;
+end;
+$function$;
+revoke execute on function app.project_patient_extracted() from public, anon, authenticated;
+drop trigger if exists trg_project_patient_extracted on events;
+create trigger trg_project_patient_extracted after insert on events
+  for each row when (new.type::text = 'PATIENT_EXTRACTED') execute function app.project_patient_extracted();
 
 commit;

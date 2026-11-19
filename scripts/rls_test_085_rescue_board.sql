@@ -76,6 +76,23 @@ begin
     (X, P_NEVER, M1, 'medic', 'PATIENT_ACCESS_UPDATED', '{"trap_status":"access_blocked","access_status":"blocked","source":"access_sync"}', 'test85-dev', 'test85-5', now());
   select access_status::text into s from patients where id = P_NEVER; r := r || 'access_sync blocked -> ' || s || ' (want blocked); ';
 
+  -- "חולץ": PATIENT_EXTRACTED from the RCC frees the casualty and sends it to the evacuation point.
+  insert into events (incident_id, patient_id, actor_id, actor_role, type, payload_json, device_id, local_event_id, local_timestamp) values
+    (X, P_STILL, RCC, 'rcc', 'PATIENT_EXTRACTED', '{"trap_status":"not_trapped","access_status":"free","next":"evac_point"}', 'test85-dev', 'test85-6', now());
+  select access_status::text || '/' || current_status::text || '/' || coalesce(evac_point_arrived_at::text, 'no arrival') || '/' || coalesce(status_set_by_role::text, '-')
+    into s from patients where id = P_STILL;
+  r := r || 'extracted -> ' || s || ' (want free/evacuating/no arrival/rcc); ';
+  -- Already at the evacuation point: only the access changes, the arrival stays.
+  insert into events (incident_id, patient_id, actor_id, actor_role, type, payload_json, device_id, local_event_id, local_timestamp) values
+    (X, P_FREED, RCC, 'rcc', 'PATIENT_EXTRACTED', '{}', 'test85-dev', 'test85-7', now());
+  select current_status::text || '/' || (evac_point_arrived_at is not null)::text into s from patients where id = P_FREED;
+  r := r || 'extracted at the point -> ' || s || ' (want evacuating/true); ';
+  -- A medic's PATIENT_EXTRACTED (sync-log never lets it through; a direct insert) changes nothing.
+  insert into events (incident_id, patient_id, actor_id, actor_role, type, payload_json, device_id, local_event_id, local_timestamp) values
+    (X, P_PART, M1, 'medic', 'PATIENT_EXTRACTED', '{}', 'test85-dev', 'test85-8', now());
+  select access_status::text || '/' || current_status::text into s from patients where id = P_PART;
+  r := r || 'medic extraction ignored -> ' || s || ' (want partial/identified); ';
+
   update profiles set company_id = rcc_co where id = RCC;
   update profiles set company_id = pc_co where id = PC;
   update profiles set platoon_id = m1_pl, company_id = m1_co where id = M1;

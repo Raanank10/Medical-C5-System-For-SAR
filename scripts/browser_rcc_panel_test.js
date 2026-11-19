@@ -266,6 +266,25 @@ async function checkDemo(browser, rel, file) {
   assert(await page.locator('[data-rcc-building-expand]').isVisible() && !(await page.locator('[data-rcc-building]').count()), `${rel}: shooting: building status behind a button`);
   await page.click('[data-rcc-building-expand]');
   assert(await page.locator('[data-rcc-building]').isVisible(), `${rel}: the button opens the building status`);
+
+  // 5. "חולץ" (owner, 2026-11-19): a trapped casualty extracted by the rescue chain goes to the
+  // נאפ״ל to meet a medic: no longer trapped, on the way to the evacuation point, sent as PATIENT_EXTRACTED.
+  assert(!(await page.locator('[data-rescue-extract="b1"]').count()), `${rel}: no "חולץ" for a casualty who is not trapped`);
+  await page.click('[data-rescue-extract="b2"]');
+  const ext = await page.evaluate(() => {
+    const p = patients.find((x) => x.id === 'b2');
+    const ev = getOutbox().filter((e) => e.type === 'PATIENT_EXTRACTED').map((e) => `${e.patient_id}:${e.payload_json.next}`);
+    return { trap: p.trapStatus, stage: rescueEvacStage(p), ev, button: !!document.querySelector('[data-rescue-extract="b2"]'),
+      row: document.querySelector('[data-rescue-priority] + *') ? '' : '', text: document.getElementById('role-dashboard-body').innerText };
+  });
+  assert(ext.trap === 'not_trapped' && ext.stage === 'moving' && !ext.button, `${rel}: extracted: freed, on the way to the נאפ״ל, button gone (got ${JSON.stringify({ trap: ext.trap, stage: ext.stage, button: ext.button })})`);
+  assert(JSON.stringify(ext.ev) === '["b2:evac_point"]', `${rel}: PATIENT_EXTRACTED queued once (got ${JSON.stringify(ext.ev)})`);
+  assert(ext.text.includes('P006') && ext.text.includes('בדרך לנאפ״ל') && ext.text.includes('חולץ '), `${rel}: the row says extracted and on the way to the נאפ״ל`);
+  await page.click('[data-rcc-all-incidents]');
+  const rowB = await page.evaluate(() => [...document.querySelector('[data-rcc-incident-row="SITE_B"]').querySelectorAll('td')].map((td) => td.textContent.trim()));
+  assert(JSON.stringify(rowB) === '["0","0","2","2","0","0","4"]', `${rel}: site B after the extraction (got ${JSON.stringify(rowB)})`);
+  const extB = await page.evaluate(() => document.querySelector('[data-rcc-incident-detail="SITE_B"] [data-rcc-extracted]')?.textContent || '');
+  assert(extB.includes('חולצו עד כה: 1 מתוך 3'), `${rel}: extracted so far counts it (got ${extB})`);
   assert(!errors.length, `${rel}: page errors: ${errors.join(' | ')}`);
   await context.close();
 }
@@ -318,6 +337,14 @@ async function checkSignedIn(browser, rel, file) {
   const order = await page.evaluate(() => [...document.querySelectorAll('[data-rescue-priority]')].map((r) => r.querySelector('.role-row-title').textContent));
   assert(order.length === 2 && order[0].includes('P001-AA') && order[1].includes('P002-AA'), `${rel}: incident view lists the board in evacuation order (got ${JSON.stringify(order)})`);
   assert((await bodyText(page)).includes('בנאפ״ל'), `${rel}: arrived patient shown at the evacuation point`);
+  // "חולץ" signed in: sent for the server patient; the next board pull (the server has not
+  // projected it yet) does not put the casualty back under the rubble.
+  await page.click(`[data-rescue-extract="${pid(1)}"]`);
+  await page.evaluate((id) => pullProjectedPatientState(id), INC1);
+  await page.waitForTimeout(300);
+  const ext = await page.evaluate((id) => ({ ev: getOutbox().filter((e) => e.type === 'PATIENT_EXTRACTED').map((e) => e.patient_id),
+    stage: rescueEvacStage(patients.find((p) => p.id === id)), trap: patients.find((p) => p.id === id).trapStatus }), pid(1));
+  assert(JSON.stringify(ext.ev) === JSON.stringify([pid(1)]) && ext.stage === 'moving' && ext.trap === 'not_trapped', `${rel}: signed-in extraction queued and kept over a pull (got ${JSON.stringify(ext)})`);
   // Access sync (V2.99.76): a medic's trapped / no-access mark is sent once the patient exists on
   // the server, as access_status 'blocked' for "אין גישה", and the server's "unknown" never wipes it.
   const sync = await page.evaluate((inc) => {

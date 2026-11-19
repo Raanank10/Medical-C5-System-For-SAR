@@ -623,6 +623,7 @@ input[type=range]{width:100%;accent-color:var(--orange);}
 .rcc-row-main th,.rcc-row-main td{border-bottom:none !important;padding-bottom:2px;}
 .rcc-row-detail td{text-align:right !important;padding-top:0;font-family:var(--sans);}
 .rcc-incidents-table .rcc-group-head{color:var(--orange);border-bottom:1px solid var(--orange) !important;padding-bottom:2px;}
+.rcc-extract-btn{width:100%;margin-top:8px;border-color:var(--green) !important;color:var(--green) !important;font-weight:900;}
 .rcc-trapped-line{font-size:11px;font-weight:800;color:var(--orange);margin-top:3px;line-height:1.35;}
 .rcc-incidents-table thead th{font-size:10.5px;line-height:1.25;padding-left:2px;padding-right:2px;}
 .rcc-incidents-table td{padding-left:2px;padding-right:2px;}
@@ -3473,7 +3474,7 @@ function mapServerRole(role){ return SERVER_ROLE_TO_CLIENT_ROLE[role] || role; }
 const SYNC_ELIGIBLE_EVENT_TYPES = new Set([
   'PATIENT_CREATED','QUICK_PATIENT_CREATED','PATIENT_IDENTIFIED','PATIENT_INJURY_UPDATED',
   'PATIENT_LOCATION_UPDATED','PATIENT_ACCESS_UPDATED','PATIENT_TRIAGE_UPDATED','PATIENT_STATUS_UPDATED',
-  'PATIENT_EVAC_POINT_ARRIVED',
+  'PATIENT_EVAC_POINT_ARRIVED','PATIENT_EXTRACTED',
   'PATIENT_T_INJURY_UPDATED','PATIENT_HANDED_OVER','PATIENT_TRIAGED_EXPECTANT','VITALS_RECORDED',
   'MINIMAL_TRIAGE_RECORDED','SABCDE_RECORDED','MSTART_SUGGESTED','JUMPSTART_SUGGESTED','MSTART_OVERRIDE',
   'JUMPSTART_OVERRIDE','TOURNIQUET_APPLIED','TOURNIQUET_REASSESSMENT','TOURNIQUET_RELEASED','TOURNIQUET_TIME_RECORDED',
@@ -7472,6 +7473,28 @@ function sortedPatientsByEvacPriority(list=patients){
 // get_rescue_patient_board(); otherwise sortedPatientsByEvacPriority), so rescue-chain and medical
 // command never disagree about who is evacuated first. No reason text: it would name the
 // tourniquet, the colour or the vitals behind the order (database/074). Only the priority shows.
+// "חולץ" (owner, 2026-11-19): the RPC / RCC mark a trapped (or "אין גישה") casualty extracted.
+// The casualty goes to the evacuation point to meet a medic for the MIST handover: no longer
+// trapped, on the way to the נאפ״ל (evacuating, not arrived; the medic or PC marks the arrival,
+// WP-18). database/085 projects PATIENT_EXTRACTED the same way on the server.
+function rescueMarkExtracted(patientId){
+  const p=patients.find(x=>x.id===patientId);
+  if(!p || !isTrappedForRescue(p)) return;
+  if(!confirm(`${p.visualId||p.id} חולץ?\nהפצוע יועבר לנאפ״ל לפגוש חובש ולמסירת MIST.`)) return;
+  const role=rescueCmdRole();
+  const now=Date.now();
+  p.everTrapped=true;
+  p.trapStatus='not_trapped'; p.accessibility='full'; p._accessSyncRef='not_trapped';
+  p.extractedAt=now; p.extractedByRole=role;
+  if(rescueEvacStage(p)==='on_site' && p.patientStatus!=='deceased'){
+    p.patientStatus='evacuating'; p.evacPointArrivedAt=null;
+    p.rescueEvacState='evacuating'; p.rescueEvacPointAt=null;
+  }
+  saveLocalEvent({type:'PATIENT_EXTRACTED', detail:`${p.visualId||p.id} חולץ — בדרך לנאפ״ל`, warn:false, patient_id:p.id,
+    payload_json:{trap_status:'not_trapped', access_status:'free', next:'evac_point', role, extracted_at:new Date(now).toISOString()}});
+  saveDemoState();
+  renderRoleDashboard(role);
+}
 function renderRescueEvacOrderPanel(pts, title){
   const ordered=rescueSortedForEvac(pts.filter(p=>rescueEvacStateOf(p)!=='evacuated'));
   const rows=ordered.map((p,i)=>{
@@ -7479,7 +7502,9 @@ function renderRescueEvacOrderPanel(pts, title){
     return `<div class="role-row" style="border-color:${RESCUE_PRIORITY_COLORS[prio]}" data-rescue-priority="${prio}">
       <div class="role-row-title"><span style="font-family:var(--mono);color:var(--accent);font-weight:900">#${i+1}</span> · ${p.visualId||p.id} · ${RESCUE_PRIORITY_LABELS[prio]}</div>
       <div class="role-row-sub">${rescueIdentityLine(p)}</div>
-      <div class="role-row-sub" style="margin-top:2px;color:var(--muted)">${p.location||'אזור לא תועד'} · ${TRAP_LABELS[p.trapStatus]||'לא תועד'} · ${RESCUE_STAGE_LABELS[rescueEvacStage(p)]}</div>
+      <div class="role-row-sub" style="margin-top:2px;color:var(--muted)">${p.location||'אזור לא תועד'} · ${TRAP_LABELS[p.trapStatus]||'לא תועד'} · ${RESCUE_STAGE_LABELS[rescueEvacStage(p)]}${p.extractedAt?` · חולץ ${new Date(p.extractedAt).toTimeString().slice(0,5)}`:''}</div>
+      ${isRccViewer() && isTrappedForRescue(p) && rescueEvacStage(p)==='on_site'
+        ? `<button class="demo-mini-btn rcc-extract-btn" data-rescue-extract="${escAttr(p.id)}" onclick="rescueMarkExtracted('${escAttr(p.id)}')">✓ חולץ — להעביר לנאפ״ל</button>`:''}
     </div>`;
   }).join('');
   return roleSection(title, rows || roleRow('אין פצועים ברשימה',''));
@@ -16719,9 +16744,11 @@ function applyRescuePatientBoard(rows, incidentId){
     }
     const before=JSON.stringify([p.visualId,p.rescuePriority,p.rescueEvacState,p.rescueEvacOrder,p.rescueEvacPointAt,p.trapStatus,p.fullName,p.temporaryDescription,p.location,p.locDetail]);
     if(row.visual_id) p.visualId=row.visual_id;
-    p.rescuePriority=priority; p.rescueEvacState=evacState; p.rescueEvacOrder=order; p.rescueEvacPointAt=rescueBoardEvacPointAt(row);
+    p.rescuePriority=priority; p.rescueEvacOrder=order;
     if(rescueBoardWasTrapped(row)!==undefined) p.rescueWasTrapped=rescueBoardWasTrapped(row);
     if(!pending.has(p.id)){
+      // An unsent "חולץ" on this phone keeps its evacuation stage until the server has it.
+      p.rescueEvacState=evacState; p.rescueEvacPointAt=rescueBoardEvacPointAt(row);
       if(access.trapStatus){ p.accessibility=access.accessibility; p.trapStatus=access.trapStatus; p._accessSyncRef=access.trapStatus; }
       p.fullName=row.optional_name||'לא מזוהה';
       p.identityStatus=row.optional_name?'reported':'unknown';
