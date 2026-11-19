@@ -1001,7 +1001,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9978</div>
+      <div class="demo-kicker">Demo V2.9979</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1098,7 +1098,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9978</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9979</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1108,7 +1108,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9978</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9979</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3419,7 +3419,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.78';
+const APP_VERSION = '2.99.79';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -14364,6 +14364,52 @@ const EVAC_POINT_ROLE_NAMES={medic:'חובש', paramedic:'פראמדיק', physi
 function canMarkEvacPointArrival(p){
   return !!p && p.patientStatus==='evacuating' && !isAtEvacPoint(p) && EVAC_POINT_ARRIVAL_ROLES.has(evacuationActorRole()) && C5Rules.canChangePatientStatus(p);
 }
+// WP-41 (owner 2026-11-18/19): every medical role in the incident (medic, paramedic, physician)
+// sees a patient leave for and arrive at the נאפ״ל when another phone records it: a banner with
+// "open the patient" and "close" that closes by itself after 15 seconds. Learned from the pull, so up
+// to about a minute late; the phone that recorded it gets no banner (its own change never comes back
+// as a change). Several in one pull make one banner. News older than 10 minutes is not shown.
+const EVAC_POINT_BANNER_ROLES=new Set(['medic','paramedic','physician']);
+const EVAC_POINT_BANNER_MS=15000;
+const EVAC_POINT_NEWS_MAX_AGE_MS=10*60*1000;
+const EVAC_POINT_TRIAGE_NAMES={red:'אדום', yellow:'צהוב', green:'ירוק', black:'שחור'};
+let _evacPointNews=[], _evacPointNewsTimer=null, _evacPointBannerTimer=null;
+function noteEvacPointNews(p, kind, atMs){
+  if(!currentUser || !EVAC_POINT_BANNER_ROLES.has(mapServerRole(currentUser.role))) return;
+  if(Number.isFinite(atMs) && Date.now()-atMs>EVAC_POINT_NEWS_MAX_AGE_MS) return;
+  if(_evacPointNews.some(n=>n.id===p.id && n.kind===kind)) return;
+  _evacPointNews.push({id:p.id, kind});
+  clearTimeout(_evacPointNewsTimer);
+  _evacPointNewsTimer=setTimeout(showEvacPointBanner, 300);
+}
+function showEvacPointBanner(){
+  const news=_evacPointNews.splice(0).map(n=>({...n, p:patients.find(x=>x.id===n.id)})).filter(n=>n.p);
+  if(!news.length) return;
+  haptic([150,80,150]);
+  let el=document.getElementById('evac-point-banner');
+  if(!el){ el=document.createElement('div'); el.id='evac-point-banner'; el.setAttribute('role','status'); document.body.appendChild(el); }
+  const tq=document.getElementById('tq-time-alert');
+  const top=tq ? Math.round(tq.getBoundingClientRect().bottom)+8 : 12;
+  el.style.cssText=`position:fixed;top:${top}px;left:12px;right:12px;z-index:590;background:var(--surface2);color:var(--text);border:2px solid var(--orange);padding:12px 14px;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,0.45)`;
+  const place=p=>{ const loc=p.locDetail || (p.location && p.location!==REMOTE_LOCATION_PLACEHOLDER ? p.location : ''); return loc ? ` · ${escAttr(loc)}` : ''; };
+  const rows=news.map(n=>`<div data-evac-news="${escAttr(n.kind)}" style="display:flex;align-items:center;gap:8px;margin-top:8px">
+      <div style="flex:1;min-width:0;font-size:14px;font-weight:800">${n.kind==='arrived'?'📍':'🚶'} ${escAttr(n.p.visualId||n.p.id)} · ${EVAC_POINT_TRIAGE_NAMES[n.p.triage]||'טרם מוין'} · ${n.kind==='arrived'?'הגיע לנאפ״ל':'בדרך לנאפ״ל'}<span style="font-weight:600;color:var(--muted)">${place(n.p)}</span></div>
+      <button class="demo-mini-btn" data-evac-open="${escAttr(n.p.id)}" onclick="openFromEvacPointBanner('${escAttr(n.p.id)}')">פתח פצוע</button>
+    </div>`).join('');
+  el.innerHTML=`<div style="font-size:13px;color:var(--orange);font-weight:900">${news.length===1?'עדכון נאפ״ל':`${news.length} עדכוני נאפ״ל`}</div>${rows}
+    <button class="demo-mini-btn" data-evac-close style="width:100%;margin-top:10px" onclick="closeEvacPointBanner()">סגור</button>`;
+  clearTimeout(_evacPointBannerTimer);
+  _evacPointBannerTimer=setTimeout(closeEvacPointBanner, EVAC_POINT_BANNER_MS);
+}
+function closeEvacPointBanner(){
+  clearTimeout(_evacPointBannerTimer);
+  document.getElementById('evac-point-banner')?.remove();
+}
+function openFromEvacPointBanner(id){
+  closeEvacPointBanner();
+  openPatient(id);
+  goTo('patient');
+}
 function isAtEvacPoint(p){ return !!p && p.patientStatus==='evacuating' && Number.isFinite(p.evacPointArrivedAt); }
 function evacPointWaitMinutes(p, now=Date.now()){
   return isAtEvacPoint(p) ? Math.max(0, Math.floor((now-p.evacPointArrivedAt)/60000)) : null;
@@ -16199,8 +16245,10 @@ function applyProjectedPatientState(rows){
       // so it is not echoed back to the server.
       if(serverTriage && serverTriage!=='pending'){ existing.triage=serverTriage; existing._triageSyncRef=serverTriage; }
       else if(!existing.triage || existing.triage==='pending'){ existing.triage=serverTriage; }
+      const wasStatus=existing.patientStatus;
       if(status) existing.patientStatus=status;
       if(status==='evacuating'){ const sentAt=serverEvacSentAt(row); if(sentAt) existing.evacSentAt=sentAt; }
+      if(status==='evacuating' && wasStatus!=='evacuating') noteEvacPointNews(existing, 'sent', existing.evacSentAt);
       existing.accessibility=access.accessibility;
       existing.trapStatus=access.trapStatus;
       existing.needsFullAssessment=!!row.needs_full_assessment;
@@ -16225,7 +16273,10 @@ function applyProjectedPatientState(rows){
       // Unknown locally: another device created this patient. Add a minimal local record so
       // it's visible at all, rather than staying invisible until this device happens to touch it.
       changed=true;
-      patients.push(remotePatientRecord(row));
+      const rec=remotePatientRecord(row);
+      patients.push(rec);
+      // First seen here: news only with a known, recent send time (not every old trip on sign-in).
+      if(rec.patientStatus==='evacuating' && Number.isFinite(rec.evacSentAt)) noteEvacPointNews(rec, 'sent', rec.evacSentAt);
     }
   }
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
@@ -16858,7 +16909,9 @@ function applyEvacPointArrivals(rows){
     const clearedAt=Date.parse(row.evac_point_cleared_at);
     if(Number.isFinite(serverAt)){
       if(p.evacPointArrivedAt===serverAt) continue;
+      const hadArrival=Number.isFinite(p.evacPointArrivedAt);
       p.evacPointArrivedAt=serverAt;
+      if(!hadArrival && p.patientStatus==='evacuating') noteEvacPointNews(p, 'arrived', serverAt);
       p.evacPointArrivedRole=mapServerRole(String(row.evac_point_arrived_role||''));
       if(p.patientStatus==='evacuating') (p.events||(p.events=[])).push({type:'REMOTE_STATE_APPLIED',time:nowT(),detail:`הגיע לנאפ״ל (מסנכרון) · ${new Date(serverAt).toTimeString().slice(0,5)}`});
       changed=true;

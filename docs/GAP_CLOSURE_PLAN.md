@@ -687,6 +687,8 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 
 **Verify.** A browser test with a PC phone sending the patient, a medic and a paramedic phone: both get the banner on the send and on the arrival, the sender does not, it closes after 15 s, "open" opens the patient, it does not repeat on the next pull.
 
+**Done (V2.99.79), no SQL.** `noteEvacPointNews` is called from the pull: a known patient whose status turns `evacuating`, a patient first seen already `evacuating` with a send time under 10 minutes old (`status_recorded_at`, WP-40), and a first recorded arrival (`applyEvacPointArrivals`). A phone's own change never comes back as a change, so the sender gets no banner. Medic, paramedic and physician only. Several news items within 300 ms become one banner; "פתח פצוע" per patient, "סגור", 15-second timer; placed under the tourniquet banner when that is open. `scripts/browser_evac_point_arrival_test.js`: medic 2 gets the "sent" banner, medic 1 (the sender) and the PC do not, it closes after 15 s and does not return on the next pull, medic 1 gets the "arrived" banner and "פתח פצוע" opens the patient.
+
 ---
 
 ## Tracks outside this plan's PRs
@@ -753,7 +755,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-37 Unlink tombstone | P3 | Not started | | `database/069` known limit |
 | WP-39 Evacuation point = נאפ"ל | P2 | Done (V2.99.77), no SQL | this PR | owner 2026-11-18; reverses WP-18's "נקודת פינוי"; one per site |
 | WP-40 30 min at the נאפ"ל alert | P2 | Done (V2.99.78), no SQL | this PR | owner 2026-11-18/19: PC + CC, every colour but black, from the send, 30 warn / 60 critical |
-| WP-41 Banner: patient to / at the נאפ"ל | P2 | Not started | | owner 2026-11-18/19; send + arrival, all medical roles, open or close, 15 s |
+| WP-41 Banner: patient to / at the נאפ"ל | P2 | Done (V2.99.79), no SQL | this PR | owner 2026-11-18/19; send + arrival, medic / paramedic / physician, open or close, 15 s |
 | WP-38 Resupply raises the medic's bag | P2 | Done (V2.99.74): `database/082` applied live by the owner, `sync-log` v18 deployed 2026-11-18; live two-phone check pending | #132 | owner 2026-11-18: the medic confirms, by what arrived; the PC's / logistics' "delivered" = handed over, waiting for the medic |
 
 ## Revisions after #73 (2026-10-19)

@@ -79,7 +79,7 @@ function push(server, userId, body) {
     }
     if (p && e.type === 'PATIENT_HANDED_OVER') { p.current_status = 'handed_over'; p.version++; }
     if (p && e.type === 'PATIENT_STATUS_UPDATED' && pj.status) {
-      p.current_status = pj.status; p.version++;
+      p.current_status = pj.status; p.status_recorded_at = e.local_timestamp; p.version++; // database/013
       // database/077: a later status that is neither evacuating nor final takes the patient back.
       if (!['evacuating', 'handed_over', 'deceased', 'closed', 'self_evacuated'].includes(p.current_status)
         && (!p.evac_point_cleared_at || Date.parse(p.evac_point_cleared_at) < ts)) {
@@ -274,6 +274,18 @@ async function checkFile(browser, file) {
   await login(m2.page, 'medic2@test');
   await enter(m2.page);
   await pullAll(m2.page);
+  // WP-41: medic 2 learns from the pull that the patient left for the נאפ״ל (medic 1 sent it): a banner
+  // with "open" and "close". Medic 1, who sent it, and the PC (not a medical role) get none.
+  const banner = (page) => page.evaluate(() => { const el = document.getElementById('evac-point-banner'); return el ? { text: el.textContent, open: el.querySelectorAll('[data-evac-open]').length, close: !!el.querySelector('[data-evac-close]'), kinds: [...el.querySelectorAll('[data-evac-news]')].map((r) => r.dataset.evacNews) } : null; });
+  const m2Sent = await banner(m2.page);
+  assert(m2Sent && m2Sent.kinds.join() === 'sent' && m2Sent.text.includes('בדרך לנאפ״ל') && m2Sent.text.includes('אדום') && m2Sent.open === 1 && m2Sent.close,
+    `${rel}: medic 2 gets a banner that the patient left for the נאפ״ל, with open and close (got ${JSON.stringify(m2Sent)})`);
+  assert(!(await banner(m1.page)) && !(await banner(pc.page)), `${rel}: the phone that sent the patient and the PC get no banner`);
+  // It closes by itself after 15 seconds.
+  await m2.page.waitForTimeout(15300);
+  assert(!(await banner(m2.page)), `${rel}: the banner closes by itself after 15 seconds`);
+  await pullAll(m2.page);
+  assert(!(await banner(m2.page)), `${rel}: the next pull does not bring the same news back`);
   await m2.page.evaluate((pid) => markPatientArrivedAtEvacPoint(pid), id);
   const sixMinAgo = new Date(Date.now() - 6 * 60000).toISOString();
   await m2.page.evaluate((at) => {
@@ -308,6 +320,13 @@ async function checkFile(browser, file) {
 
   // Every phone reads the same: the PC and medic 1 pick up the earlier time on their next pull.
   await pullAll(pc.page); await pullAll(m1.page);
+  // WP-41: medic 1 learns of the arrival another phone recorded; "open" opens the patient.
+  const m1Arrived = await banner(m1.page);
+  assert(m1Arrived && m1Arrived.kinds.join() === 'arrived' && m1Arrived.text.includes('הגיע לנאפ״ל'), `${rel}: medic 1 gets a banner that the patient arrived at the נאפ״ל (got ${JSON.stringify(m1Arrived)})`);
+  assert(!(await banner(pc.page)), `${rel}: the PC gets no arrival banner`);
+  await m1.page.click('#evac-point-banner [data-evac-open]');
+  assert(!(await banner(m1.page)) && await m1.page.evaluate(() => document.getElementById('screen-patient')?.classList.contains('active')),
+    `${rel}: "פתח פצוע" closes the banner and opens the patient`);
   for (const [name, page] of [['PC', pc.page], ['medic 1', m1.page]]) {
     const at = await page.evaluate((pid) => patients.find((p) => p.id === pid).evacPointArrivedAt, id);
     assert(at === Date.parse(sixMinAgo), `${rel}: ${name} phone must show the server's arrival time`);
