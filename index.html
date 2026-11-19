@@ -612,6 +612,26 @@ input[type=range]{width:100%;accent-color:var(--orange);}
 .cmd-tab.active{color:var(--text);border-bottom-color:var(--accent);}
 .cmd-tab-badge{display:inline-block;min-width:18px;padding:1px 5px;margin-inline-start:4px;border-radius:999px;background:var(--red);color:#fff;font-size:11px;}
 .cmd-tab-panel[hidden]{display:none !important;}
+/* RCC panel (V2.99.76): incidents table, site management, evacuation messages */
+.rcc-evac-banner{display:none;flex-direction:column;gap:6px;position:fixed;top:0;left:0;right:0;z-index:300;background:#0f2a1a;border-bottom:2px solid var(--green);padding:10px 16px;font-size:13px;color:var(--text);box-shadow:0 4px 16px rgba(0,0,0,.5);}
+.rcc-evac-banner-row{display:flex;align-items:center;gap:8px;}
+.rcc-evac-banner-row button{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;}
+.rcc-feed-line.evac-done{border-color:var(--green);background:rgba(52,199,89,.10);}
+.rcc-feed-line.evac-point{border-color:var(--accent);background:rgba(67,97,238,.10);}
+.rcc-row-sub{font-size:11px;font-weight:600;color:var(--muted);margin-top:2px;line-height:1.35;}
+.rcc-incidents-table tbody th{font-size:13px;}
+.rcc-incident-head{padding:4px 2px 10px;}
+.rcc-incident-name{font-size:18px;font-weight:900;}
+.rcc-field-label{font-size:12px;font-weight:800;color:var(--muted);margin:10px 0 6px;}
+.rcc-choices{margin:0;grid-template-columns:1fr 1fr;}
+.rcc-selected{border-color:var(--accent) !important;background:rgba(67,97,238,.16) !important;color:var(--accent) !important;}
+.rcc-muted{opacity:.6;}
+.rcc-link-btn{width:100%;margin-top:10px;border-style:dashed;}
+.rcc-close-note{font-size:13px;font-weight:700;padding:8px 10px;border-radius:9px;margin-bottom:8px;}
+.rcc-close-note.warn{border:1px solid var(--orange);color:var(--orange);background:rgba(255,149,0,.08);}
+.rcc-close-note.ok{border:1px solid var(--green);color:var(--green);background:rgba(52,199,89,.08);}
+.rcc-evacuated{margin:-4px 0 12px;}
+.rcc-evacuated summary{cursor:pointer;font-weight:900;color:var(--muted);padding:8px 0;}
 .incident-triage-table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;}
 .incident-triage-table th,.incident-triage-table td{padding:7px 3px;border-bottom:1px solid var(--border);text-align:center;font-family:var(--mono);font-weight:800;}
 .incident-triage-table thead th{font-family:inherit;font-size:11px;color:var(--muted);}
@@ -844,6 +864,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
 </div>
 <div id="incident-open-alert-banner" class="open-alert-banner"></div>
+<div id="rcc-evac-banner" class="rcc-evac-banner" role="status" aria-live="polite"></div>
 
 <!-- ══════════════════════ PIN GATE (local-storage encryption unlock) ══ -->
 <div id="screen-pin-gate" class="screen active">
@@ -1001,7 +1022,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9975</div>
+      <div class="demo-kicker">Demo V2.9976</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1098,7 +1119,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9975</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9976</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1108,7 +1129,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9975</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9976</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3400,7 +3421,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.75';
+const APP_VERSION = '2.99.76';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -5855,6 +5876,8 @@ function rescueIdentityLine(p={}){
 const RESCUE_PRIORITY_LABELS={urgent:'דחוף', pending:'טרם מוין', not_urgent:'לא דחוף'};
 const RESCUE_PRIORITY_COLORS={urgent:'var(--red)', pending:'var(--accent)', not_urgent:'var(--muted)'};
 const RESCUE_EVAC_LABELS={on_site:'באתר', evacuating:'בפינוי', evacuated:'פונה'};
+// Finer than RESCUE_EVAC_LABELS: on the way to the evacuation point or already there (WP-18).
+const RESCUE_STAGE_LABELS={on_site:'באתר', moving:'בדרך לנאפ״ל', evacuating_unknown:'בפינוי', at_point:'בנאפ״ל', evacuated:'פונה'};
 function rescuePriorityOf(p={}){
   if(RESCUE_PRIORITY_LABELS[p.rescuePriority]) return p.rescuePriority;
   if(isDeceasedForEvac(p)) return 'not_urgent';
@@ -5879,7 +5902,7 @@ function rescueSortedForEvac(pts){
 }
 function tacticalPatientRow(p){
   const trap=TRAP_LABELS[p.trapStatus]||'לא תועד';
-  const evac=RESCUE_EVAC_LABELS[rescueEvacStateOf(p)];
+  const evac=RESCUE_STAGE_LABELS[rescueEvacStage(p)];
   const medic=medicCallsign(p.assignedMedicId||userIdFromMedic(p.medic||p.lastTouchedBy));
   return roleRow(
     `${p.visualId||p.id} · ${RESCUE_PRIORITY_LABELS[rescuePriorityOf(p)]} · ${rescueIdentityLine(p)}`,
@@ -6315,7 +6338,7 @@ function roleConfig(role){
     chamal:{title:'חמ״ל / מפעיל', actor:'חמ״ל — משתמש מחובר', audience:'chamal', legacy:'commander', responsibilities:['תמונת מצב כללית','אמינות נתונים ו-Sync','כפילויות ודיווחים חיצוניים','תמיכה בחוג"ד / מ״פ רפואה','ייצוא סיכום אירוע חי']},
     admin:{title:'מנהל דמו', actor:'מנהל דמו', audience:'chamal', legacy:'roles', responsibilities:['הפעלת תרחיש חתום','ניקוי דמו','ייצוא ניסוי','בדיקת הרשאות','הפרדת דמו מנתוני אמת']},
     rpc:{title:'מ״מ — תמונת מצב טקטית וסמכות אתר', actor:'מ״מ — משתמש מחובר', audience:'rpc', legacy:'role-dashboard', responsibilities:['צפייה בתג, עדיפות פינוי (דחוף / לא דחוף), אזור, לכוד/נייד וסטטוס פינוי לפצועי המחלקה שלי בלבד','צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע — לזיהוי פיזי בשטח','ראיית חובש אחראי לכל פצוע (כינוי קריאה בלבד, לא שם)','סדר פינוי מומלץ למחלקה שלי, זהה למה שחוג"ד/מ״פ רפואה רואים','ספירות דחוף / לא דחוף מצטברות למחלקה','ללא גישה לצבע מיון, חסם, מדדים, טיפול או מנגנון פציעה','לא מגיש בקשות תגבור / אספקה','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה']},
-    rcc:{title:'מ״פ חילוץ — תמונת מצב מרוכזת וסמכות אתר', actor:'מ״פ חילוץ — משתמש מחובר', audience:'rcc', legacy:'role-dashboard', responsibilities:['תמונת מצב מרוכזת לפי מחלקות עבור הפלוגה שלי','צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע — לזיהוי פיזי בשטח','ספירות דחוף / לא דחוף, לכודים וסטטוס פינוי לכל מחלקה','סדר פינוי מומלץ לכלל הפלוגה, זהה למה שמ״פ רפואה רואה','צפייה בבקשות אספקה פתוחות (לוגיסטיקת פלוגת חילוץ)','ללא גישה לצבע מיון, חסם, מדדים, טיפול או מנגנון פציעה','לא מגיש בקשות תגבור רפואי','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה']}
+    rcc:{title:'מ״פ חילוץ', actor:'מ״פ חילוץ — משתמש מחובר', audience:'rcc', legacy:'role-dashboard', responsibilities:['טבלת כל האירועים הפתוחים בפלוגה שלי — הקשה על אירוע פותחת את הפצועים שלו לפי סדר הפינוי','הודעה (באנר ורטט) כשפצוע מגיע לנאפ״ל או מפונה לבית חולים, ורשימת עדכוני הפינוי בפס העליון','צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע — לזיהוי פיזי בשטח','ספירות דחוף, לכודים, באתר, בפינוי ופונו לכל אירוע','סדר פינוי מומלץ לכלל הפלוגה, זהה למה שמ״פ רפואה רואה','צפייה בבקשות אספקה פתוחות (לוגיסטיקת פלוגת חילוץ)','ללא גישה לצבע מיון, חסם, מדדים, טיפול או מנגנון פציעה','לא מגיש בקשות תגבור רפואי','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סוג אירוע, מצב מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה','סגירת אירוע אחרי שכל הפצועים נמסרו (לא ניתן לעקוף את חסימת הסגירה)']}
   }[role] || roleConfig('medic');
 }
 function roleMetric(n,l){ return `<div class="role-metric"><div class="role-metric-num">${n}</div><div class="role-metric-label">${l}</div></div>`; }
@@ -7452,7 +7475,7 @@ function renderRescueEvacOrderPanel(pts, title){
     return `<div class="role-row" style="border-color:${RESCUE_PRIORITY_COLORS[prio]}" data-rescue-priority="${prio}">
       <div class="role-row-title"><span style="font-family:var(--mono);color:var(--accent);font-weight:900">#${i+1}</span> · ${p.visualId||p.id} · ${RESCUE_PRIORITY_LABELS[prio]}</div>
       <div class="role-row-sub">${rescueIdentityLine(p)}</div>
-      <div class="role-row-sub" style="margin-top:2px;color:var(--muted)">${p.location||'אזור לא תועד'} · ${TRAP_LABELS[p.trapStatus]||'לא תועד'} · ${RESCUE_EVAC_LABELS[rescueEvacStateOf(p)]}</div>
+      <div class="role-row-sub" style="margin-top:2px;color:var(--muted)">${p.location||'אזור לא תועד'} · ${TRAP_LABELS[p.trapStatus]||'לא תועד'} · ${RESCUE_STAGE_LABELS[rescueEvacStage(p)]}</div>
     </div>`;
   }).join('');
   return roleSection(title, rows || roleRow('אין פצועים ברשימה',''));
@@ -7923,6 +7946,343 @@ function renderCommandPanel(role, ctx){
     ${dashboardFocusBanner()}
     ${COMMAND_PANEL_TABS.map(([key])=>`<div class="cmd-tab-panel" data-cmd-panel="${key}"${key===commandPanelTab?'':' hidden'}>${panels[key]}</div>`).join('')}`;
 }
+// ── RCC panel (V2.99.76, owner 2026-11-19) ──
+// מ״פ חילוץ: every open incident of the company in one table, one row per incident. A row opens
+// that incident: its patients in evacuation order, the incident type, the building status (when a
+// building is involved), site clear and close. A message when a patient reaches the evacuation
+// point (נאפ״ל) or is evacuated to hospital: a short banner with vibration, kept in a feed in the
+// strip. The role's responsibilities sit behind a button instead of on top of the screen.
+// Same clinical scope as before (database/074): priority urgent / not urgent / not sorted only,
+// never a colour, tourniquet, vitals or treatment.
+// Signed in, the other incidents come from get_rescue_patient_board() per incident and
+// incident_site_authority (the RCC cannot read the patients table); the incident open on this
+// phone counts from the phone, so its unsent patients are not missed. Local demo: one incident
+// per site.
+let rccDemoIncidentOpen=false;       // local demo: the incident view of rescueActiveSiteId is open
+let rccResponsibilitiesOpen=false;
+let rccFeedExpanded=false;
+let rccBuildingExpanded=false;       // building status opened by hand for a type without a building
+let _rccEvacFeed=[];                 // newest first
+let _rccEvacSeen=null;               // `${incident}:${patient}` -> last stage; null until the first baseline
+let _rccBannerItems=[], _rccBannerTimer=null;
+let _rescueIncidentBoards={}, _rescueIncidentAuthority={}, _rescueBoardsAt=null;
+const RCC_FEED_MAX=30;
+const RESCUE_STAGE_RANK={on_site:0, moving:1, evacuating_unknown:2, at_point:3, evacuated:4};
+const RCC_STAGE_MESSAGES={at_point:'הגיע לנאפ״ל', evacuating_unknown:'בפינוי לנאפ״ל', evacuated:'פונה לבית חולים'};
+const RCC_BUILDING_TYPES=new Set(['missile_strike_structural_collapse','explosion']);
+
+function isRccViewer(){ return currentUser ? mapServerRole(currentUser.role)==='rcc' : activeRoleDashboard==='rcc'; }
+function isRccOverviewMode(){ return currentUser ? !activeIncident : !rccDemoIncidentOpen; }
+function rccLocalPatients(siteId){
+  if(currentUser) return getSitePatients('SITE_A');
+  return roleScopedPatients('rcc').filter(p=>(p.siteId||'SITE_A')===siteId);
+}
+// One rescue-board row (database/074, 085) as a read-only patient for the overview and the feed.
+function rescueBoardRowPatient(row, incidentId){
+  const raw=(row.location_json && typeof row.location_json==='object') ? row.location_json : {};
+  const order=Number.isFinite(Number(row.evac_order)) ? Number(row.evac_order) : null;
+  return {
+    id:row.id, visualId:row.visual_id, incidentId, sourcedFromRemote:true,
+    fullName:row.optional_name||'לא מזוהה', temporaryDescription:row.identifying_description||'',
+    location:sanitizeRemoteText(raw.label)||sanitizeRemoteText(raw.zone)||'',
+    trapStatus:accessibilityFromServerStatus(row.access_status).trapStatus||null,
+    rescuePriority:RESCUE_BOARD_PRIORITIES.has(row.priority)?row.priority:'pending',
+    rescueEvacState:RESCUE_BOARD_EVAC_STATES.has(row.evac_state)?row.evac_state:'on_site',
+    rescueEvacOrder:order,
+    rescueEvacPointAt:rescueBoardEvacPointAt(row)
+  };
+}
+// undefined: the server has no database/085 yet (cannot tell moving from arrived); null: not arrived.
+function rescueBoardEvacPointAt(row){
+  if(!row || !Object.prototype.hasOwnProperty.call(row,'evac_point_arrived_at')) return undefined;
+  const t=Date.parse(row.evac_point_arrived_at||'');
+  return Number.isFinite(t) ? t : null;
+}
+// on_site / moving (to the evacuation point) / at_point (נאפ״ל) / evacuated (to hospital).
+function rescueEvacStage(p){
+  const s=rescueEvacStateOf(p);
+  if(s==='evacuated') return 'evacuated';
+  if(s!=='evacuating') return 'on_site';
+  if(Number.isFinite(p.evacPointArrivedAt) || Number.isFinite(p.rescueEvacPointAt)) return 'at_point';
+  if(p.sourcedFromRemote && p.rescueEvacPointAt===undefined && !Number.isFinite(p.evacPointArrivedAt)) return 'evacuating_unknown';
+  return 'moving';
+}
+function rescueStageCounts(pts){
+  const c={urgent:0,not_urgent:0,pending:0,trapped:0,onSite:0,moving:0,atPoint:0,evacuated:0,total:pts.length};
+  pts.forEach(p=>{
+    const stage=rescueEvacStage(p);
+    if(stage==='evacuated'){ c.evacuated++; return; }
+    if(stage==='on_site') c.onSite++; else if(stage==='at_point') c.atPoint++; else c.moving++;
+    c[rescuePriorityOf(p)]++;
+    if(p.trapStatus==='trapped') c.trapped++;
+  });
+  return c;
+}
+// Every incident the RCC sees, as one row each.
+function rccIncidentRows(){
+  if(!currentUser){
+    return allSites.filter(s=>s.id!=='ALL').map(s=>{
+      const a=ensureSiteStatusFields(s.id);
+      return {key:s.id, name:siteShortName(s.id), typeLabel:incidentTypeLabel(s.id), building:a.buildingStatus, t0:a.t0,
+        cleared:!!a.siteClear?.cleared, closed:a.incidentStatus==='closed', mine:rccDemoIncidentOpen&&rescueActiveSiteId===s.id, pts:rccLocalPatients(s.id)};
+    });
+  }
+  return _openIncidents.map(inc=>{
+    const mine=activeIncident?.id===inc.id;
+    const auth=_rescueIncidentAuthority[inc.id]||{};
+    const a=mine?ensureSiteStatusFields('SITE_A'):null;
+    const board=_rescueIncidentBoards[inc.id];
+    return {key:inc.id, name:incidentDisplayName(inc),
+      typeLabel:mine?incidentTypeLabel('SITE_A'):(INCIDENT_TYPE_LABELS[inc.incident_type]||'לא נבחר'),
+      building:mine?a.buildingStatus:(BUILDING_STATUS_LABELS[auth.building_status]?auth.building_status:null),
+      t0:mine?(a.t0||inc.t_zero):(auth.official_t0||inc.t_zero||null),
+      cleared:mine?!!a.siteClear?.cleared:!!auth.site_cleared_at, closed:false, mine,
+      pts:mine?getSitePatients('SITE_A'):(board?board.map(r=>rescueBoardRowPatient(r,inc.id)):null), patientCount:inc.patient_count};
+  });
+}
+function rccOpenIncident(key){
+  if(currentUser){
+    if(activeIncident?.id===key){ renderRoleDashboard('rcc'); return; }
+    enterIncidentFromPicker(key);
+    return;
+  }
+  rescueActiveSiteId=key;
+  rccDemoIncidentOpen=true;
+  rccBuildingExpanded=false;
+  renderRoleDashboard('rcc');
+  window.scrollTo(0,0);
+}
+function rccShowAllIncidents(){
+  rccBuildingExpanded=false;
+  if(currentUser){ enterAllIncidentsView('rcc'); return; }
+  rccDemoIncidentOpen=false;
+  renderRoleDashboard('rcc');
+  window.scrollTo(0,0);
+}
+function toggleRccResponsibilities(){ rccResponsibilitiesOpen=!rccResponsibilitiesOpen; renderRoleDashboard('rcc'); if(rccResponsibilitiesOpen) window.scrollTo(0,0); }
+function toggleRccFeed(){ rccFeedExpanded=!rccFeedExpanded; renderRoleDashboard('rcc'); }
+function rccExpandBuilding(){ rccBuildingExpanded=true; renderRoleDashboard('rcc'); }
+
+// ── Evacuation messages ──
+// Every patient the RCC sees is watched for its evacuation stage. Reaching the evacuation point
+// (נאפ״ל) or being evacuated (to hospital) adds a feed line and a banner with vibration. The first
+// look at a patient sets its stage silently, so signing in or loading another incident does not
+// flood the RCC with old evacuations. A server without database/085 cannot tell moving from
+// arrived: the message then says "בפינוי לנאפ״ל".
+function rccWatchedPatients(){
+  if(!currentUser) return roleScopedPatients('rcc').map(p=>({p, where:p.siteId||'SITE_A', name:siteShortName(p.siteId||'SITE_A')}));
+  const out=[];
+  const activeId=activeIncident?.id||null;
+  if(activeId) getSitePatients('SITE_A').forEach(p=>out.push({p, where:activeId, name:incidentDisplayName(activeIncident)}));
+  Object.entries(_rescueIncidentBoards).forEach(([incId, rows])=>{
+    if(incId===activeId || !Array.isArray(rows)) return;
+    const inc=_openIncidents.find(i=>i.id===incId);
+    rows.forEach(row=>{ if(row && row.id) out.push({p:rescueBoardRowPatient(row, incId), where:incId, name:inc?incidentDisplayName(inc):''}); });
+  });
+  return out;
+}
+function rccCheckEvacTransitions(){
+  if(!isRccViewer()) return;
+  const first=!_rccEvacSeen;
+  const seen=_rccEvacSeen ? new Map(_rccEvacSeen) : new Map();
+  const fresh=[];
+  rccWatchedPatients().forEach(({p,where,name})=>{
+    const key=`${where}:${p.id}`;
+    const stage=rescueEvacStage(p);
+    const prev=seen.get(key);
+    seen.set(key, stage);
+    if(first || prev===undefined || !RCC_STAGE_MESSAGES[stage]) return;
+    if(RESCUE_STAGE_RANK[stage]<=RESCUE_STAGE_RANK[prev]) return;
+    // moving -> evacuating_unknown never happens; an unknown evacuating that is later known to be
+    // at the point is the same message twice, so it is skipped.
+    if(prev==='evacuating_unknown' && stage==='at_point') return;
+    fresh.push({key:`${key}:${stage}:${Date.now()}`, at:Date.now(), where, incidentName:name, patientId:p.id,
+      visualId:p.visualId||p.id, identity:rescueIdentityLine(p), stage, text:RCC_STAGE_MESSAGES[stage]});
+  });
+  _rccEvacSeen=seen;
+  if(!fresh.length) return;
+  _rccEvacFeed=[...fresh.reverse(), ..._rccEvacFeed].slice(0, RCC_FEED_MAX);
+  _rccBannerItems=[...fresh, ..._rccBannerItems].slice(0,3);
+  haptic([150,80,150]);
+  renderRccEvacBanner();
+  clearTimeout(_rccBannerTimer);
+  _rccBannerTimer=setTimeout(dismissRccEvacBanner, 10000);
+}
+function rccFeedLineHtml(m){
+  const time=new Date(m.at).toTimeString().slice(0,5);
+  const cls=m.stage==='evacuated'?'evac-done':'evac-point';
+  return `<div class="cmd-strip-alert rcc-feed-line ${cls}" data-rcc-feed="${escAttr(m.stage)}" onclick="rccOpenIncident('${escAttr(m.where)}')">
+    <span class="cmd-strip-alert-id">${escAttr(m.visualId)}</span>
+    <div style="flex:1;min-width:0"><div class="cmd-strip-alert-title">${escAttr(m.text)} · ${time}</div><div class="cmd-strip-alert-sub">${escAttr(m.identity)}${m.incidentName?` · ${escAttr(m.incidentName)}`:''}</div></div>
+  </div>`;
+}
+function renderRccEvacBanner(){
+  const el=document.getElementById('rcc-evac-banner');
+  if(!el) return;
+  if(!_rccBannerItems.length){ el.style.display='none'; el.innerHTML=''; return; }
+  el.style.display='flex';
+  el.innerHTML=_rccBannerItems.map(m=>`<div class="rcc-evac-banner-row" data-rcc-banner="${escAttr(m.stage)}">
+      <span>${m.stage==='evacuated'?'🚑':'📍'} <strong>${escAttr(m.visualId)} · ${escAttr(m.text)}</strong> · ${escAttr(m.identity)}${m.incidentName?` · ${escAttr(m.incidentName)}`:''}</span>
+    </div>`).join('')+`<div class="rcc-evac-banner-row" style="justify-content:flex-end"><button onclick="dismissRccEvacBanner()">ראיתי</button></div>`;
+}
+function dismissRccEvacBanner(){
+  clearTimeout(_rccBannerTimer);
+  _rccBannerItems=[];
+  renderRccEvacBanner();
+}
+
+// ── Server data for the overview ──
+async function pullRescueAllIncidents(client){
+  const ids=_openIncidents.map(i=>i.id);
+  const boards={};
+  await Promise.all(ids.map(async id=>{
+    try{
+      const r=await client.rpc('get_rescue_patient_board', {p_incident_id:id});
+      if(!r.error && Array.isArray(r.data)) boards[id]=r.data;
+      else if(_rescueIncidentBoards[id]) boards[id]=_rescueIncidentBoards[id];
+    }catch(e){ if(_rescueIncidentBoards[id]) boards[id]=_rescueIncidentBoards[id]; }
+  }));
+  _rescueIncidentBoards=boards;
+  if(ids.length){
+    try{
+      const r=await client.from('incident_site_authority').select(SITE_AUTHORITY_COLUMNS).in('incident_id', ids);
+      if(!r.error && Array.isArray(r.data)){ const out={}; r.data.forEach(row=>{ if(row?.incident_id) out[row.incident_id]=row; }); _rescueIncidentAuthority=out; }
+    }catch(e){}
+  }else _rescueIncidentAuthority={};
+  _rescueBoardsAt=Date.now();
+  rccCheckEvacTransitions();
+}
+
+// ── Rendering ──
+function renderRccStrip(pts, overview){
+  const contact=serverContactState();
+  const c=rescueStageCounts(pts);
+  const cell=(n,label,color)=>`<div class="cmd-strip-count" style="border-top-color:${color}"><b>${n}</b>${label}</div>`;
+  const feed=_rccEvacFeed;
+  const shown=rccFeedExpanded ? feed : feed.slice(0,1);
+  const more=feed.length>1 ? `<button class="cmd-strip-chip cmd-strip-more" onclick="toggleRccFeed()">${rccFeedExpanded?'סגור ▴':`+${feed.length-1} עדכוני פינוי ▾`}</button>` : '';
+  return `<div class="cmd-strip" id="command-status-strip">
+    <div class="cmd-strip-row">
+      <span id="role-strip-conn" class="cmd-conn ${contact.level}">${escAttr(serverContactLabel(contact))}</span>
+      ${overview?'':`<button class="cmd-strip-chip" data-rcc-all-incidents onclick="rccShowAllIncidents()">‹ כל האירועים</button>`}
+      <button class="cmd-strip-chip" data-rcc-responsibilities onclick="toggleRccResponsibilities()">${rccResponsibilitiesOpen?'סגור אחריות ✕':'ⓘ האחריות שלי'}</button>
+      ${more}
+    </div>
+    <div class="cmd-strip-counts">${cell(c.urgent,'דחוף','var(--red)')}${cell(c.not_urgent,'לא דחוף','var(--muted)')}${cell(c.pending,'טרם מוין','var(--accent)')}${cell(c.trapped,'לכודים','var(--orange)')}${cell(c.evacuated,'פונו','var(--green)')}</div>
+    <div class="cmd-strip-alerts${rccFeedExpanded?' expanded':''}" data-rcc-feed-list>${shown.map(rccFeedLineHtml).join('')||'<div class="cmd-strip-alert-sub" style="padding:6px 2px;font-size:12px">אין עדכוני פינוי עדיין · הודעה תופיע כשפצוע מגיע לנאפ״ל או מפונה לבית חולים</div>'}</div>
+  </div>`;
+}
+function renderRccResponsibilities(cfg){
+  if(!rccResponsibilitiesOpen) return '';
+  return `<div data-rcc-responsibilities-panel>${roleSection('האחריות שלי', [myPlatoonRow(), ...cfg.responsibilities.map(x=>roleRow(x,''))].join(''))}</div>`;
+}
+function rccIncidentLineSub(r){
+  const t0=r.t0?` · T0 לפני ${minutesSinceIso(r.t0)} דק׳`:' · T0 טרם נקבע';
+  const building=r.building?` · מבנה: ${BUILDING_STATUS_LABELS[r.building]}`:'';
+  return `${r.typeLabel}${building}${t0}${r.cleared?' · ✓ אתר נקי':''}${r.closed?' · סגור':''}`;
+}
+function renderRccIncidentsTable(){
+  const rows=rccIncidentRows();
+  if(!rows.length) return renderOperationalEmptyState('אין אירועים פתוחים בפלוגה');
+  const cols=[['urgent','דחוף','var(--red)'],['trapped','לכודים','var(--orange)'],['onSite','באתר','var(--text)'],['moving','בפינוי','var(--accent)'],['evacuated','פונו','var(--green)']];
+  const body=rows.map(r=>{
+    const c=r.pts?rescueStageCounts(r.pts):null;
+    // "בפינוי" = on the way to or at the evacuation point.
+    const val=k=>!c?'—':k==='moving'?c.moving+c.atPoint:c[k];
+    return `<tr class="tappable${r.mine?' mine':''}" data-rcc-incident-row="${escAttr(r.key)}" onclick="rccOpenIncident('${escAttr(r.key)}')">
+      <th>${escAttr(r.name)} ‹<div class="rcc-row-sub">${escAttr(rccIncidentLineSub(r))}</div></th>
+      ${cols.map(([k,,color])=>`<td style="color:${c&&val(k)?color:'var(--muted)'}">${val(k)}</td>`).join('')}
+    </tr>`;
+  }).join('');
+  const total={urgent:0,trapped:0,onSite:0,moving:0,evacuated:0};
+  rows.forEach(r=>{ if(!r.pts) return; const c=rescueStageCounts(r.pts); total.urgent+=c.urgent; total.trapped+=c.trapped; total.onSite+=c.onSite; total.moving+=c.moving+c.atPoint; total.evacuated+=c.evacuated; });
+  const footer=currentUser
+    ? (_rescueBoardsAt?`לפי נתוני השרת · עודכן ${timeAgoLabel(_rescueBoardsAt)} · מה שטרם נשלח מהשטח לא מופיע`:'טרם התקבלו נתונים מהשרת')
+    : 'מצב דמו · נתונים מקומיים';
+  return `<table class="incident-triage-table rcc-incidents-table" data-rcc-incidents-table>
+      <colgroup><col style="width:40%">${cols.map(()=>'<col style="width:12%">').join('')}</colgroup>
+      <thead><tr><th>אירוע</th>${cols.map(([,label])=>`<th>${label}</th>`).join('')}</tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr><th>סה״כ</th>${cols.map(([k,,color])=>`<td style="color:${total[k]?color:'var(--muted)'}">${total[k]}</td>`).join('')}</tr></tfoot>
+    </table>
+    <div class="role-row-sub" style="margin-top:6px">הקש על אירוע כדי לראות את הפצועים לפי סדר הפינוי · ${footer}</div>`;
+}
+function rccChoiceButton(label, selected, onclick, attr=''){
+  return `<button class="demo-mini-btn${selected?' rcc-selected':''}" ${attr} onclick="${onclick}">${selected?'✓ ':''}${label}</button>`;
+}
+function renderRccSiteManagement(siteId, pts){
+  const a=ensureSiteStatusFields(siteId);
+  const c=rescueStageCounts(pts);
+  const closed=isIncidentClosedForSite(siteId);
+  const official=currentUser ? !!a.t0 : (a.incidentStatus==='official'||a.incidentStatus==='closed');
+  const types=[['missile_strike_structural_collapse','קריסת מבנה / טיל'],['mass_shooting','ירי המוני'],['vehicle_accident','תאונת דרכים'],['explosion','פיצוץ']];
+  const typeHtml=types.map(([k,label])=>rccChoiceButton(label, a.incidentType===k, `rescueSetIncidentType('rcc','${k}','${siteId}')`, `data-rcc-type="${k}"`)).join('');
+  const buildingRelevant=RCC_BUILDING_TYPES.has(a.incidentType) || siteHasBuildingCollapse(siteId) || !!a.buildingStatus || rccBuildingExpanded;
+  const buildings=[['stable','יציב'],['unstable','לא יציב'],['progressive_collapse','קריסה מתמשכת'],['safe_to_enter','בטוח לכניסה']];
+  const buildingHtml=buildingRelevant
+    ? `<div class="rcc-field-label">מצב המבנה</div><div class="demo-actions rcc-choices" data-rcc-building>${buildings.map(([k,label])=>rccChoiceButton(label, a.buildingStatus===k, `rescueUpdateBuildingStatus('rcc','${k}','${siteId}')`, `data-rcc-building-status="${k}"`)).join('')}</div>`
+    : `<button class="demo-mini-btn rcc-link-btn" data-rcc-building-expand onclick="rccExpandBuilding()">מבנה מעורב? עדכון מצב מבנה</button>`;
+  const remaining=c.onSite+c.moving+c.atPoint;
+  const clearLine=remaining
+    ? `<div class="rcc-close-note warn" data-rcc-remaining="${remaining}">עדיין ${c.onSite} באתר${c.moving+c.atPoint?` · ${c.moving+c.atPoint} בפינוי`:''} · ניתן לסגור רק אחרי שכל הפצועים נמסרו</div>`
+    : `<div class="rcc-close-note ok" data-rcc-remaining="0">${pts.length?'כל הפצועים פונו מהאתר · ניתן לאשר אתר נקי ולסגור':'אין פצועים באירוע'}</div>`;
+  const clearBtn=a.siteClear?.cleared
+    ? `<div class="role-row-sub" data-rcc-site-cleared>✓ האתר הוכרז נקי${a.siteClear.clearedAt?` · ${new Date(a.siteClear.clearedAt).toTimeString().slice(0,5)}`:''}</div>`
+    : `<button class="demo-mini-btn" data-rcc-site-clear onclick="rccConfirmSiteClear('${siteId}')">אשר אתר נקי</button>`;
+  const closeBtn=`<button class="demo-mini-btn${remaining&&!closed?' rcc-muted':''}" data-rcc-close onclick="rescueToggleIncidentClosed('rcc','${siteId}')">${closed?'פתח אירוע מחדש':'סגור אירוע'}</button>`;
+  return `<div class="role-section" data-rcc-site-management>
+    <div class="role-section-title">ניהול אתר</div>
+    ${official?`<div class="role-row-sub" style="margin-bottom:8px">T0 ${a.t0?new Date(a.t0).toTimeString().slice(0,5):''} · לפני ${a.t0?minutesSinceIso(a.t0):'—'} דק׳${closed?' · האירוע סגור':''}</div>`
+      :`<button class="demo-mini-btn" style="width:100%;margin-bottom:8px" data-rcc-official onclick="rescueOpenOfficialIncident('rcc','${siteId}')">פתח אירוע רשמי + T0</button>`}
+    <div class="rcc-field-label">סוג אירוע</div>
+    <div class="demo-actions rcc-choices" data-rcc-types>${typeHtml}</div>
+    ${buildingHtml}
+    <div class="rcc-field-label">אתר נקי וסגירה</div>
+    ${clearLine}
+    <div class="demo-actions rcc-choices">${clearBtn}${closeBtn}</div>
+  </div>`;
+}
+function rccConfirmSiteClear(siteId){
+  const c=rescueStageCounts(rccLocalPatients(siteId));
+  if(c.onSite && !confirm(`עדיין ${c.onSite} פצועים באתר. לאשר בכל זאת שהאתר נקי?`)) return;
+  rescueConfirmSiteClear('rcc', siteId);
+}
+function renderRccIncidentView(cfg){
+  const siteId=currentUser?'SITE_A':rescueActiveSiteId;
+  const pts=rccLocalPatients(siteId);
+  const name=currentUser?incidentDisplayName(activeIncident):siteShortName(siteId);
+  const evacuated=rescueSortedForEvac(pts.filter(p=>rescueEvacStage(p)==='evacuated'));
+  const alerts=roleAlertRows('rcc').filter(a=>!a.patientId || pts.some(p=>p.id===a.patientId));
+  const requests=roleScopedRequests('rcc').filter(isRequestOpen);
+  return `<div class="rcc-incident-head" data-rcc-incident-view="${escAttr(currentUser?activeIncident.id:siteId)}">
+      <div class="rcc-incident-name">${escAttr(name)}</div>
+      <div class="role-row-sub">${escAttr(incidentTypeLabel(siteId))}${ensureSiteStatusFields(siteId).buildingStatus?` · מבנה: ${BUILDING_STATUS_LABELS[ensureSiteStatusFields(siteId).buildingStatus]}`:''}</div>
+    </div>
+    ${renderRescueEvacOrderPanel(pts, 'סדר פינוי — הפצועים באירוע')}
+    ${evacuated.length?`<details class="rcc-evacuated" data-rcc-evacuated><summary>פונו (${evacuated.length})</summary>${evacuated.map(tacticalPatientRow).join('')}</details>`:''}
+    ${renderRccSiteManagement(siteId, pts)}
+    ${alerts.length?roleSection('התראות שדורשות פעולה ממני', alerts.slice(0,8).map(a=>renderAlertCard(a,'commander')).join('')):''}
+    ${requests.length?roleSection('בקשות אספקה פתוחות', requests.slice(0,8).map(r=>roleRow(r.id, `${resupplyItemsText(r)} · ${resupplyStatusText(r)}`)).join('')):''}
+    <div class="demo-actions" style="margin:12px 0 0;grid-template-columns:1fr"><button class="demo-mini-btn" onclick="openFirstResponderReport('rcc')">דיווח פצוע ראשוני</button></div>`;
+}
+function renderRccOverview(){
+  return `${roleSection('כל האירועים בפלוגה', renderRccIncidentsTable())}
+    <div class="demo-actions" style="margin:12px 0 0;grid-template-columns:1fr${currentUser?' 1fr':''}">
+      <button class="demo-mini-btn" onclick="openFirstResponderReport('rcc')">דיווח פצוע ראשוני</button>
+      ${currentUser?'<button class="demo-mini-btn" onclick="openIncidentPicker()">רשימת אירועים</button>':''}
+    </div>`;
+}
+function renderRccPanel(){
+  const cfg=roleConfig('rcc');
+  rccCheckEvacTransitions();
+  const overview=isRccOverviewMode();
+  const scopePts=overview
+    ? rccIncidentRows().flatMap(r=>r.pts||[])
+    : rccLocalPatients(currentUser?'SITE_A':rescueActiveSiteId);
+  return `<div id="command-sticky" class="cmd-sticky">${renderRccStrip(scopePts, overview)}</div>
+    ${renderRccResponsibilities(cfg)}
+    ${overview?renderRccOverview():renderRccIncidentView(cfg)}`;
+}
 function renderRoleDashboard(role=activeRoleDashboard){
   activeRoleDashboard=role;
   updateClock();
@@ -7998,8 +8358,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
       ...rescueSortedForEvac(pts).slice(0,10).map(tacticalPatientRow)
     ].join('');
   }else if(role==='rcc'){
-    const myPlatoonIds=commandPlatoons().filter(pl=>pl.companyId==='COMP-1').map(pl=>pl.platoonId);
-    objects=myPlatoonRow()+myPlatoonIds.map(tacticalPlatoonRollup).join('');
+    objects=''; // RCC has its own panel (renderRccPanel)
   }else{
     objects=allSites.filter(s=>s.id!=='ALL').map(s=>roleRow(
       `${s.name} · ${incidentTypeLabel(s.id)}`,
@@ -8007,7 +8366,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
     )).join('');
   }
   const authSite=ensureSiteStatusFields(rescueActiveSiteId);
-  const rescueAuthorityPanel=['rpc','rcc'].includes(role)?`
+  const rescueAuthorityPanel=role==='rpc'?`
     <div class="role-section">
       <div class="role-section-title">סמכות אתר — ראשונים בזירה</div>
       <div class="demo-actions" style="margin:0 0 8px;grid-template-columns:1fr 1fr">
@@ -8030,9 +8389,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
         <button class="demo-mini-btn" onclick="rescueConfirmSiteClear('${role}')" style="grid-column:1/-1">אשר אתר נקי</button>
       </div>
     </div>`:'';
-  const rescueEvacOrderPanel=role==='rpc'?renderRescueEvacOrderPanel(pts,'סדר פינוי מומלץ — מחלקה שלי')
-    :role==='rcc'?renderRescueEvacOrderPanel(pts,'סדר פינוי מומלץ — כלל הפלוגה')
-    :'';
+  const rescueEvacOrderPanel=role==='rpc'?renderRescueEvacOrderPanel(pts,'סדר פינוי מומלץ — מחלקה שלי'):'';
   const reqHtml=requests.slice(0,8).map(r=>roleRow(
     `${r.id} · ${r.type==='resupply'?'השלמת ציוד':(REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType)}`,
     `${r.type==='resupply'?resupplyItemsText(r):r.targetLocation} · ${r.type==='resupply'?resupplyStatusText(r):(REINFORCEMENT_STATUS_LABELS[r.status]||r.status)} · ${r.type==='resupply'?(r.truckAvailability==='available'?'זמין ברכב חוג״ד':'דורש מ״פ רפואה'):(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')}`
@@ -8053,11 +8410,17 @@ function renderRoleDashboard(role=activeRoleDashboard){
     ${rescueAuthorityPanel}
     ${rescueEvacOrderPanel}
     ${roleSection('התראות שדורשות פעולה ממני', alertHtml)}
-    ${roleSection(role==='pc'?'האובייקטים שלי: חובשים / פצועים / מוקדים':role==='cc'?'האובייקטים שלי: מחלקות / מוקדים / משאבים':role==='physician'?'תור סקירה רפואית':role==='logistics'?'מלאי ובקשות ציוד':role==='rpc'?'תמונה טקטית — מחלקה שלי (ללא מידע קליני)':role==='rcc'?'תמונה טקטית מרוכזת — פלוגה שלי (ללא מידע קליני)':'האובייקטים שלי', objects)}
+    ${roleSection(role==='pc'?'האובייקטים שלי: חובשים / פצועים / מוקדים':role==='cc'?'האובייקטים שלי: מחלקות / מוקדים / משאבים':role==='physician'?'תור סקירה רפואית':role==='logistics'?'מלאי ובקשות ציוד':role==='rpc'?'תמונה טקטית — מחלקה שלי (ללא מידע קליני)':'האובייקטים שלי', objects)}
     ${roleSection('בקשות / הקצאות פתוחות', reqHtml)}
     <div class="demo-actions" style="margin:0;grid-template-columns:1fr 1fr">${actions}</div>`;
   const body=document.getElementById('role-dashboard-body');
-  if(isCommandPanelRole(role)){
+  // The RCC strip carries the server-contact label; the version banner is noise there.
+  const demoStrip=document.querySelector('#screen-role-dashboard .demo-strip');
+  if(demoStrip) demoStrip.style.display=role==='rcc'?'none':'';
+  if(role==='rcc'){
+    body.innerHTML=renderRccPanel();
+    positionCommandSticky();
+  }else if(isCommandPanelRole(role)){
     body.innerHTML=renderCommandPanel(role,{pts,alerts,responsibilities,objects,reqHtml,actions});
     positionCommandSticky();
   }else{
@@ -14219,7 +14582,9 @@ const LOCATION_BOARD_EVACUATED_STATUSES = new Set(['handed_over','self_evacuated
 // every open incident; tapping one opens it, "כל האירועים" comes back. Its own unsent events stay
 // in the outbox, each pinned to its incident, and are still sent (syncPush groups by incident_id).
 function isCcOverviewMode(){ return !!currentUser && mapServerRole(currentUser.role)==='cc' && !activeIncident; }
-function enterCcAllIncidentsView(){
+function enterCcAllIncidentsView(){ enterAllIncidentsView('cc'); }
+// CC and RCC start from every open incident (no incident open on the phone); a row opens one.
+function enterAllIncidentsView(role){
   if(!currentUser) return;
   if(activeIncident){
     activeIncident=null;
@@ -14230,8 +14595,8 @@ function enterCcAllIncidentsView(){
     saveDemoState();
     renderIncidentContext();
   }
-  startRoleDashboard('cc');
-  refreshOpenIncidents().then(()=>{ if(isCcOverviewMode() && document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard('cc'); });
+  startRoleDashboard(role);
+  refreshOpenIncidents().then(()=>{ if(!activeIncident && document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard(role); });
 }
 function ccOverviewTotals(){
   const total=emptyTriageCounts();
@@ -14972,7 +15337,12 @@ async function refreshOpenIncidents(){
   if(result.error){ _incidentListError='טעינת האירועים נכשלה: '+(result.error.message||''); return false; }
   _incidentListError='';
   _openIncidents=Array.isArray(result.data)?result.data:[];
-  if(hasBlanketIncidentAccess()){
+  if(currentUser.role==='rcc'){
+    // RCC: no patients table, no command state (database/074). The rescue board per incident and
+    // the site authority rows instead (RCC panel).
+    await pullRescueAllIncidents(client);
+    if(document.getElementById('screen-role-dashboard')?.classList.contains('active') && activeRoleDashboard==='rcc') renderRoleDashboard('rcc');
+  }else if(hasBlanketIncidentAccess()){
     // Overview counts for roles that can read every incident (CC overview, spec: all open
     // incidents with drill-down). Same server snapshot the command view already polls.
     await Promise.all(_openIncidents.map(async inc=>{
@@ -15088,6 +15458,8 @@ async function enterIncidentContextAfterLogin(){
   const listed=await refreshOpenIncidents();
   // CC starts from every open incident, not from one site, also offline (owner, 2026-10-26).
   if(currentUser.role==='cc'){ enterCcAllIncidentsView(); return; }
+  // RCC too (owner, 2026-11-19): the company's incidents table first.
+  if(currentUser.role==='rcc'){ enterAllIncidentsView('rcc'); return; }
   if(stored){
     const fresh=_openIncidents.find(i=>i.id===stored.id);
     if(fresh && (fresh.is_member || hasBlanketIncidentAccess())){ await activateIncident(fresh); return; }
@@ -16236,16 +16608,16 @@ function applyRescuePatientBoard(rows, incidentId){
         lastModifiedAt:new Date().toISOString(), confirmedClinical:true, unsyncedEvents:0, locationHistory:[], possibleDuplicate:false,
         time:'', vitals:{...VITALS_NOT_ON_DEVICE}, vitalsCapture:null, txHistory:[], alert:false, deterioration:[], lastVitalsAt:null,
         vitalsHistory:[], tourniquet:null, medic:'(remote)', siteId:INCIDENT_ID_TO_SITE[incidentId]||'SITE_A', sourcedFromRemote:true,
-        rescuePriority:priority, rescueEvacState:evacState, rescueEvacOrder:order, _serverVersion:row.version,
+        rescuePriority:priority, rescueEvacState:evacState, rescueEvacOrder:order, rescueEvacPointAt:rescueBoardEvacPointAt(row), _serverVersion:row.version,
         events:[{type:'REMOTE_PATIENT_DISCOVERED',time:nowT(),detail:`${row.visual_id} התקבל מהשרת (תמונה טקטית)`}]
       };
       patients.push(p);
       changed=true;
       continue;
     }
-    const before=JSON.stringify([p.visualId,p.rescuePriority,p.rescueEvacState,p.rescueEvacOrder,p.trapStatus,p.fullName,p.temporaryDescription,p.location,p.locDetail]);
+    const before=JSON.stringify([p.visualId,p.rescuePriority,p.rescueEvacState,p.rescueEvacOrder,p.rescueEvacPointAt,p.trapStatus,p.fullName,p.temporaryDescription,p.location,p.locDetail]);
     if(row.visual_id) p.visualId=row.visual_id;
-    p.rescuePriority=priority; p.rescueEvacState=evacState; p.rescueEvacOrder=order;
+    p.rescuePriority=priority; p.rescueEvacState=evacState; p.rescueEvacOrder=order; p.rescueEvacPointAt=rescueBoardEvacPointAt(row);
     if(!pending.has(p.id)){
       if(access.trapStatus){ p.accessibility=access.accessibility; p.trapStatus=access.trapStatus; }
       p.fullName=row.optional_name||'לא מזוהה';
@@ -16256,9 +16628,10 @@ function applyRescuePatientBoard(rows, incidentId){
       if(loc.label) p.location=loc.label;
     }
     p._serverVersion=row.version;
-    if(before!==JSON.stringify([p.visualId,p.rescuePriority,p.rescueEvacState,p.rescueEvacOrder,p.trapStatus,p.fullName,p.temporaryDescription,p.location,p.locDetail])) changed=true;
+    if(before!==JSON.stringify([p.visualId,p.rescuePriority,p.rescueEvacState,p.rescueEvacOrder,p.rescueEvacPointAt,p.trapStatus,p.fullName,p.temporaryDescription,p.location,p.locDetail])) changed=true;
   }
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
+  rccCheckEvacTransitions();
 }
 // Active tourniquets from the server (tourniquets table, RLS-scoped by app.can_access_incident).
 // Applied only to patients this device received from another device: a patient created here

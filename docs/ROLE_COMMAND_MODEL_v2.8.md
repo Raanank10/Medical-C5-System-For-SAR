@@ -30,6 +30,20 @@ RPC/RCC need to know which patient is evacuated first and what the order is afte
 
 Since V2.99.63 (`database/074`) none of that ranking's reasoning reaches RPC/RCC: the server computes the order in `get_rescue_patient_board()` and returns only each patient's place in it (1, 2, 3...) and its priority (urgent / not urgent / not yet sorted). The reason text, which named the tourniquet time, the colour or the vitals, is gone from their screens, and the score itself is not sent because it would show minutes on a tourniquet. Before V2.99.63 the tourniquet reason was shown verbatim and only the vitals-based reason was redacted.
 
+## RCC panel (V2.99.76)
+
+Owner decisions, 2026-11-19. The RCC no longer shares the generic role dashboard (the nine responsibility cards on top pushed the evacuation order three screens down).
+
+- **Start:** a table of every open incident of the company, one row per incident: urgent, trapped, at the site, being evacuated (on the way to or at the evacuation point) and evacuated, plus the incident type, building status, time since T0 and "site clear" under the name. Signed in, the RCC starts here after sign-in, like the CC, with no incident open on the phone. The rows come from `get_rescue_patient_board()` per incident and `incident_site_authority`, never the patients table (database/074).
+- **A row opens the incident:** its patients in the shared evacuation order (evacuated ones folded apart), then site management: official T0, incident type, building status and site clear / close. Building status shows for a collapse or explosion, or once anyone set it or marked a collapse; for other types it sits behind "מבנה מעורב?". Closing goes through the same close guard as before: the RCC cannot override it.
+- **Evacuation messages:** a patient reaching the evacuation point (נאפ״ל) or evacuated to hospital gives a banner with vibration and a line in the strip's feed (tap opens the incident). The first look at a patient is silent, so signing in does not replay old evacuations. Messages are kept on the phone only for the session.
+- **Responsibilities** (and the company line) behind the strip's "האחריות שלי" button.
+- Clinical scope unchanged: priority urgent / not urgent / not sorted only.
+
+`database/085` (not applied live yet) adds `evac_point_arrived_at` to `get_rescue_patient_board()`, so "arrived at the evacuation point" can be told from "on the way". Until it is applied the message says "בפינוי לנאפ״ל" when the patient starts evacuating.
+
+The RPC screen is unchanged for now.
+
 ## Clinical data stays with the medical roles (V2.99.63)
 
 Decided with the repo owner on 2026-10-23, after a live check of what each role could read. Enforced by the database (`database/074`), not only on the screen.

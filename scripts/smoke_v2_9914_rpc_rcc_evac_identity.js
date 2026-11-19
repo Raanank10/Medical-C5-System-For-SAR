@@ -56,12 +56,16 @@ for (const rel of files) {
   // (rpc = own platoon, rcc = whole company) - no new DecisionSupportEngine method needed since
   // this is a direct sort, not an acknowledgable recommendation.
   assert(roleDashboardFn.includes("role==='rpc'?renderRescueEvacOrderPanel(pts,'סדר פינוי מומלץ — מחלקה שלי')"), `${rel}: rpc must render the evac-order panel scoped to its own platoon`);
-  assert(roleDashboardFn.includes("role==='rcc'?renderRescueEvacOrderPanel(pts,'סדר פינוי מומלץ — כלל הפלוגה')"), `${rel}: rcc must render the evac-order panel scoped to the whole company`);
+  // RCC has its own panel since V2.99.76 (owner 2026-11-19): incidents table, a row opens the
+  // incident's patients in the same shared evacuation order.
+  const rccIncidentFn = section(html, 'function renderRccIncidentView(cfg){', 'function renderRccOverview(){');
+  assert(roleDashboardFn.includes("if(role==='rcc'){") && roleDashboardFn.includes('body.innerHTML=renderRccPanel();'), `${rel}: rcc must render its own panel`);
+  assert(rccIncidentFn.includes("renderRescueEvacOrderPanel(pts, 'סדר פינוי — הפצועים באירוע')"), `${rel}: rcc incident view must use the shared evac-order panel`);
   assert(roleDashboardFn.includes('${rescueEvacOrderPanel}'), `${rel}: rescueEvacOrderPanel must be spliced into the rendered sections`);
 
   // Section titles: identity is shown, clinical data is not (database/074).
   assert(roleDashboardFn.includes('תמונה טקטית — מחלקה שלי (ללא מידע קליני)'), `${rel}: rpc tactical section title must say no clinical data`);
-  assert(roleDashboardFn.includes('תמונה טקטית מרוכזת — פלוגה שלי (ללא מידע קליני)'), `${rel}: rcc tactical section title must say no clinical data`);
+  assert(!html.slice(html.indexOf('function renderRccPanel(')).split('function renderRoleDashboard(')[0].includes('TRIAGE_LABELS'), `${rel}: rcc panel must not show the triage colour`);
   assert(!roleDashboardFn.includes('ללא מדדים / זהות'), `${rel}: no rpc/rcc section title should still claim identity is excluded`);
 
   // roleConfig responsibilities text updated to match (identity now owned, not excluded)
