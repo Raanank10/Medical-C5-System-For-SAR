@@ -22,9 +22,21 @@
 -- patients, ever trapped, extracted, still trapped, at the evacuation point, evacuated. Same
 -- wrapper pattern as 069: the current function is renamed and called.
 --
+-- Fourth: "אין גישה" (no access to the casualty yet) is waiting for rescue like trapped (owner,
+-- 2026-11-19). access_status gets a 'blocked' value; the client sends it (PATIENT_ACCESS_UPDATED
+-- access_status 'blocked', projected by 041's existing cast) and every count here treats
+-- trapped / partial / blocked alike. Before 085 the phone sent 'free' for it.
+--
+-- Fifth: a FIRST_RESPONDER_REPORT (the rescue chain's only way to report a casualty) marked
+-- "trapped" sets the new patient's access_status, which nothing projected before.
+--
 -- New output columns change the return type, so the function is dropped and created again;
 -- the grants are restated. The client reads the column only when it is present: before this file
 -- is applied the RCC message says "בפינוי לנאפ״ל" on 'evacuating' instead of "הגיע לנאפ״ל".
+
+-- A new enum value cannot be used in the transaction that adds it; nothing below casts to it (all
+-- comparisons are on text), so it can sit inside the same file.
+alter type access_status add value if not exists 'blocked';
 
 begin;
 
@@ -36,11 +48,11 @@ stable
 security definer
 set search_path = public
 as $$
-  select coalesce(p_access_status, '') in ('trapped', 'partial')
+  select coalesce(p_access_status, '') in ('trapped', 'partial', 'blocked')
       or exists (select 1 from events e
                  where e.patient_id = p_patient_id
-                   and (e.payload_json->>'trap_status' = 'trapped'
-                        or e.payload_json->>'access_status' in ('trapped', 'partial')
+                   and (e.payload_json->>'trap_status' in ('trapped', 'access_blocked')
+                        or e.payload_json->>'access_status' in ('trapped', 'partial', 'blocked')
                         or e.payload_json->>'trapped' = 'true'))
 $$;
 revoke execute on function app.rescue_patient_was_trapped(uuid, text) from public, anon, authenticated;
@@ -157,12 +169,33 @@ as $$
         'at_evac_point_at_close', count(*) filter (where x.status = 'evacuating' and x.evac_point_arrived_at is not null),
         'evacuated', count(*) filter (where x.status in ('handed_over', 'evacuated', 'self_evacuated', 'closed')))
       from (select app.rescue_patient_was_trapped(p.id, p.access_status::text) as was_trapped,
-                   coalesce(p.access_status::text, '') in ('trapped', 'partial')
+                   coalesce(p.access_status::text, '') in ('trapped', 'partial', 'blocked')
                      and coalesce(p.current_status::text, '') not in ('evacuating', 'handed_over', 'evacuated', 'self_evacuated', 'closed') as trapped_now,
                    p.current_status::text as status, p.evac_point_arrived_at
             from patients p where p.incident_id = p_incident_id) x))
 $$;
 revoke execute on function app.build_incident_aar(uuid) from public, anon, authenticated;
 revoke execute on function app.build_incident_aar_ext(uuid) from public, anon, authenticated;
+
+-- A first responder's "trapped" reaches the patient row. Only while the access status is still
+-- unknown: a medic's later record wins.
+create or replace function app.project_first_responder_access()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $function$
+begin
+  if new.type::text = 'FIRST_RESPONDER_REPORT' and new.patient_id is not null and new.payload_json->>'trapped' = 'true' then
+    update patients set access_status = 'trapped', access_recorded_at = new.local_timestamp, updated_at = now(), version = version + 1
+     where id = new.patient_id and access_status::text = 'unknown';
+  end if;
+  return new;
+end;
+$function$;
+revoke execute on function app.project_first_responder_access() from public, anon, authenticated;
+drop trigger if exists trg_project_first_responder_access on events;
+create trigger trg_project_first_responder_access after insert on events
+  for each row when (new.type::text = 'FIRST_RESPONDER_REPORT') execute function app.project_first_responder_access();
 
 commit;

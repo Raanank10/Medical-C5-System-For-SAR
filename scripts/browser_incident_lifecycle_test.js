@@ -355,10 +355,10 @@ async function checkFile(browser, file) {
   // 7b. Rescue command (rpc): may close, may not override; closes once everything is handed over.
   await page.evaluate(() => signOut());
   await login(page, 'rpc@test');
-  await page.waitForSelector('#screen-incident-picker.active', { timeout: 5000 });
-  await page.waitForFunction(() => document.querySelector('#incident-picker-list button'), { timeout: 5000 });
-  await page.click('#incident-picker-list button:has-text("כניסה")');
-  await page.waitForSelector('#screen-role-dashboard.active', { timeout: 5000 });
+  // Since V2.99.76 the RPC starts on its platoon's incidents table (RCC panel); a row enters the incident.
+  await page.waitForSelector('#screen-role-dashboard.active [data-rcc-incident-row]', { timeout: 5000 });
+  await page.click('[data-rcc-incident-row]');
+  await page.waitForFunction(() => !!activeIncident && !!document.querySelector('[data-rcc-incident-view]'), { timeout: 5000 });
   const rescueClose = page.locator('#screen-role-dashboard button:has-text("סגור אירוע")');
   await rescueClose.click();
   await page.waitForSelector('#incident-close-modal:not(.hidden)', { timeout: 5000 });
@@ -393,6 +393,7 @@ async function checkFile(browser, file) {
   await page.evaluate(() => startRoleDashboard('rpc'));
   await page.waitForSelector('#screen-role-dashboard.active', { timeout: 5000 });
   await page.evaluate(() => { patients.push({ id: newUuid(), visualId: 'L01', triage: 'red', patientStatus: 'evacuating', events: [], siteId: 'SITE_A' }); renderRoleDashboard('rpc'); });
+  await page.click('[data-rcc-incident-row="SITE_A"]'); // the RPC panel opens on its incidents table
   await page.click('#screen-role-dashboard button:has-text("סגור אירוע")');
   await page.waitForSelector('#incident-close-modal:not(.hidden)', { timeout: 5000 });
   assert((await page.textContent('#incident-close-list')).includes('L01'), `${rel}: local close guard should list the open local patient`);

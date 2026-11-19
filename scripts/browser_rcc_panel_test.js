@@ -32,7 +32,13 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-const USERS = { 'rcc@test': { id: RCC, role: 'rcc', display_name: 'מ"פ חילוץ בדיקה' } };
+const RPC = '44444444-4444-4444-8444-444444444444';
+const PLT1 = '55555555-5555-4555-8555-555555555555';
+const PLT2 = '66666666-6666-4666-8666-666666666666';
+const USERS = {
+  'rcc@test': { id: RCC, role: 'rcc', display_name: 'מ"פ חילוץ בדיקה', platoon_id: null },
+  'rpc@test': { id: RPC, role: 'rpc', display_name: 'מ"מ חילוץ בדיקה', platoon_id: PLT1 },
+};
 const userById = (id) => Object.values(USERS).find((u) => u.id === id);
 
 function newServer() {
@@ -41,8 +47,8 @@ function newServer() {
     is_trapped: false, evac_state: evac, priority, evac_order: order, updated_at: new Date().toISOString(), version: 1, evac_point_arrived_at: null, was_trapped: false, ...extra });
   return {
     incidents: [
-      { id: INC1, visual_id: 'INC-1', status: 'active', location_name: 'רחוב הרצל', address: null, incident_type: 'missile_strike_structural_collapse', t_zero: null, opened_at: new Date().toISOString(), patient_count: 3, is_member: false },
-      { id: INC2, visual_id: 'INC-2', status: 'active', location_name: 'צומת גומא', address: null, incident_type: 'vehicle_accident', t_zero: null, opened_at: new Date().toISOString(), patient_count: 2, is_member: false },
+      { id: INC1, visual_id: 'INC-1', status: 'active', location_name: 'רחוב הרצל', address: null, incident_type: 'missile_strike_structural_collapse', t_zero: null, opened_at: new Date().toISOString(), patient_count: 3, is_member: false, platoon_id: PLT1 },
+      { id: INC2, visual_id: 'INC-2', status: 'active', location_name: 'צומת גומא', address: null, incident_type: 'vehicle_accident', t_zero: null, opened_at: new Date().toISOString(), patient_count: 2, is_member: false, platoon_id: PLT2 },
     ],
     boards: {
       [INC1]: [
@@ -78,11 +84,13 @@ function handle(server, req) {
     return { data: clone(req.single ? (rows[0] || null) : rows), error: null };
   }
   if (req.table === 'profiles') {
-    const rows = Object.values(USERS).map((x) => ({ id: x.id, role: x.role, display_name: x.display_name, is_active: true }));
+    const rows = Object.values(USERS).filter((x) => !req.eq.id || x.id === req.eq.id)
+      .map((x) => ({ id: x.id, role: x.role, display_name: x.display_name, is_active: true, company_id: null, platoon_id: x.platoon_id }));
     return { data: req.single ? rows[0] : rows, error: null };
   }
   if (req.table === 'incidents') {
-    const rows = server.incidents.filter((i) => Object.entries(req.eq || {}).every(([c, v]) => i[c] === v));
+    const rows = server.incidents.filter((i) => Object.entries(req.eq || {}).every(([c, v]) => i[c] === v)
+      && Object.entries(req.in || {}).every(([c, v]) => v.includes(i[c])));
     return { data: clone(req.single ? (rows[0] || null) : rows), error: null };
   }
   return { data: req.single ? null : [], error: null };
@@ -180,6 +188,7 @@ async function checkDemo(browser, rel, file) {
     patients.push({ ...base, id: 'b1', visualId: 'P005', triage: 'green', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B' });
     patients.push({ ...base, id: 'b2', visualId: 'P006', triage: 'green', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', trapStatus: 'trapped' });
     patients.push({ ...base, id: 'b3', visualId: 'P007', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', trapStatus: 'trapped' });
+    patients.push({ ...base, id: 'b4', visualId: 'P008', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', trapStatus: 'access_blocked', accessibility: 'blocked' });
     ensureSiteStatusFields('SITE_A').incidentType = 'missile_strike_structural_collapse';
     ensureSiteStatusFields('SITE_B').incidentType = 'mass_shooting';
     goTo('demo'); startRoleDashboard('rcc');
@@ -194,7 +203,8 @@ async function checkDemo(browser, rel, file) {
   // columns (owner 2026-11-19): trapped urgent, trapped not urgent, trapped not sorted, trapped in
   // total (still to be extracted), at the נאפ״ל, evacuated to hospital, every casualty of the incident
   assert(JSON.stringify(ov.rows[0].cells) === '["1","0","0","1","0","0","3"]', `${rel}: site A counts (got ${JSON.stringify(ov.rows[0].cells)})`);
-  assert(JSON.stringify(ov.rows[1].cells) === '["0","1","1","2","0","0","3"]', `${rel}: site B: trapped not urgent / not sorted (got ${JSON.stringify(ov.rows[1].cells)})`);
+  // "אין גישה" (P008) waits for rescue like trapped (owner, 2026-11-19)
+  assert(JSON.stringify(ov.rows[1].cells) === '["0","1","2","3","0","0","4"]', `${rel}: site B: trapped not urgent / not sorted, no access counted as trapped (got ${JSON.stringify(ov.rows[1].cells)})`);
   assert((await page.evaluate(() => document.querySelector('[data-rcc-incident-detail="SITE_A"] [data-rcc-freed]')?.dataset.rccFreed)) === '2', `${rel}: freed and not at the נאפ״ל yet: P001 and P003`);
   assert(!ov.resp, `${rel}: responsibilities must be closed until the button is pressed`);
   // No T0 in the demo: trapped time counts from the first trapped casualty's registration, "at least".
@@ -307,10 +317,63 @@ async function checkSignedIn(browser, rel, file) {
   const order = await page.evaluate(() => [...document.querySelectorAll('[data-rescue-priority]')].map((r) => r.querySelector('.role-row-title').textContent));
   assert(order.length === 2 && order[0].includes('P001-AA') && order[1].includes('P002-AA'), `${rel}: incident view lists the board in evacuation order (got ${JSON.stringify(order)})`);
   assert((await bodyText(page)).includes('בנאפ״ל'), `${rel}: arrived patient shown at the evacuation point`);
+  // Access sync (V2.99.76): a medic's trapped / no-access mark is sent once the patient exists on
+  // the server, as access_status 'blocked' for "אין גישה", and the server's "unknown" never wipes it.
+  const sync = await page.evaluate((inc) => {
+    const role = currentUser.role; currentUser.role = 'medic';
+    patients.push({ id: 'acc-1', visualId: 'P090', siteId: 'SITE_A', incidentId: inc, trapStatus: 'access_blocked', accessibility: 'blocked', _serverVersion: 1, events: [], vitals: {} });
+    patients.push({ id: 'acc-2', visualId: 'P091', siteId: 'SITE_A', incidentId: inc, trapStatus: 'trapped', events: [], vitals: {} }); // not on the server yet
+    reconcileAccessSync(); reconcileAccessSync();
+    const sent = getOutbox().filter((e) => e.type === 'PATIENT_ACCESS_UPDATED').map((e) => `${e.patient_id}:${e.payload_json.access_status}`);
+    applyProjectedPatientState([{ id: 'acc-1', visual_id: 'P090', current_triage: null, current_status: 'identified', access_status: 'unknown', needs_full_assessment: true }]);
+    const kept = patients.find((p) => p.id === 'acc-1').trapStatus;
+    patients.splice(patients.findIndex((p) => p.id === 'acc-1'), 1); patients.splice(patients.findIndex((p) => p.id === 'acc-2'), 1);
+    currentUser.role = role;
+    return { sent, kept };
+  }, INC1);
+  assert(JSON.stringify(sync.sent) === '["acc-1:blocked"]', `${rel}: access sent once, only for a patient the server has (got ${JSON.stringify(sync.sent)})`);
+  assert(sync.kept === 'access_blocked', `${rel}: the server's unknown access does not wipe the phone's mark (got ${sync.kept})`);
+
   await page.click('[data-rcc-all-incidents]');
   await page.waitForFunction(() => !activeIncident && document.querySelectorAll('[data-rcc-incident-row]').length === 2, null, { timeout: 5000 });
   assert(!errors.length, `${rel}: page errors: ${errors.join(' | ')}`);
   await context.close();
+}
+
+// RPC (owner, 2026-11-19): the same panel, only the incidents of the RPC's own platoon.
+async function checkRpc(browser, rel, file) {
+  const context = await browser.newContext({ viewport: { width: 420, height: 900 } });
+  const page = await context.newPage();
+  page.on('dialog', (d) => d.accept());
+  await page.route('**/supabase-js@*/**', (r) => r.fulfill({ contentType: 'application/javascript', body: '' }));
+  await page.goto('file://' + file, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#screen-pin-gate.active', { timeout: 5000 });
+  await page.fill('#pin-gate-setup-new', PIN); await page.fill('#pin-gate-setup-confirm', PIN); await page.click('#pin-gate-setup-btn');
+  await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    const base = { events: [], location: 'בניין 3', patientStatus: 'in_treatment', trapStatus: 'trapped', vitals: {}, createdAt: new Date().toISOString() };
+    patients.push({ ...base, id: 'ra', visualId: 'P001', triage: 'red', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A' });
+    patients.push({ ...base, id: 'rb', visualId: 'P002', triage: 'red', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B' });
+    goTo('demo'); startRoleDashboard('rpc');
+  });
+  const demoRows = await page.evaluate(() => [...document.querySelectorAll('[data-rcc-incident-row]')].map((r) => r.dataset.rccIncidentRow));
+  assert(JSON.stringify(demoRows) === '["SITE_A"]', `${rel}: demo RPC sees its platoon's site only (got ${JSON.stringify(demoRows)})`);
+  const title = await page.evaluate(() => document.getElementById('role-dashboard-body').innerText);
+  assert(title.includes('כל האירועים במחלקה') && !title.includes('P002'), `${rel}: RPC table titled for the platoon, no other platoon's patient`);
+  await context.close();
+
+  SERVER = newServer();
+  const ctx2 = await browser.newContext({ viewport: { width: 420, height: 900 } });
+  await ctx2.exposeBinding('__fakeServer', (_source, req) => handle(SERVER, req));
+  const { page: p2, errors } = await openPhone(ctx2, file);
+  await login(p2, 'rpc@test');
+  await p2.waitForFunction(() => document.querySelectorAll('[data-rcc-incident-row]').length >= 1 && !!_rescueBoardsAt, null, { timeout: 5000 });
+  await p2.waitForTimeout(200);
+  const rows = await p2.evaluate(() => [...document.querySelectorAll('[data-rcc-incident-row]')].map((r) => r.dataset.rccIncidentRow));
+  assert(JSON.stringify(rows) === JSON.stringify([INC1]), `${rel}: signed-in RPC sees its platoon's incident only (got ${JSON.stringify(rows)})`);
+  assert(SERVER.clinicalReads === 0, `${rel}: the RPC panel never reads the patients table`);
+  assert(!errors.length, `${rel}: page errors: ${errors.join(' | ')}`);
+  await ctx2.close();
 }
 
 (async () => {
@@ -321,6 +384,7 @@ async function checkSignedIn(browser, rel, file) {
       const rel = path.relative(root, file);
       await checkDemo(browser, rel, file);
       await checkSignedIn(browser, rel, file);
+      await checkRpc(browser, rel, file);
       console.log(`${rel}: RCC panel browser test passed`);
     }
   } finally {

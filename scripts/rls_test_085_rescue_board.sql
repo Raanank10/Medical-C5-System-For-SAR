@@ -14,6 +14,8 @@ declare
   P_PART  uuid := gen_random_uuid();  -- partially trapped now
   P_NEVER uuid := gen_random_uuid();  -- never trapped, on the way to the evacuation point
   P_HOSP  uuid := gen_random_uuid();  -- was trapped (event), handed over
+  P_BLOCK uuid := gen_random_uuid();  -- "אין גישה" now
+  P_FR    uuid := gen_random_uuid();  -- reported trapped by a first responder (access unknown)
   CA uuid; A1 uuid;
   rcc_co uuid; pc_co uuid; m1_pl uuid; m1_co uuid;
   r text := ''; n bigint; s text; j jsonb;
@@ -34,21 +36,26 @@ begin
            (P_FREED, X, 'T85-FREED', now(), 'yellow', 'evacuating', 'free',    M1),
            (P_PART,  X, 'T85-PART',  now(), null,     'identified', 'partial', M1),
            (P_NEVER, X, 'T85-NEVER', now(), 'green',  'evacuating', 'free',    M1),
-           (P_HOSP,  X, 'T85-HOSP',  now(), 'red',    'handed_over','free',    M1);
+           (P_HOSP,  X, 'T85-HOSP',  now(), 'red',    'handed_over','free',    M1),
+           (P_BLOCK, X, 'T85-BLOCK', now(), null,     'identified', 'blocked', M1),
+           (P_FR,    X, 'T85-FR',    now(), null,     'identified', 'unknown', RCC);
   update patients set evac_point_arrived_at = now() where id = P_FREED;
   insert into events (incident_id, patient_id, actor_id, actor_role, type, payload_json, device_id, local_event_id, local_timestamp) values
     (X, P_FREED, M1, 'medic', 'PATIENT_ACCESS_UPDATED', '{"trap_status":"trapped","access_status":"trapped"}', 'test85-dev', 'test85-1', now() - interval '30 minutes'),
     (X, P_FREED, M1, 'medic', 'PATIENT_ACCESS_UPDATED', '{"trap_status":"not_trapped","access_status":"free"}', 'test85-dev', 'test85-2', now() - interval '10 minutes'),
-    (X, P_HOSP,  M1, 'medic', 'PATIENT_ACCESS_UPDATED', '{"access_status":"partial"}', 'test85-dev', 'test85-3', now() - interval '40 minutes');
+    (X, P_HOSP,  M1, 'medic', 'PATIENT_ACCESS_UPDATED', '{"access_status":"partial"}', 'test85-dev', 'test85-3', now() - interval '40 minutes'),
+    (X, P_FR,    RCC, 'rcc',  'FIRST_RESPONDER_REPORT', '{"visual_id":"T85-FR","trapped":true}', 'test85-dev', 'test85-4', now() - interval '20 minutes');
   -- The access trigger projects these events onto patients.access_status; put the final values back.
   update patients set access_status = 'free' where id in (P_FREED, P_HOSP);
+
+  select access_status::text into s from patients where id = P_FR; r := r || 'first responder trapped -> ' || s || ' (want trapped); ';
 
   -- rcc of the company: the board carries was_trapped and evac_point_arrived_at
   perform set_config('request.jwt.claims', json_build_object('sub', RCC, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
-  select count(*) into n from get_rescue_patient_board(X); r := r || 'rcc board X=' || n || ' (want 5); ';
+  select count(*) into n from get_rescue_patient_board(X); r := r || 'rcc board X=' || n || ' (want 7); ';
   select string_agg(visual_id || ':' || was_trapped::text, ',' order by visual_id) into s from get_rescue_patient_board(X);
-  r := r || 'was_trapped ' || s || ' (want FREED:true,HOSP:true,NEVER:false,PART:true,STILL:true); ';
+  r := r || 'was_trapped ' || s || ' (want BLOCK:true,FR:true,FREED:true,HOSP:true,NEVER:false,PART:true,STILL:true); ';
   select string_agg(visual_id || ':' || (evac_point_arrived_at is not null)::text, ',' order by visual_id) into s
     from get_rescue_patient_board(X) where evac_state = 'evacuating';
   r := r || 'at point ' || s || ' (want FREED:true,NEVER:false); ';
@@ -61,8 +68,13 @@ begin
   -- the stored report's rescue section
   j := app.build_incident_aar(X)->'rescue';
   r := r || 'report rescue ' || coalesce(j::text, 'null')
-         || ' (want total 5, ever_trapped 4, extracted 2, trapped_at_close 2, at_evac_point_at_close 1, evacuated 1); ';
+         || ' (want total 7, ever_trapped 6, extracted 2, trapped_at_close 4, at_evac_point_at_close 1, evacuated 1); ';
   r := r || case when app.build_incident_aar(X) ? 'external_reports' then 'ok 069 section kept; ' else 'FAIL 069 section lost; ' end;
+
+  -- Last, as it changes the counts above: a blocked status sent by a phone is projected by 041's cast.
+  insert into events (incident_id, patient_id, actor_id, actor_role, type, payload_json, device_id, local_event_id, local_timestamp) values
+    (X, P_NEVER, M1, 'medic', 'PATIENT_ACCESS_UPDATED', '{"trap_status":"access_blocked","access_status":"blocked","source":"access_sync"}', 'test85-dev', 'test85-5', now());
+  select access_status::text into s from patients where id = P_NEVER; r := r || 'access_sync blocked -> ' || s || ' (want blocked); ';
 
   update profiles set company_id = rcc_co where id = RCC;
   update profiles set company_id = pc_co where id = PC;

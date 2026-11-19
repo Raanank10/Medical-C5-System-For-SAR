@@ -55,16 +55,16 @@ for (const rel of files) {
   // Wired into renderRoleDashboard for rpc/rcc only, scoped via the existing roleScopedPatients
   // (rpc = own platoon, rcc = whole company) - no new DecisionSupportEngine method needed since
   // this is a direct sort, not an acknowledgable recommendation.
-  assert(roleDashboardFn.includes("role==='rpc'?renderRescueEvacOrderPanel(pts,'סדר פינוי מומלץ — מחלקה שלי')"), `${rel}: rpc must render the evac-order panel scoped to its own platoon`);
+  // Since V2.99.76 the RPC has the RCC panel too (owner 2026-11-19), scoped to its own platoon.
+  assert(roleDashboardFn.includes('if(RESCUE_PANEL_ROLES.has(role)){') && html.includes("const RESCUE_PANEL_ROLES=new Set(['rpc','rcc']);"), `${rel}: rpc must render the rescue panel`);
+  assert(html.includes("const platoonOk=inc=>rescueCmdRole()!=='rpc'"), `${rel}: the rpc table keeps its own platoon's incidents only`);
   // RCC has its own panel since V2.99.76 (owner 2026-11-19): incidents table, a row opens the
   // incident's patients in the same shared evacuation order.
   const rccIncidentFn = section(html, 'function renderRccIncidentView(cfg){', 'function renderRccOverview(){');
-  assert(roleDashboardFn.includes("if(role==='rcc'){") && roleDashboardFn.includes('body.innerHTML=renderRccPanel();'), `${rel}: rcc must render its own panel`);
+  assert(roleDashboardFn.includes('body.innerHTML=renderRccPanel();'), `${rel}: rcc must render its own panel`);
   assert(rccIncidentFn.includes("renderRescueEvacOrderPanel(pts, 'סדר פינוי — הפצועים באירוע')"), `${rel}: rcc incident view must use the shared evac-order panel`);
-  assert(roleDashboardFn.includes('${rescueEvacOrderPanel}'), `${rel}: rescueEvacOrderPanel must be spliced into the rendered sections`);
 
   // Section titles: identity is shown, clinical data is not (database/074).
-  assert(roleDashboardFn.includes('תמונה טקטית — מחלקה שלי (ללא מידע קליני)'), `${rel}: rpc tactical section title must say no clinical data`);
   assert(!html.slice(html.indexOf('function renderRccPanel(')).split('function renderRoleDashboard(')[0].includes('TRIAGE_LABELS'), `${rel}: rcc panel must not show the triage colour`);
   assert(html.includes('data-aar-rescue') && html.includes('rep.rescue.extracted'), `${rel}: the stored report shows the rescue section (database/085)`);
   assert(!roleDashboardFn.includes('ללא מדדים / זהות'), `${rel}: no rpc/rcc section title should still claim identity is excluded`);

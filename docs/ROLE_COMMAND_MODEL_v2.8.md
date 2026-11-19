@@ -45,7 +45,11 @@ Owner decisions, 2026-11-19. The RCC no longer shares the generic role dashboard
 
 `database/085` (not applied live yet; test: `scripts/rls_test_085_rescue_board.sql`) adds `evac_point_arrived_at` and `was_trapped` to `get_rescue_patient_board()` and the `rescue` section to the stored report. Until it is applied the evacuation message says "בפינוי לנאפ״ל" when the patient starts evacuating, and "extracted so far" is unknown for server patients.
 
-The RPC screen is unchanged for now.
+**RPC (מ״מ חילוץ), owner 2026-11-19:** the same panel, limited to the incidents (sites) of the RPC's own platoon and their patients. The server also lists the company's incidents that have no platoon yet (064d, so every RPC is alerted); they stay out of the RPC's table. An RPC with no platoon sees an empty table that says so.
+
+**"אין גישה" counts as trapped** (owner, 2026-11-19): a casualty rescuers cannot reach yet is waiting for rescue. `access_status` gets a `blocked` value (database/085).
+
+**Access sync (found while building this):** before V2.99.76 trapped / not trapped / no access from the sweep, the quick paths and later edits never reached the server (only the full-assessment step sent `PATIENT_ACCESS_UPDATED`, before the patient existed there), and every pull wiped the phone's value with the server's "unknown". The phone now sends its value whenever it differs from the last one sent or read (as location does), and an "unknown" from the server no longer overwrites it. A first responder's "trapped" sets the patient's access status on the server (085). Rescuers cannot yet mark a casualty freed themselves (sync-log does not let rpc/rcc send `PATIENT_ACCESS_UPDATED`); that is an open owner decision.
 
 ## Clinical data stays with the medical roles (V2.99.63)
 
