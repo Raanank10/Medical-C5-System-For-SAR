@@ -173,11 +173,13 @@ async function checkDemo(browser, rel, file) {
   await page.fill('#pin-gate-setup-new', PIN); await page.fill('#pin-gate-setup-confirm', PIN); await page.click('#pin-gate-setup-btn');
   await page.waitForTimeout(300);
   await page.evaluate(() => {
-    const base = { events: [], location: 'בניין 3', patientStatus: 'in_treatment', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', trapStatus: 'not_trapped', vitals: {} };
+    const base = { events: [], location: 'בניין 3', patientStatus: 'in_treatment', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', trapStatus: 'not_trapped', vitals: {}, createdAt: new Date(Date.now() - 20 * 60000).toISOString() };
     patients.push({ ...base, id: 'r1', visualId: 'P001', fullName: 'ישראל ישראלי', triage: 'red', tourniquets: [{ id: 'T1', limb: 'rl', appliedAt: Date.now() - 50 * 60000, status: 'active' }] });
     patients.push({ ...base, id: 'r2', visualId: 'P002', triage: 'red', trapStatus: 'trapped' });
     patients.push({ ...base, id: 'y1', visualId: 'P003', triage: 'yellow', patientStatus: 'evacuating' });
     patients.push({ ...base, id: 'b1', visualId: 'P005', triage: 'green', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B' });
+    patients.push({ ...base, id: 'b2', visualId: 'P006', triage: 'green', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', trapStatus: 'trapped' });
+    patients.push({ ...base, id: 'b3', visualId: 'P007', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', trapStatus: 'trapped' });
     ensureSiteStatusFields('SITE_A').incidentType = 'missile_strike_structural_collapse';
     ensureSiteStatusFields('SITE_B').incidentType = 'mass_shooting';
     goTo('demo'); startRoleDashboard('rcc');
@@ -189,9 +191,14 @@ async function checkDemo(browser, rel, file) {
     stripHidden: getComputedStyle(document.querySelector('#screen-role-dashboard .demo-strip')).display === 'none',
   }));
   assert(JSON.stringify(ov.rows.map((r) => r.key)) === '["SITE_A","SITE_B"]', `${rel}: one table row per incident (got ${JSON.stringify(ov.rows)})`);
-  // columns: urgent, trapped, on site, being evacuated, evacuated
-  assert(JSON.stringify(ov.rows[0].cells) === '["2","1","2","1","0"]', `${rel}: site A counts (got ${JSON.stringify(ov.rows[0].cells)})`);
+  // columns (owner 2026-11-19): trapped urgent, trapped not urgent, trapped not sorted, everyone at
+  // the site (being carried to the נאפ״ל included), at the נאפ״ל, evacuated to hospital
+  assert(JSON.stringify(ov.rows[0].cells) === '["1","0","0","3","0","0"]', `${rel}: site A counts (got ${JSON.stringify(ov.rows[0].cells)})`);
+  assert(JSON.stringify(ov.rows[1].cells) === '["0","1","1","3","0","0"]', `${rel}: site B: trapped not urgent / not sorted (got ${JSON.stringify(ov.rows[1].cells)})`);
   assert(!ov.resp, `${rel}: responsibilities must be closed until the button is pressed`);
+  // No T0 in the demo: trapped time counts from the first trapped casualty's registration, "at least".
+  const demoTrap = await page.evaluate(() => document.querySelector('[data-rcc-incident-detail="SITE_A"] [data-rcc-trapped-since]')?.textContent || '');
+  assert(demoTrap.includes('לכודים לפחות'), `${rel}: without T0 the trapped time says "at least" (got ${demoTrap})`);
   assert(ov.stripHidden, `${rel}: the English version banner is hidden on the RCC panel`);
   noTriage(await bodyText(page), `${rel} overview`);
   await page.click('[data-rcc-responsibilities]');
@@ -205,6 +212,8 @@ async function checkDemo(browser, rel, file) {
     patients.find((p) => p.id === 'r2').patientStatus = 'handed_over';
     renderRoleDashboard('rcc');
   });
+  const after = await page.evaluate(() => [...document.querySelector('[data-rcc-incident-row="SITE_A"]').querySelectorAll('td')].map((td) => td.textContent.trim()));
+  assert(JSON.stringify(after) === '["0","0","0","1","1","1"]', `${rel}: freed trapped patient leaves the trapped column, arrival counted at the נאפ״ל (got ${JSON.stringify(after)})`);
   const msg = await page.evaluate(() => ({ banner: document.getElementById('rcc-evac-banner').innerText, feed: _rccEvacFeed.map((m) => `${m.visualId}:${m.text}`) }));
   assert(msg.banner.includes('P003 · הגיע לנאפ״ל') && msg.banner.includes('P002 · פונה לבית חולים'), `${rel}: banner names both patients (got ${msg.banner})`);
   assert(msg.feed.length === 2 && msg.feed.includes('P003:הגיע לנאפ״ל') && msg.feed.includes('P002:פונה לבית חולים'), `${rel}: both kept in the feed (got ${JSON.stringify(msg.feed)})`);
@@ -255,10 +264,14 @@ async function checkSignedIn(browser, rel, file) {
   await login(page, 'rcc@test');
   await page.waitForFunction(() => document.querySelectorAll('[data-rcc-incident-row]').length === 2, null, { timeout: 5000 });
   const rows = await page.evaluate(() => [...document.querySelectorAll('[data-rcc-incident-row]')].map((tr) => ({
-    key: tr.dataset.rccIncidentRow, sub: tr.querySelector('.rcc-row-sub').textContent, cells: [...tr.querySelectorAll('td')].map((td) => td.textContent.trim()) })));
-  assert(rows[0].key === INC1 && JSON.stringify(rows[0].cells) === '["1","1","1","1","1"]', `${rel}: INC-1 counts from the rescue board (got ${JSON.stringify(rows[0])})`);
+    key: tr.dataset.rccIncidentRow, sub: document.querySelector(`[data-rcc-incident-detail="${tr.dataset.rccIncidentRow}"] .rcc-row-sub`).textContent, cells: [...tr.querySelectorAll('td')].map((td) => td.textContent.trim()) })));
+  assert(rows[0].key === INC1 && JSON.stringify(rows[0].cells) === '["1","0","0","2","0","1"]', `${rel}: INC-1 counts from the rescue board (got ${JSON.stringify(rows[0])})`);
   assert(rows[0].sub.includes('מבנה: לא יציב') && rows[0].sub.includes('T0 לפני'), `${rel}: building status and T0 from incident_site_authority (got ${rows[0].sub})`);
-  assert(JSON.stringify(rows[1].cells) === '["1","0","2","0","0"]' && rows[1].sub.includes('תאונת דרכים'), `${rel}: INC-2 row (got ${JSON.stringify(rows[1])})`);
+  assert(JSON.stringify(rows[1].cells) === '["0","0","0","2","0","0"]' && rows[1].sub.includes('תאונת דרכים'), `${rel}: INC-2 row (got ${JSON.stringify(rows[1])})`);
+  // Trapped since T0 unless recorded otherwise (owner 2026-11-19); INC-1's official T0 is 30 min old.
+  const trap = await page.evaluate((id) => { const el = document.querySelector(`[data-rcc-incident-detail="${id}"] [data-rcc-trapped-since]`); return el && { since: el.dataset.rccTrappedSince, oldest: el.dataset.rccTrappedOldest, text: el.textContent }; }, INC1);
+  assert(trap && trap.since === '30' && trap.oldest === '0' && trap.text.includes('(מ-T0)'), `${rel}: trapped time from T0 and oldest trapped update (got ${JSON.stringify(trap)})`);
+  assert(!(await page.locator(`[data-rcc-incident-detail="${INC2}"] [data-rcc-trapped-since]`).count()), `${rel}: no trapped line without trapped casualties`);
   noTriage(await bodyText(page), `${rel} signed-in overview`);
 
   // Server changes: P002-AA reaches the evacuation point (085), P001-BB is handed over, and a
@@ -273,6 +286,10 @@ async function checkSignedIn(browser, rel, file) {
   assert(JSON.stringify(feed) === JSON.stringify(['P001-BB:פונה לבית חולים', 'P002-AA:הגיע לנאפ״ל', 'P002-BB:בפינוי לנאפ״ל']),
     `${rel}: messages from every incident (got ${JSON.stringify(feed)})`);
   assert(await page.locator('#rcc-evac-banner').isVisible(), `${rel}: banner shown`);
+  const cellsAfter = await page.evaluate(() => [...document.querySelectorAll('[data-rcc-incident-row]')].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent.trim()).join(',')));
+  // INC-1: P002-AA arrived (085). INC-2: P001-BB to hospital, P002-BB evacuating on a server without
+  // 085 cannot be placed at the נאפ״ל, so it stays in the on-site total.
+  assert(JSON.stringify(cellsAfter) === JSON.stringify(['1,0,0,1,1,1', '0,0,0,1,0,1']), `${rel}: table after the server changes (got ${JSON.stringify(cellsAfter)})`);
   assert(SERVER.clinicalReads === 0, `${rel}: the RCC overview never reads the patients table (got ${SERVER.clinicalReads})`);
 
   // A row opens the incident; the strip leads back to every incident.
