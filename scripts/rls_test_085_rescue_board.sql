@@ -1,0 +1,72 @@
+-- Rolled-back test for database/085 (RCC panel, V2.99.76). Run in the Supabase SQL editor after
+-- 085 is applied. It ends with an error on purpose so nothing persists; the error text is the
+-- result. Every item should start with "ok" or show the expected value.
+-- Uses the synthetic test accounts of the live project, looked up by role; every unit, site,
+-- patient and event it needs is created inside the block and rolled back.
+do $test$
+declare
+  RCC  uuid := (select id from profiles where role = 'rcc' and is_active order by created_at limit 1);
+  PC   uuid := (select id from profiles where role = 'pc' and is_active order by created_at limit 1);
+  M1   uuid := (select id from profiles where role = 'medic' and is_active order by created_at limit 1);
+  X uuid := gen_random_uuid();
+  P_STILL uuid := gen_random_uuid();  -- trapped now
+  P_FREED uuid := gen_random_uuid();  -- was trapped (event), freed, at the evacuation point
+  P_PART  uuid := gen_random_uuid();  -- partially trapped now
+  P_NEVER uuid := gen_random_uuid();  -- never trapped, on the way to the evacuation point
+  P_HOSP  uuid := gen_random_uuid();  -- was trapped (event), handed over
+  CA uuid; A1 uuid;
+  rcc_co uuid; pc_co uuid; m1_pl uuid; m1_co uuid;
+  r text := ''; n bigint; s text; j jsonb;
+begin
+  select company_id into rcc_co from profiles where id = RCC;
+  select company_id into pc_co from profiles where id = PC;
+  select platoon_id, company_id into m1_pl, m1_co from profiles where id = M1;
+
+  insert into companies(name, kind) values ('TEST85-CO', 'rescue') returning id into CA;
+  insert into platoons(company_id, name) values (CA, 'A1') returning id into A1;
+  update profiles set company_id = CA, platoon_id = null where id in (RCC, PC);
+  update profiles set platoon_id = A1, company_id = null where id = M1;
+  insert into incidents (id, visual_id, t_zero, t_injury_default, location_name, status, opened_at, company_id, platoon_id)
+    values (X, 'TEST85-X', now(), now(), 'TEST85 X', 'active', now(), CA, A1);
+  insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by) values (X, M1, 'medic', PC);
+  insert into patients (id, incident_id, visual_id, t_injury, current_triage, current_status, access_status, created_by)
+    values (P_STILL, X, 'T85-STILL', now(), 'red',    'identified', 'trapped', M1),
+           (P_FREED, X, 'T85-FREED', now(), 'yellow', 'evacuating', 'free',    M1),
+           (P_PART,  X, 'T85-PART',  now(), null,     'identified', 'partial', M1),
+           (P_NEVER, X, 'T85-NEVER', now(), 'green',  'evacuating', 'free',    M1),
+           (P_HOSP,  X, 'T85-HOSP',  now(), 'red',    'handed_over','free',    M1);
+  update patients set evac_point_arrived_at = now() where id = P_FREED;
+  insert into events (incident_id, patient_id, actor_id, actor_role, type, payload_json, device_id, local_event_id, local_timestamp) values
+    (X, P_FREED, M1, 'medic', 'PATIENT_ACCESS_UPDATED', '{"trap_status":"trapped","access_status":"trapped"}', 'test85-dev', 'test85-1', now() - interval '30 minutes'),
+    (X, P_FREED, M1, 'medic', 'PATIENT_ACCESS_UPDATED', '{"trap_status":"not_trapped","access_status":"free"}', 'test85-dev', 'test85-2', now() - interval '10 minutes'),
+    (X, P_HOSP,  M1, 'medic', 'PATIENT_ACCESS_UPDATED', '{"access_status":"partial"}', 'test85-dev', 'test85-3', now() - interval '40 minutes');
+  -- The access trigger projects these events onto patients.access_status; put the final values back.
+  update patients set access_status = 'free' where id in (P_FREED, P_HOSP);
+
+  -- rcc of the company: the board carries was_trapped and evac_point_arrived_at
+  perform set_config('request.jwt.claims', json_build_object('sub', RCC, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  select count(*) into n from get_rescue_patient_board(X); r := r || 'rcc board X=' || n || ' (want 5); ';
+  select string_agg(visual_id || ':' || was_trapped::text, ',' order by visual_id) into s from get_rescue_patient_board(X);
+  r := r || 'was_trapped ' || s || ' (want FREED:true,HOSP:true,NEVER:false,PART:true,STILL:true); ';
+  select string_agg(visual_id || ':' || (evac_point_arrived_at is not null)::text, ',' order by visual_id) into s
+    from get_rescue_patient_board(X) where evac_state = 'evacuating';
+  r := r || 'at point ' || s || ' (want FREED:true,NEVER:false); ';
+  select count(*) into n from get_rescue_patient_board(X) where evac_state = 'evacuated' and evac_point_arrived_at is not null;
+  r := r || 'arrival hidden after evacuation=' || n || ' (want 0); ';
+  begin perform app.rescue_patient_was_trapped(P_STILL, 'trapped'); r := r || 'FAIL rcc called the helper directly; ';
+  exception when others then r := r || 'ok helper not callable; '; end;
+  execute 'reset role';
+
+  -- the stored report's rescue section
+  j := app.build_incident_aar(X)->'rescue';
+  r := r || 'report rescue ' || coalesce(j::text, 'null')
+         || ' (want total 5, ever_trapped 4, extracted 2, trapped_at_close 2, at_evac_point_at_close 1, evacuated 1); ';
+  r := r || case when app.build_incident_aar(X) ? 'external_reports' then 'ok 069 section kept; ' else 'FAIL 069 section lost; ' end;
+
+  update profiles set company_id = rcc_co where id = RCC;
+  update profiles set company_id = pc_co where id = PC;
+  update profiles set platoon_id = m1_pl, company_id = m1_co where id = M1;
+  raise exception 'TEST85 RESULT: %', r;
+end
+$test$;

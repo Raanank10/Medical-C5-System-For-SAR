@@ -1,6 +1,6 @@
--- RCC evacuation messages: the rescue board tells "at the evacuation point" from "on the way"
--- (RCC panel, V2.99.76, repo owner 2026-11-19). Needs 074 (the board) and 077 (the arrival
--- columns) applied first.
+-- RCC panel (V2.99.76, repo owner 2026-11-19): the rescue board tells "at the evacuation point"
+-- from "on the way" and says who was ever trapped; the stored report keeps the rescue counts.
+-- Needs 069 (the report wrapper), 074 (the board) and 077 (the arrival columns) applied first.
 --
 -- Why. The RCC gets a message when a patient reaches the evacuation point (נאפ״ל) or is evacuated
 -- to hospital. get_rescue_patient_board() (074) returns evac_state on_site / evacuating /
@@ -13,11 +13,37 @@
 -- place, not clinical data (no colour, tourniquet, vitals or treatment), so it is inside the
 -- rescue chain's scope (docs/ROLE_COMMAND_MODEL_v2.8.md).
 --
--- A new output column changes the return type, so the function is dropped and created again;
+-- Second column: was_trapped, true when the patient is trapped now or any event ever recorded them
+-- trapped (PATIENT_ACCESS_UPDATED trap_status / access_status, or a create payload). The board
+-- only knows who is trapped now; the RCC table counts "extracted so far" (was trapped, is not any
+-- more) so the incident's history does not vanish as patients are freed and evacuated.
+--
+-- Third: the stored report (068, wrapped by 069) gets a 'rescue' section at close: total
+-- patients, ever trapped, extracted, still trapped, at the evacuation point, evacuated. Same
+-- wrapper pattern as 069: the current function is renamed and called.
+--
+-- New output columns change the return type, so the function is dropped and created again;
 -- the grants are restated. The client reads the column only when it is present: before this file
 -- is applied the RCC message says "בפינוי לנאפ״ל" on 'evacuating' instead of "הגיע לנאפ״ל".
 
 begin;
+
+-- Was this patient ever trapped? Current access status, or any event that recorded it trapped.
+create or replace function app.rescue_patient_was_trapped(p_patient_id uuid, p_access_status text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(p_access_status, '') in ('trapped', 'partial')
+      or exists (select 1 from events e
+                 where e.patient_id = p_patient_id
+                   and (e.payload_json->>'trap_status' = 'trapped'
+                        or e.payload_json->>'access_status' in ('trapped', 'partial')
+                        or e.payload_json->>'trapped' = 'true'))
+$$;
+revoke execute on function app.rescue_patient_was_trapped(uuid, text) from public, anon, authenticated;
 
 drop function if exists public.get_rescue_patient_board(uuid);
 
@@ -25,7 +51,7 @@ create function public.get_rescue_patient_board(p_incident_id uuid)
 returns table(id uuid, visual_id text, optional_name text, identifying_description text,
               location_json jsonb, access_status text, trap_status text, is_trapped boolean,
               evac_state text, priority text, evac_order integer, updated_at timestamptz, version integer,
-              evac_point_arrived_at timestamptz)
+              evac_point_arrived_at timestamptz, was_trapped boolean)
 language plpgsql
 stable
 security definer
@@ -101,7 +127,8 @@ begin
          r.updated_at, r.version,
          -- 085: only while the patient is evacuating (moving or at the point); final statuses keep the
          -- column for the stored report, the rescue board does not need it then.
-         case when r.current_status::text = 'evacuating' then r.evac_point_arrived_at end
+         case when r.current_status::text = 'evacuating' then r.evac_point_arrived_at end,
+         app.rescue_patient_was_trapped(r.id, r.access_status::text)
   from scored r
   order by r.score, r.id;
 end;
@@ -109,5 +136,33 @@ $function$;
 
 revoke all on function public.get_rescue_patient_board(uuid) from public, anon;
 grant execute on function public.get_rescue_patient_board(uuid) to authenticated;
+
+-- The stored report keeps the rescue counts (built at close by app.store_incident_aar_on_close()).
+alter function app.build_incident_aar(uuid) rename to build_incident_aar_ext;
+
+create or replace function app.build_incident_aar(p_incident_id uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select app.build_incident_aar_ext(p_incident_id) || jsonb_build_object(
+    'rescue', (
+      select jsonb_build_object(
+        'total', count(*),
+        'ever_trapped', count(*) filter (where x.was_trapped),
+        'extracted', count(*) filter (where x.was_trapped and not x.trapped_now),
+        'trapped_at_close', count(*) filter (where x.trapped_now),
+        'at_evac_point_at_close', count(*) filter (where x.status = 'evacuating' and x.evac_point_arrived_at is not null),
+        'evacuated', count(*) filter (where x.status in ('handed_over', 'evacuated', 'self_evacuated', 'closed')))
+      from (select app.rescue_patient_was_trapped(p.id, p.access_status::text) as was_trapped,
+                   coalesce(p.access_status::text, '') in ('trapped', 'partial')
+                     and coalesce(p.current_status::text, '') not in ('evacuating', 'handed_over', 'evacuated', 'self_evacuated', 'closed') as trapped_now,
+                   p.current_status::text as status, p.evac_point_arrived_at
+            from patients p where p.incident_id = p_incident_id) x))
+$$;
+revoke execute on function app.build_incident_aar(uuid) from public, anon, authenticated;
+revoke execute on function app.build_incident_aar_ext(uuid) from public, anon, authenticated;
 
 commit;

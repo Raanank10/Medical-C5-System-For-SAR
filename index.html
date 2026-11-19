@@ -5999,6 +5999,7 @@ function saveDemoState(){
   if(_demoSandbox) return Promise.resolve();
   reconcileTriageSync();
   reconcileLocationSync();
+  markEverTrapped(patients);
   return runSerialized(DEMO_STORAGE_KEY, async ()=>{
     try{
       const raw=await secureGetItem(DEMO_STORAGE_KEY);
@@ -7995,6 +7996,7 @@ function rescueBoardRowPatient(row, incidentId){
     rescueEvacState:RESCUE_BOARD_EVAC_STATES.has(row.evac_state)?row.evac_state:'on_site',
     rescueEvacOrder:order,
     rescueEvacPointAt:rescueBoardEvacPointAt(row),
+    rescueWasTrapped:rescueBoardWasTrapped(row),
     lastModifiedAt:row.updated_at||null
   };
 }
@@ -8003,6 +8005,22 @@ function rescueBoardEvacPointAt(row){
   if(!row || !Object.prototype.hasOwnProperty.call(row,'evac_point_arrived_at')) return undefined;
   const t=Date.parse(row.evac_point_arrived_at||'');
   return Number.isFinite(t) ? t : null;
+}
+// undefined: the server has no database/085 yet; otherwise whether the patient was ever trapped.
+function rescueBoardWasTrapped(row){
+  if(!row || !Object.prototype.hasOwnProperty.call(row,'was_trapped')) return undefined;
+  return row.was_trapped===true;
+}
+// Ever trapped: trapped now, seen trapped on this phone (everTrapped), or the server says so (085).
+// null when it cannot be known: a server patient without 085 who is not trapped now.
+function rescueWasTrapped(p){
+  if(p.trapStatus==='trapped' || p.everTrapped===true || p.rescueWasTrapped===true) return true;
+  if(p.sourcedFromRemote && p.rescueWasTrapped===undefined) return null;
+  return false;
+}
+// The phone remembers who it saw trapped, so "extracted so far" survives the trapped mark being cleared.
+function markEverTrapped(list){
+  (list||[]).forEach(p=>{ if(p && p.trapStatus==='trapped' && p.everTrapped!==true) p.everTrapped=true; });
 }
 // on_site / moving (to the evacuation point) / at_point (נאפ״ל) / evacuated (to hospital).
 function rescueEvacStage(p){
@@ -8028,9 +8046,20 @@ function rescueStageCounts(pts){
       if(prio==='urgent') c.trappedUrgent++; else if(prio==='not_urgent') c.trappedNotUrgent++; else c.trappedPending++;
     }
   });
+  // Extracted so far: was trapped, is not any more (freed, at the נאפ״ל or at hospital).
+  c.everTrapped=0; c.extracted=0; c.trappedHistoryKnown=true;
+  pts.forEach(p=>{
+    const was=rescueWasTrapped(p);
+    if(was===null){ c.trappedHistoryKnown=false; return; }
+    if(!was) return;
+    c.everTrapped++;
+    if(!(rescueEvacStage(p)==='on_site' && p.trapStatus==='trapped')) c.extracted++;
+  });
   // On site = everyone not at the נאפ״ל yet: trapped, freed, and those being carried there. A server
   // without database/085 cannot tell carried from arrived, so its "evacuating" counts here.
   c.onSiteTotal=c.onSite+c.moving;
+  // Freed from the rubble (or never trapped) and not at the נאפ״ל yet: at the site or being carried.
+  c.freedNotAtPoint=c.onSiteTotal-c.trapped;
   return c;
 }
 // Every incident the RCC sees, as one row each.
@@ -8099,6 +8128,7 @@ function rccWatchedPatients(){
 }
 function rccCheckEvacTransitions(){
   if(!isRccViewer()) return;
+  markEverTrapped(currentUser?getSitePatients('SITE_A'):roleScopedPatients('rcc'));
   const first=!_rccEvacSeen;
   const seen=_rccEvacSeen ? new Map(_rccEvacSeen) : new Map();
   const fresh=[];
@@ -8184,7 +8214,7 @@ function renderRccStrip(pts, overview){
       <button class="cmd-strip-chip" data-rcc-responsibilities onclick="toggleRccResponsibilities()">${rccResponsibilitiesOpen?'סגור אחריות ✕':'ⓘ האחריות שלי'}</button>
       ${more}
     </div>
-    <div class="cmd-strip-counts">${cell(c.trappedUrgent,'לכוד דחוף','var(--red)')}${cell(c.trapped,'לכודים','var(--orange)')}${cell(c.onSiteTotal,'באתר','var(--text)')}${cell(c.atPoint,'בנאפ״ל','var(--orange)')}${cell(c.evacuated,'פונו לבי״ח','var(--green)')}</div>
+    <div class="cmd-strip-counts">${cell(c.trappedUrgent,'לכוד דחוף','var(--red)')}${cell(c.trapped,'סה״כ לכודים','var(--orange)')}${cell(c.atPoint,'בנאפ״ל','var(--orange)')}${cell(c.evacuated,'פונו לבי״ח','var(--green)')}${cell(c.total,'סה״כ באירוע','var(--text)')}</div>
     <div class="cmd-strip-alerts${rccFeedExpanded?' expanded':''}" data-rcc-feed-list>${shown.map(rccFeedLineHtml).join('')||'<div class="cmd-strip-alert-sub" style="padding:6px 2px;font-size:12px">אין עדכוני פינוי עדיין · הודעה תופיע כשפצוע מגיע לנאפ״ל או מפונה לבית חולים</div>'}</div>
   </div>`;
 }
@@ -8226,10 +8256,11 @@ function rccIncidentLineSub(r){
 function renderRccIncidentsTable(){
   const rows=rccIncidentRows();
   if(!rows.length) return renderOperationalEmptyState('אין אירועים פתוחים בפלוגה');
-  // Owner 2026-11-19: trapped by priority (waiting for extraction from the rubble), everyone still
-  // at the site, at the נאפ״ל, evacuated to hospital.
+  // Owner 2026-11-19: trapped by priority and in total (still to be extracted from the rubble), at
+  // the נאפ״ל, evacuated to hospital, and every casualty the incident ever had (never goes down: the
+  // rescue board keeps evacuated patients, so nothing extra is stored).
   const cols=[['trappedUrgent','לכוד<br>דחוף','var(--red)'],['trappedNotUrgent','לכוד<br>לא דחוף','var(--text)'],['trappedPending','לכוד<br>טרם מוין','var(--accent)'],
-    ['onSiteTotal','סה״כ<br>באתר','var(--text)'],['atPoint','בנאפ״ל','var(--orange)'],['evacuated','פונו<br>לבי״ח','var(--green)']];
+    ['trapped','סה״כ<br>לכודים','var(--orange)'],['atPoint','בנאפ״ל','var(--orange)'],['evacuated','פונו<br>לבי״ח','var(--green)'],['total','סה״כ<br>באירוע','var(--text)']];
   const body=rows.map(r=>{
     const c=r.pts?rescueStageCounts(r.pts):null;
     const val=k=>!c?'—':c[k];
@@ -8239,7 +8270,7 @@ function renderRccIncidentsTable(){
       ${cols.map(([k,,color])=>`<td style="color:${c&&val(k)?color:'var(--muted)'}">${val(k)}</td>`).join('')}
     </tr>
     <tr class="tappable rcc-row-detail" data-rcc-incident-detail="${escAttr(r.key)}" onclick="rccOpenIncident('${escAttr(r.key)}')">
-      <td colspan="${cols.length+1}"><div class="rcc-row-sub">${escAttr(rccIncidentLineSub(r))}</div>${rccTrappedLine(r)}</td>
+      <td colspan="${cols.length+1}"><div class="rcc-row-sub">${escAttr(rccIncidentLineSub(r))}</div>${rccTrappedLine(r)}${c&&c.freedNotAtPoint?`<div class="rcc-row-sub" data-rcc-freed="${c.freedNotAtPoint}">חולצו / לא לכודים, טרם הגיעו לנאפ״ל: ${c.freedNotAtPoint}</div>`:''}${c&&c.everTrapped?`<div class="rcc-row-sub" data-rcc-extracted="${c.trappedHistoryKnown?c.extracted:''}">${c.trappedHistoryKnown?`חולצו עד כה: ${c.extracted} מתוך ${c.everTrapped} שהיו לכודים`:'חולצו עד כה: לא ידוע (נדרש עדכון שרת 085)'}</div>`:''}</td>
     </tr>`;
   }).join('');
   const total=Object.fromEntries(cols.map(([k])=>[k,0]));
@@ -8248,7 +8279,7 @@ function renderRccIncidentsTable(){
     ? (_rescueBoardsAt?`לפי נתוני השרת · עודכן ${timeAgoLabel(_rescueBoardsAt)} · מה שטרם נשלח מהשטח לא מופיע`:'טרם התקבלו נתונים מהשרת')
     : 'מצב דמו · נתונים מקומיים';
   return `<table class="incident-triage-table rcc-incidents-table" data-rcc-incidents-table>
-      <colgroup><col style="width:28%">${cols.map(()=>'<col style="width:12%">').join('')}</colgroup>
+      <colgroup><col style="width:23%">${cols.map(()=>'<col style="width:11%">').join('')}</colgroup>
       <thead><tr><th>אירוע</th>${cols.map(([,label])=>`<th>${label}</th>`).join('')}</tr></thead>
       <tbody>${body}</tbody>
       <tfoot><tr><th>סה״כ</th>${cols.map(([k,,color])=>`<td style="color:${total[k]?color:'var(--muted)'}">${total[k]}</td>`).join('')}</tr></tfoot>
@@ -15982,6 +16013,7 @@ function renderIncidentReport(){
     <div class="aar-grid">
       <div class="aar-box"><div class="aar-k">פצועים</div><div class="aar-v">${pt.total??0}</div><div>${aarCountChips(pt.by_triage, TRIAGE_LABELS)}</div></div>
       <div class="aar-box"><div class="aar-k">מצב בסגירה</div><div>${aarCountChips(pt.by_status, AAR_STATUS_LABELS)}</div><div class="demo-strip-sub">נמסרו ${pt.handed_over??0} · חציון עד מסירה ${pt.median_minutes_open_to_handover??'—'} דק׳ · ילדים ${pt.pediatric??0} · עם מדדים ${pt.with_vitals??0} · ממתינים להערכה מלאה ${pt.still_needing_full_assessment??0}</div></div>
+      ${rep.rescue?`<div class="aar-box" data-aar-rescue><div class="aar-k">חילוץ</div><div class="demo-strip-sub">סה״כ באירוע ${rep.rescue.total??0} · היו לכודים ${rep.rescue.ever_trapped??0} · חולצו ${rep.rescue.extracted??0} · לכודים בסגירה ${rep.rescue.trapped_at_close??0} · בנאפ״ל בסגירה ${rep.rescue.at_evac_point_at_close??0} · פונו ${rep.rescue.evacuated??0}</div></div>`:''}
       <div class="aar-box"><div class="aar-k">חסמי עורקים</div><div class="aar-v">${tq.total??0}</div><div class="demo-strip-sub">פעילים בסגירה ${tq.active_at_close??0} · מקסימום ${tq.max_minutes??'—'} דק׳ · מעל 120 דק׳: ${tq.over_120_minutes??0}</div></div>
       <div class="aar-box"><div class="aar-k">פינוי לפי יעד</div><div>${aarCountChips(rep.evacuations_by_destination)}</div></div>
       <div class="aar-box"><div class="aar-k">מד״א מול מיון שטח</div><div>${(rep.mda_vs_field||[]).length?(rep.mda_vs_field||[]).map(x=>`<span class="aar-chip">${escAttr(TRIAGE_LABELS[x.field_triage]||x.field_triage)} → ${escAttr(x.mda_classification)}: <b>${x.count}</b></span>`).join(''):'<span class="demo-strip-sub">אין</span>'}</div></div>
@@ -16656,7 +16688,7 @@ function applyRescuePatientBoard(rows, incidentId){
         lastModifiedAt:new Date().toISOString(), confirmedClinical:true, unsyncedEvents:0, locationHistory:[], possibleDuplicate:false,
         time:'', vitals:{...VITALS_NOT_ON_DEVICE}, vitalsCapture:null, txHistory:[], alert:false, deterioration:[], lastVitalsAt:null,
         vitalsHistory:[], tourniquet:null, medic:'(remote)', siteId:INCIDENT_ID_TO_SITE[incidentId]||'SITE_A', sourcedFromRemote:true,
-        rescuePriority:priority, rescueEvacState:evacState, rescueEvacOrder:order, rescueEvacPointAt:rescueBoardEvacPointAt(row), _serverVersion:row.version,
+        rescuePriority:priority, rescueEvacState:evacState, rescueEvacOrder:order, rescueEvacPointAt:rescueBoardEvacPointAt(row), rescueWasTrapped:rescueBoardWasTrapped(row), _serverVersion:row.version,
         events:[{type:'REMOTE_PATIENT_DISCOVERED',time:nowT(),detail:`${row.visual_id} התקבל מהשרת (תמונה טקטית)`}]
       };
       patients.push(p);
@@ -16666,6 +16698,7 @@ function applyRescuePatientBoard(rows, incidentId){
     const before=JSON.stringify([p.visualId,p.rescuePriority,p.rescueEvacState,p.rescueEvacOrder,p.rescueEvacPointAt,p.trapStatus,p.fullName,p.temporaryDescription,p.location,p.locDetail]);
     if(row.visual_id) p.visualId=row.visual_id;
     p.rescuePriority=priority; p.rescueEvacState=evacState; p.rescueEvacOrder=order; p.rescueEvacPointAt=rescueBoardEvacPointAt(row);
+    if(rescueBoardWasTrapped(row)!==undefined) p.rescueWasTrapped=rescueBoardWasTrapped(row);
     if(!pending.has(p.id)){
       if(access.trapStatus){ p.accessibility=access.accessibility; p.trapStatus=access.trapStatus; }
       p.fullName=row.optional_name||'לא מזוהה';

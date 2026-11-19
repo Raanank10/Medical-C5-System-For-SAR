@@ -66,6 +66,7 @@ for (const rel of files) {
   // Section titles: identity is shown, clinical data is not (database/074).
   assert(roleDashboardFn.includes('תמונה טקטית — מחלקה שלי (ללא מידע קליני)'), `${rel}: rpc tactical section title must say no clinical data`);
   assert(!html.slice(html.indexOf('function renderRccPanel(')).split('function renderRoleDashboard(')[0].includes('TRIAGE_LABELS'), `${rel}: rcc panel must not show the triage colour`);
+  assert(html.includes('data-aar-rescue') && html.includes('rep.rescue.extracted'), `${rel}: the stored report shows the rescue section (database/085)`);
   assert(!roleDashboardFn.includes('ללא מדדים / זהות'), `${rel}: no rpc/rcc section title should still claim identity is excluded`);
 
   // roleConfig responsibilities text updated to match (identity now owned, not excluded)
