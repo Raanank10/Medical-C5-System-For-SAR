@@ -1,6 +1,7 @@
 -- Rolled-back test for database/085 (RCC panel, V2.99.76). Run in the Supabase SQL editor after
 -- 085 is applied. It ends with an error on purpose so nothing persists; the error text is the
--- result. Every item should start with "ok" or show the expected value.
+-- result. Run live on 2026-11-19 right after 085 was applied: every item as wanted.
+-- Every item should start with "ok" or show the expected value.
 -- Uses the synthetic test accounts of the live project, looked up by role; every unit, site,
 -- patient and event it needs is created inside the block and rolled back.
 do $test$
@@ -17,13 +18,8 @@ declare
   P_BLOCK uuid := gen_random_uuid();  -- "אין גישה" now
   P_FR    uuid := gen_random_uuid();  -- reported trapped by a first responder (access unknown)
   CA uuid; A1 uuid;
-  rcc_co uuid; pc_co uuid; m1_pl uuid; m1_co uuid;
   r text := ''; n bigint; s text; j jsonb;
 begin
-  select company_id into rcc_co from profiles where id = RCC;
-  select company_id into pc_co from profiles where id = PC;
-  select platoon_id, company_id into m1_pl, m1_co from profiles where id = M1;
-
   insert into companies(name, kind) values ('TEST85-CO', 'rescue') returning id into CA;
   insert into platoons(company_id, name) values (CA, 'A1') returning id into A1;
   update profiles set company_id = CA, platoon_id = null where id in (RCC, PC);
@@ -34,11 +30,11 @@ begin
   insert into patients (id, incident_id, visual_id, t_injury, current_triage, current_status, access_status, created_by)
     values (P_STILL, X, 'T85-STILL', now(), 'red',    'identified', 'trapped', M1),
            (P_FREED, X, 'T85-FREED', now(), 'yellow', 'evacuating', 'free',    M1),
-           (P_PART,  X, 'T85-PART',  now(), null,     'identified', 'partial', M1),
+           (P_PART,  X, 'T85-PART',  now(), 'pending', 'identified', 'partial', M1),
            (P_NEVER, X, 'T85-NEVER', now(), 'green',  'evacuating', 'free',    M1),
            (P_HOSP,  X, 'T85-HOSP',  now(), 'red',    'handed_over','free',    M1),
-           (P_BLOCK, X, 'T85-BLOCK', now(), null,     'identified', 'blocked', M1),
-           (P_FR,    X, 'T85-FR',    now(), null,     'identified', 'unknown', RCC);
+           (P_BLOCK, X, 'T85-BLOCK', now(), 'pending', 'identified', 'blocked', M1),
+           (P_FR,    X, 'T85-FR',    now(), 'pending', 'identified', 'unknown', RCC);
   update patients set evac_point_arrived_at = now() where id = P_FREED;
   insert into events (incident_id, patient_id, actor_id, actor_role, type, payload_json, device_id, local_event_id, local_timestamp) values
     (X, P_FREED, M1, 'medic', 'PATIENT_ACCESS_UPDATED', '{"trap_status":"trapped","access_status":"trapped"}', 'test85-dev', 'test85-1', now() - interval '30 minutes'),
@@ -64,6 +60,7 @@ begin
   begin perform app.rescue_patient_was_trapped(P_STILL, 'trapped'); r := r || 'FAIL rcc called the helper directly; ';
   exception when others then r := r || 'ok helper not callable; '; end;
   execute 'reset role';
+  perform set_config('request.jwt.claims', '', true);
 
   -- the stored report's rescue section
   j := app.build_incident_aar(X)->'rescue';
@@ -93,9 +90,7 @@ begin
   select access_status::text || '/' || current_status::text into s from patients where id = P_PART;
   r := r || 'medic extraction ignored -> ' || s || ' (want partial/identified); ';
 
-  update profiles set company_id = rcc_co where id = RCC;
-  update profiles set company_id = pc_co where id = PC;
-  update profiles set platoon_id = m1_pl, company_id = m1_co where id = M1;
+  -- No restore needed: the exception below rolls back every change, profiles included.
   raise exception 'TEST85 RESULT: %', r;
 end
 $test$;
