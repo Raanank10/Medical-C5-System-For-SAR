@@ -622,6 +622,7 @@ input[type=range]{width:100%;accent-color:var(--orange);}
 .rcc-incidents-table tbody th{font-size:13px;}
 .rcc-row-main th,.rcc-row-main td{border-bottom:none !important;padding-bottom:2px;}
 .rcc-row-detail td{text-align:right !important;padding-top:0;font-family:var(--sans);}
+.rcc-incidents-table .rcc-group-head{color:var(--orange);border-bottom:1px solid var(--orange) !important;padding-bottom:2px;}
 .rcc-trapped-line{font-size:11px;font-weight:800;color:var(--orange);margin-top:3px;line-height:1.35;}
 .rcc-incidents-table thead th{font-size:10.5px;line-height:1.25;padding-left:2px;padding-right:2px;}
 .rcc-incidents-table td{padding-left:2px;padding-right:2px;}
@@ -8283,8 +8284,11 @@ function renderRccIncidentsTable(){
   // Owner 2026-11-19: trapped by priority and in total (still to be extracted from the rubble), at
   // the נאפ״ל, evacuated to hospital, and every casualty the incident ever had (never goes down: the
   // rescue board keeps evacuated patients, so nothing extra is stored).
-  const cols=[['trappedUrgent','לכוד<br>דחוף','var(--red)'],['trappedNotUrgent','לכוד<br>לא דחוף','var(--text)'],['trappedPending','לכוד<br>טרם מוין','var(--accent)'],
-    ['trapped','סה״כ<br>לכודים','var(--orange)'],['atPoint','בנאפ״ל','var(--orange)'],['evacuated','פונו<br>לבי״ח','var(--green)'],['total','סה״כ<br>באירוע','var(--text)']];
+  // Every casualty sits in exactly one column, so the row adds up to the total (owner, 2026-11-19:
+  // "5 patients but the table shows 4"): trapped by priority, at the site and not trapped (freed,
+  // never trapped, or being carried), at the נאפ״ל, at hospital. The trapped total is in the strip.
+  const cols=[['trappedUrgent','דחוף','var(--red)'],['trappedNotUrgent','לא<br>דחוף','var(--text)'],['trappedPending','טרם<br>מוין','var(--accent)'],
+    ['freedNotAtPoint','באתר<br>לא לכוד','var(--text)'],['atPoint','בנאפ״ל','var(--orange)'],['evacuated','פונו<br>לבי״ח','var(--green)'],['total','סה״כ','var(--text)']];
   const body=rows.map(r=>{
     const c=r.pts?rescueStageCounts(r.pts):null;
     const val=k=>!c?'—':c[k];
@@ -8294,7 +8298,7 @@ function renderRccIncidentsTable(){
       ${cols.map(([k,,color])=>`<td style="color:${c&&val(k)?color:'var(--muted)'}">${val(k)}</td>`).join('')}
     </tr>
     <tr class="tappable rcc-row-detail" data-rcc-incident-detail="${escAttr(r.key)}" onclick="rccOpenIncident('${escAttr(r.key)}')">
-      <td colspan="${cols.length+1}"><div class="rcc-row-sub">${escAttr(rccIncidentLineSub(r))}</div>${rccTrappedLine(r)}${c&&c.freedNotAtPoint?`<div class="rcc-row-sub" data-rcc-freed="${c.freedNotAtPoint}">חולצו / לא לכודים, טרם הגיעו לנאפ״ל: ${c.freedNotAtPoint}</div>`:''}${c&&c.everTrapped?`<div class="rcc-row-sub" data-rcc-extracted="${c.trappedHistoryKnown?c.extracted:''}">${c.trappedHistoryKnown?`חולצו עד כה: ${c.extracted} מתוך ${c.everTrapped} שהיו לכודים`:'חולצו עד כה: לא ידוע (נדרש עדכון שרת 085)'}</div>`:''}</td>
+      <td colspan="${cols.length+1}"><div class="rcc-row-sub">${escAttr(rccIncidentLineSub(r))}</div>${rccTrappedLine(r)}${c&&c.everTrapped?`<div class="rcc-row-sub" data-rcc-extracted="${c.trappedHistoryKnown?c.extracted:''}">${c.trappedHistoryKnown?`חולצו עד כה: ${c.extracted} מתוך ${c.everTrapped} שהיו לכודים`:'חולצו עד כה: לא ידוע (נדרש עדכון שרת 085)'}</div>`:''}</td>
     </tr>`;
   }).join('');
   const total=Object.fromEntries(cols.map(([k])=>[k,0]));
@@ -8304,7 +8308,8 @@ function renderRccIncidentsTable(){
     : 'מצב דמו · נתונים מקומיים';
   return `<table class="incident-triage-table rcc-incidents-table" data-rcc-incidents-table>
       <colgroup><col style="width:23%">${cols.map(()=>'<col style="width:11%">').join('')}</colgroup>
-      <thead><tr><th>אירוע</th>${cols.map(([,label])=>`<th>${label}</th>`).join('')}</tr></thead>
+      <thead><tr><th rowspan="2">אירוע</th><th colspan="3" class="rcc-group-head">לכודים</th><th colspan="3"></th><th rowspan="2">סה״כ<br>באירוע</th></tr>
+        <tr>${cols.slice(0,-1).map(([,label])=>`<th>${label}</th>`).join('')}</tr></thead>
       <tbody>${body}</tbody>
       <tfoot><tr><th>סה״כ</th>${cols.map(([k,,color])=>`<td style="color:${total[k]?color:'var(--muted)'}">${total[k]}</td>`).join('')}</tr></tfoot>
     </table>

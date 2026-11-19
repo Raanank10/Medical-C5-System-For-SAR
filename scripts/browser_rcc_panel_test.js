@@ -202,10 +202,11 @@ async function checkDemo(browser, rel, file) {
   assert(JSON.stringify(ov.rows.map((r) => r.key)) === '["SITE_A","SITE_B"]', `${rel}: one table row per incident (got ${JSON.stringify(ov.rows)})`);
   // columns (owner 2026-11-19): trapped urgent, trapped not urgent, trapped not sorted, trapped in
   // total (still to be extracted), at the נאפ״ל, evacuated to hospital, every casualty of the incident
-  assert(JSON.stringify(ov.rows[0].cells) === '["1","0","0","1","0","0","3"]', `${rel}: site A counts (got ${JSON.stringify(ov.rows[0].cells)})`);
+  assert(JSON.stringify(ov.rows[0].cells) === '["1","0","0","2","0","0","3"]', `${rel}: site A counts (got ${JSON.stringify(ov.rows[0].cells)})`);
   // "אין גישה" (P008) waits for rescue like trapped (owner, 2026-11-19)
-  assert(JSON.stringify(ov.rows[1].cells) === '["0","1","2","3","0","0","4"]', `${rel}: site B: trapped not urgent / not sorted, no access counted as trapped (got ${JSON.stringify(ov.rows[1].cells)})`);
-  assert((await page.evaluate(() => document.querySelector('[data-rcc-incident-detail="SITE_A"] [data-rcc-freed]')?.dataset.rccFreed)) === '2', `${rel}: freed and not at the נאפ״ל yet: P001 and P003`);
+  assert(JSON.stringify(ov.rows[1].cells) === '["0","1","2","1","0","0","4"]', `${rel}: site B: trapped not urgent / not sorted, no access counted as trapped (got ${JSON.stringify(ov.rows[1].cells)})`);
+  // Every casualty in exactly one column: the row adds up to the total (owner, 2026-11-19).
+  ov.rows.forEach((r) => { const n = r.cells.map(Number); assert(n.slice(0, 6).reduce((a, b) => a + b, 0) === n[6], `${rel}: ${r.key} row adds up (got ${JSON.stringify(r.cells)})`); });
   assert(!ov.resp, `${rel}: responsibilities must be closed until the button is pressed`);
   // No T0 in the demo: trapped time counts from the first trapped casualty's registration, "at least".
   const demoTrap = await page.evaluate(() => document.querySelector('[data-rcc-incident-detail="SITE_A"] [data-rcc-trapped-since]')?.textContent || '');
@@ -224,7 +225,7 @@ async function checkDemo(browser, rel, file) {
     renderRoleDashboard('rcc');
   });
   const after = await page.evaluate(() => [...document.querySelector('[data-rcc-incident-row="SITE_A"]').querySelectorAll('td')].map((td) => td.textContent.trim()));
-  assert(JSON.stringify(after) === '["0","0","0","0","1","1","3"]', `${rel}: handed-over trapped patient leaves the trapped columns, arrival counted at the נאפ״ל, total kept (got ${JSON.stringify(after)})`);
+  assert(JSON.stringify(after) === '["0","0","0","1","1","1","3"]', `${rel}: handed-over trapped patient leaves the trapped columns, arrival counted at the נאפ״ל, total kept (got ${JSON.stringify(after)})`);
   const extractedDemo = await page.evaluate(() => document.querySelector('[data-rcc-incident-detail="SITE_A"] [data-rcc-extracted]')?.textContent || '');
   assert(extractedDemo.includes('חולצו עד כה: 1 מתוך 1'), `${rel}: the phone remembers P002 was trapped (got ${extractedDemo})`);
   const msg = await page.evaluate(() => ({ banner: document.getElementById('rcc-evac-banner').innerText, feed: _rccEvacFeed.map((m) => `${m.visualId}:${m.text}`) }));
@@ -280,7 +281,7 @@ async function checkSignedIn(browser, rel, file) {
     key: tr.dataset.rccIncidentRow, sub: document.querySelector(`[data-rcc-incident-detail="${tr.dataset.rccIncidentRow}"] .rcc-row-sub`).textContent, cells: [...tr.querySelectorAll('td')].map((td) => td.textContent.trim()) })));
   assert(rows[0].key === INC1 && JSON.stringify(rows[0].cells) === '["1","0","0","1","0","1","3"]', `${rel}: INC-1 counts from the rescue board (got ${JSON.stringify(rows[0])})`);
   assert(rows[0].sub.includes('מבנה: לא יציב') && rows[0].sub.includes('T0 לפני'), `${rel}: building status and T0 from incident_site_authority (got ${rows[0].sub})`);
-  assert(JSON.stringify(rows[1].cells) === '["0","0","0","0","0","0","2"]' && rows[1].sub.includes('תאונת דרכים'), `${rel}: INC-2 row (got ${JSON.stringify(rows[1])})`);
+  assert(JSON.stringify(rows[1].cells) === '["0","0","0","2","0","0","2"]' && rows[1].sub.includes('תאונת דרכים'), `${rel}: INC-2 row (got ${JSON.stringify(rows[1])})`);
   // Trapped since T0 unless recorded otherwise (owner 2026-11-19); INC-1's official T0 is 30 min old.
   const trap = await page.evaluate((id) => { const el = document.querySelector(`[data-rcc-incident-detail="${id}"] [data-rcc-trapped-since]`); return el && { since: el.dataset.rccTrappedSince, oldest: el.dataset.rccTrappedOldest, text: el.textContent }; }, INC1);
   assert(trap && trap.since === '30' && trap.oldest === '0' && trap.text.includes('(מ-T0)'), `${rel}: trapped time from T0 and oldest trapped update (got ${JSON.stringify(trap)})`);
@@ -304,7 +305,7 @@ async function checkSignedIn(browser, rel, file) {
   const cellsAfter = await page.evaluate(() => [...document.querySelectorAll('[data-rcc-incident-row]')].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent.trim()).join(',')));
   // INC-1: P002-AA arrived (085). INC-2: P001-BB to hospital, P002-BB evacuating on a server without
   // 085 cannot be placed at the נאפ״ל, so it stays in the on-site total.
-  assert(JSON.stringify(cellsAfter) === JSON.stringify(['1,0,0,1,1,1,3', '0,0,0,0,0,1,2']), `${rel}: table after the server changes (got ${JSON.stringify(cellsAfter)})`);
+  assert(JSON.stringify(cellsAfter) === JSON.stringify(['1,0,0,0,1,1,3', '0,0,0,1,0,1,2']), `${rel}: table after the server changes (got ${JSON.stringify(cellsAfter)})`);
   assert(SERVER.clinicalReads === 0, `${rel}: the RCC overview never reads the patients table (got ${SERVER.clinicalReads})`);
 
   // A row opens the incident; the strip leads back to every incident.
