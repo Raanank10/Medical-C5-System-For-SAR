@@ -469,4 +469,22 @@ assert.equal(rules.rescueEvacPriority(undefined, false), "pending");
 assert.equal(rules.rescueEvacPriority("pending", true), "urgent");
 assert.deepEqual(rules.RESCUE_PRIORITIES, ["urgent", "pending", "not_urgent"]);
 
+// WP-40 (owner 2026-11-19): waiting for a vehicle after leaving for the נאפ״ל, from when the patient was sent.
+{
+  const now = Date.parse("2026-11-19T12:00:00Z");
+  const sent = (min, extra = {}) => ({ patientStatus: "evacuating", triage: "yellow", evacSentAt: now - min * 60000, ...extra });
+  assert.equal(rules.evacPointWaitAlert(sent(29), now), null);
+  assert.deepEqual(rules.evacPointWaitAlert(sent(30), now), { level: "warning", minutes: 30 });
+  assert.deepEqual(rules.evacPointWaitAlert(sent(59), now), { level: "warning", minutes: 59 });
+  assert.deepEqual(rules.evacPointWaitAlert(sent(60), now), { level: "critical", minutes: 60 });
+  assert.deepEqual(rules.evacPointWaitAlert(sent(45, { triage: "green" }), now), { level: "warning", minutes: 45 }); // every colour
+  assert.deepEqual(rules.evacPointWaitAlert(sent(45, { triage: "pending" }), now), { level: "warning", minutes: 45 });
+  assert.equal(rules.evacPointWaitAlert(sent(90, { triage: "black" }), now), null); // except black
+  assert.equal(rules.evacPointWaitAlert(sent(90, { patientStatus: "handed_over" }), now), null); // a vehicle took them
+  assert.equal(rules.evacPointWaitAlert(sent(90, { patientStatus: "stabilizing" }), now), null);
+  assert.equal(rules.evacPointWaitAlert({ patientStatus: "evacuating", triage: "red" }, now), null); // send time unknown
+  assert.equal(rules.EVAC_POINT_WAIT_WARN_MS, 30 * 60000);
+  assert.equal(rules.EVAC_POINT_WAIT_CRITICAL_MS, 60 * 60000);
+}
+
 console.log("Domain rule tests passed.");
