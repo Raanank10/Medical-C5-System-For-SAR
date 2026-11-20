@@ -1033,7 +1033,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9980</div>
+      <div class="demo-kicker">Demo V2.9981</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1130,7 +1130,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9980</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9981</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1140,7 +1140,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9980</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9981</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3467,7 +3467,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.80';
+const APP_VERSION = '2.99.81';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -11739,6 +11739,7 @@ function openPatient(id){
       <div class="summary-row"><span class="summary-key">מיקום</span><span class="summary-val">${p.location}${p.locDetail?' · '+p.locDetail:''}</span></div>
       <div class="summary-row"><span class="summary-key">חילוץ</span><span class="summary-val">${TRAP_LABELS[normalizeTrapStatus(p)]||'לא תועד'}</span></div>
       <div class="summary-row"><span class="summary-key">פציעה</span><span class="summary-val">${p.injury}</span></div>
+      ${patientInjuryTimeRowHtml(p)}
     </div>
     ${p.txHistory&&p.txHistory.length?`
     <div style="margin-bottom:4px"><div class="section-label" style="padding:0 0 8px">היסטוריית טיפולים (${p.txHistory.length})</div>
@@ -12008,7 +12009,7 @@ function handoverPatient(id, {destination='', mdaClassification=null}={}){
     payload_json:{
       handover_method:'mist_logged_local',
       ...evacPayload,
-      mist_summary:{mechanism:p.injury, injuries:p.injury, signs:`HR ${pulseDisplay(p,'en')}, RR ${rrDisplay(p,'en')}, AVPU=${p.vitals.avpu||'—'}`, treatment:(p.txHistory||[]).map(tx=>tx.text).join('; ')||'none recorded'}
+      mist_summary:mistSummaryPayload(p)
     }
   };
   p.events.push(event);
@@ -12062,7 +12063,7 @@ async function generateQrHandover(id){
       token_hash:tokenHash,
       token_signature:tokenSignature,
       token_expires_at:expiresAt,
-      mist_summary:{mechanism:p.injury, injuries:p.injury, signs:`HR ${pulseDisplay(p,'en')}, RR ${rrDisplay(p,'en')}, AVPU=${p.vitals.avpu||'—'}`, treatment:(p.txHistory||[]).map(tx=>tx.text).join('; ')||'none recorded'}
+      mist_summary:mistSummaryPayload(p)
     }
   };
   p.events.push(event);
@@ -12086,8 +12087,31 @@ function shareHandoverQrLink(){
   if(navigator.share){ navigator.share({title:'מסירת פצוע', url:link}).catch(()=>{}); }
   else copyHandoverQrLink();
 }
+// MIST parts (WP-23). Mechanism and injuries used to read the same field (p.injury) twice. There
+// is no per-patient mechanism field: the mechanism is the incident's likely mechanism when one is
+// set (siteData.likelyMechanisms), else "לא תועד"; injuries are the marked body zones, else
+// p.injury. The injury time is said with "משוערת" until someone enters it.
+function mistMechanismText(p){
+  const m=(siteData.likelyMechanisms||[]).filter(Boolean).join(' / ');
+  return m || 'לא תועד';
+}
+function mistInjuriesText(p){
+  const zones=[...(p.injuryZones||[])].map(k=>BODY_ZONE_LABELS[k]||k).filter(Boolean);
+  return zones.length ? zones.join(', ') : (p.injury||'לא תועד');
+}
+function mistInjuryTimeText(p){
+  const it=patientInjuryTime(p);
+  const minutes=Math.max(0, Math.floor((Date.now()-it.ms)/60000));
+  return `${tourniquetHhmm(it.ms)}${it.estimated?' משוערת':''}, לפני ${tourniquetAgoText(minutes)}`;
+}
+function mistSummaryPayload(p){
+  const it=patientInjuryTime(p);
+  return {mechanism:mistMechanismText(p), injuries:mistInjuriesText(p),
+    injury_time:Number.isFinite(it.ms)?new Date(it.ms).toISOString():null, injury_time_estimated:it.estimated,
+    signs:`HR ${pulseDisplay(p,'en')}, RR ${rrDisplay(p,'en')}, AVPU=${p.vitals.avpu||'—'}`, treatment:(p.txHistory||[]).map(tx=>tx.text).join('; ')||'none recorded'};
+}
 function mistTextForPatient(p){
-  return `פצוע ${p.visualId||p.id}. מנגנון: ${p.injury||'לא ידוע'}. פציעות: ${p.injury||'לא תועד'}. סימנים: דופק ${pulseDisplay(p)}, נשימות ${rrDisplay(p)}, הכרה ${p.vitals?.avpu?p.vitals.avpu+vitalSourceTag(p,'avpu'):'לא נמדד'}, לחץ דם ${BP_LABELS[p.vitals?.bp_estimate]?BP_LABELS[p.vitals.bp_estimate]+vitalSourceTag(p,'bp_estimate'):'לא נמדד'}. טיפול: ${(p.txHistory||[]).map(tx=>tx.text).join(', ')||'לא תועד'}. מיקום: ${p.location||''} ${p.locDetail||''}.`;
+  return `פצוע ${p.visualId||p.id}. שעת פציעה: ${mistInjuryTimeText(p)}. מנגנון: ${mistMechanismText(p)}. פציעות: ${mistInjuriesText(p)}. סימנים: דופק ${pulseDisplay(p)}, נשימות ${rrDisplay(p)}, הכרה ${p.vitals?.avpu?p.vitals.avpu+vitalSourceTag(p,'avpu'):'לא נמדד'}, לחץ דם ${BP_LABELS[p.vitals?.bp_estimate]?BP_LABELS[p.vitals.bp_estimate]+vitalSourceTag(p,'bp_estimate'):'לא נמדד'}. טיפול: ${(p.txHistory||[]).map(tx=>tx.text).join(', ')||'לא תועד'}. מיקום: ${p.location||''} ${p.locDetail||''}.`;
 }
 function speakMist(id){
   const p=patients.find(x=>x.id===id); if(!p) return;
@@ -14131,12 +14155,17 @@ function computeWatchdogRows(pts){
   const now=Date.now();
   const rows=[];
   pts.forEach(p=>{
-    const ageMin=Math.floor((now-patientClockStart(p))/60000);
+    // Golden Hour and Crush count from the injury time (WP-23): entered in the field, else the
+    // incident's alert time, marked "משוערת". Before WP-23 they counted from this phone's
+    // registration of the patient while the label already said T_injury.
+    const injury=patientInjuryTime(p);
+    const ageMin=Math.max(0, Math.floor((now-injury.ms)/60000));
+    const injuryNote=`מאז הפציעה ${tourniquetHhmm(injury.ms)}${injury.estimated?' (משוערת)':''}`;
     const golden=watchdogState(ageMin,45,60);
-    rows.push({patient:p.id, name:'Golden Hour', trigger:'Any registered patient', threshold:'T_injury +45m / +60m', state:golden, detail:`${ageMin} דק׳ מאז פתיחה מקומית`});
+    rows.push({patient:p.id, name:'Golden Hour', trigger:'Any registered patient', threshold:'T_injury +45m / +60m', state:golden, detail:`${ageMin} דק׳ ${injuryNote}`});
     if(normalizeTrapStatus(p)==='trapped'){
       const crush=watchdogState(ageMin,45,60);
-      rows.push({patient:p.id, name:'Crush Syndrome', trigger:'Access = Trapped', threshold:'T_injury +45m', state:crush, detail:`לכוד · ${ageMin} דק׳`});
+      rows.push({patient:p.id, name:'Crush Syndrome', trigger:'Access = Trapped', threshold:'T_injury +45m', state:crush, detail:`לכוד · ${ageMin} דק׳ ${injuryNote}`});
     }
     if(p.tourniquet?.appliedAt){
       const tqMin=Math.floor((now-p.tourniquet.appliedAt)/60000);
@@ -15599,7 +15628,7 @@ const INCIDENT_COMMAND_ROLES=new Set(['pc','cc','chamal','admin','physician']); 
 const COMPANY_COMMAND_ROLES=new Set(['cc','chamal','admin','physician']);
 const INCIDENT_BLANKET_ROLES=new Set(['cc','chamal','admin','rpc','rcc','physician']); // app.can_access_incident() without membership
 const SERVER_INCIDENT_STATUS_LABELS={draft:'טיוטה, ממתין לאישור',staging:'בהכנה',active:'פעיל',closed:'סגור'};
-let activeIncident=null; // {id, visual_id, status, location_name, address, incident_type, draft_resolution, opened_by, false_alarm}
+let activeIncident=null; // {id, visual_id, status, location_name, address, incident_type, draft_resolution, opened_by, false_alarm, t_zero}
 let _incidentOpenAlerts=[]; // list_incident_open_alerts() rows not yet acknowledged by this user
 let _seenOpenAlertIds=new Set(); // vibrate once per new alert, not on every poll
 let _platoonsByCompany={}; // company id -> [{id,name}], for the banner's platoon choice
@@ -15914,7 +15943,8 @@ async function activateIncident(inc){
   if(!inc || !currentUser) return;
   const prev=activeIncident?.id===inc.id ? activeIncident : null;
   activeIncident={id:inc.id, visual_id:inc.visual_id, status:inc.status, location_name:inc.location_name, address:inc.address||'', incident_type:inc.incident_type||null, draft_resolution:inc.draft_resolution||null,
-    opened_by:inc.opened_by!==undefined?inc.opened_by:(prev?prev.opened_by:undefined), false_alarm:!!(inc.false_alarm||prev?.false_alarm)};
+    opened_by:inc.opened_by!==undefined?inc.opened_by:(prev?prev.opened_by:undefined), false_alarm:!!(inc.false_alarm||prev?.false_alarm),
+    t_zero:inc.t_zero||prev?.t_zero||null}; // the alert time, injury time's default (WP-23)
   if(_workingIncidentId!==inc.id){ resetWorkingStateForIncident(inc); _workingIncidentId=inc.id; }
   siteData.name=siteData.name||inc.location_name||'';
   siteData.address=siteData.address||inc.address||'';
@@ -16097,7 +16127,7 @@ async function submitOpenIncident(){
   ['incident-open-location','incident-open-address'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   hideOpenIncidentDupes();
   toast(INCIDENT_FIELD_OPEN_ROLES.has(currentUser?.role)?'אירוע נפתח · הפיקוד קיבל התראה':'אירוע נפתח');
-  await activateIncident({id:r.data.id, visual_id:r.data.visual_id, status:r.data.status, location_name:location, address, incident_type:type, is_member:true, opened_by:currentUser.id});
+  await activateIncident({id:r.data.id, visual_id:r.data.visual_id, status:r.data.status, location_name:location, address, incident_type:type, is_member:true, opened_by:currentUser.id, t_zero:r.data.t_zero||new Date().toISOString()});
 }
 // D10: the opener may cancel the incident as a false alarm while it has no patients
 // (database/064 cancel_incident_false_alarm). With patients, closing follows the close guard.
@@ -16259,7 +16289,15 @@ function renderIncidentReport(){
     ? `<label class="demo-strip-sub" for="incident-report-version">גרסה:</label> <select id="incident-report-version" onchange="_incidentReportVersion=Number(this.value);renderIncidentReport()">${reports.map(x=>`<option value="${x.version}" ${x.version===chosen.version?'selected':''}>גרסה ${x.version} · ${fmt(x.generated_at)}</option>`).join('')}</select>`
     : `<span class="demo-strip-sub">גרסה ${escAttr(chosen.version)} · נשמר ${fmt(chosen.generated_at)}</span>`;
   const late=Number(data.late_records_after_close||0);
-  const rows=(rep.patient_rows||[]).map(r=>`<tr><td>${escAttr(r.visual_id||'')}</td><td>${escAttr(TRIAGE_LABELS[r.triage]||r.triage||'')}</td><td>${escAttr(AAR_STATUS_LABELS[r.status]||r.status||'')}</td><td>${r.minutes_from_open??'—'}</td><td>${r.minutes_to_handover??'—'}</td><td>${escAttr(r.evacuation_destination||'—')}</td><td>${escAttr(r.mda_classification||'—')}</td><td>${r.tourniquets||0}</td></tr>`).join('');
+  // Golden hour (WP-23, database/088): minutes from injury to handover. Reports stored before 088
+  // have no golden_hour part; the box says so instead of showing zeros.
+  const gh=rep.golden_hour||null;
+  const ghByVisual=new Map((gh?.patient_rows||[]).map(r=>[r.visual_id, r]));
+  const ghCell=r=>{ const g=ghByVisual.get(r.visual_id); if(!g) return '—'; const v=g.minutes_injury_to_handover??'—'; return g.injury_time_source==='entered' ? `${v}` : `${v} <span class="demo-strip-sub">(משוערת)</span>`; };
+  const ghBox=gh
+    ? `<div class="aar-box" id="aar-golden-hour"><div class="aar-k">שעת זהב · מפציעה עד מסירה</div><div class="demo-strip-sub">תוך 60 דק׳ ${gh.handed_over_within_60??0} · אחרי 60 דק׳ ${gh.handed_over_after_60??0} · חציון ${gh.median_minutes_injury_to_handover??'—'} דק׳ · אדומים ${gh.red_median_minutes_injury_to_handover??'—'} דק׳</div><div class="demo-strip-sub">לא נמסרו ועברו 60 דק׳ מהפציעה: ${gh.not_handed_over_past_60??0}</div><div class="demo-strip-sub">שעת פציעה הוזנה ל-${gh.injury_time_entered??0} · משוערת ל-${gh.injury_time_estimated??0}</div></div>`
+    : `<div class="aar-box" id="aar-golden-hour"><div class="aar-k">שעת זהב · מפציעה עד מסירה</div><div class="demo-strip-sub">לא נכלל בגרסה זו של הדוח</div></div>`;
+  const rows=(rep.patient_rows||[]).map(r=>`<tr><td>${escAttr(r.visual_id||'')}</td><td>${escAttr(TRIAGE_LABELS[r.triage]||r.triage||'')}</td><td>${escAttr(AAR_STATUS_LABELS[r.status]||r.status||'')}</td><td>${r.minutes_from_open??'—'}</td><td>${r.minutes_to_handover??'—'}</td><td>${ghCell(r)}</td><td>${escAttr(r.evacuation_destination||'—')}</td><td>${escAttr(r.mda_classification||'—')}</td><td>${r.tourniquets||0}</td></tr>`).join('');
   el.innerHTML=`
     <div class="aar-head"><div><strong>${escAttr(inc.visual_id||'')} · ${escAttr(inc.location_name||'')}</strong><div class="demo-strip-sub">נפתח ${fmt(inc.opened_at)} · נסגר ${fmt(inc.closed_at)} · ${inc.duration_minutes??'—'} דקות${inc.false_alarm?' · אזעקת שווא':''}${inc.closed_with_override?' · נסגר בעקיפה':''}</div></div><div>${versionPicker}</div></div>
     ${late>0?`<div class="aar-warn">${late} רשומות הגיעו לשרת אחרי הסגירה ואינן בדוח זה. פתיחה וסגירה מחדש של האירוע תשמור גרסה מלאה.</div>`:''}
@@ -16267,6 +16305,7 @@ function renderIncidentReport(){
     <div class="aar-grid">
       <div class="aar-box"><div class="aar-k">פצועים</div><div class="aar-v">${pt.total??0}</div><div>${aarCountChips(pt.by_triage, TRIAGE_LABELS)}</div></div>
       <div class="aar-box"><div class="aar-k">מצב בסגירה</div><div>${aarCountChips(pt.by_status, AAR_STATUS_LABELS)}</div><div class="demo-strip-sub">נמסרו ${pt.handed_over??0} · חציון עד מסירה ${pt.median_minutes_open_to_handover??'—'} דק׳ · ילדים ${pt.pediatric??0} · עם מדדים ${pt.with_vitals??0} · ממתינים להערכה מלאה ${pt.still_needing_full_assessment??0}</div></div>
+      ${ghBox}
       ${rep.rescue?`<div class="aar-box" data-aar-rescue><div class="aar-k">חילוץ</div><div class="demo-strip-sub">סה״כ באירוע ${rep.rescue.total??0} · היו לכודים ${rep.rescue.ever_trapped??0} · חולצו ${rep.rescue.extracted??0} · לכודים בסגירה ${rep.rescue.trapped_at_close??0} · בנאפ״ל בסגירה ${rep.rescue.at_evac_point_at_close??0} · פונו ${rep.rescue.evacuated??0}</div></div>`:''}
       <div class="aar-box"><div class="aar-k">חסמי עורקים</div><div class="aar-v">${tq.total??0}</div><div class="demo-strip-sub">פעילים בסגירה ${tq.active_at_close??0} · מקסימום ${tq.max_minutes??'—'} דק׳ · מעל 120 דק׳: ${tq.over_120_minutes??0}</div></div>
       <div class="aar-box"><div class="aar-k">פינוי לפי יעד</div><div>${aarCountChips(rep.evacuations_by_destination)}</div></div>
@@ -16279,7 +16318,7 @@ function renderIncidentReport(){
       <div class="aar-box"><div class="aar-k">בעיות סנכרון</div><div>${aarCountChips(rep.sync_problems)}</div></div>
       <div class="aar-box"><div class="aar-k">פצועים לפי יחידה</div><div>${aarCountChips(rep.patients_by_unit)}</div></div>
     </div>
-    <div class="aar-table-wrap"><table class="aar-table"><thead><tr><th>מספר</th><th>מיון</th><th>מצב</th><th>דקות מפתיחה</th><th>דקות עד מסירה</th><th>יעד פינוי</th><th>מד״א</th><th>חסמים</th></tr></thead><tbody>${rows||'<tr><td colspan="8">אין פצועים</td></tr>'}</tbody></table></div>`;
+    <div class="aar-table-wrap"><table class="aar-table"><thead><tr><th>מספר</th><th>מיון</th><th>מצב</th><th>דקות מפתיחה</th><th>דקות עד מסירה</th><th>מפציעה עד מסירה</th><th>יעד פינוי</th><th>מד״א</th><th>חסמים</th></tr></thead><tbody>${rows||'<tr><td colspan="9">אין פצועים</td></tr>'}</tbody></table></div>`;
 }
 
 // ── Incident close guard (database/040_close_incident_guard.sql) ──
@@ -17064,7 +17103,7 @@ function applyServerTourniquets(rows, incidentId, timeMeta=null){
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
 function pullProjectedPatientStateAll(){
-  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullEvacPointArrivals(id); pullExternalReports(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); pullAlertAcknowledgments(id); pullRemoteTreatments(id); pullRemoteVitals(id); pullServerWatchdogAlerts(id); pullTourniquetSnoozes(id); });
+  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullEvacPointArrivals(id); pullExternalReports(id); pullInjuryTimes(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); pullAlertAcknowledgments(id); pullRemoteTreatments(id); pullRemoteVitals(id); pullServerWatchdogAlerts(id); pullTourniquetSnoozes(id); });
 }
 // ── Pre-evacuation report pull (V2.99.36, database/050) ──
 // incident_pre_evacuations is the server's verdict on who owns the report (first medical
@@ -17562,6 +17601,175 @@ function applyEvacPointArrivals(rows){
       p.evacPointArrivedAt=null; p.evacPointArrivedRole=null;
       changed=true;
     }
+  }
+  if(changed){ saveDemoState(); refreshActiveScreenData(); }
+}
+// ── Injury time (WP-23, database/088; repo owner 2026-10-23 and 2026-11-18) ──
+// Injury time starts as the incident's alert time (T0, the server's t_injury_default) and medical
+// staff change it in the field with the same 4-digit control as the tourniquet body time. Medic,
+// paramedic, physician, PC and admin may change it; CC may not (owner, 2026-11-18). It is shown as
+// "משוערת" until someone enters it. The command watchdog's Golden Hour / Crush rows, the MIST
+// handover and the stored report all count from it. Sent as PATIENT_T_INJURY_UPDATED; on the
+// server the newest entry by phone time wins, so an older entry pushed late does not overwrite a
+// newer correction. Other phones read patients.t_injury with its own query (pullInjuryTimes).
+const INJURY_TIME_EDIT_ROLES=new Set(['medic','paramedic','physician','pc','admin']);
+const INJURY_TIME_SOURCE_LABELS={entered:'הוזנה בשטח', incident_open:'משוערת · שעת ההתראה', event_time:'משוערת · שעת הרישום'};
+function injuryTimeRole(){ return currentUser?.role || activeRoleDashboard; }
+function canEditInjuryTime(){ return INJURY_TIME_EDIT_ROLES.has(injuryTimeRole()); }
+// Signed in, the account's own name (currentMedicName() is the local demo medic).
+function injuryTimeActorName(){ return currentUser ? (_myDisplayName || EVAC_POINT_ROLE_NAMES[currentUser.role] || currentUser.role) : currentMedicName(); }
+// The incident's alert time: signed in, the active incident's T0 (open_incident() stores it as
+// t_injury_default); in local demo mode, the site's T0 once the incident is official.
+function incidentAlertTimeMs(p){
+  if(currentUser){
+    if(p?.incidentId && activeIncident && p.incidentId!==activeIncident.id) return NaN;
+    return Date.parse(activeIncident?.t_zero||'');
+  }
+  const s=siteAuthority?.[p?.siteId||'SITE_A'];
+  return Date.parse(s?.t0||'');
+}
+// {ms, source, estimated}: an entered or server time first, then the alert time, then (no T0
+// known) the registration time, which is what the server held before 088.
+function patientInjuryTime(p){
+  const own=Number(p?.tInjury);
+  if(Number.isFinite(own) && own>0 && INJURY_TIME_SOURCE_LABELS[p.tInjurySource]) return {ms:own, source:p.tInjurySource, estimated:p.tInjurySource!=='entered'};
+  const alertMs=incidentAlertTimeMs(p);
+  if(Number.isFinite(alertMs) && alertMs>0) return {ms:alertMs, source:'incident_open', estimated:true};
+  return {ms:patientClockStart(p), source:'event_time', estimated:true};
+}
+function injuryClockStart(p){ return patientInjuryTime(p).ms; }
+function injuryTimeHhmm(p){ return tourniquetHhmm(injuryClockStart(p)); }
+function injuryTimeShortLabel(p){
+  const it=patientInjuryTime(p);
+  return `${tourniquetHhmm(it.ms)}${it.estimated?' (משוערת)':''}`;
+}
+function patientInjuryTimeRowHtml(p){
+  const it=patientInjuryTime(p);
+  const minutes=Math.max(0, Math.floor((Date.now()-it.ms)/60000));
+  const by=it.source==='entered' && p.tInjurySetByLabel ? ` · ${escAttr(p.tInjurySetByLabel)}` : '';
+  const btn=canEditInjuryTime()
+    ? `<button class="demo-mini-btn" data-injury-time-edit="${escAttr(p.id)}" style="width:100%;margin-top:8px" onclick="openInjuryTimeEntry('${escAttr(p.id)}')">${it.estimated?'הזן שעת פציעה':'תקן שעת פציעה'}</button>`
+    : '';
+  return `<div class="summary-row" data-injury-time-row="${escAttr(p.id)}"><span class="summary-key">שעת פציעה${it.estimated?' (משוערת)':''}</span><span class="summary-val"><span style="font-family:var(--mono);font-weight:800">${tourniquetHhmm(it.ms)}</span> · לפני ${tourniquetAgoText(minutes)}<div style="font-size:11px;color:${it.estimated?'var(--orange)':'var(--muted)'}">${INJURY_TIME_SOURCE_LABELS[it.source]}${by}</div></span></div>${btn}`;
+}
+let _injuryTimeEntry=null; // {patientId}
+function openInjuryTimeEntry(patientId){
+  const p=patients.find(x=>x.id===patientId);
+  if(!p || !canEditInjuryTime()) return;
+  _injuryTimeEntry={patientId};
+  let el=document.getElementById('injury-time-entry');
+  if(!el){
+    el=document.createElement('div');
+    el.id='injury-time-entry';
+    el.className='tq-time-entry-overlay';
+    document.body.appendChild(el);
+  }
+  const it=patientInjuryTime(p);
+  el.innerHTML=`<div class="tq-time-entry-card" role="dialog" aria-label="שעת פציעה">
+    <div style="font-size:16px;font-weight:900">${it.estimated?'הזן שעת פציעה':'תקן שעת פציעה'}</div>
+    <div style="font-size:13px;color:var(--muted);margin-top:4px">${escAttr(p.visualId||p.id)} · כעת ${tourniquetHhmm(it.ms)} (${INJURY_TIME_SOURCE_LABELS[it.source]}) · 4 ספרות</div>
+    <input type="text" id="injury-time-entry-input" inputmode="numeric" maxlength="4" placeholder="למשל 0910" value="${it.estimated?'':escAttr(p.tInjuryCode||'')}"
+      style="width:100%;margin-top:12px;font-family:var(--mono);font-size:22px;letter-spacing:6px;text-align:center" autocomplete="off">
+    <div id="injury-time-entry-error" style="min-height:18px;font-size:12px;color:var(--orange);margin-top:6px"></div>
+    <div class="tq-alert-actions">
+      <button class="tq-alert-btn primary" data-injury-time-action="save" onclick="saveInjuryEnteredTime()">שמור שעה</button>
+      <button class="tq-alert-btn" data-injury-time-action="cancel" onclick="closeInjuryTimeEntry()">ביטול</button>
+    </div>
+  </div>`;
+  setTimeout(()=>document.getElementById('injury-time-entry-input')?.focus(), 0);
+}
+function closeInjuryTimeEntry(){
+  _injuryTimeEntry=null;
+  document.getElementById('injury-time-entry')?.remove();
+}
+// Same reading as the tourniquet body time (C5Rules.parseTourniquetTimeCode): today, or
+// yesterday when the time has not come yet today; up to 5 minutes later than the phone's clock is
+// taken as now; 5-60 minutes later asks (type again / yesterday / keep the previous time); more
+// than 12 hours ago asks for confirmation.
+function saveInjuryEnteredTime(code){
+  const target=_injuryTimeEntry; if(!target) return;
+  const p=patients.find(x=>x.id===target.patientId);
+  if(!p || !canEditInjuryTime()){ closeInjuryTimeEntry(); return; }
+  const value=String(code ?? document.getElementById('injury-time-entry-input')?.value ?? '').trim();
+  const errorEl=document.getElementById('injury-time-entry-error');
+  const parsed=C5Rules.parseTourniquetTimeCode(value, Date.now());
+  if(!parsed.ok && parsed.reason==='future'){
+    if(errorEl) errorEl.textContent='';
+    showTourniquetAheadChoice(value, parsed, {
+      onRetype:()=>{ const input=document.getElementById('injury-time-entry-input'); if(input){ input.value=''; input.focus(); } },
+      onYesterday:()=>applyInjuryEnteredTime(p, value, parsed.yesterdayAtMs),
+      onUnknown:()=>closeInjuryTimeEntry(),
+      unknownLabel:'השאר את השעה הקודמת'
+    });
+    return;
+  }
+  if(!parsed.ok){
+    if(errorEl) errorEl.textContent='שעה לא תקינה — 4 ספרות, 0000-2359';
+    return;
+  }
+  if(parsed.needsConfirm && !confirm(`הפציעה הייתה לפני ${tourniquetAgoText(parsed.minutesAgo)}?`)) return;
+  applyInjuryEnteredTime(p, value, parsed.appliedAtMs);
+}
+function applyInjuryEnteredTime(p, value, injuryMs){
+  const now=Date.now();
+  const previous=patientInjuryTime(p);
+  p.tInjury=injuryMs;
+  p.tInjurySource='entered';
+  p.tInjuryCode=value;
+  p.tInjuryRecordedAt=now;
+  p.tInjurySetByLabel=injuryTimeActorName();
+  p.tInjuryHistory=p.tInjuryHistory||[];
+  p.tInjuryHistory.push({at:now, from:previous.ms, fromSource:previous.source, to:injuryMs, by:injuryTimeActorName(), role:injuryTimeRole()});
+  const detail=`שעת פציעה ${value.slice(0,2)}:${value.slice(2)} (לפני ${tourniquetAgoText(Math.max(0,Math.floor((now-injuryMs)/60000)))}) · קודם ${tourniquetHhmm(previous.ms)}${previous.estimated?' משוערת':''}`;
+  p.events=p.events||[];
+  p.events.unshift({type:'PATIENT_T_INJURY_UPDATED',time:nowT(),detail,warn:false});
+  saveLocalEvent({type:'PATIENT_T_INJURY_UPDATED',detail:`${p.visualId||p.id} · ${detail}`,warn:false,patient_id:p.id,
+    payload_json:{patient_id:p.id,t_injury:new Date(injuryMs).toISOString(),time_code:value,
+      previous_t_injury:Number.isFinite(previous.ms)?new Date(previous.ms).toISOString():null,previous_source:previous.source,
+      time_entered_at:new Date(now).toISOString(),siteId:p.siteId}});
+  saveDemoState();
+  closeInjuryTimeEntry();
+  if(activeScreenId()==='patient' && document.getElementById('detail-pid')?.dataset.patientId===p.id) openPatient(p.id);
+  toast(`שעת פציעה נשמרה: ${value.slice(0,2)}:${value.slice(2)}`);
+}
+const INJURY_TIME_COLUMNS='id,t_injury,t_injury_source,t_injury_recorded_at,t_injury_set_by_role';
+async function pullInjuryTimes(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let result;
+  // Its own query: until 088 is applied t_injury_source does not exist and the query errors,
+  // which must not break any other pull.
+  try{ result=await client.from('patients').select(INJURY_TIME_COLUMNS).eq('incident_id', incidentId); }
+  catch(e){ return; }
+  if(result.error || !result.data) return;
+  applyInjuryTimes(result.data);
+}
+function applyInjuryTimes(rows){
+  let changed=false;
+  for(const row of rows){
+    const p=patients.find(x=>x.id===row.id); if(!p) continue;
+    const serverMs=Date.parse(row.t_injury);
+    const source=String(row.t_injury_source||'');
+    if(!Number.isFinite(serverMs) || !INJURY_TIME_SOURCE_LABELS[source]) continue;
+    const serverRecordedAt=Date.parse(row.t_injury_recorded_at||'');
+    // This phone's own entry stays until the server holds one at least as new (it may not be sent yet).
+    if(p.tInjurySource==='entered' && Number.isFinite(p.tInjuryRecordedAt)
+       && !(source==='entered' && Number.isFinite(serverRecordedAt) && serverRecordedAt>=p.tInjuryRecordedAt)) continue;
+    if(p.tInjury===serverMs && p.tInjurySource===source) continue;
+    const wasEntered=p.tInjurySource==='entered';
+    p.tInjury=serverMs;
+    p.tInjurySource=source;
+    p.tInjuryRecordedAt=Number.isFinite(serverRecordedAt)?serverRecordedAt:null;
+    if(source==='entered'){
+      const role=mapServerRole(String(row.t_injury_set_by_role||''));
+      p.tInjurySetByLabel=EVAC_POINT_ROLE_NAMES[role]||role||null;
+      p.tInjuryCode=null;
+      (p.events||(p.events=[])).push({type:'REMOTE_STATE_APPLIED',time:nowT(),detail:`שעת פציעה ${tourniquetHhmm(serverMs)} (מסנכרון${p.tInjurySetByLabel?' · '+p.tInjurySetByLabel:''})`});
+    } else if(wasEntered){
+      p.tInjurySetByLabel=null;
+    }
+    changed=true;
   }
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
