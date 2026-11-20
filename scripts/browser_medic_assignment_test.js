@@ -69,6 +69,15 @@ function handle(server, req) {
       if (!server.members.some((m) => m.incident_id === p.p_incident_id && m.profile_id === u.id)) server.members.push({ incident_id: p.p_incident_id, profile_id: u.id, role_at_incident: u.role, assigned_by: null, created_at: new Date().toISOString() });
       return { data: { id: p.p_incident_id }, error: null };
     }
+    // change_incident_type (database/090 WP-25): one add/remove on the server's list; incident_type = the first.
+    if (req.name === 'change_incident_type') {
+      const inc = server.incidents.find((i) => i.id === p.p_incident_id);
+      if (!inc || !['rpc', 'rcc', 'admin', 'pc', 'cc', 'chamal', 'medic', 'paramedic', 'physician'].includes(u.role)) return { data: null, error: { code: '42501', message: 'may not' } };
+      const types = Array.isArray(inc.incident_types) ? inc.incident_types : (inc.incident_type ? [inc.incident_type] : []);
+      inc.incident_types = p.p_action === 'add' ? (types.includes(p.p_type) ? types : [...types, p.p_type]) : types.filter((t) => t !== p.p_type);
+      inc.incident_type = inc.incident_types[0] || null;
+      return { data: { incident_types: inc.incident_types, metadata: inc.metadata || {} }, error: null };
+    }
     if (req.name === 'get_incident_command_state') { const inc = server.incidents.find((i) => i.id === p.p_incident_id); return { data: inc ? { incident_id: inc.id, status: inc.status, state_json: {} } : null, error: null }; }
     return { data: null, error: null };
   }

@@ -64,6 +64,17 @@ async function checkFile(browser, file) {
   assert((await page.textContent('#enroute-assignment-card')).includes('קריסת מבנה'), `${rel}: Movement screen badge must show the collapse`);
   await hideBrief();
 
+  // Several types (WP-25): shooting added next to the explosion, both questions, both in the label.
+  await page.click('#enroute-incident-type-grid [data-incident-type="mass_shooting"]');
+  await hideBrief();
+  assert((await page.evaluate(() => incidentTypeLabel(currentSiteId()))).includes('פיצוץ + ירי המוני'), `${rel}: two types must both show in the label`);
+  assert(await visible('#enroute-incident-details [data-incident-detail="hazmat"]') && await visible('#enroute-incident-details [data-incident-detail="shooterStatus"]'), `${rel}: both types' questions must show`);
+  assert((await page.$$('#enroute-incident-type-grid .tap-btn.selected')).length === 2, `${rel}: both type buttons must be selected`);
+  // A tap on a type this medic added removes it.
+  await page.click('#enroute-incident-type-grid [data-incident-type="mass_shooting"]');
+  await page.click('#enroute-incident-type-grid [data-incident-type="explosion"]');
+  assert((await page.evaluate(() => siteIncidentTypes(currentSiteId()))).length === 0, `${rel}: a tap on the medic's own type must remove it`);
+
   // Missile type already includes collapse: no duplicate.
   await page.click('#enroute-incident-type-grid [data-incident-type="missile_strike_structural_collapse"]');
   assert(!(await visible('#enroute-building-ask')), `${rel}: missile must not ask, the building section is always open`);
@@ -76,6 +87,7 @@ async function checkFile(browser, file) {
   await hideBrief();
 
   // Building standing, nobody trapped: collapse removed.
+  await page.click('#enroute-incident-type-grid [data-incident-type="missile_strike_structural_collapse"]');
   await page.click('#enroute-incident-type-grid [data-incident-type="mass_shooting"]');
   await hideBrief();
   assert(await visible('#enroute-building-section'), `${rel}: a reported collapse keeps the building section open after a type change`);
@@ -99,6 +111,7 @@ async function checkFile(browser, file) {
   assert(!(await page.evaluate(() => incidentTypeLabel(currentSiteId()))).includes('קריסת מבנה'), `${rel}: "no" must clear the collapse`);
 
   // Road accident questions, per type: the shooting answers are not mixed in.
+  await page.click('#enroute-incident-type-grid [data-incident-type="mass_shooting"]');
   await page.click('#enroute-incident-type-grid [data-incident-type="vehicle_accident"]');
   await hideBrief();
   assert(!(await visible('#enroute-building-section')), `${rel}: road accident after "no" keeps the building section closed`);
