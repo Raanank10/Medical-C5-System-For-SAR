@@ -22,7 +22,8 @@ for (const rel of files) {
   assert(html.includes('id="enroute-incident-type-grid"'), `${rel}: Movement screen must have an incident-type grid`);
   for (const type of ['missile_strike_structural_collapse', 'mass_shooting', 'vehicle_accident', 'explosion']) {
     assert(html.includes(`onclick="selectEnrouteIncidentType('${type}')"`), `${rel}: Movement screen must offer incident type ${type}`);
-    assert(html.includes(`onclick="rescueSetIncidentType('\${role}','${type}')"`), `${rel}: rescue panel must still offer incident type ${type}`);
+    // Since V2.99.80 the rescue panel (renderRccSiteManagement, RPC and RCC) lists the types.
+    assert(html.includes(`['${type}','`) && html.includes("rescueSetIncidentType('${rescueCmdRole()}','${k}','${siteId}')"), `${rel}: rescue panel must still offer incident type ${type}`);
   }
   assert(html.includes('id="enroute-assignment-card"'), `${rel}: Movement screen must render the assignment / prior-info card`);
 
