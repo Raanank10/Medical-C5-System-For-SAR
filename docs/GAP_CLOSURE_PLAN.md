@@ -366,15 +366,12 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 6. WP-28, WP-30, WP-31 and WP-33 wait for an owner answer; ask it first in the session.
 7. WP-32 and WP-34 to WP-37 any time.
 
-**Status check 2026-11-18 (evening).** `main` is V2.99.75 with `database/084` the highest file. Live: up to `082` (WP-38), `sync-log` v18. Done: WP-19 (#130), WP-20 (#128), WP-38 (#132, #135). Merged, not yet live: WP-24 (#133; `083`, `084` and a `sync-log` with `SUPPLY_REQUEST_CANCELLED` still to deploy, checked live 2026-11-18 21:40 UTC). In progress: WP-22 (its session waits for the owner to approve the closing groups; 55 still open, 0 closed), WP-23 (#131), WP-25 (#134). Neither open PR is applied live. Their numbers collide with `main`:
+**Status check 2026-11-20.** `main` is V2.99.81 with `database/088` the highest file. Live (checked read-only 2026-11-20): every file through `088`, `sync-log` v19.
 
-| PR | WP | Claims | Against `main` | Next free if merged in this order |
-| --- | --- | --- | --- | --- |
-| #133 | WP-24 | V2.99.75, `083`, `084` | merged 2026-11-18; `084` starts from WP-38's live `project_supply_request_event()` body (keeps the receipt logic) | apply `083`, `084`, then `sync-log` |
-| #131 | WP-23 | V2.99.73, `082` | conflicts; `082` and V2.99.73 already taken | V2.99.76, `085` |
-| #134 | WP-25 | V2.99.74, `082`, `083` | conflicts; `082`, `083` and V2.99.74 taken | V2.99.77, `086`, `087` |
-
-Merge one at a time; each session renumbers from `main` right before its merge (the rule above), applies its SQL only after renumbering, and redeploys `sync-log` from `main`'s file (live v18 has WP-38). WP-19's fix is merged but no phone has pushed a stock movement since (live `inventory_ledger_v12` still 0 rows; last event 2026-11-18 12:19 UTC, before the merge); that check is part of WP-21.
+- Done: WP-19 (#130), WP-20 (#128), WP-22 (#140, 55 rejections closed with reasons, 0 open), WP-23 (#139, `088` live), WP-33 (#137), WP-38 (#132, #135), WP-39 (#138), WP-40 (#142), WP-41 (#143). Outside the WP list: the RCC panel (#141, V2.99.80, `085`-`087` live): "חולץ" by RPC / RCC, a medic check before extracting an unsorted or long-trapped casualty, "בקש חובש לבדיקה"; `085` also does WP-32 step 1 (rescue board tells moving from arrived).
+- Needs a deploy: WP-24 (#133). `083` and `084` are live, but live `sync-log` v19 has no `SUPPLY_REQUEST_CANCELLED` (it was deployed from a file without WP-24), so a CC or chamal cancel is refused as `FORBIDDEN_ACTOR_ROLE`. Fix: redeploy `sync-log` from `main`'s file (v20), which has every change since v18.
+- Open: WP-25 (#134), conflicts with `main`; its `085`-`086` and V2.99.76 are taken; next free V2.99.82, `089`-`090`; none of it is live. #131 is the superseded first WP-23 PR (#139 replaced it) and can be closed.
+- Not yet seen on a phone: no event has reached the server since 2026-11-18 12:19 UTC, so WP-19 (stock ledger still 0 rows), WP-23, WP-24, WP-38, WP-40, WP-41 and the RCC panel have only run in browser tests and rolled-back SQL. That check is WP-21.
 8. WP-38 after WP-19 (owner 2026-11-18); WP-24 touches the same flow.
 
 | Round 2 WP | Title | Priority | Needs from the owner first |
@@ -393,12 +390,15 @@ Merge one at a time; each session renumbers from `main` right before its merge (
 | WP-30 | Telegram critical alerts (B1) | P2 | the 19 alert answers, a bot |
 | WP-31 | MARCH completion rule and hands-on PC | P2 | clinical criteria |
 | WP-32 | Evacuation point leftovers (WP-18) | P2 | - |
-| WP-33 | CC all-incidents: what counts as an alert | P3 | one answer |
+| WP-33 | CC all-incidents: what counts as an alert | P3 | - (answered 2026-11-18) |
 | WP-34 | Test gaps: AAR screen, analytics pytest in CI | P3 | - |
 | WP-35 | Record what is applied live | P3 | - |
 | WP-36 | Demo constants in signed-in paths | P3 | - |
 | WP-37 | External report unlink tombstone | P3 | - |
 | WP-38 | A resupply delivered to a medic raises the bag | P2 | one design question |
+| WP-39 | The evacuation point is called נאפ"ל | P2 | - (decided 2026-11-18) |
+| WP-40 | 30 minutes waiting at the נאפ"ל alerts PC and CC | P2 | - (decided 2026-11-19) |
+| WP-41 | Medical staff see a patient sent to / arriving at the נאפ"ל | P2 | - (decided 2026-11-19) |
 
 ---
 
@@ -486,6 +486,10 @@ Merge one at a time; each session renumbers from `main` right before its merge (
 
 **Done when.** The panel shows only rejections that still need someone, each closed one has a reason, and nothing was deleted.
 
+**Re-checked (2026-11-18).** Still 55 open, the same four groups (8 / 10 / 18 / 19), but every one is now in a closed incident, including the 5 stock movements that were in an open one on 2026-11-17. So `resolve_sync_ingestion_error()` lets only admin close them (`app.can_read_incident_patients`, D9), and the in-app panel cannot reach them: it loads rejections only for the incidents the phone has open. Closing changes no screen; it ends the open backlog and, by the nightly job `redact-resolved-sync-error-payloads` (03:15 UTC, `database/028`), deletes each closed row's stored copy (`raw_payload`), logged in `retention_actions`. The row stays.
+
+**Done (2026-11-19, owner approved all four groups 2026-11-18).** One transaction, `resolve_sync_ingestion_error()` called once per row as the admin account ("Test Admin"), aborting if any row fell outside the four groups or any count had changed: A (8) `test_data`; B (10), C (18) and D (19) `not_recoverable`, each with a note naming the cause and its fix (`database/047`, WP-17, WP-19). Group C was not resent: its incident is closed and its stored report written. Checked after: 55 rows, 0 open, every one with a reason and a "WP-22" note, closed by the same account; no row deleted or edited outside the function.
+
 ---
 
 ### WP-23: Injury time editable in the field (P2, owner 2026-10-23)
@@ -499,6 +503,22 @@ Merge one at a time; each session renumbers from `main` right before its merge (
 4. Who may edit: medic, paramedic, physician, PC (ask the owner whether CC too).
 
 **Verify.** New browser test across two phones; check `068`'s report uses `t_injury` for golden-hour figures. Timing logic: owner reviews (CLAUDE.md, clinically relevant timing).
+
+**Evidence re-checked 2026-11-18, three corrections.** (a) `013` does not set `t_injury` on create: `sync-log` inserts the patients row with `t_injury` = the create event's `local_timestamp` and reads nothing from the payload, so step 1's "send it in the create payload" would have done nothing without a `sync-log` deploy. (b) `068`'s report has no golden-hour figure and never reads `t_injury`; it measures from incident open. (c) The phone's command watchdog rows "Golden Hour" and "Crush Syndrome" were labelled `T_injury +45m` but counted from the phone's registration of the patient. Also: the live `project_patient_state()` applied `PATIENT_T_INJURY_UPDATED` in arrival order, so an offline phone's older entry pushed late would overwrite a newer correction.
+
+**Decided (owner, 2026-11-18).** CC may not change the injury time. All three clocks follow it: the command watchdog rows, a "שעת פציעה" line in MIST, and golden-hour figures in the stored report. The MIST mechanism/injuries bug found on the way is fixed in the same PR.
+
+**Done (V2.99.81, `database/088`; no `sync-log` change).** Written as 082; renumbered to 085 after WP-38 took 082 and WP-24 083-084, then to 088 because PR #141's `085_rescue_board_evac_point` (with 086-087) was applied live first. That file renamed `app.build_incident_aar()` to `app.build_incident_aar_ext()` and wrapped it, so 085's in-place report edit stopped with its own guard on 2026-11-19 (nothing applied); 088 edits whichever of the two holds the base call.
+1. `patients.t_injury_source` (`event_time` = the old fallback and every existing row, kept as it is; `incident_open`; `entered`) plus who, which role, which event and the phone time of the winning entry.
+2. The create event (`PATIENT_CREATED`, `QUICK_PATIENT_CREATED`, `FIRST_RESPONDER_REPORT`) gives the row the incident's `t_injury_default` (the alert time, = `t_zero` from `open_incident()`), source `incident_open`. Done by a trigger, not by the create payload, so no `sync-log` deploy.
+3. `PATIENT_T_INJURY_UPDATED` moved out of `project_patient_state()` (edited in place like `047`, fails if the branch text is not found exactly once) into `app.project_patient_t_injury()`: medic/paramedic/physician/pc/admin only (second gate after `sync-log`), a parseable time not more than 5 minutes after the entry nor 26 hours before it, newest entry by phone time wins. The event stays in the log either way.
+4. The report gains `golden_hour` (edited in place in `app.build_incident_aar()`, or in `app.build_incident_aar_ext()` once #141's 085 renamed it): entered vs estimated, handed over within / after 60 minutes of injury, median injury-to-handover overall and for red, still not handed over past 60 minutes, one row per patient by temporary number. Reports already stored stay as they were; the next close stores a new version.
+5. Client: "שעת פציעה" row on the patient screen with the tourniquet body-time control (`C5Rules.parseTourniquetTimeCode`: same day rule, 5 min tolerance, 5-60 min later asks, over 12 h confirms), "(משוערת)" until entered; `pullInjuryTimes` (own query, so a database without 088 breaks nothing); the phone keeps its own entry until the server holds one at least as new. Golden Hour / Crush watchdog rows, MIST text, the MIST summary in `PATIENT_HANDED_OVER` (`injury_time`, `injury_time_estimated`) and the report screen (golden-hour box, "מפציעה עד מסירה" column; older reports say they have none) read it. MIST mechanism is now the incident's likely mechanism (no per-patient mechanism field exists) and injuries the marked body zones; before, both read `p.injury`.
+6. `supabase/functions/handover-consume` shows the injury time on the receiving page; **not deployed** (file only).
+
+**Verify.** `scripts/browser_injury_time_test.js` (two medics, PC, CC on one fake backend that mirrors 088). `088` ran on a local PostgreSQL 16 against the live text of both edited functions (md5 of `prosrc` equal to live, re-checked 2026-11-19 after WP-19, WP-38 and WP-24 merged; re-tested 2026-11-19 with and without PR #141's rename): 12 scenarios (default on create, entry, older entry pushed late ignored, CC ignored, too late / bad / 27 h old ignored, 4 min ahead accepted, a later create event does not reset, rows without a create event stay `event_time`, report figures, no event changed). **Not applied live yet**: the session's apply was blocked; the owner applies `088` in the SQL editor.
+
+**Not done / found on the way.** `siteData.lastMechanism` is overwritten with the last full-flow patient's body-zone labels at save (`savePatient`, `effectiveInjury`), so the quick-flow patients that follow inherit those labels as their "injury"; not fixed here.
 
 ---
 
@@ -605,9 +625,11 @@ Merge one at a time; each session renumbers from `main` right before its merge (
 
 ---
 
-### WP-33: CC all-incidents: what counts as an alert (P3, one answer)
+### WP-33: CC all-incidents: what counts as an alert (P3, answered 2026-11-18)
 
-Ask the owner (open in the 2026-11-08 PC/CC session): on the all-incidents page, does a red patient alone count as an alert ("פצוע אדום")? Recommendation: no, only a red patient with a real problem (no evacuation status, tourniquet past 120 min, trapped with no medic contact); the tables already show red counts. Inside an incident nothing changes. Extend `scripts/browser_command_panel_test.js`.
+**Owner, 2026-11-18.** The per-patient alert lines of V2.99.68 were too much on the CC's first page. Chosen from a mockup: one line per incident ("option A"), coloured by its worst alert, with the location, how many patients / requests have alerts, the most urgent one and "(+N)" for the rest; a tap opens the incident, where each alert keeps its own line. A red patient alone counts ("פצוע אדום"), because a red patient is a problem until evacuated to a hospital: at the extraction site and at the evacuation point the patient is still the platoon's. Found while asking: "פצוע אדום" kept firing after a vehicle took the patient (handed over, evacuated, self-evacuated); now it stops then, everywhere, not only on this page.
+
+**Done (V2.99.76).** `ccOverviewIncidentAlerts()` groups the existing per-patient groups by incident; `renderCcOverviewStrip()` draws one line per incident, worst first, then by count; `RED_CASUALTY_CREATED` only while the patient is not in `LOCATION_BOARD_EVACUATED_STATUSES`. `scripts/browser_command_panel_test.js` step 13: lines per incident and their order, counts, "(+N)", a red patient at the evacuation point counts, a red patient handed over does not.
 
 ---
 
@@ -664,6 +686,38 @@ Ask the owner (open in the 2026-11-08 PC/CC session): on the all-incidents page,
 
 ---
 
+### WP-39: The evacuation point is called נאפ"ל (P2, owner 2026-11-18)
+
+**Why.** The owner's term is נאפ"ל, נקודת איסוף פלוגתית (company collection point). This reverses the 2026-10-23 rename to "נקודת פינוי" (WP-18). Each site has its own נאפ"ל, as today; the PC and the CC must see each site's. The נאפ"ל is not the final destination: a patient there is still the platoon's until MDA or another vehicle takes them.
+
+**Steps.** "נאפ"ל" on buttons, chips, column headers and lines where space is short; the full "נקודת איסוף פלוגתית" once on the patient screen and in help text. Every UI string, test and doc that says "נקודת פינוי". No data change: the payload keeps `destination: 'company_collection_point'`.
+
+**Verify.** `scripts/browser_evac_point_arrival_test.js`, `scripts/browser_command_panel_test.js` and the smoke scripts that assert the wording; `browser_mobile_layout_test.js` for the shorter labels.
+
+**Done (V2.99.77).** Every UI string: "נאפ״ל" in buttons ("יצא לנאפ״ל", "הגיע לנאפ״ל"), statuses, board lines, the stage cards, advice and toasts; the full "נקודת איסוף פלוגתית" on the PC site card's section title, the toast after "יצא לנאפ״ל" and the event detail. Written with gershayim (״) like חוג״ד and מד״א. Tests updated; `database/076`/`077` comments left as applied.
+
+---
+
+### WP-40: 30 minutes waiting at the נאפ"ל alerts the PC and CC (P2, owner 2026-11-18/19)
+
+**Why.** WP-18 showed the waiting time at the evacuation point without an alert, until the owner set a threshold. Owner, 2026-11-18: 30 minutes, seen by the PC and the CC. Owner, 2026-11-19: every colour except black; counted from when the patient was sent to the נאפ"ל, not from the recorded arrival ("it will catch most patients that should go to hospital", including one nobody marked as arrived); two levels.
+
+**Done (V2.99.78), no SQL.** `evacPointWaitAlert` in `src/domain/rules.js` (30 min warning, 60 min critical, only while `evacuating`, never black) with domain tests. The phone records `evacSentAt` on "יצא לנאפ״ל"; other phones read the send time from `patients.status_recorded_at` (set from the status event's phone time by `database/013`), added to the patient pulls and the CC overview read. Alert `EVAC_POINT_WAIT_LONG` for PC and CC, tab פעולה, listed under `not_events` in `event-contract.json`; its line shows minutes since leaving and, when marked, since arrival. `scripts/browser_command_panel_test.js` step 14 and the overview step. Known limit: `status_recorded_at` moves if another status event for the patient arrives while evacuating (none of today's flows send one).
+
+---
+
+### WP-41: Medical staff see a patient sent to and arriving at the נאפ"ל (P2, owner 2026-11-18/19)
+
+**Why.** Owner, 2026-11-18: the platoon's medical staff should know a patient is going to the נאפ"ל, as a banner that closes after 15 seconds or on a tap. Owner, 2026-11-19: both when the patient is sent and when they arrive; every medical role (medic, paramedic, physician); the banner offers "open the patient" or "close".
+
+**Steps.** Detect, in the pull, a patient newly `evacuating` and a newly recorded arrival, once each per patient; skip the phone that recorded it; a banner like the tourniquet one with two buttons, 15-second timer; several patients in one pull become one banner. Phones learn it from the 45-second pull, so up to about a minute late, and an offline phone after it reconnects. No new event type.
+
+**Verify.** A browser test with a PC phone sending the patient, a medic and a paramedic phone: both get the banner on the send and on the arrival, the sender does not, it closes after 15 s, "open" opens the patient, it does not repeat on the next pull.
+
+**Done (V2.99.79), no SQL.** `noteEvacPointNews` is called from the pull: a known patient whose status turns `evacuating`, a patient first seen already `evacuating` with a send time under 10 minutes old (`status_recorded_at`, WP-40), and a first recorded arrival (`applyEvacPointArrivals`). A phone's own change never comes back as a change, so the sender gets no banner. Medic, paramedic and physician only. Several news items within 300 ms become one banner; "פתח פצוע" per patient, "סגור", 15-second timer; placed under the tourniquet banner when that is open. `scripts/browser_evac_point_arrival_test.js`: medic 2 gets the "sent" banner, medic 1 (the sender) and the PC do not, it closes after 15 s and does not return on the next pull, medic 1 gets the "arrived" banner and "פתח פצוע" opens the patient.
+
+---
+
 ## Tracks outside this plan's PRs
 
 These need a decision, people or money rather than a code change in this repo. Listed so nothing is lost:
@@ -710,22 +764,25 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-19 Stock movements reach the server | P1 | Client done (V2.99.73), no SQL; database check rolled back 2026-11-18; real-phone push pending (owner) | this PR | every stock event has a uuid patient or none; New Patient form stock sent after the create, net; abandoned form sent with no patient; bag per user, kept over new patients and reloads, below 0 allowed, "התיק חודש" (owner 2026-11-18) |
 | WP-20 Finish #128, apply 079-081 | P1 | Done: 079, 080, 081 and `sync-log` v17 live, checked 2026-11-17 | #128 | 100-minute check on a real tourniquet runs in WP-21 |
 | WP-21 Live two-phone run | P1 | Not started | | WP-0 part 2 plus WP-17/18/19, D1 offline, WP-10 install, T6 |
-| WP-22 Open sync rejections | P2 | In progress: waiting for the owner to approve the closing groups (2026-11-18); 0 of 55 closed live | | 55 open, 0 ever closed; after WP-19 |
-| WP-23 Injury time editable | P2 | PR #131 open, not live; must renumber (`082`, V2.99.73 taken) | | owner 2026-10-23; server already applies `PATIENT_T_INJURY_UPDATED` |
-| WP-24 Command cancels a resupply request | P2 | Client done (V2.99.75); `database/083` + `084` written, tested on local PostgreSQL 16, not applied live; `sync-log` needs `SUPPLY_REQUEST_CANCELLED` deployed | #133 | rescoped 2026-11-18: CC holds no stock, so no "fulfilled by company"; medic's escalation stays with the PC; cancel with a reason (cc/chamal/admin while open, PC before escalation); direct writes to `supply_requests` closed |
-| WP-25 Medic incident type + mismatch | P2 | PR #134 open, not live; must renumber (`082`-`083`, V2.99.74 taken) | | owner 2026-10-23 (WP-8 follow-up) |
+| WP-22 Open sync rejections | P2 | Done 2026-11-19: 55 closed with reasons (8 test data, 47 not recoverable), 0 open, rows kept | #140 | all in closed incidents, so admin only; stored copies removed by the nightly privacy job |
+| WP-23 Injury time editable | P2 | Done (V2.99.81, `database/088`): 088 live (checked 2026-11-20), `sync-log` already allowed `PATIENT_T_INJURY_UPDATED` | #139 | owner 2026-10-23 and 2026-11-18: CC may not edit; watchdog rows, MIST and stored report follow the injury time; newest entry by phone time wins; `handover-consume` change not deployed |
+| WP-24 Command cancels a resupply request | P2 | Client done (V2.99.75); `database/083` + `084` live (checked 2026-11-20); live `sync-log` v19 lacks `SUPPLY_REQUEST_CANCELLED`, so a CC / chamal cancel is refused live until `sync-log` is redeployed from `main`'s file | #133 | rescoped 2026-11-18: CC holds no stock, so no "fulfilled by company"; medic's escalation stays with the PC; cancel with a reason (cc/chamal/admin while open, PC before escalation); direct writes to `supply_requests` closed |
+| WP-25 Medic incident type + mismatch | P2 | PR #134 open, not live; must renumber (its `085`-`086` and V2.99.76 are taken; next free V2.99.82, `089`-`090`) | #134 | owner 2026-10-23 (WP-8 follow-up) |
 | WP-26 PC deterioration review | P2 | Not started | | owner 2026-10-23 (WP-5 `known_gaps`) |
 | WP-27 CC moves a site to another platoon | P2 | Not started, 1 design question | | owner 2026-10-23 (WP-7 remainder); RLS |
 | WP-28 27 never-sent event types | P2 | Waiting on owner's list | | |
 | WP-29 Dead Man's Switch on the server | P2 | Not started | | builds on 081's watchdog (live) |
 | WP-30 Telegram alerts (B1) | P2 | Waiting on owner's 19 answers | | |
 | WP-31 MARCH completion + hands-on PC | P2 | Waiting on clinical criteria | | B2 |
-| WP-32 Evacuation point leftovers | P2 | Not started | | WP-18 remainder |
-| WP-33 CC all-incidents alert rule | P3 | Waiting on 1 owner answer | | |
+| WP-32 Evacuation point leftovers | P2 | Step 1 done by `085` (RCC panel, #141): the rescue board tells moving from arrived. Open: waiting time in the stored report | | WP-18 remainder |
+| WP-33 CC all-incidents alert rule | P3 | Done (V2.99.76), no SQL | this PR | owner 2026-11-18: one line per incident; a red patient counts until a vehicle takes them; "פצוע אדום" no longer fires after a vehicle took the patient |
 | WP-34 Test gaps | P3 | Not started | | AAR screen test, analytics pytest in CI |
 | WP-35 Record what is applied live | P3 | Not started | | read-only |
 | WP-36 Demo constants | P3 | Not started | | `SITE_A` x60, `PLT-A` x25 |
 | WP-37 Unlink tombstone | P3 | Not started | | `database/069` known limit |
+| WP-39 Evacuation point = נאפ"ל | P2 | Done (V2.99.77), no SQL | this PR | owner 2026-11-18; reverses WP-18's "נקודת פינוי"; one per site |
+| WP-40 30 min at the נאפ"ל alert | P2 | Done (V2.99.78), no SQL | this PR | owner 2026-11-18/19: PC + CC, every colour but black, from the send, 30 warn / 60 critical |
+| WP-41 Banner: patient to / at the נאפ"ל | P2 | Done (V2.99.79), no SQL | this PR | owner 2026-11-18/19; send + arrival, medic / paramedic / physician, open or close, 15 s |
 | WP-38 Resupply raises the medic's bag | P2 | Done (V2.99.74): `database/082` applied live by the owner, `sync-log` v18 deployed 2026-11-18; live two-phone check pending | #132 | owner 2026-11-18: the medic confirms, by what arrived; the PC's / logistics' "delivered" = handed over, waiting for the medic |
 
 ## Revisions after #73 (2026-10-19)

@@ -217,7 +217,7 @@ assert.deepEqual(
 // FINAL_PATIENT_STATUSES / canChangePatientStatus: once a patient reaches deceased,
 // handed_over, evacuated, closed, or self_evacuated, mutation sites (handover, manual
 // triage override, sweep color override) must refuse to overwrite them. "evacuating" is
-// deliberately not final - a patient waiting at the site's evacuation point (נקודת פינוי) under
+// deliberately not final - a patient waiting at the site's evacuation point (נאפ״ל, נקודת איסוף פלוגתית) under
 // the platoon commander's supervision must still be able to reach handed_over.
 assert.equal(rules.isFinalPatientStatus("deceased"), true);
 assert.equal(rules.isFinalPatientStatus("handed_over"), true);
@@ -461,6 +461,16 @@ assert.equal(rules.tourniquetSnoozeOption("toString", 0), null);
 assert.equal(rules.rescueEvacPriority("red", false), "urgent");
 assert.equal(rules.rescueEvacPriority("green", true), "urgent"); // active tourniquet
 assert.equal(rules.rescueEvacPriority("yellow", false), "not_urgent");
+// Extraction by the rescue chain (owner, 2026-11-19): unsorted needs a medic's check; 60 minutes
+// trapped or more needs a medic present (crush syndrome), whatever the priority.
+assert.equal(rules.LONG_ENTRAPMENT_MINUTES, 60);
+assert.equal(rules.rescueExtractionRequirement("urgent", 10), null);
+assert.equal(rules.rescueExtractionRequirement("not_urgent", 59), null);
+assert.equal(rules.rescueExtractionRequirement("pending", 10), "medic_check");
+assert.equal(rules.rescueExtractionRequirement(undefined, null), "medic_check");
+assert.equal(rules.rescueExtractionRequirement("not_urgent", 60), "medic_present");
+assert.equal(rules.rescueExtractionRequirement("pending", 90), "medic_present");
+assert.equal(rules.rescueExtractionRequirement("urgent", NaN), null);
 assert.equal(rules.rescueEvacPriority("green", false), "not_urgent");
 assert.equal(rules.rescueEvacPriority("black", false), "not_urgent");
 // Not sorted yet is never "not urgent".
@@ -468,5 +478,23 @@ assert.equal(rules.rescueEvacPriority("pending", false), "pending");
 assert.equal(rules.rescueEvacPriority(undefined, false), "pending");
 assert.equal(rules.rescueEvacPriority("pending", true), "urgent");
 assert.deepEqual(rules.RESCUE_PRIORITIES, ["urgent", "pending", "not_urgent"]);
+
+// WP-40 (owner 2026-11-19): waiting for a vehicle after leaving for the נאפ״ל, from when the patient was sent.
+{
+  const now = Date.parse("2026-11-19T12:00:00Z");
+  const sent = (min, extra = {}) => ({ patientStatus: "evacuating", triage: "yellow", evacSentAt: now - min * 60000, ...extra });
+  assert.equal(rules.evacPointWaitAlert(sent(29), now), null);
+  assert.deepEqual(rules.evacPointWaitAlert(sent(30), now), { level: "warning", minutes: 30 });
+  assert.deepEqual(rules.evacPointWaitAlert(sent(59), now), { level: "warning", minutes: 59 });
+  assert.deepEqual(rules.evacPointWaitAlert(sent(60), now), { level: "critical", minutes: 60 });
+  assert.deepEqual(rules.evacPointWaitAlert(sent(45, { triage: "green" }), now), { level: "warning", minutes: 45 }); // every colour
+  assert.deepEqual(rules.evacPointWaitAlert(sent(45, { triage: "pending" }), now), { level: "warning", minutes: 45 });
+  assert.equal(rules.evacPointWaitAlert(sent(90, { triage: "black" }), now), null); // except black
+  assert.equal(rules.evacPointWaitAlert(sent(90, { patientStatus: "handed_over" }), now), null); // a vehicle took them
+  assert.equal(rules.evacPointWaitAlert(sent(90, { patientStatus: "stabilizing" }), now), null);
+  assert.equal(rules.evacPointWaitAlert({ patientStatus: "evacuating", triage: "red" }, now), null); // send time unknown
+  assert.equal(rules.EVAC_POINT_WAIT_WARN_MS, 30 * 60000);
+  assert.equal(rules.EVAC_POINT_WAIT_CRITICAL_MS, 60 * 60000);
+}
 
 console.log("Domain rule tests passed.");

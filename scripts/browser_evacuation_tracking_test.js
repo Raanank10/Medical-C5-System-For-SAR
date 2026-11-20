@@ -35,7 +35,8 @@ const USERS = {
 const BLANKET = ['cc', 'chamal', 'admin', 'rpc', 'rcc', 'physician'];
 const userById = (id) => Object.values(USERS).find((u) => u.id === id);
 const MDA = ['minor', 'anxiety', 'moderate', 'serious', 'critical', 'deceased'];
-const CLINICAL = ['PATIENT_CREATED', 'QUICK_PATIENT_CREATED', 'PATIENT_LOCATION_UPDATED', 'PATIENT_TRIAGE_UPDATED',
+const CLINICAL = ['PATIENT_CREATED', 'QUICK_PATIENT_CREATED', 'PATIENT_LOCATION_UPDATED', 'PATIENT_ACCESS_UPDATED', // access sync, V2.99.80
+  'PATIENT_TRIAGE_UPDATED',
   'PATIENT_STATUS_UPDATED', 'PATIENT_HANDED_OVER', 'PATIENT_TRIAGED_EXPECTANT', 'VITALS_RECORDED', 'TOURNIQUET_APPLIED',
   'INTERVENTION_RECORDED', 'AIRWAY_MANAGED'];
 const ALLOWED = {
@@ -235,7 +236,7 @@ async function checkFile(browser, file) {
 
   // Handover of A through the real sheet: destination + MDA classification.
   await pc.page.evaluate((id) => openPatient(id), idA);
-  // Since 2026-10-23 handover sits under "עוד" while "יצא לנקודת פינוי" holds the second slot.
+  // Since 2026-10-23 handover sits under "עוד" while "יצא לנאפ״ל" holds the second slot.
   if (!(await pc.page.locator('#detail-bottom-bar button:has-text("הועבר למד״א — עכשיו")').isVisible())) await pc.page.click('#detail-bar-more-btn');
   await pc.page.click('#detail-bottom-bar button:has-text("הועבר למד״א — עכשיו")');
   await pc.page.waitForSelector('#evac-sheet-modal:not(.hidden)');

@@ -193,12 +193,15 @@ T_injury = T₀ by default
 
 For simplicity, most clinical timers should use `T_injury`. Since `T_injury` defaults to `T₀`, this preserves clinical semantics while allowing future per-patient injury-time overrides.
 
-Future option:
+Per-patient override (built in V2.99.81, WP-23, `database/088`):
 
 ```text
-A Medic may override T_injury for an individual patient if injury time is known to differ.
-Any override is logged as PATIENT_T_INJURY_UPDATED.
+A medic, paramedic, physician, PC or admin (not CC) may override T_injury for an individual
+patient when the injury time is known to differ. Any override is logged as PATIENT_T_INJURY_UPDATED.
+Until someone enters it, T_injury is shown as an estimate ("משוערת").
 ```
+
+The command watchdog's Golden Hour and Crush Syndrome rows, the MIST handover and the stored after-action report count from `T_injury`. On the server the newest entry by phone time wins, so an older entry pushed late by an offline phone does not overwrite a newer correction.
 
 ### Site Guard and Patient Creation
 
@@ -793,15 +796,15 @@ Bandage / Combat Gauze / TQ / Airway: [count]
 Button:
 
 ```text
-🚶 יצא לנקודת פינוי
+🚶 יצא לנאפ״ל
 ```
 
 Action:
 
 - Writes a `PATIENT_STATUS_UPDATED` event with `payload_json.status = 'evacuating'`
 - Sets patient status to `evacuating`
-- Represents the rescuers having moved the patient from the extraction site to the site's evacuation point (נקודת פינוי): each site has one, where rescued patients wait for an MDA ambulance and where the PC truck and its supplies stand (the company's own ambulance carries the doctor between sites, not patients). Still under the platoon commander's supervision, not yet formally handed to MDA
-- The payload keeps `destination: 'company_collection_point'` for continuity; only the wording changed (V2.99.62, was "נקודת איסוף פלוגתית")
+- Represents the rescuers having moved the patient from the extraction site to the site's evacuation point (נאפ״ל, נקודת איסוף פלוגתית; WP-39, owner 2026-11-18): each site has one, where rescued patients wait for an MDA ambulance and where the PC truck and its supplies stand (the company's own ambulance carries the doctor between sites, not patients). Still under the platoon commander's supervision, not yet formally handed to MDA
+- The payload keeps `destination: 'company_collection_point'` for continuity; only the wording changed: "נקודת פינוי" from V2.99.62 to V2.99.76, "נאפ״ל" (נקודת איסוף פלוגתית) since V2.99.77 (WP-39, owner 2026-11-18)
 - Command views show three separate stages per site: at the extraction site, at the evacuation point, evacuated by MDA / handed over
 - Only shown while the patient is not already `evacuating` or in a terminal status
 
@@ -816,7 +819,7 @@ Button:
 Action:
 
 - Writes `PATIENT_HANDED_OVER` event
-- Sets patient status to `handed_over` (final custody state - distinct from the `evacuating` evacuation-point (נקודת פינוי) step above)
+- Sets patient status to `handed_over` (final custody state - distinct from the `evacuating` evacuation-point (נאפ״ל) step above)
 - Makes field file read-only
 - Updates heatmap sector state
 

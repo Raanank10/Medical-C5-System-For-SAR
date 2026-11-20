@@ -257,7 +257,8 @@ async function checkFile(browser, file) {
   assert(rp.length === 4, `${rel}: the RPC must get the four board patients (got ${JSON.stringify(rp)})`);
   assert(rp.every((p) => !p.triage && p.tq === 0), `${rel}: no triage colour or tourniquet may reach the RPC's phone (got ${JSON.stringify(rp)})`);
   const board = await rpc.page.evaluate(() => { renderRoleDashboard('rpc'); return document.getElementById('role-dashboard-body')?.innerText || ''; });
-  assert(board.includes('דחוף 2') && board.includes('לא דחוף 1') && board.includes('טרם מוין 1'), `${rel}: the RPC's counts must be by priority (got ${board.slice(0, 600)})`);
+  // Since V2.99.80 the RPC has the RCC panel (incident view here): every row carries its priority.
+  assert(board.includes('P001-TA · דחוף') && board.includes('P003-TA · לא דחוף') && board.includes('P002-TA · טרם מוין'), `${rel}: the RPC sees priority only (got ${board.slice(0, 600)})`);
   for (const word of ['אדום', 'צהוב', 'ירוק', 'שחור', 'חסם פעיל', 'נותרו']) {
     assert(!board.includes(word), `${rel}: the RPC's dashboard must not show "${word}"`);
   }
