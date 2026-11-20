@@ -78,7 +78,7 @@ function handle(server, req) {
       inc.status = 'closed'; inc.closed_at = new Date().toISOString();
       server.reports.push({ version: server.reports.length + 1, generated_at: inc.closed_at, report: {
         version: server.reports.length + 1,
-        incident: { visual_id: inc.visual_id, location_name: inc.location_name, opened_at: inc.opened_at, closed_at: inc.closed_at, duration_minutes: 5 },
+        incident: { visual_id: inc.visual_id, location_name: inc.location_name, incident_type: 'mass_shooting', incident_types: ['mass_shooting', 'explosion'], opened_at: inc.opened_at, closed_at: inc.closed_at, duration_minutes: 5 },
         patients: { total: server.patients.length, by_triage: { red: server.patients.length }, by_status: { identified: server.patients.length }, handed_over: 0 },
         patient_rows: server.patients.map((x) => ({ visual_id: x.visual_id, triage: x.current_triage, status: x.current_status, minutes_from_open: 1, tourniquets: 0 })),
         tourniquets: { total: 0, active_at_close: 0, over_120_minutes: 0 } } });
@@ -236,6 +236,7 @@ async function checkFile(browser, file) {
   const reportText = await m1.page.textContent('#incident-report-body');
   assert(reportText.includes('INC-AAAA') && reportText.includes('P001'), `${rel}: the report must show the incident and temporary numbers (got ${reportText.slice(0, 200)})`);
   assert(!reportText.includes('Zeta'), `${rel}: the report must not show names`);
+  assert((await m1.page.textContent('[data-aar-incident-types]')).includes('ירי המוני + פיצוץ'), `${rel}: the stored report must show every incident type (database/092)`);
   assert(reportText.includes('אחרי הסגירה'), `${rel}: the report must say records arrived after the close`);
 
   // Admin keeps the local copy.

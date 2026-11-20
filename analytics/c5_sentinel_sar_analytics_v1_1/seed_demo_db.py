@@ -177,7 +177,7 @@ create table local_event_queue(id text primary key, device_id text not null, eve
 -- Filled by export_live_incident.py only (N10): tables and columns added live after this schema.
 -- Separate tables, not new columns, so the seed scripts' positional inserts keep working.
 -- Display names are left out (ids join to profiles); free text the live table holds is kept.
-create table incident_details(incident_id text primary key, incident_type text, company_id text, platoon_id text, aar_finalized_at text, metadata_json text not null default '{}');
+create table incident_details(incident_id text primary key, incident_type text, incident_types_json text not null default '[]', company_id text, platoon_id text, aar_finalized_at text, metadata_json text not null default '{}');
 create table patient_evacuation(patient_id text primary key, incident_id text not null, evacuation_destination text, mda_classification text, evacuation_updated_at text, trap_status text);
 create table event_origins(event_id text primary key, incident_id text not null, origin_incident_id text not null);
 create table medical_resource_requests(id text primary key, incident_id text not null, request_kind text, resource_type text, quantity integer, urgency text, reason_codes_json text not null default '[]', linked_patient_ids_json text not null default '[]', target_location text, free_text text, auto_generated integer, status text, status_history_json text not null default '[]', requested_by text, requested_by_role text, requested_at text, status_updated_by text, status_updated_by_role text, status_updated_at text);

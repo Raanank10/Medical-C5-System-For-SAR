@@ -223,8 +223,12 @@ def export_newer_tables(conn: sqlite3.Connection, incident_id: str, service_key:
     (seed_demo_db.SCHEMA) so the existing ones keep their shape. Display names are not copied:
     the actor ids join to profiles."""
     # incidents: type, unit, finalize time and metadata (a merged duplicate keeps merged_into there).
-    insert_rows(conn, "incident_details", ["incident_id", "incident_type", "company_id", "platoon_id", "aar_finalized_at", "metadata_json"], [
-        (r["id"], r.get("incident_type"), r.get("company_id"), r.get("platoon_id"), r.get("aar_finalized_at"), j(r.get("metadata"))) for r in incidents
+    # incident_types (database/090, WP-25): every type, in the order added, as a JSON list;
+    # incident_type stays the first one. An incident exported before 090 gets [incident_type].
+    insert_rows(conn, "incident_details", ["incident_id", "incident_type", "incident_types_json", "company_id", "platoon_id", "aar_finalized_at", "metadata_json"], [
+        (r["id"], r.get("incident_type"),
+         j(r.get("incident_types") if r.get("incident_types") else ([r["incident_type"]] if r.get("incident_type") else [])),
+         r.get("company_id"), r.get("platoon_id"), r.get("aar_finalized_at"), j(r.get("metadata"))) for r in incidents
     ])
     # patients: where they were evacuated to and MDA's own classification beside field triage
     # (database/043, 044), and the trapped / not trapped status.
