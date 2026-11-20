@@ -79,7 +79,7 @@ function push(server, userId, body) {
     }
     if (p && e.type === 'PATIENT_HANDED_OVER') { p.current_status = 'handed_over'; p.version++; }
     if (p && e.type === 'PATIENT_STATUS_UPDATED' && pj.status) {
-      p.current_status = pj.status; p.version++;
+      p.current_status = pj.status; p.status_recorded_at = e.local_timestamp; p.version++; // database/013
       // database/077: a later status that is neither evacuating nor final takes the patient back.
       if (!['evacuating', 'handed_over', 'deceased', 'closed', 'self_evacuated'].includes(p.current_status)
         && (!p.evac_point_cleared_at || Date.parse(p.evac_point_cleared_at) < ts)) {
@@ -249,12 +249,12 @@ async function checkFile(browser, file) {
   const id = await m1.page.evaluate(() => { siteData.currentZone = 'קומה 2'; createImmediateInterventionPatient('airway'); return patients[0].id; });
   await syncAll(m1.page); await syncAll(m1.page);
   await m1.page.evaluate((pid) => openPatient(pid), id);
-  await m1.page.click('#detail-bottom-bar button:has-text("יצא לנקודת פינוי")');
+  await m1.page.click('#detail-bottom-bar button:has-text("יצא לנאפ״ל")');
   await m1.page.waitForTimeout(150);
-  assert(await m1.page.locator('#detail-bottom-bar button:has-text("הגיע לנקודת פינוי")').isVisible(),
-    `${rel}: on the way to the evacuation point, the bar must offer "הגיע לנקודת פינוי"`);
-  assert(await m1.page.evaluate((pid) => patientStatusLabel(patients.find((p) => p.id === pid)), id) === 'בדרך לנקודת פינוי',
-    `${rel}: a patient sent to the evacuation point reads "בדרך לנקודת פינוי" until the arrival`);
+  assert(await m1.page.locator('#detail-bottom-bar button:has-text("הגיע לנאפ״ל")').isVisible(),
+    `${rel}: on the way to the evacuation point, the bar must offer "הגיע לנאפ״ל"`);
+  assert(await m1.page.evaluate((pid) => patientStatusLabel(patients.find((p) => p.id === pid)), id) === 'בדרך לנאפ״ל',
+    `${rel}: a patient sent to the evacuation point reads "בדרך לנאפ״ל" until the arrival`);
   await syncAll(m1.page);
   let sp = SERVER.patients.find((p) => p.id === id);
   assert(sp.current_status === 'evacuating' && !sp.evac_point_arrived_at, `${rel}: the server has the patient moving, not arrived`);
@@ -265,15 +265,27 @@ async function checkFile(browser, file) {
   await enter(pc.page);
   await pullAll(pc.page);
   let pcBoard = await boardText(pc.page, 'pc');
-  assert(pcBoard.includes('🚶 בדרך לנקודת הפינוי') && pcBoard.includes('בדרך 1') && pcBoard.includes('בנקודת פינוי 0'),
+  assert(pcBoard.includes('🚶 בדרך לנאפ״ל') && pcBoard.includes('בדרך 1') && pcBoard.includes('בנאפ״ל 0'),
     `${rel}: the PC board must show the patient on the way, not at the point (got ${pcBoard.slice(pcBoard.indexOf('בזירה'), pcBoard.indexOf('בזירה') + 200)})`);
-  assert(await pc.page.locator('#role-dashboard-body .evac-arrived-btn').count() === 1, `${rel}: the PC is offered "הגיע לנקודה" on the board`);
+  assert(await pc.page.locator('#role-dashboard-body .evac-arrived-btn').count() === 1, `${rel}: the PC is offered "הגיע לנאפ״ל" on the board`);
 
   // Medic 2, offline, records the arrival 6 minutes ago (its push comes late, below).
   const m2 = await openPhone(context, file);
   await login(m2.page, 'medic2@test');
   await enter(m2.page);
   await pullAll(m2.page);
+  // WP-41: medic 2 learns from the pull that the patient left for the נאפ״ל (medic 1 sent it): a banner
+  // with "open" and "close". Medic 1, who sent it, and the PC (not a medical role) get none.
+  const banner = (page) => page.evaluate(() => { const el = document.getElementById('evac-point-banner'); return el ? { text: el.textContent, open: el.querySelectorAll('[data-evac-open]').length, close: !!el.querySelector('[data-evac-close]'), kinds: [...el.querySelectorAll('[data-evac-news]')].map((r) => r.dataset.evacNews) } : null; });
+  const m2Sent = await banner(m2.page);
+  assert(m2Sent && m2Sent.kinds.join() === 'sent' && m2Sent.text.includes('בדרך לנאפ״ל') && m2Sent.text.includes('אדום') && m2Sent.open === 1 && m2Sent.close,
+    `${rel}: medic 2 gets a banner that the patient left for the נאפ״ל, with open and close (got ${JSON.stringify(m2Sent)})`);
+  assert(!(await banner(m1.page)) && !(await banner(pc.page)), `${rel}: the phone that sent the patient and the PC get no banner`);
+  // It closes by itself after 15 seconds.
+  await m2.page.waitForTimeout(15300);
+  assert(!(await banner(m2.page)), `${rel}: the banner closes by itself after 15 seconds`);
+  await pullAll(m2.page);
+  assert(!(await banner(m2.page)), `${rel}: the next pull does not bring the same news back`);
   await m2.page.evaluate((pid) => markPatientArrivedAtEvacPoint(pid), id);
   const sixMinAgo = new Date(Date.now() - 6 * 60000).toISOString();
   await m2.page.evaluate((at) => {
@@ -299,21 +311,28 @@ async function checkFile(browser, file) {
   await enter(cc.page);
   await pullAll(cc.page);
   const ccBoard = await boardText(cc.page, 'cc');
-  assert(ccBoard.includes('בנקודת פינוי 1 (עד 6 דק׳)') && ccBoard.includes('🚑 ממתינים לפינוי מד״א · עד 6 דק׳'),
+  assert(ccBoard.includes('בנאפ״ל 1 (עד 6 דק׳)') && ccBoard.includes('🚑 ממתינים לפינוי מד״א · עד 6 דק׳'),
     `${rel}: CC must see the patient waiting at the evacuation point for 6 minutes (got ${ccBoard.slice(ccBoard.indexOf('בזירה'), ccBoard.indexOf('בזירה') + 260)})`);
-  assert(ccBoard.includes('בנקודת פינוי · ממתין 6 דק׳'), `${rel}: the evacuation priority list shows the wait`);
+  assert(ccBoard.includes('בנאפ״ל · ממתין 6 דק׳'), `${rel}: the evacuation priority list shows the wait`);
   assert(!(await cc.page.evaluate((pid) => canMarkEvacPointArrival(patients.find((p) => p.id === pid)), id)), `${rel}: CC is not offered the arrival`);
   await cc.page.evaluate((pid) => openPatient(pid), id);
   assert((await cc.page.textContent('.evac-arrival-row') || '').includes('חובש'), `${rel}: the patient card says who recorded the arrival`);
 
   // Every phone reads the same: the PC and medic 1 pick up the earlier time on their next pull.
   await pullAll(pc.page); await pullAll(m1.page);
+  // WP-41: medic 1 learns of the arrival another phone recorded; "open" opens the patient.
+  const m1Arrived = await banner(m1.page);
+  assert(m1Arrived && m1Arrived.kinds.join() === 'arrived' && m1Arrived.text.includes('הגיע לנאפ״ל'), `${rel}: medic 1 gets a banner that the patient arrived at the נאפ״ל (got ${JSON.stringify(m1Arrived)})`);
+  assert(!(await banner(pc.page)), `${rel}: the PC gets no arrival banner`);
+  await m1.page.click('#evac-point-banner [data-evac-open]');
+  assert(!(await banner(m1.page)) && await m1.page.evaluate(() => document.getElementById('screen-patient')?.classList.contains('active')),
+    `${rel}: "פתח פצוע" closes the banner and opens the patient`);
   for (const [name, page] of [['PC', pc.page], ['medic 1', m1.page]]) {
     const at = await page.evaluate((pid) => patients.find((p) => p.id === pid).evacPointArrivedAt, id);
     assert(at === Date.parse(sixMinAgo), `${rel}: ${name} phone must show the server's arrival time`);
   }
   pcBoard = await boardText(pc.page, 'pc');
-  assert(pcBoard.includes('בדרך לנקודה') && pcBoard.includes('עד 6 דק׳'), `${rel}: the PC funnel shows four stages and the longest wait`);
+  assert(pcBoard.includes('בדרך לנאפ״ל') && pcBoard.includes('עד 6 דק׳'), `${rel}: the PC funnel shows four stages and the longest wait`);
 
   // Taken back from the point (a later on-scene status): the server clears the arrival and the
   // phones follow on the next pull.

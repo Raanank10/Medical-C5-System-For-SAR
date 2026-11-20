@@ -383,12 +383,15 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 | WP-30 | Telegram critical alerts (B1) | P2 | the 19 alert answers, a bot |
 | WP-31 | MARCH completion rule and hands-on PC | P2 | clinical criteria |
 | WP-32 | Evacuation point leftovers (WP-18) | P2 | - |
-| WP-33 | CC all-incidents: what counts as an alert | P3 | one answer |
+| WP-33 | CC all-incidents: what counts as an alert | P3 | - (answered 2026-11-18) |
 | WP-34 | Test gaps: AAR screen, analytics pytest in CI | P3 | - |
 | WP-35 | Record what is applied live | P3 | - |
 | WP-36 | Demo constants in signed-in paths | P3 | - |
 | WP-37 | External report unlink tombstone | P3 | - |
 | WP-38 | A resupply delivered to a medic raises the bag | P2 | one design question |
+| WP-39 | The evacuation point is called נאפ"ל | P2 | - (decided 2026-11-18) |
+| WP-40 | 30 minutes waiting at the נאפ"ל alerts PC and CC | P2 | - (decided 2026-11-19) |
+| WP-41 | Medical staff see a patient sent to / arriving at the נאפ"ל | P2 | - (decided 2026-11-19) |
 
 ---
 
@@ -498,7 +501,7 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 
 **Decided (owner, 2026-11-18).** CC may not change the injury time. All three clocks follow it: the command watchdog rows, a "שעת פציעה" line in MIST, and golden-hour figures in the stored report. The MIST mechanism/injuries bug found on the way is fixed in the same PR.
 
-**Done (V2.99.76, `database/088`; no `sync-log` change).** Written as 082; renumbered to 085 after WP-38 took 082 and WP-24 083-084, then to 088 because PR #141's `085_rescue_board_evac_point` (with 086-087) was applied live first. That file renamed `app.build_incident_aar()` to `app.build_incident_aar_ext()` and wrapped it, so 085's in-place report edit stopped with its own guard on 2026-11-19 (nothing applied); 088 edits whichever of the two holds the base call.
+**Done (V2.99.80, `database/088`; no `sync-log` change).** Written as 082; renumbered to 085 after WP-38 took 082 and WP-24 083-084, then to 088 because PR #141's `085_rescue_board_evac_point` (with 086-087) was applied live first. That file renamed `app.build_incident_aar()` to `app.build_incident_aar_ext()` and wrapped it, so 085's in-place report edit stopped with its own guard on 2026-11-19 (nothing applied); 088 edits whichever of the two holds the base call.
 1. `patients.t_injury_source` (`event_time` = the old fallback and every existing row, kept as it is; `incident_open`; `entered`) plus who, which role, which event and the phone time of the winning entry.
 2. The create event (`PATIENT_CREATED`, `QUICK_PATIENT_CREATED`, `FIRST_RESPONDER_REPORT`) gives the row the incident's `t_injury_default` (the alert time, = `t_zero` from `open_incident()`), source `incident_open`. Done by a trigger, not by the create payload, so no `sync-log` deploy.
 3. `PATIENT_T_INJURY_UPDATED` moved out of `project_patient_state()` (edited in place like `047`, fails if the branch text is not found exactly once) into `app.project_patient_t_injury()`: medic/paramedic/physician/pc/admin only (second gate after `sync-log`), a parseable time not more than 5 minutes after the entry nor 26 hours before it, newest entry by phone time wins. The event stays in the log either way.
@@ -615,9 +618,11 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 
 ---
 
-### WP-33: CC all-incidents: what counts as an alert (P3, one answer)
+### WP-33: CC all-incidents: what counts as an alert (P3, answered 2026-11-18)
 
-Ask the owner (open in the 2026-11-08 PC/CC session): on the all-incidents page, does a red patient alone count as an alert ("פצוע אדום")? Recommendation: no, only a red patient with a real problem (no evacuation status, tourniquet past 120 min, trapped with no medic contact); the tables already show red counts. Inside an incident nothing changes. Extend `scripts/browser_command_panel_test.js`.
+**Owner, 2026-11-18.** The per-patient alert lines of V2.99.68 were too much on the CC's first page. Chosen from a mockup: one line per incident ("option A"), coloured by its worst alert, with the location, how many patients / requests have alerts, the most urgent one and "(+N)" for the rest; a tap opens the incident, where each alert keeps its own line. A red patient alone counts ("פצוע אדום"), because a red patient is a problem until evacuated to a hospital: at the extraction site and at the evacuation point the patient is still the platoon's. Found while asking: "פצוע אדום" kept firing after a vehicle took the patient (handed over, evacuated, self-evacuated); now it stops then, everywhere, not only on this page.
+
+**Done (V2.99.76).** `ccOverviewIncidentAlerts()` groups the existing per-patient groups by incident; `renderCcOverviewStrip()` draws one line per incident, worst first, then by count; `RED_CASUALTY_CREATED` only while the patient is not in `LOCATION_BOARD_EVACUATED_STATUSES`. `scripts/browser_command_panel_test.js` step 13: lines per incident and their order, counts, "(+N)", a red patient at the evacuation point counts, a red patient handed over does not.
 
 ---
 
@@ -674,6 +679,38 @@ Ask the owner (open in the 2026-11-08 PC/CC session): on the all-incidents page,
 
 ---
 
+### WP-39: The evacuation point is called נאפ"ל (P2, owner 2026-11-18)
+
+**Why.** The owner's term is נאפ"ל, נקודת איסוף פלוגתית (company collection point). This reverses the 2026-10-23 rename to "נקודת פינוי" (WP-18). Each site has its own נאפ"ל, as today; the PC and the CC must see each site's. The נאפ"ל is not the final destination: a patient there is still the platoon's until MDA or another vehicle takes them.
+
+**Steps.** "נאפ"ל" on buttons, chips, column headers and lines where space is short; the full "נקודת איסוף פלוגתית" once on the patient screen and in help text. Every UI string, test and doc that says "נקודת פינוי". No data change: the payload keeps `destination: 'company_collection_point'`.
+
+**Verify.** `scripts/browser_evac_point_arrival_test.js`, `scripts/browser_command_panel_test.js` and the smoke scripts that assert the wording; `browser_mobile_layout_test.js` for the shorter labels.
+
+**Done (V2.99.77).** Every UI string: "נאפ״ל" in buttons ("יצא לנאפ״ל", "הגיע לנאפ״ל"), statuses, board lines, the stage cards, advice and toasts; the full "נקודת איסוף פלוגתית" on the PC site card's section title, the toast after "יצא לנאפ״ל" and the event detail. Written with gershayim (״) like חוג״ד and מד״א. Tests updated; `database/076`/`077` comments left as applied.
+
+---
+
+### WP-40: 30 minutes waiting at the נאפ"ל alerts the PC and CC (P2, owner 2026-11-18/19)
+
+**Why.** WP-18 showed the waiting time at the evacuation point without an alert, until the owner set a threshold. Owner, 2026-11-18: 30 minutes, seen by the PC and the CC. Owner, 2026-11-19: every colour except black; counted from when the patient was sent to the נאפ"ל, not from the recorded arrival ("it will catch most patients that should go to hospital", including one nobody marked as arrived); two levels.
+
+**Done (V2.99.78), no SQL.** `evacPointWaitAlert` in `src/domain/rules.js` (30 min warning, 60 min critical, only while `evacuating`, never black) with domain tests. The phone records `evacSentAt` on "יצא לנאפ״ל"; other phones read the send time from `patients.status_recorded_at` (set from the status event's phone time by `database/013`), added to the patient pulls and the CC overview read. Alert `EVAC_POINT_WAIT_LONG` for PC and CC, tab פעולה, listed under `not_events` in `event-contract.json`; its line shows minutes since leaving and, when marked, since arrival. `scripts/browser_command_panel_test.js` step 14 and the overview step. Known limit: `status_recorded_at` moves if another status event for the patient arrives while evacuating (none of today's flows send one).
+
+---
+
+### WP-41: Medical staff see a patient sent to and arriving at the נאפ"ל (P2, owner 2026-11-18/19)
+
+**Why.** Owner, 2026-11-18: the platoon's medical staff should know a patient is going to the נאפ"ל, as a banner that closes after 15 seconds or on a tap. Owner, 2026-11-19: both when the patient is sent and when they arrive; every medical role (medic, paramedic, physician); the banner offers "open the patient" or "close".
+
+**Steps.** Detect, in the pull, a patient newly `evacuating` and a newly recorded arrival, once each per patient; skip the phone that recorded it; a banner like the tourniquet one with two buttons, 15-second timer; several patients in one pull become one banner. Phones learn it from the 45-second pull, so up to about a minute late, and an offline phone after it reconnects. No new event type.
+
+**Verify.** A browser test with a PC phone sending the patient, a medic and a paramedic phone: both get the banner on the send and on the arrival, the sender does not, it closes after 15 s, "open" opens the patient, it does not repeat on the next pull.
+
+**Done (V2.99.79), no SQL.** `noteEvacPointNews` is called from the pull: a known patient whose status turns `evacuating`, a patient first seen already `evacuating` with a send time under 10 minutes old (`status_recorded_at`, WP-40), and a first recorded arrival (`applyEvacPointArrivals`). A phone's own change never comes back as a change, so the sender gets no banner. Medic, paramedic and physician only. Several news items within 300 ms become one banner; "פתח פצוע" per patient, "סגור", 15-second timer; placed under the tourniquet banner when that is open. `scripts/browser_evac_point_arrival_test.js`: medic 2 gets the "sent" banner, medic 1 (the sender) and the PC do not, it closes after 15 s and does not return on the next pull, medic 1 gets the "arrived" banner and "פתח פצוע" opens the patient.
+
+---
+
 ## Tracks outside this plan's PRs
 
 These need a decision, people or money rather than a code change in this repo. Listed so nothing is lost:
@@ -721,7 +758,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-20 Finish #128, apply 079-081 | P1 | Done: 079, 080, 081 and `sync-log` v17 live, checked 2026-11-17 | #128 | 100-minute check on a real tourniquet runs in WP-21 |
 | WP-21 Live two-phone run | P1 | Not started | | WP-0 part 2 plus WP-17/18/19, D1 offline, WP-10 install, T6 |
 | WP-22 Open sync rejections | P2 | Done 2026-11-19: 55 closed with reasons (8 test data, 47 not recoverable), 0 open, rows kept | this PR | all in closed incidents, so admin only; stored copies removed by the nightly privacy job |
-| WP-23 Injury time editable | P2 | Done in this PR (V2.99.76, `database/088`); 088 not applied live yet (owner applies) | this PR | owner 2026-10-23 and 2026-11-18: CC may not edit; watchdog rows, MIST and stored report follow the injury time; newest entry by phone time wins; `handover-consume` change not deployed |
+| WP-23 Injury time editable | P2 | Done in this PR (V2.99.80, `database/088`); 088 not applied live yet (owner applies) | this PR | owner 2026-10-23 and 2026-11-18: CC may not edit; watchdog rows, MIST and stored report follow the injury time; newest entry by phone time wins; `handover-consume` change not deployed |
 | WP-24 Command cancels a resupply request | P2 | Client done (V2.99.75); `database/083` + `084` written, tested on local PostgreSQL 16, not applied live; `sync-log` needs `SUPPLY_REQUEST_CANCELLED` deployed | this PR | rescoped 2026-11-18: CC holds no stock, so no "fulfilled by company"; medic's escalation stays with the PC; cancel with a reason (cc/chamal/admin while open, PC before escalation); direct writes to `supply_requests` closed |
 | WP-25 Medic incident type + mismatch | P2 | Not started | | owner 2026-10-23 (WP-8 follow-up) |
 | WP-26 PC deterioration review | P2 | Not started | | owner 2026-10-23 (WP-5 `known_gaps`) |
@@ -731,11 +768,14 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-30 Telegram alerts (B1) | P2 | Waiting on owner's 19 answers | | |
 | WP-31 MARCH completion + hands-on PC | P2 | Waiting on clinical criteria | | B2 |
 | WP-32 Evacuation point leftovers | P2 | Not started | | WP-18 remainder |
-| WP-33 CC all-incidents alert rule | P3 | Waiting on 1 owner answer | | |
+| WP-33 CC all-incidents alert rule | P3 | Done (V2.99.76), no SQL | this PR | owner 2026-11-18: one line per incident; a red patient counts until a vehicle takes them; "פצוע אדום" no longer fires after a vehicle took the patient |
 | WP-34 Test gaps | P3 | Not started | | AAR screen test, analytics pytest in CI |
 | WP-35 Record what is applied live | P3 | Not started | | read-only |
 | WP-36 Demo constants | P3 | Not started | | `SITE_A` x60, `PLT-A` x25 |
 | WP-37 Unlink tombstone | P3 | Not started | | `database/069` known limit |
+| WP-39 Evacuation point = נאפ"ל | P2 | Done (V2.99.77), no SQL | this PR | owner 2026-11-18; reverses WP-18's "נקודת פינוי"; one per site |
+| WP-40 30 min at the נאפ"ל alert | P2 | Done (V2.99.78), no SQL | this PR | owner 2026-11-18/19: PC + CC, every colour but black, from the send, 30 warn / 60 critical |
+| WP-41 Banner: patient to / at the נאפ"ל | P2 | Done (V2.99.79), no SQL | this PR | owner 2026-11-18/19; send + arrival, medic / paramedic / physician, open or close, 15 s |
 | WP-38 Resupply raises the medic's bag | P2 | Done (V2.99.74): `database/082` applied live by the owner, `sync-log` v18 deployed 2026-11-18; live two-phone check pending | #132 | owner 2026-11-18: the medic confirms, by what arrived; the PC's / logistics' "delivered" = handed over, waiting for the medic |
 
 ## Revisions after #73 (2026-10-19)

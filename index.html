@@ -1001,7 +1001,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9976</div>
+      <div class="demo-kicker">Demo V2.9980</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1098,7 +1098,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9976</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9980</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1108,7 +1108,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9976</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9980</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3170,7 +3170,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 
   // Statuses a patient's record must not be silently overwritten out of once reached.
   // Deliberately excludes "evacuating": a patient the rescuers moved to the site's evacuation
-  // point (נקודת פינוי) is still under the platoon commander's supervision, waiting for an
+  // point (נאפ״ל, נקודת איסוף פלוגתית) is still under the platoon commander's supervision, waiting for an
   // ambulance and the final handover to MDA, so status must still be able to advance from there
   // to "handed_over".
   const FINAL_PATIENT_STATUSES = new Set([
@@ -3266,6 +3266,22 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   // sorted (pending / unknown) is its own value and is never shown as not urgent. The server
   // computes the same in get_rescue_patient_board().
   const RESCUE_PRIORITIES = ["urgent", "pending", "not_urgent"];
+  // Waiting for a vehicle after leaving for the נאפ״ל (WP-40, owner 2026-11-19): counted from when the
+  // patient was sent there, not from the recorded arrival, so a patient nobody marked as arrived
+  // is caught too. Every colour except black; 30 minutes warns, 60 minutes is critical. Only while
+  // the status is still "evacuating": once a vehicle takes the patient the clock is gone.
+  const EVAC_POINT_WAIT_WARN_MS = 30 * 60 * 1000;
+  const EVAC_POINT_WAIT_CRITICAL_MS = 60 * 60 * 1000;
+
+  function evacPointWaitAlert(patient, nowMs = Date.now()) {
+    if (!patient || patient.patientStatus !== "evacuating" || patient.triage === "black") return null;
+    const sentAt = Number(patient.evacSentAt);
+    if (!Number.isFinite(sentAt) || sentAt <= 0) return null;
+    const ms = nowMs - sentAt;
+    if (ms < EVAC_POINT_WAIT_WARN_MS) return null;
+    return { level: ms >= EVAC_POINT_WAIT_CRITICAL_MS ? "critical" : "warning", minutes: Math.floor(ms / 60000) };
+  }
+
   function rescueEvacPriority(triage, tourniquetActive) {
     if (triage === "red" || tourniquetActive === true) return "urgent";
     if (triage === "yellow" || triage === "green" || triage === "black") return "not_urgent";
@@ -3298,6 +3314,9 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     computeMstartTriage,
     detectDeterioration,
     elapsedMinutes,
+    EVAC_POINT_WAIT_CRITICAL_MS,
+    EVAC_POINT_WAIT_WARN_MS,
+    evacPointWaitAlert,
     isCriticalAlert,
     isDeviceSilent,
     isFinalPatientStatus,
@@ -3400,7 +3419,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.76';
+const APP_VERSION = '2.99.80';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3776,7 +3795,7 @@ const STATUS_LABELS = {
   stabilizing:'ייצוב בטיפול',
   observing:'בהשגחה',
   extricating:'בחילוץ',
-  evacuating:'בדרך לנקודת פינוי',
+  evacuating:'בדרך לנאפ״ל',
   handed_over:'הועבר למד״א',
   deceased:'נפטר / שחור',
   in_treatment:'בטיפול',
@@ -6876,8 +6895,8 @@ const DecisionSupportEngine=(()=>{
         id:'REC_EVAC_WAITING_AMBULANCE',
         category:'Evacuation Bottlenecks',
         priority:waitingRed.length?'HIGH':'MEDIUM',
-        title:'ממתינים לאמבולנס בנקודת פינוי',
-        explanation:`${split.atPoint.length} אדום/צהוב ממתינים בנקודת הפינוי${split.moving.length?` · ${split.moving.length} בדרך אליה`:''} · ${waitingRed.length} אדומים${longestWait!==null?` · ההמתנה הארוכה ${longestWait} דק׳`:''}.`,
+        title:'ממתינים לאמבולנס בנאפ״ל',
+        explanation:`${split.atPoint.length} אדום/צהוב ממתינים בנאפ״ל${split.moving.length?` · ${split.moving.length} בדרך אליה`:''} · ${waitingRed.length} אדומים${longestWait!==null?` · ההמתנה הארוכה ${longestWait} דק׳`:''}.`,
         suggestedAction:'בקש אמבולנסים אזרחיים נוספים',
         responsibleRole:'PC',
         affectedSector:siteData.name||'כלל המוקד',
@@ -6894,7 +6913,7 @@ const DecisionSupportEngine=(()=>{
         priority:red.length?'HIGH':'MEDIUM',
         title:'צוואר בקבוק פינוי באתר החילוץ',
         explanation:`${split.onScene.length} אדום/צהוב עדיין באתר החילוץ · ${red.length} אדומים · ${split.onScene.filter(p=>normalizeTrapStatus(p)==='trapped').length} לכודים.`,
-        suggestedAction:'החילוץ מעביר לנקודת פינוי; שקול לשלוח חובשים נוספים או את אמבולנס הרופא',
+        suggestedAction:'החילוץ מעביר לנאפ״ל; שקול לשלוח חובשים נוספים או את אמבולנס הרופא',
         responsibleRole:'CC',
         affectedSector:siteData.name||'כלל המוקד',
         confidence:0.8,
@@ -7403,7 +7422,7 @@ function evacuationPriorityRank(p){
 }
 // Evacuation-to-hospital list. Patients at the site's evacuation point or on the way to it
 // (status evacuating) are still waiting for MDA, so they stay on it whatever their rank (owner,
-// 2026-10-23), marked "בנקודת פינוי" with the waiting time or "בדרך לנקודת פינוי" (WP-18); the
+// 2026-10-23), marked "בנאפ״ל" with the waiting time or "בדרך לנאפ״ל" (WP-18); the
 // ranking itself is unchanged.
 function companyEvacuationPriorityRows(pts=patients){
   const rows=pts.map(p=>{
@@ -7418,9 +7437,9 @@ function companyEvacuationPriorityRows(pts=patients){
     const reason=p.evacRank===4?'':`${p.evacReason} · `;
     // Owner, 2026-10-24: trapped patients are treated before extraction; a free patient is carried
     // to the evacuation point by the rescuers, and is usually held back by too few civilian ambulances.
-    const action=atPoint?(isAtEvacPoint(p)?'בנקודת פינוי · ממתין לפינוי מד״א':'בדרך לנקודת פינוי · ממתין לפינוי מד״א')
+    const action=atPoint?(isAtEvacPoint(p)?'בנאפ״ל · ממתין לפינוי מד״א':'בדרך לנאפ״ל · ממתין לפינוי מד״א')
       :normalizeTrapStatus(p)==='trapped'?'פעולה: טיפול לפני החילוץ · ממתין לחילוץ'
-      :'פעולה: החילוץ מעביר לנקודת פינוי · חסרים אמבולנסים אזרחיים? בקש תוספת';
+      :'פעולה: החילוץ מעביר לנאפ״ל · חסרים אמבולנסים אזרחיים? בקש תוספת';
     return roleRow(`${label} · ${p.visualId||p.id}`,`${where} · ${reason}${p.location} · ${TRIAGE_LABELS[p.triage]||p.triage}`,`<span class="identity-chip">${action}</span>`);
   });
   if(rows.length>8) shown.push(roleRow(`+${rows.length-8} נוספים בתור הפינוי`,'מוצגים 8 הראשונים לפי סדר העדיפות'));
@@ -7725,12 +7744,12 @@ function renderCcCommandBoard(){
   const waitingRed=evacSplit.awaitingMda.filter(p=>p.triage==='red').length;
   const longestWait=longestEvacPointWait(evacSplit.atPoint);
   if(waitingRed || evacSplit.awaitingMda.length>=2) suggestions.push(roleRow(
-    'ממתינים לאמבולנס בנקודת פינוי',
-    `${evacSplit.awaitingMda.length} פצועים ממתינים לפינוי${evacSplit.moving.length?` (${evacSplit.moving.length} בדרך לנקודה)`:''}${waitingRed?` · ${waitingRed} אדומים`:''}${longestWait!==null?` · ההמתנה הארוכה ${longestWait} דק׳`:''} · בקש אמבולנסים אזרחיים נוספים`
+    'ממתינים לאמבולנס בנאפ״ל',
+    `${evacSplit.awaitingMda.length} פצועים ממתינים לפינוי${evacSplit.moving.length?` (${evacSplit.moving.length} בדרך לנאפ״ל)`:''}${waitingRed?` · ${waitingRed} אדומים`:''}${longestWait!==null?` · ההמתנה הארוכה ${longestWait} דק׳`:''} · בקש אמבולנסים אזרחיים נוספים`
   ));
   if(evacSplit.onScene.length>=2) suggestions.push(roleRow(
     'צוואר בקבוק פינוי באתר החילוץ',
-    `${evacSplit.onScene.length} פצועים עדיין באתר החילוץ · החילוץ מעביר לנקודת פינוי · שקול לשלוח חובשים נוספים או את אמבולנס הרופא`
+    `${evacSplit.onScene.length} פצועים עדיין באתר החילוץ · החילוץ מעביר לנאפ״ל · שקול לשלוח חובשים נוספים או את אמבולנס הרופא`
   ));
   const suggestionsHtml=suggestions.length?suggestions.join(''):roleRow('אין המלצות כרגע','תמונת המצב תקינה');
   const focusedPts=focusFilteredList(patients, focusMatchesPatient);
@@ -7773,7 +7792,7 @@ function renderCcEvacuationFunnel(){
 // the company's sites; it does not evacuate patients. Same split as the location board (evacuationStage).
 function renderCommandEvacuationFunnel(pts, title){
   const total=pts.length||1;
-  const stages=[['on_scene','בזירה'],['to_evac_point','בדרך לנקודה'],['evac_point','בנקודת פינוי'],['evacuated','פונו']].map(([key,label])=>{
+  const stages=[['on_scene','בזירה'],['to_evac_point','בדרך לנאפ״ל'],['evac_point','בנאפ״ל'],['evacuated','פונו']].map(([key,label])=>{
     const list=pts.filter(p=>evacuationStage(p)===key);
     const pct=Math.round((list.length/total)*100);
     const wait=key==='evac_point'?longestEvacPointWait(list):null;
@@ -7813,22 +7832,18 @@ function commandAlertGroups(alerts){
     return g;
   }).sort((x,y)=>x.rank-y.rank || x.oldest-y.oldest);
 }
-// In the CC all-incidents view the group carries its incident and that incident's patient: no
-// "בטיפול" there (the patient is not on this phone), a tap opens the incident.
 function commandAlertLineHtml(group){
-  const inc=group.incident||null;
-  const p=inc ? group.patient : group.patientId ? patients.find(x=>x.id===group.patientId) : null;
+  const p=group.patientId ? patients.find(x=>x.id===group.patientId) : null;
   const prefix=p ? `${p.visualId||p.id} — ` : '';
   const short=a=>String(a.title||'').startsWith(prefix) ? String(a.title).slice(prefix.length) : String(a.title||'');
   const first=group.alerts[0];
   const rest=[...new Set(group.alerts.slice(1).map(short))].filter(t=>t!==short(first)).join(' · ');
   const cls=group.rank===0?'crit':group.rank===1?'high':'med';
-  const open=inc?` onclick="enterIncidentFromPicker('${escAttr(inc.id)}')"`:p?` onclick="openPatientFromAlert('${p.id}')"`:'';
-  const ack=p&&!inc?`<button class="ack-btn" onclick="event.stopPropagation();acknowledgeAlert('${p.id}')">בטיפול</button>`:'';
-  const where=inc?`${inc.visual_id||''} · ${inc.location_name||''} · `:'';
-  return `<div class="cmd-strip-alert ${cls}" data-alert-group="${escAttr(group.key)}"${inc?` data-incident-alerts="${escAttr(inc.id)}"`:''}${open}>
+  const open=p?` onclick="openPatientFromAlert('${p.id}')"`:'';
+  const ack=p?`<button class="ack-btn" onclick="event.stopPropagation();acknowledgeAlert('${p.id}')">בטיפול</button>`:'';
+  return `<div class="cmd-strip-alert ${cls}" data-alert-group="${escAttr(group.key)}"${open}>
     <span class="cmd-strip-alert-id">${p?escAttr(p.visualId||p.id):'מוקד'}</span>
-    <div style="flex:1;min-width:0"><div class="cmd-strip-alert-title">${p?`${escAttr(TRIAGE_LABELS[p.triage]||'')} · `:''}${escAttr(short(first))}</div><div class="cmd-strip-alert-sub">${escAttr(where+(rest||first.detail||''))}</div></div>${ack}
+    <div style="flex:1;min-width:0"><div class="cmd-strip-alert-title">${p?`${escAttr(TRIAGE_LABELS[p.triage]||'')} · `:''}${escAttr(short(first))}</div><div class="cmd-strip-alert-sub">${escAttr(rest||first.detail||'')}</div></div>${ack}
   </div>`;
 }
 function commandLongestTourniquet(pts){
@@ -9930,11 +9945,19 @@ function patientAlertObjects(pts){
       const reason=(p.deterioration&&p.deterioration.length)?p.deterioration.join(' · '):TRIAGE_LABELS[p.triage]||'שינוי קריטי';
       pushAlert(alerts,{...base,id:`clinical-${p.id}`,type:'CRITICAL_CLINICAL_ACTION',severity:'critical',owner:'medic',audience:['medic','pc'],escalatesTo:'pc',escalateAfterMin:5,actionRequired:'update_vitals',scope:'patient',category:'urgent',title:`${p.visualId||p.id} — הידרדרות / מיון קריטי`,detail:reason});
     }
-    if(p.triage==='red'){
+    // Until a vehicle takes the patient (owner, 2026-11-18): at the extraction site and at the
+    // evacuation point the red patient is still the platoon's to evacuate; after it, no alert.
+    if(p.triage==='red' && !LOCATION_BOARD_EVACUATED_STATUSES.has(p.patientStatus)){
       pushAlert(alerts,{...base,id:`pc-red-${p.id}`,type:'RED_CASUALTY_CREATED',severity:'high',owner:'pc',audience:['pc','chamal','cc'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'request_evac',scope:'patient',category:'urgent',title:`${p.visualId||p.id} — פצוע אדום`,detail:`${p.location} · ${p.injury||'פציעה לא צוינה'}`});
     }
     if(p.triage==='red' && !['evacuating','evacuated','handed_over'].includes(p.patientStatus)){
       pushAlert(alerts,{...base,id:`evac-${p.id}`,type:'RED_WITHOUT_EVAC_STATUS',severity:'high',owner:'pc',audience:['pc','cc'],escalatesTo:'cc',escalateAfterMin:5,actionRequired:'request_evac',scope:'patient',category:'evac',title:`${p.visualId||p.id} — אדום ללא סטטוס פינוי`,detail:'נדרש תעדוף / הקצאת פינוי או אישור עיכוב'});
+    }
+    // WP-40 (owner 2026-11-19): still waiting for a vehicle 30 / 60 minutes after leaving for the נאפ״ל.
+    const evacWait=C5Rules.evacPointWaitAlert(p);
+    if(evacWait){
+      const crit=evacWait.level==='critical';
+      pushAlert(alerts,{...base,id:`evac-wait-${p.id}`,type:'EVAC_POINT_WAIT_LONG',severity:crit?'critical':'high',owner:'pc',audience:['pc','cc'],escalatesTo:'cc',escalateAfterMin:crit?0:10,actionRequired:'request_evac',scope:'patient',category:'evac',title:`${p.visualId||p.id} — ממתין לפינוי ${evacWait.minutes} דק׳`,detail:isAtEvacPoint(p)?`בנאפ״ל · ${evacPointWaitMinutes(p)} דק׳ מההגעה · ${evacWait.minutes} דק׳ מהיציאה`:`יצא לנאפ״ל לפני ${evacWait.minutes} דק׳ · לא סומנה הגעה`});
     }
     if(isVitalsOverdue(p)){
       pushAlert(alerts,{...base,id:`vitals-${p.id}`,type:redOrYellow?'STALE_VITALS_PRIORITY':'STALE_VITALS_GREEN',severity:redOrYellow?'high':'medium',owner:'medic',audience:redOrYellow?['medic','pc']:['medic'],escalatesTo:redOrYellow?'pc':null,escalateAfterMin:redOrYellow?5:null,actionRequired:'update_vitals',scope:'patient',category:redOrYellow?'data':'complete',title:`${p.visualId||p.id} — מדדים באיחור`,detail:`עדכון אחרון: ${timeAgoLabel(p.lastVitalsAt||patientClockStart(p))}`});
@@ -11100,7 +11123,7 @@ function openPatient(id){
     ${alertAcknowledgmentLine(p)}
     <div class="summary-card patient-hero" style="border:2px ${triageKey(p.triage)==='pending'?'dashed':'solid'} ${heroColor};border-top-width:8px;padding:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${triagePill(p.triage)}<span style="font-weight:700;font-size:14px">${patientStatusLabel(p)}</span><span style="font-size:12px;color:var(--muted)">${AGE_BAND_LABELS[ageBandOf(p)]}</span>${isAtEvacPoint(p)?`<span class="evac-arrival-row" style="font-size:12px;color:var(--muted)">הגעה לנקודת פינוי: ${new Date(p.evacPointArrivedAt).toTimeString().slice(0,5)}${EVAC_POINT_ROLE_NAMES[p.evacPointArrivedRole]?` · ${EVAC_POINT_ROLE_NAMES[p.evacPointArrivedRole]}`:''}</span>`:''}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${triagePill(p.triage)}<span style="font-weight:700;font-size:14px">${patientStatusLabel(p)}</span><span style="font-size:12px;color:var(--muted)">${AGE_BAND_LABELS[ageBandOf(p)]}</span>${isAtEvacPoint(p)?`<span class="evac-arrival-row" style="font-size:12px;color:var(--muted)">הגעה לנאפ״ל: ${new Date(p.evacPointArrivedAt).toTimeString().slice(0,5)}${EVAC_POINT_ROLE_NAMES[p.evacPointArrivedRole]?` · ${EVAC_POINT_ROLE_NAMES[p.evacPointArrivedRole]}`:''}</span>`:''}</div>
         <button onclick="openQuickVitals('${p.id}')" style="background:var(--accent);border:none;color:white;border-radius:20px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;min-height:44px">עדכן מדדים</button>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
@@ -11175,14 +11198,14 @@ function openPatient(id){
 
   const showCollectionPointBtn = p.patientStatus!=='evacuating' && C5Rules.canChangePatientStatus(p);
   const showArrivedBtn = canMarkEvacPointArrival(p);
-  // Two most-used actions always visible (owner, 2026-10-23: עדכן מדדים, יצא לנקודת פינוי); the rest
-  // under "עוד". On the way to the evacuation point (נקודת פינוי) the slot confirms the arrival
+  // Two most-used actions always visible (owner, 2026-10-23: עדכן מדדים, יצא לנאפ״ל); the rest
+  // under "עוד". On the way to the evacuation point (נאפ״ל, נקודת איסוף פלוגתית) the slot confirms the arrival
   // (WP-18); once the casualty is there, handover takes it.
   const handoverBtn=`<button class="btn-primary" style="background:var(--green)" onclick="openEvacuationSheet('${p.id}','handover')">הועבר למד״א — עכשיו</button>`;
   const secondPrimary=showCollectionPointBtn
-    ? `<button class="btn-primary bar-main-btn" style="background:var(--orange)" onclick="markPatientAtCollectionPoint('${p.id}')">🚶 יצא לנקודת פינוי</button>`
+    ? `<button class="btn-primary bar-main-btn" style="background:var(--orange)" onclick="markPatientAtCollectionPoint('${p.id}')">🚶 יצא לנאפ״ל</button>`
     : showArrivedBtn
-    ? `<button class="btn-primary bar-main-btn" style="background:var(--orange)" onclick="markPatientArrivedAtEvacPoint('${p.id}')">📍 הגיע לנקודת פינוי</button>`
+    ? `<button class="btn-primary bar-main-btn" style="background:var(--orange)" onclick="markPatientArrivedAtEvacPoint('${p.id}')">📍 הגיע לנאפ״ל</button>`
     : handoverBtn;
   const moreBtns=[
     `<button class="btn-secondary" onclick="speakMist('${p.id}')">🔊 הקרא MIST</button>`,
@@ -11206,7 +11229,7 @@ function toggleDetailBarMore(){
   if(btn){ btn.setAttribute('aria-expanded', panel.hidden?'false':'true'); btn.textContent=panel.hidden?'עוד ▾':'סגור ▴'; }
 }
 // Intermediate step before final MDA handover: the rescuers moved the patient from the extraction
-// site to the site's evacuation point (נקודת פינוי, where the PC truck stands) to wait for an
+// site to the site's evacuation point (נאפ״ל, where the PC truck stands) to wait for an
 // ambulance; still under the platoon commander's supervision, not yet handed to MDA. The payload
 // keeps its original destination value (company_collection_point) so history and the server
 // projection stay unchanged; only the wording changed (V2.99.62). Uses the generic PATIENT_STATUS_UPDATED event (already sync-eligible for
@@ -11215,24 +11238,25 @@ function toggleDetailBarMore(){
 function markPatientAtCollectionPoint(id){
   const p=patients.find(x=>x.id===id); if(!p) return;
   if(!C5Rules.canChangePatientStatus(p)){ toast('לא ניתן לשנות — הטיפול בפצוע כבר הסתיים'); return; }
-  if(p.patientStatus==='evacuating'){ toast(isAtEvacPoint(p)?'הפצוע כבר מסומן בנקודת הפינוי':'הפצוע כבר בדרך לנקודת הפינוי'); return; }
+  if(p.patientStatus==='evacuating'){ toast(isAtEvacPoint(p)?'הפצוע כבר מסומן בנאפ״ל':'הפצוע כבר בדרך לנאפ״ל'); return; }
   p.patientStatus='evacuating';
   // A new trip to the evacuation point: an arrival from an earlier one no longer applies (WP-18).
   p.evacPointArrivedAt=null; p.evacPointArrivedRole=null;
+  p.evacSentAt=Date.now(); // the 30/60-minute wait alert counts from here (WP-40)
   p.lastTouchedBy=getDeviceId();
   p.lastModifiedAt=new Date().toISOString();
   p.unsyncedEvents=(p.unsyncedEvents||0)+1;
   const event={
     type:'PATIENT_STATUS_UPDATED',
     time:nowT(),
-    detail:'יצא מאתר החילוץ לנקודת הפינוי — בפיקוח חוג״ד, ממתין לפינוי ומסירה למד״א',
+    detail:'יצא מאתר החילוץ לנאפ״ל (נקודת איסוף פלוגתית) — בפיקוח חוג״ד, ממתין לפינוי ומסירה למד״א',
     warn:false,
     payload_json:{status:'evacuating', destination:'company_collection_point', still_under_pc_supervision:true}
   };
   p.events.push(event);
   saveLocalEvent({...event, patient_id:p.id});
   saveDemoState();
-  toast('סומן: בדרך לנקודת פינוי · סמן "הגיע" כשהפצוע בנקודה');
+  toast('סומן: בדרך לנאפ״ל (נקודת איסוף פלוגתית) · סמן "הגיע" כשהפצוע בנאפ״ל');
   openPatient(id);
 }
 // WP-18 (database/076-077): the patient reached the evacuation point and waits there for MDA.
@@ -11240,9 +11264,9 @@ function markPatientAtCollectionPoint(id){
 // server keeps the earliest phone time, so the waiting time is the same on every phone.
 function markPatientArrivedAtEvacPoint(id){
   const p=patients.find(x=>x.id===id); if(!p) return;
-  if(p.patientStatus!=='evacuating'){ toast('סמן קודם "יצא לנקודת פינוי"'); return; }
-  if(isAtEvacPoint(p)){ toast('הפצוע כבר מסומן בנקודת הפינוי'); return; }
-  if(!canMarkEvacPointArrival(p)){ toast('רק חובש, פראמדיק, רופא או חוג״ד מסמנים הגעה לנקודת פינוי'); return; }
+  if(p.patientStatus!=='evacuating'){ toast('סמן קודם "יצא לנאפ״ל"'); return; }
+  if(isAtEvacPoint(p)){ toast('הפצוע כבר מסומן בנאפ״ל'); return; }
+  if(!canMarkEvacPointArrival(p)){ toast('רק חובש, פראמדיק, רופא או חוג״ד מסמנים הגעה לנאפ״ל'); return; }
   const at=new Date();
   p.evacPointArrivedAt=at.getTime();
   p.evacPointArrivedRole=evacuationActorRole();
@@ -11252,14 +11276,14 @@ function markPatientArrivedAtEvacPoint(id){
   const event={
     type:'PATIENT_EVAC_POINT_ARRIVED',
     time:nowT(),
-    detail:'הגיע לנקודת הפינוי — ממתין לפינוי מד״א',
+    detail:'הגיע לנאפ״ל — ממתין לפינוי מד״א',
     warn:false,
     payload_json:{arrived_at:at.toISOString()}
   };
   p.events.push(event);
   saveLocalEvent({...event, patient_id:p.id, local_timestamp:at.toISOString()});
   saveDemoState();
-  toast('סומן: בנקודת פינוי · ממתין לפינוי מד״א');
+  toast('סומן: בנאפ״ל · ממתין לפינוי מד״א');
   if(activeScreenId()==='patient') openPatient(id); else refreshActiveScreenData();
 }
 
@@ -14267,26 +14291,36 @@ function ccOverviewTotals(){
   _openIncidents.forEach(inc=>{ const c=_allIncidentTriage[inc.id]; if(c) Object.keys(total).forEach(k=>{ total[k]+=c.onSite[k]; }); });
   return total;
 }
-// Strip in the all-incidents view: the alert lines of every open incident (ccOverviewAlertGroups),
-// top line plus "+N" as inside an incident, each line naming its incident; tap opens it.
+// Strip in the all-incidents view (WP-33, owner 2026-11-18): one line per incident with alerts,
+// coloured by its worst alert: how many patients / requests have alerts, the most urgent one and
+// "(+N)" for the rest. A tap opens the incident, where every alert has its own line.
+function ccOverviewIncidentLineHtml({inc, groups}){
+  const top=groups[0], first=top.alerts[0];
+  const p=top.patient;
+  const prefix=p ? `${p.visualId||p.id} — ` : '';
+  const title=String(first.title||'').startsWith(prefix) ? String(first.title).slice(prefix.length) : String(first.title||'');
+  const cls=top.rank===0?'crit':top.rank===1?'high':'med';
+  const n=groups.length;
+  return `<div class="cmd-strip-alert ${cls}" data-incident-alerts="${escAttr(inc.id)}" onclick="enterIncidentFromPicker('${escAttr(inc.id)}')">
+    <span class="cmd-strip-alert-id">${escAttr(inc.visual_id||'')}</span>
+    <div style="flex:1;min-width:0"><div class="cmd-strip-alert-title">${escAttr(inc.location_name||'')} · ${n===1?'התראה אחת':`${n} התראות`}</div><div class="cmd-strip-alert-sub">${escAttr(title)}${p?` · ${escAttr(p.visualId||p.id)}`:''}${n>1?` (+${n-1})`:''}</div></div>
+  </div>`;
+}
 function renderCcOverviewStrip(){
   const contact=serverContactState();
   const t=ccOverviewTotals();
   const cell=(n,label,color)=>`<div class="cmd-strip-count" style="border-top-color:${color}"><b>${n}</b>${label}</div>`;
-  const groups=ccOverviewAlertGroups();
-  const shown=commandStripExpanded ? groups : groups.slice(0,1);
-  const more=groups.length>1 ? `<button class="cmd-strip-chip cmd-strip-more" onclick="toggleCommandStrip()">${commandStripExpanded?'סגור ▴':`+${groups.length-1} התראות ▾`}</button>` : '';
+  const incidents=ccOverviewIncidentAlerts();
   const source=_allIncidentAlertsAt
-    ? `<div class="cmd-strip-alert-sub" data-cc-overview-alert-source style="padding:4px 2px 0;white-space:normal;font-size:12px">${groups.length?'':'אין התראות פתוחות באירועים · '}לפי נתוני השרת · עודכן ${escAttr(timeAgoLabel(_allIncidentAlertsAt))} · מה שטרם נשלח מהשטח לא מופיע</div>`
+    ? `<div class="cmd-strip-alert-sub" data-cc-overview-alert-source style="padding:4px 2px 0;white-space:normal;font-size:12px">${incidents.length?'':'אין התראות פתוחות באירועים · '}לפי נתוני השרת · עודכן ${escAttr(timeAgoLabel(_allIncidentAlertsAt))} · מה שטרם נשלח מהשטח לא מופיע</div>`
     : '<div class="cmd-strip-alert-sub" data-cc-overview-alert-source style="padding:6px 2px;font-size:12px">טרם התקבלו התראות מהשרת</div>';
   return `<div class="cmd-strip" id="command-status-strip">
     <div class="cmd-strip-row">
       <span id="role-strip-conn" class="cmd-conn ${contact.level}">${escAttr(serverContactLabel(contact))}</span>
       <span class="cmd-strip-chip">כל האירועים · ${_openIncidents.length} פתוחים</span>
-      ${more}
     </div>
     <div class="cmd-strip-counts">${cell(t.red,'אדום','var(--red)')}${cell(t.yellow,'צהוב','var(--yellow)')}${cell(t.green,'ירוק','var(--green)')}${cell(t.black,'שחור','var(--muted)')}${cell(t.pending,'טרם מוין','var(--muted)')}</div>
-    <div class="cmd-strip-alerts${commandStripExpanded?' expanded':''}">${shown.map(commandAlertLineHtml).join('')}${source}</div>
+    <div class="cmd-strip-alerts">${incidents.map(ccOverviewIncidentLineHtml).join('')}${source}</div>
   </div>`;
 }
 function renderCcOverviewPanel(){
@@ -14337,7 +14371,7 @@ function renderAllIncidentsTriageTable(){
       <tfoot><tr><th>סה״כ</th>${cells(total)}</tr></tfoot>
     </table>`;
   };
-  return `${table('onSite','באתר — אתר החילוץ ונקודת הפינוי')}
+  return `${table('onSite','באתר — אתר החילוץ והנאפ״ל')}
     <div style="height:14px"></div>
     ${table('evacuated','פונו')}
     <div class="role-row-sub" style="margin-top:6px">${footer}</div>`;
@@ -14347,16 +14381,63 @@ function openEvacuationSplit(pts=patients){
   const awaitingMda=open.filter(p=>p.patientStatus==='evacuating');
   return {open, onScene:open.filter(p=>p.patientStatus!=='evacuating'), moving:awaitingMda.filter(p=>!isAtEvacPoint(p)), atPoint:awaitingMda.filter(isAtEvacPoint), awaitingMda};
 }
-function openEvacuationLabel(split){ return `${split.onScene.length} באתר החילוץ · ${split.moving.length?`${split.moving.length} בדרך לנקודת פינוי · `:''}${split.atPoint.length} ממתינים למד״א`; }
+function openEvacuationLabel(split){ return `${split.onScene.length} באתר החילוץ · ${split.moving.length?`${split.moving.length} בדרך לנאפ״ל · `:''}${split.atPoint.length} ממתינים למד״א`; }
 // Evacuation point arrival (WP-18, owner 2026-10-24, database/076-077). Status evacuating covers
 // both "the rescuers are moving the patient to the evacuation point" and "arrived, waiting for
 // MDA"; arrival is its own event, PATIENT_EVAC_POINT_ARRIVED, recorded by any medic, paramedic,
 // physician or PC of the site, with the phone's time. Only an evacuating patient counts as
-// arrived. Waiting time is shown, never alerted on (owner: no threshold yet).
+// arrived. Waiting since the patient was sent alerts PC and CC at 30 / 60 minutes (WP-40,
+// C5Rules.evacPointWaitAlert); the minutes since arrival are shown beside it.
 const EVAC_POINT_ARRIVAL_ROLES=new Set(['medic','paramedic','physician','pc','admin']);
 const EVAC_POINT_ROLE_NAMES={medic:'חובש', paramedic:'פראמדיק', physician:'רופא', pc:'חוג״ד', admin:'מנהל מערכת'};
 function canMarkEvacPointArrival(p){
   return !!p && p.patientStatus==='evacuating' && !isAtEvacPoint(p) && EVAC_POINT_ARRIVAL_ROLES.has(evacuationActorRole()) && C5Rules.canChangePatientStatus(p);
+}
+// WP-41 (owner 2026-11-18/19): every medical role in the incident (medic, paramedic, physician)
+// sees a patient leave for and arrive at the נאפ״ל when another phone records it: a banner with
+// "open the patient" and "close" that closes by itself after 15 seconds. Learned from the pull, so up
+// to about a minute late; the phone that recorded it gets no banner (its own change never comes back
+// as a change). Several in one pull make one banner. News older than 10 minutes is not shown.
+const EVAC_POINT_BANNER_ROLES=new Set(['medic','paramedic','physician']);
+const EVAC_POINT_BANNER_MS=15000;
+const EVAC_POINT_NEWS_MAX_AGE_MS=10*60*1000;
+const EVAC_POINT_TRIAGE_NAMES={red:'אדום', yellow:'צהוב', green:'ירוק', black:'שחור'};
+let _evacPointNews=[], _evacPointNewsTimer=null, _evacPointBannerTimer=null;
+function noteEvacPointNews(p, kind, atMs){
+  if(!currentUser || !EVAC_POINT_BANNER_ROLES.has(mapServerRole(currentUser.role))) return;
+  if(Number.isFinite(atMs) && Date.now()-atMs>EVAC_POINT_NEWS_MAX_AGE_MS) return;
+  if(_evacPointNews.some(n=>n.id===p.id && n.kind===kind)) return;
+  _evacPointNews.push({id:p.id, kind});
+  clearTimeout(_evacPointNewsTimer);
+  _evacPointNewsTimer=setTimeout(showEvacPointBanner, 300);
+}
+function showEvacPointBanner(){
+  const news=_evacPointNews.splice(0).map(n=>({...n, p:patients.find(x=>x.id===n.id)})).filter(n=>n.p);
+  if(!news.length) return;
+  haptic([150,80,150]);
+  let el=document.getElementById('evac-point-banner');
+  if(!el){ el=document.createElement('div'); el.id='evac-point-banner'; el.setAttribute('role','status'); document.body.appendChild(el); }
+  const tq=document.getElementById('tq-time-alert');
+  const top=tq ? Math.round(tq.getBoundingClientRect().bottom)+8 : 12;
+  el.style.cssText=`position:fixed;top:${top}px;left:12px;right:12px;z-index:590;background:var(--surface2);color:var(--text);border:2px solid var(--orange);padding:12px 14px;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,0.45)`;
+  const place=p=>{ const loc=p.locDetail || (p.location && p.location!==REMOTE_LOCATION_PLACEHOLDER ? p.location : ''); return loc ? ` · ${escAttr(loc)}` : ''; };
+  const rows=news.map(n=>`<div data-evac-news="${escAttr(n.kind)}" style="display:flex;align-items:center;gap:8px;margin-top:8px">
+      <div style="flex:1;min-width:0;font-size:14px;font-weight:800">${n.kind==='arrived'?'📍':'🚶'} ${escAttr(n.p.visualId||n.p.id)} · ${EVAC_POINT_TRIAGE_NAMES[n.p.triage]||'טרם מוין'} · ${n.kind==='arrived'?'הגיע לנאפ״ל':'בדרך לנאפ״ל'}<span style="font-weight:600;color:var(--muted)">${place(n.p)}</span></div>
+      <button class="demo-mini-btn" data-evac-open="${escAttr(n.p.id)}" onclick="openFromEvacPointBanner('${escAttr(n.p.id)}')">פתח פצוע</button>
+    </div>`).join('');
+  el.innerHTML=`<div style="font-size:13px;color:var(--orange);font-weight:900">${news.length===1?'עדכון נאפ״ל':`${news.length} עדכוני נאפ״ל`}</div>${rows}
+    <button class="demo-mini-btn" data-evac-close style="width:100%;margin-top:10px" onclick="closeEvacPointBanner()">סגור</button>`;
+  clearTimeout(_evacPointBannerTimer);
+  _evacPointBannerTimer=setTimeout(closeEvacPointBanner, EVAC_POINT_BANNER_MS);
+}
+function closeEvacPointBanner(){
+  clearTimeout(_evacPointBannerTimer);
+  document.getElementById('evac-point-banner')?.remove();
+}
+function openFromEvacPointBanner(id){
+  closeEvacPointBanner();
+  openPatient(id);
+  goTo('patient');
 }
 function isAtEvacPoint(p){ return !!p && p.patientStatus==='evacuating' && Number.isFinite(p.evacPointArrivedAt); }
 function evacPointWaitMinutes(p, now=Date.now()){
@@ -14366,7 +14447,7 @@ function longestEvacPointWait(pts){
   return pts.reduce((m,p)=>{ const w=evacPointWaitMinutes(p); return w===null?m:Math.max(m??0,w); }, null);
 }
 function patientStatusLabel(p){
-  if(p?.patientStatus==='evacuating') return isAtEvacPoint(p) ? `בנקודת פינוי · ממתין ${evacPointWaitMinutes(p)} דק׳` : STATUS_LABELS.evacuating;
+  if(p?.patientStatus==='evacuating') return isAtEvacPoint(p) ? `בנאפ״ל · ממתין ${evacPointWaitMinutes(p)} דק׳` : STATUS_LABELS.evacuating;
   return STATUS_LABELS[p?.patientStatus]||'';
 }
 function evacuationStage(p){
@@ -14422,17 +14503,17 @@ function renderCasualtyLocationBoard(siteIds, options={}){
       </div>`).join('') || '<div style="font-size:12px;color:var(--muted);padding:6px 0">טרם פונו פצועים רשומים</div>';
     // The PC truck stands at the evacuation point; shown on the PC's own site only, since this
     // phone keeps a single truck stock.
-    const truckRow=options.truckSiteId===siteId?`<div style="font-size:12px;color:var(--muted);padding-top:6px">רכב חוג״ד בנקודה:</div>${renderPcTruckStockChips()}`:'';
+    const truckRow=options.truckSiteId===siteId?`<div style="font-size:12px;color:var(--muted);padding-top:6px">רכב חוג״ד בנאפ״ל:</div>${renderPcTruckStockChips()}`:'';
     // WP-18: patients on the way first (a medic or the PC marks the arrival from here or from the
     // patient card), then those waiting, each with minutes since arrival.
     const movingRows=movingToPoint.length?`<div class="evac-moving-row" style="padding:8px 0;border-top:1px solid var(--border)">
-        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span>🚶 בדרך לנקודת הפינוי</span><span style="font-family:var(--mono)">${triageCountsLine(movingToPoint)}</span></div>
-        <div style="margin-top:4px">${sortedPatientsByEvacPriority(movingToPoint).map(p=>`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${locationBoardChip(p)}${canMarkEvacPointArrival(p)?`<button class="demo-mini-btn evac-arrived-btn" style="margin:0;padding:5px 9px" onclick="markPatientArrivedAtEvacPoint('${p.id}')">הגיע לנקודה</button>`:''}</div>`).join('')}</div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span>🚶 בדרך לנאפ״ל</span><span style="font-family:var(--mono)">${triageCountsLine(movingToPoint)}</span></div>
+        <div style="margin-top:4px">${sortedPatientsByEvacPriority(movingToPoint).map(p=>`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${locationBoardChip(p)}${canMarkEvacPointArrival(p)?`<button class="demo-mini-btn evac-arrived-btn" style="margin:0;padding:5px 9px" onclick="markPatientArrivedAtEvacPoint('${p.id}')">הגיע לנאפ״ל</button>`:''}</div>`).join('')}</div>
       </div>`:'';
     const evacPointRows=movingRows+(atEvacPoint.length?`<div class="evac-point-row" style="padding:8px 0;border-top:1px solid var(--border)">
         <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span>🚑 ממתינים לפינוי מד״א${longestWait!==null?` · עד ${longestWait} דק׳`:''}</span><span style="font-family:var(--mono)">${triageCountsLine(atEvacPoint)}</span></div>
         <div style="display:flex;flex-wrap:wrap;margin-top:4px">${sortedPatientsByEvacPriority(atEvacPoint).map(p=>locationBoardChip(p,` · ${evacPointWaitMinutes(p)}′`)).join('')}</div>
-      </div>`:(movingToPoint.length?'':'<div style="font-size:12px;color:var(--muted);padding:6px 0">אין פצועים בנקודת הפינוי</div>'))+truckRow;
+      </div>`:(movingToPoint.length?'':'<div style="font-size:12px;color:var(--muted);padding:6px 0">אין פצועים בנאפ״ל</div>'))+truckRow;
     const ie=siteId==='SITE_A' ? siteData.initialEvacuation : null;
     const ieTotal=ie ? (ie.green||0)+(ie.yellow||0)+(ie.red||0) : 0;
     const ieRow=ieTotal?`<div style="padding:6px 0;border-top:1px solid var(--border)"><div style="font-size:12px;color:var(--muted)">פונו לפני הגעת כוח רפואי (מונה בלבד):</div>${preEvacSummaryHtml({compact:true})}</div>`:'';
@@ -14442,9 +14523,9 @@ function renderCasualtyLocationBoard(siteIds, options={}){
     return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="font-weight:900;font-size:14px">${escAttr(siteNameById(siteId))}</div><div style="font-family:var(--mono);font-size:13px;font-weight:700">${triageCountsLine(onScene)}</div></div>
       ${siteTriageGridHtml(pts)}
-      <div style="font-size:11px;color:var(--muted)">בזירה ${onScene.length}${movingToPoint.length?` · בדרך ${movingToPoint.length}`:''} · בנקודת פינוי ${atEvacPoint.length}${longestWait!==null?` (עד ${longestWait} דק׳)`:''} · פונו ${evacuated.length}</div>
+      <div style="font-size:11px;color:var(--muted)">בזירה ${onScene.length}${movingToPoint.length?` · בדרך ${movingToPoint.length}`:''} · בנאפ״ל ${atEvacPoint.length}${longestWait!==null?` (עד ${longestWait} דק׳)`:''} · פונו ${evacuated.length}</div>
       <div class="section-label" style="padding:10px 0 2px">בזירה — לפי אזור</div>${zoneRows}
-      <div class="section-label" style="padding:10px 0 2px">בנקודת פינוי — ממתינים לפינוי מד״א</div>${evacPointRows}
+      <div class="section-label" style="padding:10px 0 2px">בנאפ״ל (נקודת איסוף פלוגתית) — ממתינים לפינוי מד״א</div>${evacPointRows}
       <div class="section-label" style="padding:10px 0 2px">פונו — לפי יעד</div>${destRows}
       ${ieRow}${extRow}
     </div>`;
@@ -15026,7 +15107,7 @@ function addTriageCount(counts, triage){
   counts.total++;
 }
 // No name or identifying description: the overview needs triage, status, trapped and timing only.
-const OVERVIEW_PATIENT_COLUMNS='id,incident_id,visual_id,current_triage,current_status,access_status,needs_full_assessment,last_vitals_at,created_at';
+const OVERVIEW_PATIENT_COLUMNS='id,incident_id,visual_id,current_triage,current_status,status_recorded_at,access_status,needs_full_assessment,last_vitals_at,created_at';
 async function pullAllIncidentTriage(client){
   const ids=_openIncidents.map(i=>i.id);
   if(!ids.length){ _allIncidentTriage={}; _allIncidentTriageAt=Date.now(); _allIncidentAlertData={}; _allIncidentAlertsAt=Date.now(); return; }
@@ -15110,6 +15191,15 @@ function ccOverviewAlertGroups(nowMs=Date.now()){
     commandAlertGroups(alerts).forEach(g=>out.push({...g, key:`${inc.id}|${g.key}`, incident:inc, patient:g.patientId?d.patients.find(p=>p.id===g.patientId)||null:null}));
   });
   return out.sort((x,y)=>x.rank-y.rank || x.oldest-y.oldest);
+}
+// The same groups per incident (WP-33): incidents with alerts, worst first, then by how many.
+function ccOverviewIncidentAlerts(nowMs=Date.now()){
+  const byInc=new Map();
+  ccOverviewAlertGroups(nowMs).forEach(g=>{
+    if(!byInc.has(g.incident.id)) byInc.set(g.incident.id, {inc:g.incident, groups:[]});
+    byInc.get(g.incident.id).groups.push(g);
+  });
+  return [...byInc.values()].sort((x,y)=>x.groups[0].rank-y.groups[0].rank || y.groups.length-x.groups.length);
 }
 async function enterIncidentContextAfterLogin(){
   pollIncidentOpenAlerts(); // D10: command sees incidents opened in the field right after sign-in
@@ -16010,7 +16100,7 @@ setInterval(()=>{ if(currentUser) syncPullAll(); }, 45000);
 // so this stays a thin read + merge, not a second projector.
 // A patient with any unsynced local outbox entry is left untouched this round: the medic's own
 // in-flight edit wins locally until it's actually pushed, rather than being clobbered mid-edit.
-const PROJECTED_PATIENT_COLUMNS = 'id,incident_id,visual_id,current_triage,current_status,access_status,needs_full_assessment,is_pediatric,pediatric_age_years,last_vitals_at,version,optional_name,identifying_description,physician_death_confirmed_at,physician_death_confirmed_by';
+const PROJECTED_PATIENT_COLUMNS = 'id,incident_id,visual_id,current_triage,current_status,status_recorded_at,access_status,needs_full_assessment,is_pediatric,pediatric_age_years,last_vitals_at,version,optional_name,identifying_description,physician_death_confirmed_at,physician_death_confirmed_by';
 const VALID_LOCAL_TRIAGE = new Set(['red','yellow','green','black','pending']);
 const VALID_LOCAL_STATUS = new Set(['identified','stabilizing','observing','evacuating','handed_over','closed','self_evacuated','deceased']);
 
@@ -16125,6 +16215,13 @@ async function pullPatientLocations(incidentId){
   }
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
+// When the patient was sent to the נאפ״ל, from the server: status_recorded_at is the phone time of
+// the status event (database/013), so while the status is "evacuating" it is the send time (WP-40).
+function serverEvacSentAt(row){
+  if(row?.current_status!=='evacuating' || !row.status_recorded_at) return null;
+  const t=Date.parse(row.status_recorded_at);
+  return Number.isFinite(t) ? t : null;
+}
 // A patient another device created, built from its server row (PROJECTED_PATIENT_COLUMNS, or the
 // smaller OVERVIEW_PATIENT_COLUMNS of the CC all-incidents view).
 function remotePatientRecord(row){
@@ -16148,6 +16245,7 @@ function remotePatientRecord(row){
     _serverVersion:row.version, sourcedFromRemote:true,
     physicianDeathConfirmedAt:row.physician_death_confirmed_at?Date.parse(row.physician_death_confirmed_at):null,
     physicianDeathConfirmedBy:row.physician_death_confirmed_by||null,
+    evacSentAt:serverEvacSentAt(row),
     events:[{type:'REMOTE_PATIENT_DISCOVERED',time:nowT(),detail:`${row.visual_id} התקבל ממכשיר אחר (סנכרון)`}]
   };
 }
@@ -16186,7 +16284,10 @@ function applyProjectedPatientState(rows){
       // so it is not echoed back to the server.
       if(serverTriage && serverTriage!=='pending'){ existing.triage=serverTriage; existing._triageSyncRef=serverTriage; }
       else if(!existing.triage || existing.triage==='pending'){ existing.triage=serverTriage; }
+      const wasStatus=existing.patientStatus;
       if(status) existing.patientStatus=status;
+      if(status==='evacuating'){ const sentAt=serverEvacSentAt(row); if(sentAt) existing.evacSentAt=sentAt; }
+      if(status==='evacuating' && wasStatus!=='evacuating') noteEvacPointNews(existing, 'sent', existing.evacSentAt);
       existing.accessibility=access.accessibility;
       existing.trapStatus=access.trapStatus;
       existing.needsFullAssessment=!!row.needs_full_assessment;
@@ -16211,7 +16312,10 @@ function applyProjectedPatientState(rows){
       // Unknown locally: another device created this patient. Add a minimal local record so
       // it's visible at all, rather than staying invisible until this device happens to touch it.
       changed=true;
-      patients.push(remotePatientRecord(row));
+      const rec=remotePatientRecord(row);
+      patients.push(rec);
+      // First seen here: news only with a known, recent send time (not every old trip on sign-in).
+      if(rec.patientStatus==='evacuating' && Number.isFinite(rec.evacSentAt)) noteEvacPointNews(rec, 'sent', rec.evacSentAt);
     }
   }
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
@@ -16844,9 +16948,11 @@ function applyEvacPointArrivals(rows){
     const clearedAt=Date.parse(row.evac_point_cleared_at);
     if(Number.isFinite(serverAt)){
       if(p.evacPointArrivedAt===serverAt) continue;
+      const hadArrival=Number.isFinite(p.evacPointArrivedAt);
       p.evacPointArrivedAt=serverAt;
+      if(!hadArrival && p.patientStatus==='evacuating') noteEvacPointNews(p, 'arrived', serverAt);
       p.evacPointArrivedRole=mapServerRole(String(row.evac_point_arrived_role||''));
-      if(p.patientStatus==='evacuating') (p.events||(p.events=[])).push({type:'REMOTE_STATE_APPLIED',time:nowT(),detail:`הגיע לנקודת הפינוי (מסנכרון) · ${new Date(serverAt).toTimeString().slice(0,5)}`});
+      if(p.patientStatus==='evacuating') (p.events||(p.events=[])).push({type:'REMOTE_STATE_APPLIED',time:nowT(),detail:`הגיע לנאפ״ל (מסנכרון) · ${new Date(serverAt).toTimeString().slice(0,5)}`});
       changed=true;
     } else if(Number.isFinite(p.evacPointArrivedAt) && Number.isFinite(clearedAt) && p.evacPointArrivedAt<clearedAt){
       p.evacPointArrivedAt=null; p.evacPointArrivedRole=null;
