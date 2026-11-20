@@ -383,12 +383,15 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 | WP-30 | Telegram critical alerts (B1) | P2 | the 19 alert answers, a bot |
 | WP-31 | MARCH completion rule and hands-on PC | P2 | clinical criteria |
 | WP-32 | Evacuation point leftovers (WP-18) | P2 | - |
-| WP-33 | CC all-incidents: what counts as an alert | P3 | one answer |
+| WP-33 | CC all-incidents: what counts as an alert | P3 | - (answered 2026-11-18) |
 | WP-34 | Test gaps: AAR screen, analytics pytest in CI | P3 | - |
 | WP-35 | Record what is applied live | P3 | - |
 | WP-36 | Demo constants in signed-in paths | P3 | - |
 | WP-37 | External report unlink tombstone | P3 | - |
 | WP-38 | A resupply delivered to a medic raises the bag | P2 | one design question |
+| WP-39 | The evacuation point is called נאפ"ל | P2 | - (decided 2026-11-18) |
+| WP-40 | 30 minutes waiting at the נאפ"ל alerts PC and CC | P2 | patients, start time (proposed) |
+| WP-41 | Platoon medics see a patient sent to the נאפ"ל | P2 | trigger, recipients (proposed) |
 
 ---
 
@@ -599,9 +602,11 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 
 ---
 
-### WP-33: CC all-incidents: what counts as an alert (P3, one answer)
+### WP-33: CC all-incidents: what counts as an alert (P3, answered 2026-11-18)
 
-Ask the owner (open in the 2026-11-08 PC/CC session): on the all-incidents page, does a red patient alone count as an alert ("פצוע אדום")? Recommendation: no, only a red patient with a real problem (no evacuation status, tourniquet past 120 min, trapped with no medic contact); the tables already show red counts. Inside an incident nothing changes. Extend `scripts/browser_command_panel_test.js`.
+**Owner, 2026-11-18.** The per-patient alert lines of V2.99.68 were too much on the CC's first page. Chosen from a mockup: one line per incident ("option A"), coloured by its worst alert, with the location, how many patients / requests have alerts, the most urgent one and "(+N)" for the rest; a tap opens the incident, where each alert keeps its own line. A red patient alone counts ("פצוע אדום"), because a red patient is a problem until evacuated to a hospital: at the extraction site and at the evacuation point the patient is still the platoon's. Found while asking: "פצוע אדום" kept firing after a vehicle took the patient (handed over, evacuated, self-evacuated); now it stops then, everywhere, not only on this page.
+
+**Done (V2.99.76).** `ccOverviewIncidentAlerts()` groups the existing per-patient groups by incident; `renderCcOverviewStrip()` draws one line per incident, worst first, then by count; `RED_CASUALTY_CREATED` only while the patient is not in `LOCATION_BOARD_EVACUATED_STATUSES`. `scripts/browser_command_panel_test.js` step 13: lines per incident and their order, counts, "(+N)", a red patient at the evacuation point counts, a red patient handed over does not.
 
 ---
 
@@ -655,6 +660,40 @@ Ask the owner (open in the 2026-11-08 PC/CC session): on the all-incidents page,
 **Verify.** `scripts/browser_inventory_sync_test.js` step 7 fails on the WP-19 branch and passes after; `scripts/browser_resupply_decision_sync_test.js` now expects the medic to see the PC's delivery as waiting for receipt. Full `npm test` 79/79. Live, after the owner applies 082 and deploys `sync-log` v18: a medic asks, the PC approves and marks delivered, the medic confirms 2 of 3; `select received_at, received_items_json from supply_requests` shows the receipt and `inventory_ledger_v12` one `resupply_received` row per item for that medic. Order matters: deploy `sync-log` v18 with or before the client, or the medic's receipt is refused (`FORBIDDEN_ACTOR_ROLE`) while the bag already rose on the phone.
 
 **Not covered.** A request the medic never confirms (phone lost) stays "ממתין לאישור החובש" on the PC/CC boards; there is no command override to close it. WP-24 (CC "fulfilled by company") will need the same rule: it marks handed over, the medic confirms.
+
+---
+
+### WP-39: The evacuation point is called נאפ"ל (P2, owner 2026-11-18)
+
+**Why.** The owner's term is נאפ"ל, נקודת איסוף פלוגתית (company collection point). This reverses the 2026-10-23 rename to "נקודת פינוי" (WP-18). Each site has its own נאפ"ל, as today; the PC and the CC must see each site's. The נאפ"ל is not the final destination: a patient there is still the platoon's until MDA or another vehicle takes them.
+
+**Steps.** "נאפ"ל" on buttons, chips, column headers and lines where space is short; the full "נקודת איסוף פלוגתית" once on the patient screen and in help text. Every UI string, test and doc that says "נקודת פינוי". No data change: the payload keeps `destination: 'company_collection_point'`.
+
+**Verify.** `scripts/browser_evac_point_arrival_test.js`, `scripts/browser_command_panel_test.js` and the smoke scripts that assert the wording; `browser_mobile_layout_test.js` for the shorter labels.
+
+---
+
+### WP-40: 30 minutes waiting at the נאפ"ל alerts the PC and CC (P2, owner 2026-11-18)
+
+**Why.** WP-18 showed the waiting time at the evacuation point without an alert, until the owner set a threshold. Threshold set: 30 minutes, seen by the PC and the CC (inside the incident and on the CC's all-incidents page).
+
+**Proposed, not yet confirmed by the owner:** every colour except black; counted from the recorded arrival (`evac_point_arrived_at`), as the waiting time shown today; one alert at 30 minutes, no second level. Ask before building if still open.
+
+**Steps.** The threshold and the check in `src/domain/rules.js` (with tests), an alert type in the alert pipeline for PC and CC, its tab mapping, `event-contract.json` if it is an alert type there; the CC overview computes it from the server rows it already reads (`evac_point_arrived_at` from `database/077`). No server watchdog change.
+
+**Verify.** Domain tests; `scripts/browser_evac_point_arrival_test.js` with a fake clock (29 min nothing, 30 min the alert on PC and CC, gone once evacuated).
+
+---
+
+### WP-41: Platoon medics see a patient sent to the נאפ"ל (P2, owner 2026-11-18)
+
+**Why.** Owner: every medic of the platoon should know a patient is on the way to the נאפ"ל, as a banner that closes after 15 seconds or on a tap.
+
+**Proposed, not yet confirmed by the owner:** fires when a patient is sent (status `evacuating`), not on arrival; every medic of the incident except the phone that sent the patient; content "P004 · אדום · בדרך לנאפ"ל · מקומה 2"; several patients in one pull become one banner ("3 פצועים בדרך לנאפ"ל"); a tap only closes it. Phones learn it from the 45-second pull, so up to about a minute late, and an offline phone after it reconnects. Ask before building if still open.
+
+**Steps.** Detect the change to `evacuating` in the pull (`applyProjectedPatientState`), once per patient; a banner element like the tourniquet one, 15-second timer; no new event type.
+
+**Verify.** A browser test with a PC phone sending the patient and two medic phones: both medics get the banner, the sender does not, it closes after 15 s or on a tap, it does not repeat on the next pull.
 
 ---
 
@@ -715,11 +754,14 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-30 Telegram alerts (B1) | P2 | Waiting on owner's 19 answers | | |
 | WP-31 MARCH completion + hands-on PC | P2 | Waiting on clinical criteria | | B2 |
 | WP-32 Evacuation point leftovers | P2 | Not started | | WP-18 remainder |
-| WP-33 CC all-incidents alert rule | P3 | Waiting on 1 owner answer | | |
+| WP-33 CC all-incidents alert rule | P3 | Done (V2.99.76), no SQL | this PR | owner 2026-11-18: one line per incident; a red patient counts until a vehicle takes them; "פצוע אדום" no longer fires after a vehicle took the patient |
 | WP-34 Test gaps | P3 | Not started | | AAR screen test, analytics pytest in CI |
 | WP-35 Record what is applied live | P3 | Not started | | read-only |
 | WP-36 Demo constants | P3 | Not started | | `SITE_A` x60, `PLT-A` x25 |
 | WP-37 Unlink tombstone | P3 | Not started | | `database/069` known limit |
+| WP-39 Evacuation point = נאפ"ל | P2 | Not started | | owner 2026-11-18; reverses WP-18's "נקודת פינוי" |
+| WP-40 30 min at the נאפ"ל alert | P2 | Not started | | owner 2026-11-18; PC + CC |
+| WP-41 Medic banner: patient to the נאפ"ל | P2 | Not started | | owner 2026-11-18; 15 s or tap |
 | WP-38 Resupply raises the medic's bag | P2 | Done (V2.99.74): `database/082` applied live by the owner, `sync-log` v18 deployed 2026-11-18; live two-phone check pending | #132 | owner 2026-11-18: the medic confirms, by what arrived; the PC's / logistics' "delivered" = handed over, waiting for the medic |
 
 ## Revisions after #73 (2026-10-19)
