@@ -55,10 +55,10 @@ for (const rel of files) {
   // Wired into renderRoleDashboard for rpc/rcc only, scoped via the existing roleScopedPatients
   // (rpc = own platoon, rcc = whole company) - no new DecisionSupportEngine method needed since
   // this is a direct sort, not an acknowledgable recommendation.
-  // Since V2.99.76 the RPC has the RCC panel too (owner 2026-11-19), scoped to its own platoon.
+  // Since V2.99.80 the RPC has the RCC panel too (owner 2026-11-19), scoped to its own platoon.
   assert(roleDashboardFn.includes('if(RESCUE_PANEL_ROLES.has(role)){') && html.includes("const RESCUE_PANEL_ROLES=new Set(['rpc','rcc']);"), `${rel}: rpc must render the rescue panel`);
   assert(html.includes("const platoonOk=inc=>rescueCmdRole()!=='rpc'"), `${rel}: the rpc table keeps its own platoon's incidents only`);
-  // RCC has its own panel since V2.99.76 (owner 2026-11-19): incidents table, a row opens the
+  // RCC has its own panel since V2.99.80 (owner 2026-11-19): incidents table, a row opens the
   // incident's patients in the same shared evacuation order.
   const rccIncidentFn = section(html, 'function renderRccIncidentView(cfg){', 'function renderRccOverview(){');
   assert(roleDashboardFn.includes('body.innerHTML=renderRccPanel();'), `${rel}: rcc must render its own panel`);

@@ -1,4 +1,4 @@
-// Real-browser test of the RCC panel (V2.99.76, owner 2026-11-19).
+// Real-browser test of the RCC panel (V2.99.80, owner 2026-11-19).
 // Local demo mode, then a signed-in RCC against a fake backend in this Node process (the harness of
 // scripts/browser_role_clinical_scope_test.js). Checks:
 // - the RCC opens on a table of every incident (one row each) with urgent / trapped / on site /
@@ -387,7 +387,7 @@ async function checkSignedIn(browser, rel, file) {
   const ext = await page.evaluate((id) => ({ ev: getOutbox().filter((e) => e.type === 'PATIENT_EXTRACTED').map((e) => e.patient_id),
     stage: rescueEvacStage(patients.find((p) => p.id === id)), trap: patients.find((p) => p.id === id).trapStatus }), pid(1));
   assert(JSON.stringify(ext.ev) === JSON.stringify([pid(1)]) && ext.stage === 'moving' && ext.trap === 'not_trapped', `${rel}: signed-in extraction queued and kept over a pull (got ${JSON.stringify(ext)})`);
-  // Access sync (V2.99.76): a medic's trapped / no-access mark is sent once the patient exists on
+  // Access sync (V2.99.80): a medic's trapped / no-access mark is sent once the patient exists on
   // the server, as access_status 'blocked' for "אין גישה", and the server's "unknown" never wipes it.
   const sync = await page.evaluate((inc) => {
     const role = currentUser.role; currentUser.role = 'medic';

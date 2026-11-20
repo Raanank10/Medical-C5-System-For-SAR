@@ -1,4 +1,4 @@
--- Rolled-back test for database/085 (RCC panel, V2.99.76). Run in the Supabase SQL editor after
+-- Rolled-back test for database/085 (RCC panel, V2.99.80). Run in the Supabase SQL editor after
 -- 085 is applied. It ends with an error on purpose so nothing persists; the error text is the
 -- result. Run live on 2026-11-19 right after 085 was applied: every item as wanted.
 -- Every item should start with "ok" or show the expected value.

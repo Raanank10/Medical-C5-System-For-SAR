@@ -355,7 +355,7 @@ async function checkFile(browser, file) {
   // 7b. Rescue command (rpc): may close, may not override; closes once everything is handed over.
   await page.evaluate(() => signOut());
   await login(page, 'rpc@test');
-  // Since V2.99.76 the RPC starts on its platoon's incidents table (RCC panel); a row enters the incident.
+  // Since V2.99.80 the RPC starts on its platoon's incidents table (RCC panel); a row enters the incident.
   await page.waitForSelector('#screen-role-dashboard.active [data-rcc-incident-row]', { timeout: 5000 });
   await page.click('[data-rcc-incident-row]');
   await page.waitForFunction(() => !!activeIncident && !!document.querySelector('[data-rcc-incident-view]'), { timeout: 5000 });

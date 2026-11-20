@@ -397,7 +397,7 @@
 
   // Statuses a patient's record must not be silently overwritten out of once reached.
   // Deliberately excludes "evacuating": a patient the rescuers moved to the site's evacuation
-  // point (נקודת פינוי) is still under the platoon commander's supervision, waiting for an
+  // point (נאפ״ל, נקודת איסוף פלוגתית) is still under the platoon commander's supervision, waiting for an
   // ambulance and the final handover to MDA, so status must still be able to advance from there
   // to "handed_over".
   const FINAL_PATIENT_STATUSES = new Set([
@@ -493,6 +493,22 @@
   // sorted (pending / unknown) is its own value and is never shown as not urgent. The server
   // computes the same in get_rescue_patient_board().
   const RESCUE_PRIORITIES = ["urgent", "pending", "not_urgent"];
+  // Waiting for a vehicle after leaving for the נאפ״ל (WP-40, owner 2026-11-19): counted from when the
+  // patient was sent there, not from the recorded arrival, so a patient nobody marked as arrived
+  // is caught too. Every colour except black; 30 minutes warns, 60 minutes is critical. Only while
+  // the status is still "evacuating": once a vehicle takes the patient the clock is gone.
+  const EVAC_POINT_WAIT_WARN_MS = 30 * 60 * 1000;
+  const EVAC_POINT_WAIT_CRITICAL_MS = 60 * 60 * 1000;
+
+  function evacPointWaitAlert(patient, nowMs = Date.now()) {
+    if (!patient || patient.patientStatus !== "evacuating" || patient.triage === "black") return null;
+    const sentAt = Number(patient.evacSentAt);
+    if (!Number.isFinite(sentAt) || sentAt <= 0) return null;
+    const ms = nowMs - sentAt;
+    if (ms < EVAC_POINT_WAIT_WARN_MS) return null;
+    return { level: ms >= EVAC_POINT_WAIT_CRITICAL_MS ? "critical" : "warning", minutes: Math.floor(ms / 60000) };
+  }
+
   function rescueEvacPriority(triage, tourniquetActive) {
     if (triage === "red" || tourniquetActive === true) return "urgent";
     if (triage === "yellow" || triage === "green" || triage === "black") return "not_urgent";
@@ -539,6 +555,9 @@
     computeMstartTriage,
     detectDeterioration,
     elapsedMinutes,
+    EVAC_POINT_WAIT_CRITICAL_MS,
+    EVAC_POINT_WAIT_WARN_MS,
+    evacPointWaitAlert,
     isCriticalAlert,
     isDeviceSilent,
     isFinalPatientStatus,
