@@ -321,6 +321,9 @@ async function checkDemo(browser, rel, file) {
   await page.click('[data-medic-extract="b5"]');
   const med = await page.evaluate(() => { const p = patients.find((x) => x.id === 'b5'); return { trap: p.trapStatus, status: p.patientStatus, stage: rescueEvacStage(p) }; });
   assert(med.trap === 'not_trapped' && med.status === 'evacuating' && med.stage === 'moving', `${rel}: medic extraction: freed, on the way to the נאפ״ל (got ${JSON.stringify(med)})`);
+  // Option A: the call for b5 closes itself with the extraction; b3's (checked, not extracted) stays open.
+  const callStatus = await page.evaluate(() => Object.fromEntries(reinforcementRequests.filter((r) => r.resourceType === 'extraction_medic').map((r) => [r.linkedPatientIds[0], r.status])));
+  assert(callStatus.b5 === 'resolved' && callStatus.b3 !== 'resolved', `${rel}: extraction resolves its own call only (got ${JSON.stringify(callStatus)})`);
   await page.evaluate(() => { goTo('dashboard'); renderMedicExtractionBanner(); });
   assert((await page.evaluate(() => [...document.querySelectorAll('[data-medic-extraction-call]')].length)) === 1, `${rel}: the medic's own casualty leaves the banner`);
   await page.evaluate(() => { goTo('role-dashboard'); startRoleDashboard('rcc'); });

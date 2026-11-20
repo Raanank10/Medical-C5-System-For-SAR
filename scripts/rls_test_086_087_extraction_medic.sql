@@ -58,9 +58,17 @@ begin
   execute 'reset role';
   perform set_config('request.jwt.claims', '', true);
 
+  -- Option A: the medic marks the casualty extracted (access free): the call resolves itself.
   insert into events (incident_id, patient_id, actor_id, actor_role, type, payload_json, device_id, local_event_id, local_timestamp) values
-    (X, null, RCC, 'rcc', 'MEDICAL_REINFORCEMENT_STATUS_UPDATED', '{"id":"REQ-T86","status":"cancelled"}', 'test86-dev', 'test86-6', now() + interval '1 second');
+    (X, P_UNSORT, M1, 'medic', 'PATIENT_ACCESS_UPDATED', '{"trap_status":"not_trapped","access_status":"free","source":"access_sync"}', 'test86-dev', 'test86-6', now() + interval '1 second');
   select status into s from medical_resource_requests where incident_id = X and resource_type = 'extraction_medic';
+  r := r || 'extracted -> call ' || s || ' (want resolved); ';
+  -- A call the RCC no longer needs: the requester cancels it.
+  insert into events (incident_id, patient_id, actor_id, actor_role, type, payload_json, device_id, local_event_id, local_timestamp) values
+    (Y, null, RCC, 'rcc', 'MEDICAL_REINFORCEMENT_REQUESTED',
+     jsonb_build_object('id', 'REQ-T86-C', 'resourceType', 'extraction_medic', 'linkedPatientIds', jsonb_build_array(P_LONG::text)), 'test86-dev', 'test86-7', now()),
+    (Y, null, RCC, 'rcc', 'MEDICAL_REINFORCEMENT_STATUS_UPDATED', '{"id":"REQ-T86-C","status":"cancelled"}', 'test86-dev', 'test86-8', now() + interval '1 second');
+  select status into s from medical_resource_requests where incident_id = Y and resource_type = 'extraction_medic';
   r := r || 'requester cancels own -> ' || s || ' (want cancelled); ';
 
   -- No restore needed: the exception below rolls back every change, profiles included.

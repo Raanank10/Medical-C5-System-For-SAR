@@ -15,6 +15,12 @@
 --    PC / CC acknowledge, assign and close it, and the requesting RPC / RCC may cancel their own.
 -- 2. The incident's medics and paramedics read open and closed 'extraction_medic' requests (052
 --    lets only command roles and the requester read), so the call reaches the medics' phones.
+-- 3. A call closes itself when its casualty is extracted (owner, 2026-11-19, option A): the moment
+--    the patient row's access goes from trapped / partial / no access to free (the medic's
+--    "⛏ חולץ" sends PATIENT_ACCESS_UPDATED; a rescue extraction after the medic's check is
+--    PATIENT_EXTRACTED, 085/086), every open 'extraction_medic' request linked to that patient is
+--    resolved, with reason 'extracted' in its history. A call answered by a check alone (the
+--    casualty sorted, still trapped) stays open for the PC / CC to close.
 -- sync-log lets rpc / rcc send MEDICAL_REINFORCEMENT_REQUESTED and _STATUS_UPDATED.
 
 create or replace function app.project_rescue_extraction_request()
@@ -102,3 +108,33 @@ create policy medical_resource_requests_read_extraction_medic on medical_resourc
     and app.current_user_role() in ('medic', 'paramedic')
     and app.can_access_incident(incident_id)
   );
+
+-- 3. Extracted: the call is done.
+create or replace function app.resolve_extraction_calls_on_release()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $function$
+begin
+  if new.access_status::text = 'free' and coalesce(old.access_status::text, '') in ('trapped', 'partial', 'blocked') then
+    update medical_resource_requests
+       set status = 'resolved',
+           status_history = status_history || jsonb_build_array(jsonb_build_object(
+             'status', 'resolved', 'at', coalesce(new.access_recorded_at, now()), 'by_name', 'מערכת',
+             'by_role', 'system', 'reason', 'extracted')),
+           status_updated_at = greatest(status_updated_at, coalesce(new.access_recorded_at, now())),
+           version = version + 1
+     where incident_id = new.incident_id
+       and resource_type = 'extraction_medic'
+       and linked_patient_ids ? new.id::text
+       and status not in ('arrived', 'resolved', 'cancelled', 'denied', 'closed', 'fulfilled');
+  end if;
+  return new;
+end;
+$function$;
+revoke execute on function app.resolve_extraction_calls_on_release() from public, anon, authenticated;
+drop trigger if exists trg_resolve_extraction_calls_on_release on patients;
+create trigger trg_resolve_extraction_calls_on_release after update of access_status on patients
+  for each row when (new.access_status is distinct from old.access_status)
+  execute function app.resolve_extraction_calls_on_release();

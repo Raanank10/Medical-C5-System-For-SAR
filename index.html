@@ -7534,6 +7534,18 @@ function rescueRequestExtractionMedic(patientId){
   toast('בקשה לחובש נשלחה');
   renderRoleDashboard(role);
 }
+// Option A (owner, 2026-11-19): a call closes itself when its casualty is extracted. database/087
+// resolves it on the server when the patient's access turns free; the phone mirrors that at once
+// so the call leaves the PC's list and the medics' banner without waiting for a pull.
+function resolveExtractionCallsLocally(patientId){
+  const at=new Date().toISOString();
+  reinforcementRequests.forEach(r=>{
+    if(r.resourceType!=='extraction_medic' || !isRequestOpen(r) || !(r.linkedPatientIds||[]).includes(patientId)) return;
+    r.status='resolved';
+    r.statusHistory=r.statusHistory||[];
+    r.statusHistory.push({status:'resolved', at, by:'system', reason:'extracted'});
+  });
+}
 function rescueExtractionBlockedHtml(p){
   const need=rescueExtractionRequirementOf(p);
   const text=need==='medic_present'
@@ -7558,6 +7570,7 @@ function rescueMarkExtracted(patientId){
     p.patientStatus='evacuating'; p.evacPointArrivedAt=null;
     p.rescueEvacState='evacuating'; p.rescueEvacPointAt=null;
   }
+  resolveExtractionCallsLocally(p.id);
   saveLocalEvent({type:'PATIENT_EXTRACTED', detail:`${p.visualId||p.id} חולץ — בדרך לנאפ״ל`, warn:false, patient_id:p.id,
     payload_json:{trap_status:'not_trapped', access_status:'free', next:'evac_point', role, extracted_at:new Date(now).toISOString()}});
   saveDemoState();
@@ -11796,6 +11809,7 @@ function medicMarkExtracted(id){
   p.trapStatus='not_trapped'; p.accessibility='full';
   p.extractedAt=Date.now(); p.extractedByRole=currentUser?mapServerRole(currentUser.role):'medic';
   p.events.push({type:'PATIENT_ACCESS_UPDATED', time:nowT(), detail:'חולץ בנוכחות חובש', warn:false});
+  resolveExtractionCallsLocally(p.id);
   dismissMedicExtractionCall(p.id);
   markPatientAtCollectionPoint(id);
 }
