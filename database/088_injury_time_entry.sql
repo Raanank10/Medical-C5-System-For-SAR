@@ -1,4 +1,4 @@
--- Injury time, editable in the field (WP-23, repo owner 2026-10-23 and 2026-11-18). Does not depend on PR #141 (085-087) or PR #134; works before or after #141's 085 (already live).
+-- Injury time, editable in the field (WP-23, repo owner 2026-10-23 and 2026-11-18). Apply after 087. Works whether or not 085_rescue_board_evac_point (already live) has renamed the report function.
 --
 -- Owner's rules: injury time starts as the incident's alert time and a medic can change it in the
 -- field. Medic, paramedic, physician, PC and admin may change it; CC may not (2026-11-18). The

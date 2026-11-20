@@ -270,8 +270,10 @@ async function checkFile(browser, file) {
   await rcc1.page.evaluate(() => pullIncidentAssignmentState());
   const rccTiles = await rcc1.page.evaluate(() => commandPlatoons().map((p) => p.name));
   assert(rccTiles.includes('A1') && !rccTiles.includes('B1') && !rccTiles.includes('פלוגה א'), `${rel}: RCC tiles must be its own company's platoons (got ${JSON.stringify(rccTiles)})`);
-  await rcc1.page.evaluate(() => startRoleDashboard('rcc'));
+  // Since V2.99.80 the company line sits with the responsibilities, behind the strip's button.
+  await rcc1.page.evaluate(() => { startRoleDashboard('rcc'); if(!rccResponsibilitiesOpen) toggleRccResponsibilities(); });
   assert((await bodyRowAfter(rcc1.page, 'הפלוגה שלי')).includes('פלוגה א'), `${rel}: the RCC dashboard must name its company`);
+  await rcc1.page.evaluate(() => toggleRccResponsibilities());
 
   // CC: roster panel shows the site's unit, creates a company and a platoon, places people; the
   // CC dashboard lists the real rescue companies (not the ambulance, not the demo platoons).

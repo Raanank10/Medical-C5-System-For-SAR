@@ -193,7 +193,7 @@ T_injury = T₀ by default
 
 For simplicity, most clinical timers should use `T_injury`. Since `T_injury` defaults to `T₀`, this preserves clinical semantics while allowing future per-patient injury-time overrides.
 
-Per-patient override (built in V2.99.80, WP-23, `database/088`):
+Per-patient override (built in V2.99.81, WP-23, `database/088`):
 
 ```text
 A medic, paramedic, physician, PC or admin (not CC) may override T_injury for an individual

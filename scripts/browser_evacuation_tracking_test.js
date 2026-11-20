@@ -35,7 +35,8 @@ const USERS = {
 const BLANKET = ['cc', 'chamal', 'admin', 'rpc', 'rcc', 'physician'];
 const userById = (id) => Object.values(USERS).find((u) => u.id === id);
 const MDA = ['minor', 'anxiety', 'moderate', 'serious', 'critical', 'deceased'];
-const CLINICAL = ['PATIENT_CREATED', 'QUICK_PATIENT_CREATED', 'PATIENT_LOCATION_UPDATED', 'PATIENT_TRIAGE_UPDATED',
+const CLINICAL = ['PATIENT_CREATED', 'QUICK_PATIENT_CREATED', 'PATIENT_LOCATION_UPDATED', 'PATIENT_ACCESS_UPDATED', // access sync, V2.99.80
+  'PATIENT_TRIAGE_UPDATED',
   'PATIENT_STATUS_UPDATED', 'PATIENT_HANDED_OVER', 'PATIENT_TRIAGED_EXPECTANT', 'VITALS_RECORDED', 'TOURNIQUET_APPLIED',
   'INTERVENTION_RECORDED', 'AIRWAY_MANAGED'];
 const ALLOWED = {

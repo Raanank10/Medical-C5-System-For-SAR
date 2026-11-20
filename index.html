@@ -612,6 +612,36 @@ input[type=range]{width:100%;accent-color:var(--orange);}
 .cmd-tab.active{color:var(--text);border-bottom-color:var(--accent);}
 .cmd-tab-badge{display:inline-block;min-width:18px;padding:1px 5px;margin-inline-start:4px;border-radius:999px;background:var(--red);color:#fff;font-size:11px;}
 .cmd-tab-panel[hidden]{display:none !important;}
+/* RCC panel (V2.99.80): incidents table, site management, evacuation messages */
+.rcc-evac-banner{display:none;flex-direction:column;gap:6px;position:fixed;top:0;left:0;right:0;z-index:300;background:#0f2a1a;border-bottom:2px solid var(--green);padding:10px 16px;font-size:13px;color:var(--text);box-shadow:0 4px 16px rgba(0,0,0,.5);}
+.medic-extraction-banner{background:#2a1a0a;border-bottom-color:var(--orange);}
+.rcc-evac-banner-row{display:flex;align-items:center;gap:8px;}
+.rcc-evac-banner-row button{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;}
+.rcc-feed-line.evac-done{border-color:var(--green);background:rgba(52,199,89,.10);}
+.rcc-feed-line.evac-point{border-color:var(--accent);background:rgba(67,97,238,.10);}
+.rcc-row-sub{font-size:11px;font-weight:600;color:var(--muted);margin-top:2px;line-height:1.35;}
+.rcc-incidents-table tbody th{font-size:13px;}
+.rcc-row-main th,.rcc-row-main td{border-bottom:none !important;padding-bottom:2px;}
+.rcc-row-detail td{text-align:right !important;padding-top:0;font-family:var(--sans);}
+.rcc-incidents-table .rcc-group-head{color:var(--orange);border-bottom:1px solid var(--orange) !important;padding-bottom:2px;}
+.rcc-extract-btn{width:100%;margin-top:8px;border-color:var(--green) !important;color:var(--green) !important;font-weight:900;}
+.rcc-extract-blocked{margin-top:8px;padding:9px 10px;border-radius:9px;border:1px dashed var(--accent);color:var(--accent);font-size:13px;font-weight:800;text-align:center;}
+.rcc-request-medic-btn{width:100%;margin-top:8px;border-color:var(--accent) !important;color:var(--accent) !important;font-weight:900;}
+.rcc-trapped-line{font-size:11px;font-weight:800;color:var(--orange);margin-top:3px;line-height:1.35;}
+.rcc-incidents-table thead th{font-size:10.5px;line-height:1.25;padding-left:2px;padding-right:2px;}
+.rcc-incidents-table td{padding-left:2px;padding-right:2px;}
+.rcc-incident-head{padding:4px 2px 10px;}
+.rcc-incident-name{font-size:18px;font-weight:900;}
+.rcc-field-label{font-size:12px;font-weight:800;color:var(--muted);margin:10px 0 6px;}
+.rcc-choices{margin:0;grid-template-columns:1fr 1fr;}
+.rcc-selected{border-color:var(--accent) !important;background:rgba(67,97,238,.16) !important;color:var(--accent) !important;}
+.rcc-muted{opacity:.6;}
+.rcc-link-btn{width:100%;margin-top:10px;border-style:dashed;}
+.rcc-close-note{font-size:13px;font-weight:700;padding:8px 10px;border-radius:9px;margin-bottom:8px;}
+.rcc-close-note.warn{border:1px solid var(--orange);color:var(--orange);background:rgba(255,149,0,.08);}
+.rcc-close-note.ok{border:1px solid var(--green);color:var(--green);background:rgba(52,199,89,.08);}
+.rcc-evacuated{margin:-4px 0 12px;}
+.rcc-evacuated summary{cursor:pointer;font-weight:900;color:var(--muted);padding:8px 0;}
 .incident-triage-table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;}
 .incident-triage-table th,.incident-triage-table td{padding:7px 3px;border-bottom:1px solid var(--border);text-align:center;font-family:var(--mono);font-weight:800;}
 .incident-triage-table thead th{font-family:inherit;font-size:11px;color:var(--muted);}
@@ -844,6 +874,8 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
 </div>
 <div id="incident-open-alert-banner" class="open-alert-banner"></div>
+<div id="rcc-evac-banner" class="rcc-evac-banner" role="status" aria-live="polite"></div>
+<div id="medic-extraction-banner" class="rcc-evac-banner medic-extraction-banner" role="alert" aria-live="assertive"></div>
 
 <!-- ══════════════════════ PIN GATE (local-storage encryption unlock) ══ -->
 <div id="screen-pin-gate" class="screen active">
@@ -1001,7 +1033,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9980</div>
+      <div class="demo-kicker">Demo V2.9981</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1098,7 +1130,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9980</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9981</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1108,7 +1140,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9980</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9981</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3288,6 +3320,20 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     return "pending";
   }
 
+  // Who may extract a trapped casualty (owner, 2026-11-19). The rescue chain (rpc / rcc) marks an
+  // extraction itself only when a medic has sorted the casualty and the entrapment is short. Not
+  // yet sorted: a medic checks first ("medic_check"). Trapped for 60 minutes or more: a medic is
+  // present at the release and records the extraction ("medic_present"), for crush syndrome
+  // (fluids before release, a tourniquet if needed, cardiac monitoring). Long entrapment wins
+  // over unsorted, since it asks for more. trappedMinutes counts from the incident's start unless
+  // recorded otherwise. database/086 applies the same rule on the server.
+  const LONG_ENTRAPMENT_MINUTES = 60;
+  function rescueExtractionRequirement(priority, trappedMinutes) {
+    if (Number.isFinite(trappedMinutes) && trappedMinutes >= LONG_ENTRAPMENT_MINUTES) return "medic_present";
+    if (priority !== "urgent" && priority !== "not_urgent") return "medic_check";
+    return null;
+  }
+
   return {
     AVPU_RANK,
     DEVICE_SILENCE_MS,
@@ -3343,6 +3389,8 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     serverContactFreshness,
     RESCUE_PRIORITIES,
     rescueEvacPriority,
+    LONG_ENTRAPMENT_MINUTES,
+    rescueExtractionRequirement,
     suggestedSweepColor,
     suggestMstartTriage,
     supplyBurnAlertLevel,
@@ -3419,7 +3467,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.80';
+const APP_VERSION = '2.99.81';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3465,7 +3513,7 @@ function mapServerRole(role){ return SERVER_ROLE_TO_CLIENT_ROLE[role] || role; }
 const SYNC_ELIGIBLE_EVENT_TYPES = new Set([
   'PATIENT_CREATED','QUICK_PATIENT_CREATED','PATIENT_IDENTIFIED','PATIENT_INJURY_UPDATED',
   'PATIENT_LOCATION_UPDATED','PATIENT_ACCESS_UPDATED','PATIENT_TRIAGE_UPDATED','PATIENT_STATUS_UPDATED',
-  'PATIENT_EVAC_POINT_ARRIVED',
+  'PATIENT_EVAC_POINT_ARRIVED','PATIENT_EXTRACTED',
   'PATIENT_T_INJURY_UPDATED','PATIENT_HANDED_OVER','PATIENT_TRIAGED_EXPECTANT','VITALS_RECORDED',
   'MINIMAL_TRIAGE_RECORDED','SABCDE_RECORDED','MSTART_SUGGESTED','JUMPSTART_SUGGESTED','MSTART_OVERRIDE',
   'JUMPSTART_OVERRIDE','TOURNIQUET_APPLIED','TOURNIQUET_REASSESSMENT','TOURNIQUET_RELEASED','TOURNIQUET_TIME_RECORDED',
@@ -3599,7 +3647,9 @@ const REINFORCEMENT_RESOURCE_LABELS = {
   airway_equipment:'ציוד נתיב אוויר',
   iv_fluids:'ציוד עירוי / נוזלים',
   hypothermia_blankets:'שמיכות / מניעת היפותרמיה',
-  medical_equipment:'ציוד רפואי'
+  medical_equipment:'ציוד רפואי',
+  // The rescue chain asks for a medic before an extraction (owner, 2026-11-19, database/087).
+  extraction_medic:'חובש לחילוץ לכוד'
 };
 const REINFORCEMENT_REASON_LABELS = {
   red_patient:'פצוע אדום',
@@ -3610,7 +3660,9 @@ const REINFORCEMENT_REASON_LABELS = {
   equipment_shortage:'חוסר ציוד',
   single_medic_overload:'עומס על חובש יחיד',
   death_certification:'קביעת מוות / אישור מוות',
-  not_salvageable:'חשד לנפטר / לא בר הצלה'
+  not_salvageable:'חשד לנפטר / לא בר הצלה',
+  unsorted_trapped:'לכוד שטרם מוין — בדיקת חובש לפני חילוץ',
+  long_entrapment:'לכוד 60 דק׳ ומעלה — חובש נוכח בחילוץ (תסמונת מעיכה)'
 };
 const REINFORCEMENT_URGENCY_LABELS = {
   immediate:'מיידי',
@@ -3764,7 +3816,7 @@ const BP_LABELS = {
   carotid:'60-80 — עורק קרוטיד'
 };
 const ACCESS_LABELS = {partial:'לכוד', trapped:'לכוד', full:'לא לכוד', free:'לא לכוד', none:'לכוד', not_trapped:'לא לכוד'};
-const TRAP_LABELS = {trapped:'לכוד', not_trapped:'לא לכוד', unknown:'לא תועד'};
+const TRAP_LABELS = {trapped:'לכוד', not_trapped:'לא לכוד', access_blocked:'אין גישה', unknown:'לא תועד'};
 // Evacuation tracking (V2.99.33, database/043-044): where each casualty was taken and how MDA
 // classified them. MDA's classification sits beside field triage and never replaces it
 // (src/domain/rules.js mdaClassificationDiffersFromTriage).
@@ -5186,10 +5238,6 @@ function ensureSiteStatusFields(siteId=rescueActiveSiteId){
   if(s.incidentTypeSource===undefined) s.incidentTypeSource=null;
   return s;
 }
-function rescueSwitchAuthoritySite(role, siteId){
-  rescueActiveSiteId=siteId;
-  renderRoleDashboard(role);
-}
 function rescueSetIncidentType(role, type, siteId=rescueActiveSiteId){
   const s=ensureSiteStatusFields(siteId);
   s.incidentType=type;
@@ -5874,6 +5922,8 @@ function rescueIdentityLine(p={}){
 const RESCUE_PRIORITY_LABELS={urgent:'דחוף', pending:'טרם מוין', not_urgent:'לא דחוף'};
 const RESCUE_PRIORITY_COLORS={urgent:'var(--red)', pending:'var(--accent)', not_urgent:'var(--muted)'};
 const RESCUE_EVAC_LABELS={on_site:'באתר', evacuating:'בפינוי', evacuated:'פונה'};
+// Finer than RESCUE_EVAC_LABELS: on the way to the evacuation point or already there (WP-18).
+const RESCUE_STAGE_LABELS={on_site:'באתר', moving:'בדרך לנאפ״ל', evacuating_unknown:'בפינוי', at_point:'בנאפ״ל', evacuated:'פונה'};
 function rescuePriorityOf(p={}){
   if(RESCUE_PRIORITY_LABELS[p.rescuePriority]) return p.rescuePriority;
   if(isDeceasedForEvac(p)) return 'not_urgent';
@@ -5887,7 +5937,7 @@ function rescueEvacStateOf(p={}){
 }
 function rescuePriorityCounts(pts){
   const c={urgent:0,pending:0,not_urgent:0,trapped:0,evacuated:0};
-  pts.forEach(p=>{ c[rescuePriorityOf(p)]++; if(p.trapStatus==='trapped') c.trapped++; if(rescueEvacStateOf(p)==='evacuated') c.evacuated++; });
+  pts.forEach(p=>{ c[rescuePriorityOf(p)]++; if(p.trapStatus==='trapped' || p.trapStatus==='access_blocked') c.trapped++; if(rescueEvacStateOf(p)==='evacuated') c.evacuated++; });
   return c;
 }
 // Server order first (rescueEvacOrder), then patients the server has not ranked yet, by the same
@@ -5898,7 +5948,7 @@ function rescueSortedForEvac(pts){
 }
 function tacticalPatientRow(p){
   const trap=TRAP_LABELS[p.trapStatus]||'לא תועד';
-  const evac=RESCUE_EVAC_LABELS[rescueEvacStateOf(p)];
+  const evac=RESCUE_STAGE_LABELS[rescueEvacStage(p)];
   const medic=medicCallsign(p.assignedMedicId||userIdFromMedic(p.medic||p.lastTouchedBy));
   return roleRow(
     `${p.visualId||p.id} · ${RESCUE_PRIORITY_LABELS[rescuePriorityOf(p)]} · ${rescueIdentityLine(p)}`,
@@ -5990,6 +6040,8 @@ function saveDemoState(){
   if(_demoSandbox) return Promise.resolve();
   reconcileTriageSync();
   reconcileLocationSync();
+  reconcileAccessSync();
+  markEverTrapped(patients);
   return runSerialized(DEMO_STORAGE_KEY, async ()=>{
     try{
       const raw=await secureGetItem(DEMO_STORAGE_KEY);
@@ -6333,8 +6385,8 @@ function roleConfig(role){
     logistics:{title:'קצין לוגיסטיקה / Log-O', actor:'רס״ם אמיר דגן — Log-O', audience:'logistics', legacy:'logistics', responsibilities:['מלאי ציוד רפואי לפי מחלקה / מוקד','מענה לבקשות ציוד','הקצאת אספקה מחדש','מעקב burn rate','הצפת חוסר המשפיע על טיפול']},
     chamal:{title:'חמ״ל / מפעיל', actor:'חמ״ל — משתמש מחובר', audience:'chamal', legacy:'commander', responsibilities:['תמונת מצב כללית','אמינות נתונים ו-Sync','כפילויות ודיווחים חיצוניים','תמיכה בחוג"ד / מ״פ רפואה','ייצוא סיכום אירוע חי']},
     admin:{title:'מנהל דמו', actor:'מנהל דמו', audience:'chamal', legacy:'roles', responsibilities:['הפעלת תרחיש חתום','ניקוי דמו','ייצוא ניסוי','בדיקת הרשאות','הפרדת דמו מנתוני אמת']},
-    rpc:{title:'מ״מ — תמונת מצב טקטית וסמכות אתר', actor:'מ״מ — משתמש מחובר', audience:'rpc', legacy:'role-dashboard', responsibilities:['צפייה בתג, עדיפות פינוי (דחוף / לא דחוף), אזור, לכוד/נייד וסטטוס פינוי לפצועי המחלקה שלי בלבד','צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע — לזיהוי פיזי בשטח','ראיית חובש אחראי לכל פצוע (כינוי קריאה בלבד, לא שם)','סדר פינוי מומלץ למחלקה שלי, זהה למה שחוג"ד/מ״פ רפואה רואים','ספירות דחוף / לא דחוף מצטברות למחלקה','ללא גישה לצבע מיון, חסם, מדדים, טיפול או מנגנון פציעה','לא מגיש בקשות תגבור / אספקה','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה']},
-    rcc:{title:'מ״פ חילוץ — תמונת מצב מרוכזת וסמכות אתר', actor:'מ״פ חילוץ — משתמש מחובר', audience:'rcc', legacy:'role-dashboard', responsibilities:['תמונת מצב מרוכזת לפי מחלקות עבור הפלוגה שלי','צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע — לזיהוי פיזי בשטח','ספירות דחוף / לא דחוף, לכודים וסטטוס פינוי לכל מחלקה','סדר פינוי מומלץ לכלל הפלוגה, זהה למה שמ״פ רפואה רואה','צפייה בבקשות אספקה פתוחות (לוגיסטיקת פלוגת חילוץ)','ללא גישה לצבע מיון, חסם, מדדים, טיפול או מנגנון פציעה','לא מגיש בקשות תגבור רפואי','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה']}
+    rpc:{title:'מ״מ חילוץ', actor:'מ״מ — משתמש מחובר', audience:'rpc', legacy:'role-dashboard', responsibilities:['טבלת האירועים (מוקדים) של המחלקה שלי בלבד — הקשה על אירוע פותחת את הפצועים שלו לפי סדר הפינוי','הודעה (באנר ורטט) כשפצוע מהמחלקה מגיע לנאפ״ל או מפונה לבית חולים','צפייה בתג, עדיפות פינוי (דחוף / לא דחוף), אזור, לכוד/נייד וסטטוס פינוי לפצועי המחלקה שלי בלבד','צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע — לזיהוי פיזי בשטח','ראיית חובש אחראי לכל פצוע (כינוי קריאה בלבד, לא שם)','סדר פינוי מומלץ למחלקה שלי, זהה למה שחוג"ד/מ״פ רפואה רואים','ספירות לכודים (דחוף / לא דחוף / טרם מוין), בנאפ״ל, פונו לבי״ח וסה״כ לכל אירוע','ללא גישה לצבע מיון, חסם, מדדים, טיפול או מנגנון פציעה','לא מגיש בקשות תגבור / אספקה','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה']},
+    rcc:{title:'מ״פ חילוץ', actor:'מ״פ חילוץ — משתמש מחובר', audience:'rcc', legacy:'role-dashboard', responsibilities:['טבלת כל האירועים הפתוחים בפלוגה שלי — הקשה על אירוע פותחת את הפצועים שלו לפי סדר הפינוי','הודעה (באנר ורטט) כשפצוע מגיע לנאפ״ל או מפונה לבית חולים, ורשימת עדכוני הפינוי בפס העליון','צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע — לזיהוי פיזי בשטח','ספירות דחוף, לכודים, באתר, בפינוי ופונו לכל אירוע','סדר פינוי מומלץ לכלל הפלוגה, זהה למה שמ״פ רפואה רואה','צפייה בבקשות אספקה פתוחות (לוגיסטיקת פלוגת חילוץ)','ללא גישה לצבע מיון, חסם, מדדים, טיפול או מנגנון פציעה','לא מגיש בקשות תגבור רפואי','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סוג אירוע, מצב מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה','סגירת אירוע אחרי שכל הפצועים נמסרו (לא ניתן לעקוף את חסימת הסגירה)']}
   }[role] || roleConfig('medic');
 }
 function roleMetric(n,l){ return `<div class="role-metric"><div class="role-metric-num">${n}</div><div class="role-metric-label">${l}</div></div>`; }
@@ -7464,6 +7516,85 @@ function sortedPatientsByEvacPriority(list=patients){
 // get_rescue_patient_board(); otherwise sortedPatientsByEvacPriority), so rescue-chain and medical
 // command never disagree about who is evacuated first. No reason text: it would name the
 // tourniquet, the colour or the vitals behind the order (database/074). Only the priority shows.
+// "חולץ" (owner, 2026-11-19): the RPC / RCC mark a trapped (or "אין גישה") casualty extracted.
+// The casualty goes to the evacuation point to meet a medic for the MIST handover: no longer
+// trapped, on the way to the נאפ״ל (evacuating, not arrived; the medic or PC marks the arrival,
+// WP-18). database/085 projects PATIENT_EXTRACTED the same way on the server.
+// Who may extract (owner, 2026-11-19, C5Rules.rescueExtractionRequirement): not yet sorted, a medic
+// checks first; trapped 60 minutes or more, a medic is present and records the extraction (crush
+// syndrome). database/086 applies the same rule on the server.
+// Trapped since the incident started unless recorded otherwise: the official T0, else when the
+// incident was opened, else the casualty's registration.
+function rescueTrappedMinutes(p){
+  const siteId=currentUser?'SITE_A':(p.siteId||'SITE_A');
+  const t0=Date.parse(ensureSiteStatusFields(siteId).t0||'');
+  const opened=currentUser?Date.parse(activeIncident?.t_zero||activeIncident?.opened_at||''):NaN;
+  const reg=Date.parse(p.createdAt||'');
+  const start=Number.isFinite(t0)?t0:Number.isFinite(opened)?opened:Number.isFinite(reg)?reg:null;
+  return start===null?null:Math.max(0,Math.floor((Date.now()-start)/60000));
+}
+function rescueExtractionRequirementOf(p){ return C5Rules.rescueExtractionRequirement(rescuePriorityOf(p), rescueTrappedMinutes(p)); }
+function rescueExtractionNeedsMedic(p){ return !!rescueExtractionRequirementOf(p); }
+function openExtractionMedicRequest(p){
+  return reinforcementRequests.find(r=>r.resourceType==='extraction_medic' && isRequestOpen(r) && (r.linkedPatientIds||[]).includes(p.id))||null;
+}
+// "בקש חובש לבדיקה" (owner, 2026-11-19): a medical request linked to the casualty, to the PC / CC
+// and the incident's medics (database/087).
+function rescueRequestExtractionMedic(patientId){
+  const p=patients.find(x=>x.id===patientId);
+  if(!p || openExtractionMedicRequest(p)) return;
+  const need=rescueExtractionRequirementOf(p);
+  if(!need) return;
+  const role=rescueCmdRole();
+  createMedicalResourceRequest({resourceType:'extraction_medic', reasonCodes:[need==='medic_present'?'long_entrapment':'unsorted_trapped'],
+    urgency:need==='medic_present'?'immediate':'high', siteId:p.siteId||'SITE_A', targetLocation:`${p.visualId||p.id} · ${p.location||'אזור לא תועד'}`,
+    linkedPatientIds:[p.id], requestedByRole:role, requestedByName:currentUser?.display_name||rescueReporterLabel(role)});
+  saveDemoState();
+  toast('בקשה לחובש נשלחה');
+  renderRoleDashboard(role);
+}
+// Option A (owner, 2026-11-19): a call closes itself when its casualty is extracted. database/087
+// resolves it on the server when the patient's access turns free; the phone mirrors that at once
+// so the call leaves the PC's list and the medics' banner without waiting for a pull.
+function resolveExtractionCallsLocally(patientId){
+  const at=new Date().toISOString();
+  reinforcementRequests.forEach(r=>{
+    if(r.resourceType!=='extraction_medic' || !isRequestOpen(r) || !(r.linkedPatientIds||[]).includes(patientId)) return;
+    r.status='resolved';
+    r.statusHistory=r.statusHistory||[];
+    r.statusHistory.push({status:'resolved', at, by:'system', reason:'extracted'});
+  });
+}
+function rescueExtractionBlockedHtml(p){
+  const need=rescueExtractionRequirementOf(p);
+  const text=need==='medic_present'
+    ? `⚕ לכוד ${rescueTrappedMinutes(p)} דק׳ — חילוץ רק בנוכחות חובש (סכנת תסמונת מעיכה); החובש מסמן את החילוץ`
+    : '⚕ טרם מוין — נדרשת בדיקת חובש לפני חילוץ';
+  const req=openExtractionMedicRequest(p);
+  const action=req
+    ? `<div class="role-row-sub" data-rescue-medic-requested="${escAttr(p.id)}" style="margin-top:6px">בקשה לחובש נשלחה ${new Date(req.createdAt||Date.now()).toTimeString().slice(0,5)} · ${escAttr(REINFORCEMENT_STATUS_LABELS[req.status]||req.status)}</div>`
+    : `<button class="demo-mini-btn rcc-request-medic-btn" data-rescue-request-medic="${escAttr(p.id)}" onclick="rescueRequestExtractionMedic('${escAttr(p.id)}')">בקש חובש לבדיקה</button>`;
+  return `<div class="rcc-extract-blocked" data-rescue-extract-blocked="${escAttr(p.id)}" data-rescue-extract-need="${need}">${text}${action}</div>`;
+}
+function rescueMarkExtracted(patientId){
+  const p=patients.find(x=>x.id===patientId);
+  if(!p || !isTrappedForRescue(p) || rescueExtractionNeedsMedic(p)) return;
+  if(!confirm(`${p.visualId||p.id} חולץ?\nהפצוע יועבר לנאפ״ל לפגוש חובש ולמסירת MIST.`)) return;
+  const role=rescueCmdRole();
+  const now=Date.now();
+  p.everTrapped=true;
+  p.trapStatus='not_trapped'; p.accessibility='full'; p._accessSyncRef='not_trapped';
+  p.extractedAt=now; p.extractedByRole=role;
+  if(rescueEvacStage(p)==='on_site' && p.patientStatus!=='deceased'){
+    p.patientStatus='evacuating'; p.evacPointArrivedAt=null; p.evacSentAt=now; // WP-40 wait clock
+    p.rescueEvacState='evacuating'; p.rescueEvacPointAt=null;
+  }
+  resolveExtractionCallsLocally(p.id);
+  saveLocalEvent({type:'PATIENT_EXTRACTED', detail:`${p.visualId||p.id} חולץ — בדרך לנאפ״ל`, warn:false, patient_id:p.id,
+    payload_json:{trap_status:'not_trapped', access_status:'free', next:'evac_point', role, extracted_at:new Date(now).toISOString()}});
+  saveDemoState();
+  renderRoleDashboard(role);
+}
 function renderRescueEvacOrderPanel(pts, title){
   const ordered=rescueSortedForEvac(pts.filter(p=>rescueEvacStateOf(p)!=='evacuated'));
   const rows=ordered.map((p,i)=>{
@@ -7471,7 +7602,11 @@ function renderRescueEvacOrderPanel(pts, title){
     return `<div class="role-row" style="border-color:${RESCUE_PRIORITY_COLORS[prio]}" data-rescue-priority="${prio}">
       <div class="role-row-title"><span style="font-family:var(--mono);color:var(--accent);font-weight:900">#${i+1}</span> · ${p.visualId||p.id} · ${RESCUE_PRIORITY_LABELS[prio]}</div>
       <div class="role-row-sub">${rescueIdentityLine(p)}</div>
-      <div class="role-row-sub" style="margin-top:2px;color:var(--muted)">${p.location||'אזור לא תועד'} · ${TRAP_LABELS[p.trapStatus]||'לא תועד'} · ${RESCUE_EVAC_LABELS[rescueEvacStateOf(p)]}</div>
+      <div class="role-row-sub" style="margin-top:2px;color:var(--muted)">${p.location||'אזור לא תועד'} · ${TRAP_LABELS[p.trapStatus]||'לא תועד'} · ${RESCUE_STAGE_LABELS[rescueEvacStage(p)]}${p.extractedAt?` · חולץ ${new Date(p.extractedAt).toTimeString().slice(0,5)}`:''}</div>
+      ${isRccViewer() && isTrappedForRescue(p) && rescueEvacStage(p)==='on_site'
+        ? (rescueExtractionNeedsMedic(p)
+          ? rescueExtractionBlockedHtml(p)
+          : `<button class="demo-mini-btn rcc-extract-btn" data-rescue-extract="${escAttr(p.id)}" onclick="rescueMarkExtracted('${escAttr(p.id)}')">✓ חולץ — להעביר לנאפ״ל</button>`):''}
     </div>`;
   }).join('');
   return roleSection(title, rows || roleRow('אין פצועים ברשימה',''));
@@ -7938,6 +8073,482 @@ function renderCommandPanel(role, ctx){
     ${dashboardFocusBanner()}
     ${COMMAND_PANEL_TABS.map(([key])=>`<div class="cmd-tab-panel" data-cmd-panel="${key}"${key===commandPanelTab?'':' hidden'}>${panels[key]}</div>`).join('')}`;
 }
+// ── RCC panel (V2.99.80, owner 2026-11-19) ──
+// מ״פ חילוץ: every open incident of the company in one table, one row per incident. A row opens
+// that incident: its patients in evacuation order, the incident type, the building status (when a
+// building is involved), site clear and close. A message when a patient reaches the evacuation
+// point (נאפ״ל) or is evacuated to hospital: a short banner with vibration, kept in a feed in the
+// strip. The role's responsibilities sit behind a button instead of on top of the screen.
+// Same clinical scope as before (database/074): priority urgent / not urgent / not sorted only,
+// never a colour, tourniquet, vitals or treatment.
+// Signed in, the other incidents come from get_rescue_patient_board() per incident and
+// incident_site_authority (the RCC cannot read the patients table); the incident open on this
+// phone counts from the phone, so its unsent patients are not missed. Local demo: one incident
+// per site.
+let rccDemoIncidentOpen=false;       // local demo: the incident view of rescueActiveSiteId is open
+let rccResponsibilitiesOpen=false;
+let rccFeedExpanded=false;
+let rccBuildingExpanded=false;       // building status opened by hand for a type without a building
+let _rccEvacFeed=[];                 // newest first
+let _rccEvacSeen=null;               // `${incident}:${patient}` -> last stage; null until the first baseline
+let _rccBannerItems=[], _rccBannerTimer=null;
+let _rescueIncidentBoards={}, _rescueIncidentAuthority={}, _rescueBoardsAt=null;
+let _rescueIncidentPlatoon={}, _rescueIncidentPlatoonKnown=false;
+const RCC_FEED_MAX=30;
+const RESCUE_STAGE_RANK={on_site:0, moving:1, evacuating_unknown:2, at_point:3, evacuated:4};
+const RCC_STAGE_MESSAGES={at_point:'הגיע לנאפ״ל', evacuating_unknown:'בפינוי לנאפ״ל', evacuated:'פונה לבית חולים'};
+const RCC_BUILDING_TYPES=new Set(['missile_strike_structural_collapse','explosion']);
+
+// The same panel serves the RPC (מ״מ חילוץ) since the owner's go-ahead of 2026-11-19: only the
+// incidents (sites) of the RPC's own platoon and their patients.
+const RESCUE_PANEL_ROLES=new Set(['rpc','rcc']);
+function rescueCmdRole(){ const r=currentUser?mapServerRole(currentUser.role):activeRoleDashboard; return RESCUE_PANEL_ROLES.has(r)?r:'rcc'; }
+function isRccViewer(){ return RESCUE_PANEL_ROLES.has(currentUser ? mapServerRole(currentUser.role) : activeRoleDashboard); }
+function isRccOverviewMode(){ return currentUser ? !activeIncident : !rccDemoIncidentOpen; }
+function rccLocalPatients(siteId){
+  if(currentUser) return getSitePatients('SITE_A');
+  return roleScopedPatients(rescueCmdRole()).filter(p=>(p.siteId||'SITE_A')===siteId);
+}
+// One rescue-board row (database/074, 085) as a read-only patient for the overview and the feed.
+function rescueBoardRowPatient(row, incidentId){
+  const raw=(row.location_json && typeof row.location_json==='object') ? row.location_json : {};
+  const order=Number.isFinite(Number(row.evac_order)) ? Number(row.evac_order) : null;
+  return {
+    id:row.id, visualId:row.visual_id, incidentId, sourcedFromRemote:true,
+    fullName:row.optional_name||'לא מזוהה', temporaryDescription:row.identifying_description||'',
+    location:sanitizeRemoteText(raw.label)||sanitizeRemoteText(raw.zone)||'',
+    trapStatus:accessibilityFromServerStatus(row.access_status).trapStatus||null,
+    rescuePriority:RESCUE_BOARD_PRIORITIES.has(row.priority)?row.priority:'pending',
+    rescueEvacState:RESCUE_BOARD_EVAC_STATES.has(row.evac_state)?row.evac_state:'on_site',
+    rescueEvacOrder:order,
+    rescueEvacPointAt:rescueBoardEvacPointAt(row),
+    rescueWasTrapped:rescueBoardWasTrapped(row),
+    lastModifiedAt:row.updated_at||null
+  };
+}
+// undefined: the server has no database/085 yet (cannot tell moving from arrived); null: not arrived.
+function rescueBoardEvacPointAt(row){
+  if(!row || !Object.prototype.hasOwnProperty.call(row,'evac_point_arrived_at')) return undefined;
+  const t=Date.parse(row.evac_point_arrived_at||'');
+  return Number.isFinite(t) ? t : null;
+}
+// undefined: the server has no database/085 yet; otherwise whether the patient was ever trapped.
+function rescueBoardWasTrapped(row){
+  if(!row || !Object.prototype.hasOwnProperty.call(row,'was_trapped')) return undefined;
+  return row.was_trapped===true;
+}
+// Waiting for rescue: trapped (partial included) or "אין גישה" (owner, 2026-11-19).
+function isTrappedForRescue(p){ return p?.trapStatus==='trapped' || p?.trapStatus==='access_blocked'; }
+// Ever trapped: trapped now, seen trapped on this phone (everTrapped), or the server says so (085).
+// null when it cannot be known: a server patient without 085 who is not trapped now.
+function rescueWasTrapped(p){
+  if(isTrappedForRescue(p) || p.everTrapped===true || p.rescueWasTrapped===true) return true;
+  if(p.sourcedFromRemote && p.rescueWasTrapped===undefined) return null;
+  return false;
+}
+// The phone remembers who it saw trapped, so "extracted so far" survives the trapped mark being cleared.
+function markEverTrapped(list){
+  (list||[]).forEach(p=>{ if(p && isTrappedForRescue(p) && p.everTrapped!==true) p.everTrapped=true; });
+}
+// on_site / moving (to the evacuation point) / at_point (נאפ״ל) / evacuated (to hospital).
+function rescueEvacStage(p){
+  const s=rescueEvacStateOf(p);
+  if(s==='evacuated') return 'evacuated';
+  if(s!=='evacuating') return 'on_site';
+  if(Number.isFinite(p.evacPointArrivedAt) || Number.isFinite(p.rescueEvacPointAt)) return 'at_point';
+  if(p.sourcedFromRemote && p.rescueEvacPointAt===undefined && !Number.isFinite(p.evacPointArrivedAt)) return 'evacuating_unknown';
+  return 'moving';
+}
+function rescueStageCounts(pts){
+  const c={urgent:0,not_urgent:0,pending:0,trapped:0,trappedUrgent:0,trappedNotUrgent:0,trappedPending:0,onSite:0,moving:0,atPoint:0,onSiteTotal:0,evacuated:0,total:pts.length};
+  pts.forEach(p=>{
+    const stage=rescueEvacStage(p);
+    if(stage==='evacuated'){ c.evacuated++; return; }
+    if(stage==='on_site') c.onSite++; else if(stage==='at_point') c.atPoint++; else c.moving++;
+    const prio=rescuePriorityOf(p);
+    c[prio]++;
+    // Waiting for extraction (partial entrapment is stored as trapped). Only while still at the
+    // site: someone being carried to the נאפ״ל is out, even if nobody cleared the trapped mark.
+    if(stage==='on_site' && isTrappedForRescue(p)){
+      c.trapped++;
+      if(prio==='urgent') c.trappedUrgent++; else if(prio==='not_urgent') c.trappedNotUrgent++; else c.trappedPending++;
+    }
+  });
+  // Extracted so far: was trapped, is not any more (freed, at the נאפ״ל or at hospital).
+  c.everTrapped=0; c.extracted=0; c.trappedHistoryKnown=true;
+  pts.forEach(p=>{
+    const was=rescueWasTrapped(p);
+    if(was===null){ c.trappedHistoryKnown=false; return; }
+    if(!was) return;
+    c.everTrapped++;
+    if(!(rescueEvacStage(p)==='on_site' && isTrappedForRescue(p))) c.extracted++;
+  });
+  // On site = everyone not at the נאפ״ל yet: trapped, freed, and those being carried there. A server
+  // without database/085 cannot tell carried from arrived, so its "evacuating" counts here.
+  c.onSiteTotal=c.onSite+c.moving;
+  // Freed from the rubble (or never trapped) and not at the נאפ״ל yet: at the site or being carried.
+  c.freedNotAtPoint=c.onSiteTotal-c.trapped;
+  return c;
+}
+// Every incident the RCC sees, as one row each.
+function rccIncidentRows(){
+  if(!currentUser){
+    // Local demo: the RPC's platoon is PLT-A (roleScopedPatients); its sites are the platoon's
+    // default site and any site holding its patients.
+    const rpcSites=rescueCmdRole()==='rpc'
+      ? new Set([DEMO_PLATOONS.find(pl=>pl.platoonId==='PLT-A')?.defaultSiteId||'SITE_A', ...roleScopedPatients('rpc').map(p=>p.siteId||'SITE_A')])
+      : null;
+    return allSites.filter(s=>s.id!=='ALL' && (!rpcSites || rpcSites.has(s.id))).map(s=>{
+      const a=ensureSiteStatusFields(s.id);
+      return {key:s.id, name:siteShortName(s.id), typeLabel:incidentTypeLabel(s.id), building:a.buildingStatus, t0:a.t0,
+        cleared:!!a.siteClear?.cleared, closed:a.incidentStatus==='closed', mine:rccDemoIncidentOpen&&rescueActiveSiteId===s.id, pts:rccLocalPatients(s.id)};
+    });
+  }
+  // RPC: only the incidents of the RPC's own platoon (owner, 2026-11-19). The server also lists the
+  // company's incidents that have no platoon yet (064d, to alert every RPC); they stay out of the table.
+  const platoonOk=inc=>rescueCmdRole()!=='rpc' || !_rescueIncidentPlatoonKnown || (!!_myPlatoonId && _rescueIncidentPlatoon[inc.id]===_myPlatoonId);
+  return _openIncidents.filter(platoonOk).map(inc=>{
+    const mine=activeIncident?.id===inc.id;
+    const auth=_rescueIncidentAuthority[inc.id]||{};
+    const a=mine?ensureSiteStatusFields('SITE_A'):null;
+    const board=_rescueIncidentBoards[inc.id];
+    return {key:inc.id, name:incidentDisplayName(inc),
+      typeLabel:mine?incidentTypeLabel('SITE_A'):(INCIDENT_TYPE_LABELS[inc.incident_type]||'לא נבחר'),
+      building:mine?a.buildingStatus:(BUILDING_STATUS_LABELS[auth.building_status]?auth.building_status:null),
+      t0:mine?(a.t0||inc.t_zero):(auth.official_t0||inc.t_zero||null),
+      openedAt:inc.opened_at||null,
+      cleared:mine?!!a.siteClear?.cleared:!!auth.site_cleared_at, closed:false, mine,
+      pts:mine?getSitePatients('SITE_A'):(board?board.map(r=>rescueBoardRowPatient(r,inc.id)):null), patientCount:inc.patient_count};
+  });
+}
+function rccOpenIncident(key){
+  if(currentUser){
+    if(activeIncident?.id===key){ renderRoleDashboard(rescueCmdRole()); return; }
+    enterIncidentFromPicker(key);
+    return;
+  }
+  rescueActiveSiteId=key;
+  rccDemoIncidentOpen=true;
+  rccBuildingExpanded=false;
+  renderRoleDashboard(rescueCmdRole());
+  window.scrollTo(0,0);
+}
+function rccShowAllIncidents(){
+  rccBuildingExpanded=false;
+  if(currentUser){ enterAllIncidentsView(rescueCmdRole()); return; }
+  rccDemoIncidentOpen=false;
+  renderRoleDashboard(rescueCmdRole());
+  window.scrollTo(0,0);
+}
+function toggleRccResponsibilities(){ rccResponsibilitiesOpen=!rccResponsibilitiesOpen; renderRoleDashboard(rescueCmdRole()); if(rccResponsibilitiesOpen) window.scrollTo(0,0); }
+function toggleRccFeed(){ rccFeedExpanded=!rccFeedExpanded; renderRoleDashboard(rescueCmdRole()); }
+function rccExpandBuilding(){ rccBuildingExpanded=true; renderRoleDashboard(rescueCmdRole()); }
+
+// ── Evacuation messages ──
+// Every patient the RCC sees is watched for its evacuation stage. Reaching the evacuation point
+// (נאפ״ל) or being evacuated (to hospital) adds a feed line and a banner with vibration. The first
+// look at a patient sets its stage silently, so signing in or loading another incident does not
+// flood the RCC with old evacuations. A server without database/085 cannot tell moving from
+// arrived: the message then says "בפינוי לנאפ״ל".
+function rccWatchedPatients(){
+  if(!currentUser) return roleScopedPatients(rescueCmdRole()).map(p=>({p, where:p.siteId||'SITE_A', name:siteShortName(p.siteId||'SITE_A')}));
+  const out=[];
+  const activeId=activeIncident?.id||null;
+  if(activeId) getSitePatients('SITE_A').forEach(p=>out.push({p, where:activeId, name:incidentDisplayName(activeIncident)}));
+  Object.entries(_rescueIncidentBoards).forEach(([incId, rows])=>{
+    if(incId===activeId || !Array.isArray(rows)) return;
+    const inc=_openIncidents.find(i=>i.id===incId);
+    rows.forEach(row=>{ if(row && row.id) out.push({p:rescueBoardRowPatient(row, incId), where:incId, name:inc?incidentDisplayName(inc):''}); });
+  });
+  return out;
+}
+function rccCheckEvacTransitions(){
+  if(!isRccViewer()) return;
+  markEverTrapped(currentUser?getSitePatients('SITE_A'):roleScopedPatients(rescueCmdRole()));
+  const first=!_rccEvacSeen;
+  const seen=_rccEvacSeen ? new Map(_rccEvacSeen) : new Map();
+  const fresh=[];
+  rccWatchedPatients().forEach(({p,where,name})=>{
+    const key=`${where}:${p.id}`;
+    const stage=rescueEvacStage(p);
+    const prev=seen.get(key);
+    seen.set(key, stage);
+    if(first || prev===undefined || !RCC_STAGE_MESSAGES[stage]) return;
+    if(RESCUE_STAGE_RANK[stage]<=RESCUE_STAGE_RANK[prev]) return;
+    // moving -> evacuating_unknown never happens; an unknown evacuating that is later known to be
+    // at the point is the same message twice, so it is skipped.
+    if(prev==='evacuating_unknown' && stage==='at_point') return;
+    fresh.push({key:`${key}:${stage}:${Date.now()}`, at:Date.now(), where, incidentName:name, patientId:p.id,
+      visualId:p.visualId||p.id, identity:rescueIdentityLine(p), stage, text:RCC_STAGE_MESSAGES[stage]});
+  });
+  _rccEvacSeen=seen;
+  if(!fresh.length) return;
+  _rccEvacFeed=[...fresh.reverse(), ..._rccEvacFeed].slice(0, RCC_FEED_MAX);
+  _rccBannerItems=[...fresh, ..._rccBannerItems].slice(0,3);
+  haptic([150,80,150]);
+  renderRccEvacBanner();
+  clearTimeout(_rccBannerTimer);
+  _rccBannerTimer=setTimeout(dismissRccEvacBanner, 10000);
+}
+function rccFeedLineHtml(m){
+  const time=new Date(m.at).toTimeString().slice(0,5);
+  const cls=m.stage==='evacuated'?'evac-done':'evac-point';
+  return `<div class="cmd-strip-alert rcc-feed-line ${cls}" data-rcc-feed="${escAttr(m.stage)}" onclick="rccOpenIncident('${escAttr(m.where)}')">
+    <span class="cmd-strip-alert-id">${escAttr(m.visualId)}</span>
+    <div style="flex:1;min-width:0"><div class="cmd-strip-alert-title">${escAttr(m.text)} · ${time}</div><div class="cmd-strip-alert-sub">${escAttr(m.identity)}${m.incidentName?` · ${escAttr(m.incidentName)}`:''}</div></div>
+  </div>`;
+}
+function renderRccEvacBanner(){
+  const el=document.getElementById('rcc-evac-banner');
+  if(!el) return;
+  if(!_rccBannerItems.length){ el.style.display='none'; el.innerHTML=''; return; }
+  el.style.display='flex';
+  el.innerHTML=_rccBannerItems.map(m=>`<div class="rcc-evac-banner-row" data-rcc-banner="${escAttr(m.stage)}">
+      <span>${m.stage==='evacuated'?'🚑':'📍'} <strong>${escAttr(m.visualId)} · ${escAttr(m.text)}</strong> · ${escAttr(m.identity)}${m.incidentName?` · ${escAttr(m.incidentName)}`:''}</span>
+    </div>`).join('')+`<div class="rcc-evac-banner-row" style="justify-content:flex-end"><button onclick="dismissRccEvacBanner()">ראיתי</button></div>`;
+}
+// ── Extraction calls for medics (owner, 2026-11-19) ──
+// An open "חובש לחילוץ לכוד" request (database/087) is a banner with vibration on the medic's phone
+// until the medic opens the casualty or taps "ראיתי"; new ones vibrate once.
+let _medicExtractionSeen=new Set(), _medicExtractionDismissed=new Set();
+function isMedicViewer(){
+  if(currentUser) return ['medic','paramedic'].includes(currentUser.role);
+  return activeScreenId()==='dashboard';
+}
+function openMedicExtractionCalls(){
+  return reinforcementRequests.filter(r=>r.resourceType==='extraction_medic' && isRequestOpen(r) && !_medicExtractionDismissed.has(r.id));
+}
+function renderMedicExtractionBanner(){
+  const el=document.getElementById('medic-extraction-banner');
+  if(!el) return;
+  const calls=isMedicViewer()?openMedicExtractionCalls():[];
+  if(!calls.length){ el.style.display='none'; el.innerHTML=''; return; }
+  if(calls.some(r=>!_medicExtractionSeen.has(r.id))) haptic([200,100,200]);
+  calls.forEach(r=>_medicExtractionSeen.add(r.id));
+  el.style.display='flex';
+  el.innerHTML=calls.slice(0,3).map(r=>{
+    const pid=(r.linkedPatientIds||[])[0]||'';
+    const p=patients.find(x=>x.id===pid);
+    const reason=(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ');
+    return `<div class="rcc-evac-banner-row" data-medic-extraction-call="${escAttr(r.id)}">
+      <span style="flex:1">⚕ <strong>חובש נדרש לחילוץ · ${escAttr(p?.visualId||r.targetLocation||'')}</strong> · ${escAttr(p?.location||'')} · ${escAttr(reason)}</span>
+      ${p?`<button onclick="dismissMedicExtractionCall('${escAttr(pid)}');openPatient('${escAttr(pid)}')">פתח</button>`:''}
+      <button onclick="dismissMedicExtractionRequest('${escAttr(r.id)}')">ראיתי</button>
+    </div>`;
+  }).join('');
+}
+function dismissMedicExtractionRequest(reqId){ _medicExtractionDismissed.add(reqId); renderMedicExtractionBanner(); }
+function dismissMedicExtractionCall(patientId){
+  reinforcementRequests.filter(r=>r.resourceType==='extraction_medic' && (r.linkedPatientIds||[]).includes(patientId)).forEach(r=>_medicExtractionDismissed.add(r.id));
+  renderMedicExtractionBanner();
+}
+function dismissRccEvacBanner(){
+  clearTimeout(_rccBannerTimer);
+  _rccBannerItems=[];
+  renderRccEvacBanner();
+}
+
+// ── Server data for the overview ──
+async function pullRescueAllIncidents(client){
+  const ids=_openIncidents.map(i=>i.id);
+  const boards={};
+  await Promise.all(ids.map(async id=>{
+    try{
+      const r=await client.rpc('get_rescue_patient_board', {p_incident_id:id});
+      if(!r.error && Array.isArray(r.data)) boards[id]=r.data;
+      else if(_rescueIncidentBoards[id]) boards[id]=_rescueIncidentBoards[id];
+    }catch(e){ if(_rescueIncidentBoards[id]) boards[id]=_rescueIncidentBoards[id]; }
+  }));
+  _rescueIncidentBoards=boards;
+  if(ids.length){
+    try{
+      const r=await client.from('incident_site_authority').select(SITE_AUTHORITY_COLUMNS).in('incident_id', ids);
+      if(!r.error && Array.isArray(r.data)){ const out={}; r.data.forEach(row=>{ if(row?.incident_id) out[row.incident_id]=row; }); _rescueIncidentAuthority=out; }
+    }catch(e){}
+  }else _rescueIncidentAuthority={};
+  // Which platoon each incident belongs to (the RPC's table keeps its own platoon's only).
+  if(ids.length && rescueCmdRole()==='rpc'){
+    try{
+      const r=await client.from('incidents').select('id,platoon_id').in('id', ids);
+      if(!r.error && Array.isArray(r.data)){ const out={}; r.data.forEach(row=>{ if(row?.id) out[row.id]=row.platoon_id||null; }); _rescueIncidentPlatoon=out; _rescueIncidentPlatoonKnown=true; }
+    }catch(e){}
+    if(_myPlatoonId===null || _myPlatoonId===undefined){
+      try{ const me=await client.from('profiles').select('platoon_id').eq('id',currentUser.id).single(); if(!me.error) _myPlatoonId=me.data?.platoon_id||null; }catch(e){}
+    }
+  }
+  _rescueBoardsAt=Date.now();
+  rccCheckEvacTransitions();
+}
+
+// ── Rendering ──
+function renderRccStrip(pts, overview){
+  const contact=serverContactState();
+  const c=rescueStageCounts(pts);
+  const cell=(n,label,color)=>`<div class="cmd-strip-count" style="border-top-color:${color}"><b>${n}</b>${label}</div>`;
+  const feed=_rccEvacFeed;
+  const shown=rccFeedExpanded ? feed : feed.slice(0,1);
+  const more=feed.length>1 ? `<button class="cmd-strip-chip cmd-strip-more" onclick="toggleRccFeed()">${rccFeedExpanded?'סגור ▴':`+${feed.length-1} עדכוני פינוי ▾`}</button>` : '';
+  return `<div class="cmd-strip" id="command-status-strip">
+    <div class="cmd-strip-row">
+      <span id="role-strip-conn" class="cmd-conn ${contact.level}">${escAttr(serverContactLabel(contact))}</span>
+      ${overview?'':`<button class="cmd-strip-chip" data-rcc-all-incidents onclick="rccShowAllIncidents()">‹ כל האירועים</button>`}
+      <button class="cmd-strip-chip" data-rcc-responsibilities onclick="toggleRccResponsibilities()">${rccResponsibilitiesOpen?'סגור אחריות ✕':'ⓘ האחריות שלי'}</button>
+      ${more}
+    </div>
+    <div class="cmd-strip-counts">${cell(c.trappedUrgent,'לכוד דחוף','var(--red)')}${cell(c.trapped,'סה״כ לכודים','var(--orange)')}${cell(c.atPoint,'בנאפ״ל','var(--orange)')}${cell(c.evacuated,'פונו לבי״ח','var(--green)')}${cell(c.total,'סה״כ באירוע','var(--text)')}</div>
+    <div class="cmd-strip-alerts${rccFeedExpanded?' expanded':''}" data-rcc-feed-list>${shown.map(rccFeedLineHtml).join('')||'<div class="cmd-strip-alert-sub" style="padding:6px 2px;font-size:12px">אין עדכוני פינוי עדיין · הודעה תופיע כשפצוע מגיע לנאפ״ל או מפונה לבית חולים</div>'}</div>
+  </div>`;
+}
+function renderRccResponsibilities(cfg){
+  if(!rccResponsibilitiesOpen) return '';
+  return `<div data-rcc-responsibilities-panel>${roleSection('האחריות שלי', [myPlatoonRow(), ...cfg.responsibilities.map(x=>roleRow(x,''))].join(''))}</div>`;
+}
+// Owner 2026-11-19: a casualty is trapped since the incident started unless recorded otherwise.
+// Nothing records the moment someone became trapped, so the start is the official T0, else when the
+// incident was opened, else (local demo, no T0) the first trapped casualty's registration: "at least".
+// The oldest update among the trapped shows how stale the trapped counts may be: a trapped mark
+// only clears when someone marks the casualty freed.
+function rccTrappedTiming(r){
+  const trapped=(r.pts||[]).filter(p=>rescueEvacStage(p)==='on_site' && isTrappedForRescue(p));
+  if(!trapped.length) return null;
+  const firstReport=Math.min(...trapped.map(p=>Date.parse(p.createdAt||'')).filter(Number.isFinite));
+  const fromT0=Date.parse(r.t0||'');
+  const fromOpen=Date.parse(r.openedAt||'');
+  const start=Number.isFinite(fromT0)?fromT0:Number.isFinite(fromOpen)?fromOpen:Number.isFinite(firstReport)?firstReport:null;
+  const updates=trapped.map(p=>Date.parse(p.lastModifiedAt||p.createdAt||'')).filter(Number.isFinite);
+  return {
+    minutes:start===null?null:Math.max(0,Math.floor((Date.now()-start)/60000)),
+    atLeast:!Number.isFinite(fromT0),
+    oldestUpdateMin:updates.length?Math.max(0,Math.floor((Date.now()-Math.min(...updates))/60000)):null
+  };
+}
+function rccTrappedLine(r){
+  const t=rccTrappedTiming(r);
+  if(!t) return '';
+  const since=t.minutes===null?'לכודים · זמן לא ידוע':`⏱ לכודים ${t.atLeast?'לפחות ':''}${t.minutes} דק׳${t.atLeast?'':' (מ-T0)'}`;
+  const fresh=t.oldestUpdateMin===null?'':` · דיווח לכוד ישן ביותר: לפני ${t.oldestUpdateMin} דק׳`;
+  return `<div class="rcc-trapped-line" data-rcc-trapped-since="${t.minutes??''}" data-rcc-trapped-oldest="${t.oldestUpdateMin??''}">${since}${fresh}</div>`;
+}
+function rccIncidentLineSub(r){
+  const t0=r.t0?` · T0 לפני ${minutesSinceIso(r.t0)} דק׳`:' · T0 טרם נקבע';
+  const building=r.building?` · מבנה: ${BUILDING_STATUS_LABELS[r.building]}`:'';
+  return `${r.typeLabel}${building}${t0}${r.cleared?' · ✓ אתר נקי':''}${r.closed?' · סגור':''}`;
+}
+function renderRccIncidentsTable(){
+  const rows=rccIncidentRows();
+  if(!rows.length) return renderOperationalEmptyState(rescueCmdRole()==='rpc'
+    ? (currentUser && !_myPlatoonId && _rescueIncidentPlatoonKnown ? 'לא שובצת למחלקה · פנה למנהל המערכת' : 'אין אירועים פתוחים במחלקה')
+    : 'אין אירועים פתוחים בפלוגה');
+  // Owner 2026-11-19: trapped by priority and in total (still to be extracted from the rubble), at
+  // the נאפ״ל, evacuated to hospital, and every casualty the incident ever had (never goes down: the
+  // rescue board keeps evacuated patients, so nothing extra is stored).
+  // Every casualty sits in exactly one column, so the row adds up to the total (owner, 2026-11-19:
+  // "5 patients but the table shows 4"): trapped by priority, at the site and not trapped (freed,
+  // never trapped, or being carried), at the נאפ״ל, at hospital. The trapped total is in the strip.
+  const cols=[['trappedUrgent','דחוף','var(--red)'],['trappedNotUrgent','לא<br>דחוף','var(--text)'],['trappedPending','טרם<br>מוין','var(--accent)'],
+    ['freedNotAtPoint','באתר<br>לא לכוד','var(--text)'],['atPoint','בנאפ״ל','var(--orange)'],['evacuated','פונו<br>לבי״ח','var(--green)'],['total','סה״כ','var(--text)']];
+  const body=rows.map(r=>{
+    const c=r.pts?rescueStageCounts(r.pts):null;
+    const val=k=>!c?'—':c[k];
+    // Counts on the first line; type, building, T0 and trapped time across the full width below.
+    return `<tr class="tappable rcc-row-main${r.mine?' mine':''}" data-rcc-incident-row="${escAttr(r.key)}" onclick="rccOpenIncident('${escAttr(r.key)}')">
+      <th>${escAttr(r.name)} ‹</th>
+      ${cols.map(([k,,color])=>`<td style="color:${c&&val(k)?color:'var(--muted)'}">${val(k)}</td>`).join('')}
+    </tr>
+    <tr class="tappable rcc-row-detail" data-rcc-incident-detail="${escAttr(r.key)}" onclick="rccOpenIncident('${escAttr(r.key)}')">
+      <td colspan="${cols.length+1}"><div class="rcc-row-sub">${escAttr(rccIncidentLineSub(r))}</div>${rccTrappedLine(r)}${c&&c.everTrapped?`<div class="rcc-row-sub" data-rcc-extracted="${c.trappedHistoryKnown?c.extracted:''}">${c.trappedHistoryKnown?`חולצו עד כה: ${c.extracted} מתוך ${c.everTrapped} שהיו לכודים`:'חולצו עד כה: לא ידוע (נדרש עדכון שרת 085)'}</div>`:''}</td>
+    </tr>`;
+  }).join('');
+  const total=Object.fromEntries(cols.map(([k])=>[k,0]));
+  rows.forEach(r=>{ if(!r.pts) return; const c=rescueStageCounts(r.pts); cols.forEach(([k])=>{ total[k]+=c[k]; }); });
+  const footer=currentUser
+    ? (_rescueBoardsAt?`לפי נתוני השרת · עודכן ${timeAgoLabel(_rescueBoardsAt)} · מה שטרם נשלח מהשטח לא מופיע`:'טרם התקבלו נתונים מהשרת')
+    : 'מצב דמו · נתונים מקומיים';
+  return `<table class="incident-triage-table rcc-incidents-table" data-rcc-incidents-table>
+      <colgroup><col style="width:23%">${cols.map(()=>'<col style="width:11%">').join('')}</colgroup>
+      <thead><tr><th rowspan="2">אירוע</th><th colspan="3" class="rcc-group-head">לכודים</th><th colspan="3"></th><th rowspan="2">סה״כ<br>באירוע</th></tr>
+        <tr>${cols.slice(0,-1).map(([,label])=>`<th>${label}</th>`).join('')}</tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr><th>סה״כ</th>${cols.map(([k,,color])=>`<td style="color:${total[k]?color:'var(--muted)'}">${total[k]}</td>`).join('')}</tr></tfoot>
+    </table>
+    <div class="role-row-sub" style="margin-top:6px">הקש על אירוע כדי לראות את הפצועים לפי סדר הפינוי · ${footer}</div>`;
+}
+function rccChoiceButton(label, selected, onclick, attr=''){
+  return `<button class="demo-mini-btn${selected?' rcc-selected':''}" ${attr} onclick="${onclick}">${selected?'✓ ':''}${label}</button>`;
+}
+function renderRccSiteManagement(siteId, pts){
+  const a=ensureSiteStatusFields(siteId);
+  const c=rescueStageCounts(pts);
+  const closed=isIncidentClosedForSite(siteId);
+  const official=currentUser ? !!a.t0 : (a.incidentStatus==='official'||a.incidentStatus==='closed');
+  const types=[['missile_strike_structural_collapse','קריסת מבנה / טיל'],['mass_shooting','ירי המוני'],['vehicle_accident','תאונת דרכים'],['explosion','פיצוץ']];
+  const typeHtml=types.map(([k,label])=>rccChoiceButton(label, a.incidentType===k, `rescueSetIncidentType('${rescueCmdRole()}','${k}','${siteId}')`, `data-rcc-type="${k}"`)).join('');
+  const buildingRelevant=RCC_BUILDING_TYPES.has(a.incidentType) || siteHasBuildingCollapse(siteId) || !!a.buildingStatus || rccBuildingExpanded;
+  const buildings=[['stable','יציב'],['unstable','לא יציב'],['progressive_collapse','קריסה מתמשכת'],['safe_to_enter','בטוח לכניסה']];
+  const buildingHtml=buildingRelevant
+    ? `<div class="rcc-field-label">מצב המבנה</div><div class="demo-actions rcc-choices" data-rcc-building>${buildings.map(([k,label])=>rccChoiceButton(label, a.buildingStatus===k, `rescueUpdateBuildingStatus('${rescueCmdRole()}','${k}','${siteId}')`, `data-rcc-building-status="${k}"`)).join('')}</div>`
+    : `<button class="demo-mini-btn rcc-link-btn" data-rcc-building-expand onclick="rccExpandBuilding()">מבנה מעורב? עדכון מצב מבנה</button>`;
+  const remaining=c.onSite+c.moving+c.atPoint;
+  const clearLine=remaining
+    ? `<div class="rcc-close-note warn" data-rcc-remaining="${remaining}">עדיין ${c.onSite} באתר${c.moving+c.atPoint?` · ${c.moving+c.atPoint} בפינוי`:''} · ניתן לסגור רק אחרי שכל הפצועים נמסרו</div>`
+    : `<div class="rcc-close-note ok" data-rcc-remaining="0">${pts.length?'כל הפצועים פונו מהאתר · ניתן לאשר אתר נקי ולסגור':'אין פצועים באירוע'}</div>`;
+  const clearBtn=a.siteClear?.cleared
+    ? `<div class="role-row-sub" data-rcc-site-cleared>✓ האתר הוכרז נקי${a.siteClear.clearedAt?` · ${new Date(a.siteClear.clearedAt).toTimeString().slice(0,5)}`:''}</div>`
+    : `<button class="demo-mini-btn" data-rcc-site-clear onclick="rccConfirmSiteClear('${siteId}')">אשר אתר נקי</button>`;
+  const closeBtn=`<button class="demo-mini-btn${remaining&&!closed?' rcc-muted':''}" data-rcc-close onclick="rescueToggleIncidentClosed('${rescueCmdRole()}','${siteId}')">${closed?'פתח אירוע מחדש':'סגור אירוע'}</button>`;
+  return `<div class="role-section" data-rcc-site-management>
+    <div class="role-section-title">ניהול אתר</div>
+    ${official?`<div class="role-row-sub" style="margin-bottom:8px">T0 ${a.t0?new Date(a.t0).toTimeString().slice(0,5):''} · לפני ${a.t0?minutesSinceIso(a.t0):'—'} דק׳${closed?' · האירוע סגור':''}</div>`
+      :`<button class="demo-mini-btn" style="width:100%;margin-bottom:8px" data-rcc-official onclick="rescueOpenOfficialIncident('${rescueCmdRole()}','${siteId}')">פתח אירוע רשמי + T0</button>`}
+    <div class="rcc-field-label">סוג אירוע</div>
+    <div class="demo-actions rcc-choices" data-rcc-types>${typeHtml}</div>
+    ${buildingHtml}
+    <div class="rcc-field-label">אתר נקי וסגירה</div>
+    ${clearLine}
+    <div class="demo-actions rcc-choices">${clearBtn}${closeBtn}</div>
+  </div>`;
+}
+function rccConfirmSiteClear(siteId){
+  const c=rescueStageCounts(rccLocalPatients(siteId));
+  if(c.onSite && !confirm(`עדיין ${c.onSite} פצועים באתר. לאשר בכל זאת שהאתר נקי?`)) return;
+  rescueConfirmSiteClear(rescueCmdRole(), siteId);
+}
+function renderRccIncidentView(cfg){
+  const siteId=currentUser?'SITE_A':rescueActiveSiteId;
+  const pts=rccLocalPatients(siteId);
+  const name=currentUser?incidentDisplayName(activeIncident):siteShortName(siteId);
+  const evacuated=rescueSortedForEvac(pts.filter(p=>rescueEvacStage(p)==='evacuated'));
+  const alerts=roleAlertRows(rescueCmdRole()).filter(a=>!a.patientId || pts.some(p=>p.id===a.patientId));
+  const requests=roleScopedRequests(rescueCmdRole()).filter(isRequestOpen);
+  return `<div class="rcc-incident-head" data-rcc-incident-view="${escAttr(currentUser?activeIncident.id:siteId)}">
+      <div class="rcc-incident-name">${escAttr(name)}</div>
+      <div class="role-row-sub">${escAttr(incidentTypeLabel(siteId))}${ensureSiteStatusFields(siteId).buildingStatus?` · מבנה: ${BUILDING_STATUS_LABELS[ensureSiteStatusFields(siteId).buildingStatus]}`:''}</div>
+    </div>
+    ${renderRescueEvacOrderPanel(pts, 'סדר פינוי — הפצועים באירוע')}
+    ${evacuated.length?`<details class="rcc-evacuated" data-rcc-evacuated><summary>פונו (${evacuated.length})</summary>${evacuated.map(tacticalPatientRow).join('')}</details>`:''}
+    ${renderRccSiteManagement(siteId, pts)}
+    ${alerts.length?roleSection('התראות שדורשות פעולה ממני', alerts.slice(0,8).map(a=>renderAlertCard(a,'commander')).join('')):''}
+    ${requests.length?roleSection('בקשות אספקה פתוחות', requests.slice(0,8).map(r=>roleRow(r.id, `${resupplyItemsText(r)} · ${resupplyStatusText(r)}`)).join('')):''}
+    <div class="demo-actions" style="margin:12px 0 0;grid-template-columns:1fr"><button class="demo-mini-btn" onclick="openFirstResponderReport('${rescueCmdRole()}')">דיווח פצוע ראשוני</button></div>`;
+}
+function renderRccOverview(){
+  return `${roleSection(rescueCmdRole()==='rpc'?'כל האירועים במחלקה':'כל האירועים בפלוגה', renderRccIncidentsTable())}
+    <div class="demo-actions" style="margin:12px 0 0;grid-template-columns:1fr${currentUser?' 1fr':''}">
+      <button class="demo-mini-btn" onclick="openFirstResponderReport('${rescueCmdRole()}')">דיווח פצוע ראשוני</button>
+      ${currentUser?'<button class="demo-mini-btn" onclick="openIncidentPicker()">רשימת אירועים</button>':''}
+    </div>`;
+}
+function renderRccPanel(){
+  const cfg=roleConfig(rescueCmdRole());
+  rccCheckEvacTransitions();
+  const overview=isRccOverviewMode();
+  const scopePts=overview
+    ? rccIncidentRows().flatMap(r=>r.pts||[])
+    : rccLocalPatients(currentUser?'SITE_A':rescueActiveSiteId);
+  return `<div id="command-sticky" class="cmd-sticky">${renderRccStrip(scopePts, overview)}</div>
+    ${renderRccResponsibilities(cfg)}
+    ${overview?renderRccOverview():renderRccIncidentView(cfg)}`;
+}
 function renderRoleDashboard(role=activeRoleDashboard){
   activeRoleDashboard=role;
   updateClock();
@@ -8005,49 +8616,14 @@ function renderRoleDashboard(role=activeRoleDashboard){
       roleRow('סוג אירוע', incidentTypeLabel(currentSiteId())),
       ...logisticsCompanies().map(c=>roleRow(c.name,`${c.lowItems.length} פריטים מתחת לסף · ${c.consumed} שימושים בציוד`))
     ].join('');
-  }else if(role==='rpc'){
-    const c=rescuePriorityCounts(pts);
-    objects=[
-      myPlatoonRow(),
-      roleRow('עדיפות פינוי — מחלקה שלי',`דחוף ${c.urgent} · לא דחוף ${c.not_urgent} · טרם מוין ${c.pending} · לכודים ${c.trapped} · פונו ${c.evacuated}`),
-      ...rescueSortedForEvac(pts).slice(0,10).map(tacticalPatientRow)
-    ].join('');
-  }else if(role==='rcc'){
-    const myPlatoonIds=commandPlatoons().filter(pl=>pl.companyId==='COMP-1').map(pl=>pl.platoonId);
-    objects=myPlatoonRow()+myPlatoonIds.map(tacticalPlatoonRollup).join('');
+  }else if(role==='rpc' || role==='rcc'){
+    objects=''; // RPC and RCC have their own panel (renderRccPanel)
   }else{
     objects=allSites.filter(s=>s.id!=='ALL').map(s=>roleRow(
       `${s.name} · ${incidentTypeLabel(s.id)}`,
       `${getSitePatients(s.id).length} פצועים · ${externalConflictCount(getSitePatients(s.id), siteExternalReports(s.id))} פערי דיווח · ${siteStatusSummaryLine(s.id)}`
     )).join('');
   }
-  const authSite=ensureSiteStatusFields(rescueActiveSiteId);
-  const rescueAuthorityPanel=['rpc','rcc'].includes(role)?`
-    <div class="role-section">
-      <div class="role-section-title">סמכות אתר — ראשונים בזירה</div>
-      <div class="demo-actions" style="margin:0 0 8px;grid-template-columns:1fr 1fr">
-        ${allSites.filter(s=>s.id!=='ALL').map(s=>`<button class="demo-mini-btn" style="${s.id===rescueActiveSiteId?'border-color:var(--accent);background:rgba(67,97,238,.12);color:var(--accent)':''}" onclick="rescueSwitchAuthoritySite('${role}','${s.id}')">${s.id===rescueActiveSiteId?'✓ ':''}${s.name.split('—')[0].trim()}</button>`).join('')}
-      </div>
-      <div class="role-row"><div class="role-row-title">${siteStatusSummaryLine(rescueActiveSiteId)}</div></div>
-      <div class="demo-actions" style="margin:8px 0 0;grid-template-columns:1fr 1fr">
-        <button class="demo-mini-btn" onclick="rescueSetIncidentType('${role}','missile_strike_structural_collapse')">סוג: קריסת מבנה / טיל</button>
-        <button class="demo-mini-btn" onclick="rescueSetIncidentType('${role}','mass_shooting')">סוג: ירי המוני</button>
-        <button class="demo-mini-btn" onclick="rescueSetIncidentType('${role}','vehicle_accident')">סוג: תאונת דרכים</button>
-        <button class="demo-mini-btn" onclick="rescueSetIncidentType('${role}','explosion')">סוג: פיצוץ</button>
-      </div>
-      <div class="demo-actions" style="margin:8px 0 0;grid-template-columns:1fr 1fr">
-        <button class="demo-mini-btn" onclick="rescueOpenOfficialIncident('${role}')">${authSite.incidentStatus==='official'||authSite.incidentStatus==='closed'?'אירוע כבר רשמי':'פתח אירוע רשמי + T0'}</button>
-        <button class="demo-mini-btn" onclick="rescueToggleIncidentClosed('${role}')">${isIncidentClosedForSite(rescueActiveSiteId)?'פתח אירוע מחדש':'סגור אירוע'}</button>
-        <button class="demo-mini-btn" onclick="rescueUpdateBuildingStatus('${role}','stable')">מבנה: יציב</button>
-        <button class="demo-mini-btn" onclick="rescueUpdateBuildingStatus('${role}','unstable')">מבנה: לא יציב</button>
-        <button class="demo-mini-btn" onclick="rescueUpdateBuildingStatus('${role}','progressive_collapse')">מבנה: קריסה מתמשכת</button>
-        <button class="demo-mini-btn" onclick="rescueUpdateBuildingStatus('${role}','safe_to_enter')">מבנה: בטוח לכניסה</button>
-        <button class="demo-mini-btn" onclick="rescueConfirmSiteClear('${role}')" style="grid-column:1/-1">אשר אתר נקי</button>
-      </div>
-    </div>`:'';
-  const rescueEvacOrderPanel=role==='rpc'?renderRescueEvacOrderPanel(pts,'סדר פינוי מומלץ — מחלקה שלי')
-    :role==='rcc'?renderRescueEvacOrderPanel(pts,'סדר פינוי מומלץ — כלל הפלוגה')
-    :'';
   const reqHtml=requests.slice(0,8).map(r=>roleRow(
     `${r.id} · ${r.type==='resupply'?'השלמת ציוד':(REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType)}`,
     `${r.type==='resupply'?resupplyItemsText(r):r.targetLocation} · ${r.type==='resupply'?resupplyStatusText(r):(REINFORCEMENT_STATUS_LABELS[r.status]||r.status)} · ${r.type==='resupply'?(r.truckAvailability==='available'?'זמין ברכב חוג״ד':'דורש מ״פ רפואה'):(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')}`
@@ -8065,14 +8641,18 @@ function renderRoleDashboard(role=activeRoleDashboard){
   ].filter(Boolean).join('');
   const genericSections=`
     ${roleSection('האחריות שלי', responsibilities)}
-    ${rescueAuthorityPanel}
-    ${rescueEvacOrderPanel}
     ${roleSection('התראות שדורשות פעולה ממני', alertHtml)}
-    ${roleSection(role==='pc'?'האובייקטים שלי: חובשים / פצועים / מוקדים':role==='cc'?'האובייקטים שלי: מחלקות / מוקדים / משאבים':role==='physician'?'תור סקירה רפואית':role==='logistics'?'מלאי ובקשות ציוד':role==='rpc'?'תמונה טקטית — מחלקה שלי (ללא מידע קליני)':role==='rcc'?'תמונה טקטית מרוכזת — פלוגה שלי (ללא מידע קליני)':'האובייקטים שלי', objects)}
+    ${roleSection(role==='pc'?'האובייקטים שלי: חובשים / פצועים / מוקדים':role==='cc'?'האובייקטים שלי: מחלקות / מוקדים / משאבים':role==='physician'?'תור סקירה רפואית':role==='logistics'?'מלאי ובקשות ציוד':role==='rpc'?'תמונה טקטית — מחלקה שלי (ללא מידע קליני)':'האובייקטים שלי', objects)}
     ${roleSection('בקשות / הקצאות פתוחות', reqHtml)}
     <div class="demo-actions" style="margin:0;grid-template-columns:1fr 1fr">${actions}</div>`;
   const body=document.getElementById('role-dashboard-body');
-  if(isCommandPanelRole(role)){
+  // The RCC strip carries the server-contact label; the version banner is noise there.
+  const demoStrip=document.querySelector('#screen-role-dashboard .demo-strip');
+  if(demoStrip) demoStrip.style.display=RESCUE_PANEL_ROLES.has(role)?'none':'';
+  if(RESCUE_PANEL_ROLES.has(role)){
+    body.innerHTML=renderRccPanel();
+    positionCommandSticky();
+  }else if(isCommandPanelRole(role)){
     body.innerHTML=renderCommandPanel(role,{pts,alerts,responsibilities,objects,reqHtml,actions});
     positionCommandSticky();
   }else{
@@ -8422,6 +9002,7 @@ function projectPatientStatus(nextStatus, eventType, payload={}){
 }
 
 function goTo(screen){
+  setTimeout(renderMedicExtractionBanner,0); // extraction calls follow the screen (medic home in the demo)
   if(screen!=='sweep') hideSameZoneFab();
   Object.keys(vitalCountdowns||{}).forEach(k=>stopCountTimer(k, false));
   if(screen==='step5') projectPatientStatus('observing','VITALS_RECORDED');
@@ -10010,6 +10591,10 @@ function requestAlertObjects(reqs){
     }
     const isDeathCert=r.resourceType==='doctor_death_cert';
     const isDoctorTx=['doctor_treatment','paramedic'].includes(r.resourceType);
+    if(r.resourceType==='extraction_medic'){
+      pushAlert(alerts,{id:`reinforcement-${r.id}`,type:'MEDICAL_REINFORCEMENT_REQUEST',severity:r.urgency==='immediate'?'high':'medium',owner:'pc',audience:['medic','pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:r.urgency==='immediate'?3:10,actionRequired:'request_reinforcement',scope:'patient',category:'forces',siteId:r.siteId,patientId:(r.linkedPatientIds||[])[0],title:`${REINFORCEMENT_RESOURCE_LABELS.extraction_medic} — ${r.targetLocation||''}`,detail:`${(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')} · ${REINFORCEMENT_STATUS_LABELS[r.status]||r.status}`});
+      return;
+    }
     pushAlert(alerts,{id:`reinforcement-${r.id}`,type:isDeathCert?'DOCTOR_DEATH_CERTIFICATION_REQUEST':'MEDICAL_REINFORCEMENT_REQUEST',severity:r.urgency==='immediate'?'high':'medium',owner:isDeathCert||isDoctorTx?'physician':'cc',audience:isDeathCert?['pc','cc','physician','chamal']:isDoctorTx?['pc','cc','physician','chamal']:['pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:r.urgency==='immediate'?3:10,actionRequired:isDeathCert?'certify_death':'request_reinforcement',scope:isDeathCert?'patient':'company',category:isDeathCert?'forces':'forces',siteId:r.siteId,patientId:(r.linkedPatientIds||[])[0],title:`בקשת תגבור — ${REINFORCEMENT_RESOURCE_LABELS[r.resourceType]||r.resourceType}`,detail:`${r.targetLocation} · ${REINFORCEMENT_STATUS_LABELS[r.status]||r.status} · ${(r.reasonCodes||[]).map(x=>REINFORCEMENT_REASON_LABELS[x]||x).join(' / ')}`});
   });
   return alerts;
@@ -11202,7 +11787,11 @@ function openPatient(id){
   // under "עוד". On the way to the evacuation point (נאפ״ל, נקודת איסוף פלוגתית) the slot confirms the arrival
   // (WP-18); once the casualty is there, handover takes it.
   const handoverBtn=`<button class="btn-primary" style="background:var(--green)" onclick="openEvacuationSheet('${p.id}','handover')">הועבר למד״א — עכשיו</button>`;
-  const secondPrimary=showCollectionPointBtn
+  // A trapped casualty leaves with the extraction (owner, 2026-11-19): the medic present marks it.
+  const trappedHere=isTrappedForRescue(p);
+  const secondPrimary=showCollectionPointBtn && trappedHere
+    ? `<button class="btn-primary bar-main-btn" style="background:var(--orange)" data-medic-extract="${p.id}" onclick="medicMarkExtracted('${p.id}')">⛏ חולץ — יצא לנאפ״ל</button>`
+    : showCollectionPointBtn
     ? `<button class="btn-primary bar-main-btn" style="background:var(--orange)" onclick="markPatientAtCollectionPoint('${p.id}')">🚶 יצא לנאפ״ל</button>`
     : showArrivedBtn
     ? `<button class="btn-primary bar-main-btn" style="background:var(--orange)" onclick="markPatientArrivedAtEvacPoint('${p.id}')">📍 הגיע לנאפ״ל</button>`
@@ -11235,6 +11824,19 @@ function toggleDetailBarMore(){
 // projection stay unchanged; only the wording changed (V2.99.62). Uses the generic PATIENT_STATUS_UPDATED event (already sync-eligible for
 // medic/pc) rather than a new event type, since the server projects patients.current_status
 // straight from its payload - no backend change needed.
+// Medic present at the extraction (owner, 2026-11-19): the casualty is out of the rubble
+// (reconcileAccessSync sends "not trapped") and on the way to the evacuation point, as
+// markPatientAtCollectionPoint records it. Required for a casualty trapped 60 minutes or more.
+function medicMarkExtracted(id){
+  const p=patients.find(x=>x.id===id); if(!p) return;
+  p.everTrapped=true;
+  p.trapStatus='not_trapped'; p.accessibility='full';
+  p.extractedAt=Date.now(); p.extractedByRole=currentUser?mapServerRole(currentUser.role):'medic';
+  p.events.push({type:'PATIENT_ACCESS_UPDATED', time:nowT(), detail:'חולץ בנוכחות חובש', warn:false});
+  resolveExtractionCallsLocally(p.id);
+  dismissMedicExtractionCall(p.id);
+  markPatientAtCollectionPoint(id);
+}
 function markPatientAtCollectionPoint(id){
   const p=patients.find(x=>x.id===id); if(!p) return;
   if(!C5Rules.canChangePatientStatus(p)){ toast('לא ניתן לשנות — הטיפול בפצוע כבר הסתיים'); return; }
@@ -14272,7 +14874,9 @@ const LOCATION_BOARD_EVACUATED_STATUSES = new Set(['handed_over','self_evacuated
 // every open incident; tapping one opens it, "כל האירועים" comes back. Its own unsent events stay
 // in the outbox, each pinned to its incident, and are still sent (syncPush groups by incident_id).
 function isCcOverviewMode(){ return !!currentUser && mapServerRole(currentUser.role)==='cc' && !activeIncident; }
-function enterCcAllIncidentsView(){
+function enterCcAllIncidentsView(){ enterAllIncidentsView('cc'); }
+// CC and RCC start from every open incident (no incident open on the phone); a row opens one.
+function enterAllIncidentsView(role){
   if(!currentUser) return;
   if(activeIncident){
     activeIncident=null;
@@ -14283,8 +14887,8 @@ function enterCcAllIncidentsView(){
     saveDemoState();
     renderIncidentContext();
   }
-  startRoleDashboard('cc');
-  refreshOpenIncidents().then(()=>{ if(isCcOverviewMode() && document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard('cc'); });
+  startRoleDashboard(role);
+  refreshOpenIncidents().then(()=>{ if(!activeIncident && document.getElementById('screen-role-dashboard')?.classList.contains('active')) renderRoleDashboard(role); });
 }
 function ccOverviewTotals(){
   const total=emptyTriageCounts();
@@ -15082,7 +15686,12 @@ async function refreshOpenIncidents(){
   if(result.error){ _incidentListError='טעינת האירועים נכשלה: '+(result.error.message||''); return false; }
   _incidentListError='';
   _openIncidents=Array.isArray(result.data)?result.data:[];
-  if(hasBlanketIncidentAccess()){
+  if(currentUser.role==='rcc' || currentUser.role==='rpc'){
+    // RCC / RPC: no patients table, no command state (database/074). The rescue board per incident and
+    // the site authority rows instead (RCC panel).
+    await pullRescueAllIncidents(client);
+    if(document.getElementById('screen-role-dashboard')?.classList.contains('active') && activeRoleDashboard===currentUser.role) renderRoleDashboard(currentUser.role);
+  }else if(hasBlanketIncidentAccess()){
     // Overview counts for roles that can read every incident (CC overview, spec: all open
     // incidents with drill-down). Same server snapshot the command view already polls.
     await Promise.all(_openIncidents.map(async inc=>{
@@ -15207,6 +15816,12 @@ async function enterIncidentContextAfterLogin(){
   const listed=await refreshOpenIncidents();
   // CC starts from every open incident, not from one site, also offline (owner, 2026-10-26).
   if(currentUser.role==='cc'){ enterCcAllIncidentsView(); return; }
+  // RCC and RPC too (owner, 2026-11-19): their incidents table first. Offline with an incident from
+  // before the reload, they keep working in it, as every field role does (offline-first).
+  if(currentUser.role==='rcc' || currentUser.role==='rpc'){
+    if(stored && !listed){ await activateIncident(stored); return; }
+    enterAllIncidentsView(currentUser.role); return;
+  }
   if(stored){
     const fresh=_openIncidents.find(i=>i.id===stored.id);
     if(fresh && (fresh.is_member || hasBlanketIncidentAccess())){ await activateIncident(fresh); return; }
@@ -15691,6 +16306,7 @@ function renderIncidentReport(){
       <div class="aar-box"><div class="aar-k">פצועים</div><div class="aar-v">${pt.total??0}</div><div>${aarCountChips(pt.by_triage, TRIAGE_LABELS)}</div></div>
       <div class="aar-box"><div class="aar-k">מצב בסגירה</div><div>${aarCountChips(pt.by_status, AAR_STATUS_LABELS)}</div><div class="demo-strip-sub">נמסרו ${pt.handed_over??0} · חציון עד מסירה ${pt.median_minutes_open_to_handover??'—'} דק׳ · ילדים ${pt.pediatric??0} · עם מדדים ${pt.with_vitals??0} · ממתינים להערכה מלאה ${pt.still_needing_full_assessment??0}</div></div>
       ${ghBox}
+      ${rep.rescue?`<div class="aar-box" data-aar-rescue><div class="aar-k">חילוץ</div><div class="demo-strip-sub">סה״כ באירוע ${rep.rescue.total??0} · היו לכודים ${rep.rescue.ever_trapped??0} · חולצו ${rep.rescue.extracted??0} · לכודים בסגירה ${rep.rescue.trapped_at_close??0} · בנאפ״ל בסגירה ${rep.rescue.at_evac_point_at_close??0} · פונו ${rep.rescue.evacuated??0}</div></div>`:''}
       <div class="aar-box"><div class="aar-k">חסמי עורקים</div><div class="aar-v">${tq.total??0}</div><div class="demo-strip-sub">פעילים בסגירה ${tq.active_at_close??0} · מקסימום ${tq.max_minutes??'—'} דק׳ · מעל 120 דק׳: ${tq.over_120_minutes??0}</div></div>
       <div class="aar-box"><div class="aar-k">פינוי לפי יעד</div><div>${aarCountChips(rep.evacuations_by_destination)}</div></div>
       <div class="aar-box"><div class="aar-k">מד״א מול מיון שטח</div><div>${(rep.mda_vs_field||[]).length?(rep.mda_vs_field||[]).map(x=>`<span class="aar-chip">${escAttr(TRIAGE_LABELS[x.field_triage]||x.field_triage)} → ${escAttr(x.mda_classification)}: <b>${x.count}</b></span>`).join(''):'<span class="demo-strip-sub">אין</span>'}</div></div>
@@ -16110,6 +16726,8 @@ function patientsWithPendingLocalEdits(){
 }
 function accessibilityFromServerStatus(access_status){
   if(access_status==='trapped' || access_status==='partial') return {accessibility:'trapped', trapStatus:'trapped'};
+  // "אין גישה" (database/085): rescuers cannot reach the casualty yet.
+  if(access_status==='blocked') return {accessibility:'blocked', trapStatus:'access_blocked'};
   if(access_status==='free') return {accessibility:'full', trapStatus:'not_trapped'};
   return {accessibility:null, trapStatus:null};
 }
@@ -16189,6 +16807,26 @@ function reconcileLocationSync(){
     p._locationSyncRef=ref;
   }
 }
+// ── Access sync (V2.99.80) ──
+// Trapped / not trapped / no access ("אין גישה") recorded in the sweep, the quick paths or later
+// never reached the server: only the full-assessment step sent PATIENT_ACCESS_UPDATED, before the
+// patient existed there. Same pattern as location: whenever the phone's value differs from what
+// was last sent or read, send it, never before the patient exists server-side.
+const ACCESS_SERVER_STATUS={trapped:'trapped', not_trapped:'free', access_blocked:'blocked'};
+function reconcileAccessSync(){
+  if(_demoSandbox || !currentUser || !activeIncident || !TRIAGE_SYNC_ROLES.has(currentUser.role)) return;
+  const outbox=getOutbox();
+  for(const p of patients){
+    const trap=normalizeTrapStatus(p);
+    if(!ACCESS_SERVER_STATUS[trap] || p._accessSyncRef===trap) continue;
+    const known=p._serverVersion!=null || p.sourcedFromRemote
+      || outbox.some(e=>e.patient_id===p.id && PATIENT_CREATE_SYNC_TYPES.has(e.type) && !e.syncRejected);
+    if(!known) continue;
+    saveLocalEvent({type:'PATIENT_ACCESS_UPDATED', detail:`${p.visualId||p.id} · ${TRAP_LABELS[trap]||trap} סונכרן לשרת`, warn:false, patient_id:p.id,
+      payload_json:{trap_status:trap, access_status:ACCESS_SERVER_STATUS[trap], source:'access_sync'}});
+    p._accessSyncRef=trap;
+  }
+}
 async function pullPatientLocations(incidentId){
   if(!currentUser) return;
   const client=getSupabaseClient();
@@ -16229,7 +16867,7 @@ function remotePatientRecord(row){
   const serverTriage=VALID_LOCAL_TRIAGE.has(row.current_triage) ? row.current_triage : null;
   const status=VALID_LOCAL_STATUS.has(row.current_status) ? row.current_status : null;
   return {
-    id:row.id, visualId:row.visual_id, triage:serverTriage, _triageSyncRef:serverTriage, accessibility:access.accessibility, trapStatus:access.trapStatus,
+    id:row.id, visualId:row.visual_id, triage:serverTriage, _triageSyncRef:serverTriage, accessibility:access.accessibility, trapStatus:access.trapStatus, _accessSyncRef:access.trapStatus,
     location:REMOTE_LOCATION_PLACEHOLDER, locDetail:'',
     injury:null, injuryZones:[], patientStatus:status||'identified',
     needsFullAssessment:!!row.needs_full_assessment,
@@ -16288,8 +16926,9 @@ function applyProjectedPatientState(rows){
       if(status) existing.patientStatus=status;
       if(status==='evacuating'){ const sentAt=serverEvacSentAt(row); if(sentAt) existing.evacSentAt=sentAt; }
       if(status==='evacuating' && wasStatus!=='evacuating') noteEvacPointNews(existing, 'sent', existing.evacSentAt);
-      existing.accessibility=access.accessibility;
-      existing.trapStatus=access.trapStatus;
+      // The server's "unknown" never wipes what this phone recorded (before V2.99.80 every pull did,
+      // and the sweep's trapped mark was lost); reconcileAccessSync() sends the phone's value up.
+      if(access.trapStatus){ existing.accessibility=access.accessibility; existing.trapStatus=access.trapStatus; existing._accessSyncRef=access.trapStatus; }
       existing.needsFullAssessment=!!row.needs_full_assessment;
       if(row.last_vitals_at) existing.lastVitalsAt=Date.parse(row.last_vitals_at)||existing.lastVitalsAt;
       // Identity is optional and may be null (never identified, or already purged by
@@ -16379,18 +17018,21 @@ function applyRescuePatientBoard(rows, incidentId){
         lastModifiedAt:new Date().toISOString(), confirmedClinical:true, unsyncedEvents:0, locationHistory:[], possibleDuplicate:false,
         time:'', vitals:{...VITALS_NOT_ON_DEVICE}, vitalsCapture:null, txHistory:[], alert:false, deterioration:[], lastVitalsAt:null,
         vitalsHistory:[], tourniquet:null, medic:'(remote)', siteId:INCIDENT_ID_TO_SITE[incidentId]||'SITE_A', sourcedFromRemote:true,
-        rescuePriority:priority, rescueEvacState:evacState, rescueEvacOrder:order, _serverVersion:row.version,
+        rescuePriority:priority, rescueEvacState:evacState, rescueEvacOrder:order, rescueEvacPointAt:rescueBoardEvacPointAt(row), rescueWasTrapped:rescueBoardWasTrapped(row), _serverVersion:row.version,
         events:[{type:'REMOTE_PATIENT_DISCOVERED',time:nowT(),detail:`${row.visual_id} התקבל מהשרת (תמונה טקטית)`}]
       };
       patients.push(p);
       changed=true;
       continue;
     }
-    const before=JSON.stringify([p.visualId,p.rescuePriority,p.rescueEvacState,p.rescueEvacOrder,p.trapStatus,p.fullName,p.temporaryDescription,p.location,p.locDetail]);
+    const before=JSON.stringify([p.visualId,p.rescuePriority,p.rescueEvacState,p.rescueEvacOrder,p.rescueEvacPointAt,p.trapStatus,p.fullName,p.temporaryDescription,p.location,p.locDetail]);
     if(row.visual_id) p.visualId=row.visual_id;
-    p.rescuePriority=priority; p.rescueEvacState=evacState; p.rescueEvacOrder=order;
+    p.rescuePriority=priority; p.rescueEvacOrder=order;
+    if(rescueBoardWasTrapped(row)!==undefined) p.rescueWasTrapped=rescueBoardWasTrapped(row);
     if(!pending.has(p.id)){
-      if(access.trapStatus){ p.accessibility=access.accessibility; p.trapStatus=access.trapStatus; }
+      // An unsent "חולץ" on this phone keeps its evacuation stage until the server has it.
+      p.rescueEvacState=evacState; p.rescueEvacPointAt=rescueBoardEvacPointAt(row);
+      if(access.trapStatus){ p.accessibility=access.accessibility; p.trapStatus=access.trapStatus; p._accessSyncRef=access.trapStatus; }
       p.fullName=row.optional_name||'לא מזוהה';
       p.identityStatus=row.optional_name?'reported':'unknown';
       p.temporaryDescription=row.identifying_description||'';
@@ -16399,9 +17041,10 @@ function applyRescuePatientBoard(rows, incidentId){
       if(loc.label) p.location=loc.label;
     }
     p._serverVersion=row.version;
-    if(before!==JSON.stringify([p.visualId,p.rescuePriority,p.rescueEvacState,p.rescueEvacOrder,p.trapStatus,p.fullName,p.temporaryDescription,p.location,p.locDetail])) changed=true;
+    if(before!==JSON.stringify([p.visualId,p.rescuePriority,p.rescueEvacState,p.rescueEvacOrder,p.rescueEvacPointAt,p.trapStatus,p.fullName,p.temporaryDescription,p.location,p.locDetail])) changed=true;
   }
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
+  rccCheckEvacTransitions();
 }
 // Active tourniquets from the server (tourniquets table, RLS-scoped by app.can_access_incident).
 // Applied only to patients this device received from another device: a patient created here
@@ -17966,6 +18609,7 @@ function refreshActiveScreenData(){
   else if(screen==='aar') renderAar();
   else if(screen==='kit-templates') renderKitTemplates();
   updateDemoStatus();
+  renderMedicExtractionBanner();
 }
 
 function activeScreenId(){
