@@ -366,10 +366,11 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 6. WP-28, WP-30, WP-31 and WP-33 wait for an owner answer; ask it first in the session.
 7. WP-32 and WP-34 to WP-37 any time.
 
-**Status check 2026-11-20.** `main` is V2.99.81 with `database/088` the highest file. Live (checked read-only 2026-11-20): every file through `088`, `sync-log` v19.
+**Status check 2026-11-20.** `main` is V2.99.81 with `database/088` the highest file. Live (checked read-only 2026-11-20 and 2026-11-21): every file through `088`, `sync-log` v20, `handover-consume` v2.
 
 - Done: WP-19 (#130), WP-20 (#128), WP-22 (#140, 55 rejections closed with reasons, 0 open), WP-23 (#139, `088` live), WP-33 (#137), WP-38 (#132, #135), WP-39 (#138), WP-40 (#142), WP-41 (#143). Outside the WP list: the RCC panel (#141, V2.99.80, `085`-`087` live): "חולץ" by RPC / RCC, a medic check before extracting an unsorted or long-trapped casualty, "בקש חובש לבדיקה"; `085` also does WP-32 step 1 (rescue board tells moving from arrived).
-- Needs a deploy: WP-24 (#133). `083` and `084` are live, but live `sync-log` v19 has no `SUPPLY_REQUEST_CANCELLED` (it was deployed from a file without WP-24), so a CC or chamal cancel is refused as `FORBIDDEN_ACTOR_ROLE`. Fix: redeploy `sync-log` from `main`'s file (v20), which has every change since v18.
+- WP-24 (#133) is live since 2026-11-20 evening: `083`-`084` applied and `sync-log` v20 deployed with `SUPPLY_REQUEST_CANCELLED` (checked in the deployed source; recorded in #144). v19 had been deployed without it for about a day.
+- Needs a deploy: WP-23's change to `handover-consume` (live is still v2), so the MIST summary a receiving unit opens does not follow an edited injury time.
 - Open: WP-25 (#134), conflicts with `main`; its `085`-`086` and V2.99.76 are taken; next free V2.99.82, `089`-`090`; none of it is live. #131 is the superseded first WP-23 PR (#139 replaced it) and can be closed.
 - Not yet seen on a phone: no event has reached the server since 2026-11-18 12:19 UTC, so WP-19 (stock ledger still 0 rows), WP-23, WP-24, WP-38, WP-40, WP-41 and the RCC panel have only run in browser tests and rolled-back SQL. That check is WP-21.
 8. WP-38 after WP-19 (owner 2026-11-18); WP-24 touches the same flow.
@@ -766,8 +767,8 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-21 Live two-phone run | P1 | Not started | | WP-0 part 2 plus WP-17/18/19, D1 offline, WP-10 install, T6 |
 | WP-22 Open sync rejections | P2 | Done 2026-11-19: 55 closed with reasons (8 test data, 47 not recoverable), 0 open, rows kept | #140 | all in closed incidents, so admin only; stored copies removed by the nightly privacy job |
 | WP-23 Injury time editable | P2 | Done (V2.99.81, `database/088`): 088 live (checked 2026-11-20), `sync-log` already allowed `PATIENT_T_INJURY_UPDATED` | #139 | owner 2026-10-23 and 2026-11-18: CC may not edit; watchdog rows, MIST and stored report follow the injury time; newest entry by phone time wins; `handover-consume` change not deployed |
-| WP-24 Command cancels a resupply request | P2 | Client done (V2.99.75); `database/083` + `084` live (checked 2026-11-20); live `sync-log` v19 lacks `SUPPLY_REQUEST_CANCELLED`, so a CC / chamal cancel is refused live until `sync-log` is redeployed from `main`'s file | #133 | rescoped 2026-11-18: CC holds no stock, so no "fulfilled by company"; medic's escalation stays with the PC; cancel with a reason (cc/chamal/admin while open, PC before escalation); direct writes to `supply_requests` closed |
-| WP-25 Medic incident type + mismatch | P2 | PR #134 open, not live; must renumber (its `085`-`086` and V2.99.76 are taken; next free V2.99.82, `089`-`090`) | #134 | owner 2026-10-23 (WP-8 follow-up) |
+| WP-24 Command cancels a resupply request | P2 | Done (V2.99.75): `083` + `084` live, `sync-log` v20 with `SUPPLY_REQUEST_CANCELLED` deployed 2026-11-20 (checked in the deployed source 2026-11-21); two-phone check pending | #133 | rescoped 2026-11-18: CC holds no stock, so no "fulfilled by company"; medic's escalation stays with the PC; cancel with a reason (cc/chamal/admin while open, PC before escalation); direct writes to `supply_requests` closed |
+| WP-25 Medic incident type + mismatch | P2 | PR #134 open, renumbered to V2.99.82, `089`-`090`, merges clean with `main`; not live | #134 | owner 2026-10-23 (WP-8 follow-up) |
 | WP-26 PC deterioration review | P2 | Not started | | owner 2026-10-23 (WP-5 `known_gaps`) |
 | WP-27 CC moves a site to another platoon | P2 | Not started, 1 design question | | owner 2026-10-23 (WP-7 remainder); RLS |
 | WP-28 27 never-sent event types | P2 | Waiting on owner's list | | |
