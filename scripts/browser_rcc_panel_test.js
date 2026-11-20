@@ -48,7 +48,7 @@ function newServer() {
   return {
     incidents: [
       { id: INC1, visual_id: 'INC-1', status: 'active', location_name: 'רחוב הרצל', address: null, incident_type: 'missile_strike_structural_collapse', t_zero: null, opened_at: new Date().toISOString(), patient_count: 3, is_member: false, platoon_id: PLT1 },
-      { id: INC2, visual_id: 'INC-2', status: 'active', location_name: 'צומת גומא', address: null, incident_type: 'vehicle_accident', t_zero: null, opened_at: new Date().toISOString(), patient_count: 2, is_member: false, platoon_id: PLT2 },
+      { id: INC2, visual_id: 'INC-2', status: 'active', location_name: 'צומת גומא', address: null, incident_type: 'vehicle_accident', incident_types: ['vehicle_accident', 'explosion'], t_zero: null, opened_at: new Date().toISOString(), patient_count: 2, is_member: false, platoon_id: PLT2 },
     ],
     boards: {
       [INC1]: [
@@ -343,7 +343,7 @@ async function checkSignedIn(browser, rel, file) {
     key: tr.dataset.rccIncidentRow, sub: document.querySelector(`[data-rcc-incident-detail="${tr.dataset.rccIncidentRow}"] .rcc-row-sub`).textContent, cells: [...tr.querySelectorAll('td')].map((td) => td.textContent.trim()) })));
   assert(rows[0].key === INC1 && JSON.stringify(rows[0].cells) === '["1","0","0","1","0","1","3"]', `${rel}: INC-1 counts from the rescue board (got ${JSON.stringify(rows[0])})`);
   assert(rows[0].sub.includes('מבנה: לא יציב') && rows[0].sub.includes('T0 לפני'), `${rel}: building status and T0 from incident_site_authority (got ${rows[0].sub})`);
-  assert(JSON.stringify(rows[1].cells) === '["0","0","0","2","0","0","2"]' && rows[1].sub.includes('תאונת דרכים'), `${rel}: INC-2 row (got ${JSON.stringify(rows[1])})`);
+  assert(JSON.stringify(rows[1].cells) === '["0","0","0","2","0","0","2"]' && rows[1].sub.includes('תאונת דרכים + פיצוץ'), `${rel}: INC-2 row shows both of its types (database/092; got ${JSON.stringify(rows[1])})`);
   // Trapped since T0 unless recorded otherwise (owner 2026-11-19); INC-1's official T0 is 30 min old.
   const trap = await page.evaluate((id) => { const el = document.querySelector(`[data-rcc-incident-detail="${id}"] [data-rcc-trapped-since]`); return el && { since: el.dataset.rccTrappedSince, oldest: el.dataset.rccTrappedOldest, text: el.textContent }; }, INC1);
   assert(trap && trap.since === '30' && trap.oldest === '0' && trap.text.includes('(מ-T0)'), `${rel}: trapped time from T0 and oldest trapped update (got ${JSON.stringify(trap)})`);

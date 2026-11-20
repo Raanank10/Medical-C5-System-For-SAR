@@ -1033,7 +1033,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9982</div>
+      <div class="demo-kicker">Demo V2.9983</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1130,7 +1130,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9982</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9983</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1140,7 +1140,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9982</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9983</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3467,7 +3467,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.82';
+const APP_VERSION = '2.99.83';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -6141,6 +6141,16 @@ function rescueConfirmSiteClear(role, siteId=rescueActiveSiteId){
   renderRoleDashboard(role);
   toast('האתר הוכרז נקי · חוג"ד ומ״פ רפואה יראו עדכון');
 }
+// Every type of an incident row from the server (list_open_incidents, the stored report): the
+// incident_types list since database/090/092, else the single incident_type an older server or an
+// older stored report carries. '' when none.
+function incidentTypesFromRow(row){
+  const list=Array.isArray(row?.incident_types)&&row.incident_types.length ? row.incident_types : (row?.incident_type?[row.incident_type]:[]);
+  return list.filter((t,i)=>list.indexOf(t)===i);
+}
+function incidentTypesRowLabel(row){
+  return incidentTypesFromRow(row).map(t=>INCIDENT_TYPE_LABELS[t]||t).join(' + ');
+}
 function incidentTypeLabel(siteId=rescueActiveSiteId){
   const s=ensureSiteStatusFields(siteId);
   if(!s.incidentTypes.length) return siteHasBuildingCollapse(siteId)?'לא נבחר · קריסת מבנה':'לא נבחר';
@@ -8497,7 +8507,7 @@ function rccIncidentRows(){
     const a=mine?ensureSiteStatusFields('SITE_A'):null;
     const board=_rescueIncidentBoards[inc.id];
     return {key:inc.id, name:incidentDisplayName(inc),
-      typeLabel:mine?incidentTypeLabel('SITE_A'):(INCIDENT_TYPE_LABELS[inc.incident_type]||'לא נבחר'),
+      typeLabel:mine?incidentTypeLabel('SITE_A'):(incidentTypesRowLabel(inc)||'לא נבחר'),
       building:mine?a.buildingStatus:(BUILDING_STATUS_LABELS[auth.building_status]?auth.building_status:null),
       t0:mine?(a.t0||inc.t_zero):(auth.official_t0||inc.t_zero||null),
       openedAt:inc.opened_at||null,
@@ -16235,7 +16245,7 @@ function clearWorkingSiteData(){
 async function activateIncident(inc){
   if(!inc || !currentUser) return;
   const prev=activeIncident?.id===inc.id ? activeIncident : null;
-  activeIncident={id:inc.id, visual_id:inc.visual_id, status:inc.status, location_name:inc.location_name, address:inc.address||'', incident_type:inc.incident_type||null, draft_resolution:inc.draft_resolution||null,
+  activeIncident={id:inc.id, visual_id:inc.visual_id, status:inc.status, location_name:inc.location_name, address:inc.address||'', incident_type:inc.incident_type||null, incident_types:incidentTypesFromRow(inc), draft_resolution:inc.draft_resolution||null,
     opened_by:inc.opened_by!==undefined?inc.opened_by:(prev?prev.opened_by:undefined), false_alarm:!!(inc.false_alarm||prev?.false_alarm),
     t_zero:inc.t_zero||prev?.t_zero||null}; // the alert time, injury time's default (WP-23)
   if(_workingIncidentId!==inc.id){ resetWorkingStateForIncident(inc); _workingIncidentId=inc.id; }
@@ -16322,7 +16332,7 @@ function renderIncidentPicker(){
       const enterLabel=isCurrent?'המשך באירוע':(inc.is_member||hasBlanketIncidentAccess())?'כניסה':'הצטרף לאירוע';
       return `<div class="incident-card ${inc.status==='draft'?'draft':''}">
         <div class="incident-card-head"><strong>${escAttr(inc.visual_id||'')} · ${escAttr(inc.location_name||'')}</strong><span class="incident-status-badge ${escAttr(inc.status)}">${escAttr(SERVER_INCIDENT_STATUS_LABELS[inc.status]||inc.status)}</span></div>
-        <div class="incident-card-meta">${inc.address?escAttr(inc.address)+' · ':''}${inc.incident_type?escAttr(INCIDENT_TYPE_LABELS[inc.incident_type]||inc.incident_type)+' · ':''}נפתח ${inc.opened_at?new Date(inc.opened_at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):''}${inc.opened_by_name?' ע״י '+escAttr(inc.opened_by_name):''} · ${inc.patient_count||0} פצועים${counts}</div>
+        <div class="incident-card-meta">${inc.address?escAttr(inc.address)+' · ':''}${incidentTypesRowLabel(inc)?`<span data-incident-card-types>${escAttr(incidentTypesRowLabel(inc))}</span> · `:''}נפתח ${inc.opened_at?new Date(inc.opened_at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):''}${inc.opened_by_name?' ע״י '+escAttr(inc.opened_by_name):''} · ${inc.patient_count||0} פצועים${counts}</div>
         <div class="incident-card-actions"><button onclick="enterIncidentFromPicker('${escAttr(inc.id)}')">${enterLabel}</button>${canMergeIncidents() && ['active','staging'].includes(inc.status) && _openIncidents.length>1 ? `<button onclick="toggleIncidentMergePanel('${escAttr(inc.id)}')">מיזוג כפילות</button>`:''}</div>
         ${_mergePanelFor===inc.id && canMergeIncidents() ? incidentMergePanelHtml(inc) : ''}
       </div>`;
@@ -16592,7 +16602,7 @@ function renderIncidentReport(){
     : `<div class="aar-box" id="aar-golden-hour"><div class="aar-k">שעת זהב · מפציעה עד מסירה</div><div class="demo-strip-sub">לא נכלל בגרסה זו של הדוח</div></div>`;
   const rows=(rep.patient_rows||[]).map(r=>`<tr><td>${escAttr(r.visual_id||'')}</td><td>${escAttr(TRIAGE_LABELS[r.triage]||r.triage||'')}</td><td>${escAttr(AAR_STATUS_LABELS[r.status]||r.status||'')}</td><td>${r.minutes_from_open??'—'}</td><td>${r.minutes_to_handover??'—'}</td><td>${ghCell(r)}</td><td>${escAttr(r.evacuation_destination||'—')}</td><td>${escAttr(r.mda_classification||'—')}</td><td>${r.tourniquets||0}</td></tr>`).join('');
   el.innerHTML=`
-    <div class="aar-head"><div><strong>${escAttr(inc.visual_id||'')} · ${escAttr(inc.location_name||'')}</strong><div class="demo-strip-sub">נפתח ${fmt(inc.opened_at)} · נסגר ${fmt(inc.closed_at)} · ${inc.duration_minutes??'—'} דקות${inc.false_alarm?' · אזעקת שווא':''}${inc.closed_with_override?' · נסגר בעקיפה':''}</div></div><div>${versionPicker}</div></div>
+    <div class="aar-head"><div><strong>${escAttr(inc.visual_id||'')} · ${escAttr(inc.location_name||'')}</strong>${incidentTypesRowLabel(inc)?`<div class="demo-strip-sub" data-aar-incident-types>סוג אירוע: ${escAttr(incidentTypesRowLabel(inc))}</div>`:''}<div class="demo-strip-sub">נפתח ${fmt(inc.opened_at)} · נסגר ${fmt(inc.closed_at)} · ${inc.duration_minutes??'—'} דקות${inc.false_alarm?' · אזעקת שווא':''}${inc.closed_with_override?' · נסגר בעקיפה':''}</div></div><div>${versionPicker}</div></div>
     ${late>0?`<div class="aar-warn">${late} רשומות הגיעו לשרת אחרי הסגירה ואינן בדוח זה. פתיחה וסגירה מחדש של האירוע תשמור גרסה מלאה.</div>`:''}
     <div class="aar-note">דוח סטטיסטי בלבד: ללא שמות וללא פרטים מזהים. פצועים מוצגים לפי מספר זמני.</div>
     <div class="aar-grid">
