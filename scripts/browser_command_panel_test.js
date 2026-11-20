@@ -303,6 +303,8 @@ async function checkFile(browser, file) {
         { id: 'pa2', incident_id: 'inc-a', visual_id: 'P002-AA', current_triage: 'red', current_status: 'handed_over', access_status: 'free', last_vitals_at: ago(50), created_at: ago(60) },
         // red, sent to the evacuation point, waiting for a vehicle: still the platoon's, one alert (WP-33)
         { id: 'pc1', incident_id: 'inc-c', visual_id: 'P001-CC', current_triage: 'red', current_status: 'evacuating', access_status: 'free', last_vitals_at: ago(4), created_at: ago(30) },
+        // WP-40: sent to the נאפ״ל 65 minutes ago (status_recorded_at), still waiting: critical
+        { id: 'pc2', incident_id: 'inc-c', visual_id: 'P002-CC', current_triage: 'green', current_status: 'evacuating', status_recorded_at: ago(65), access_status: 'free', last_vitals_at: ago(4), created_at: ago(60) },
       ],
       tourniquets: [{ id: 't1', incident_id: 'inc-b', patient_id: 'pb2', limb: 'right_leg', applied_at: ago(125), is_active: true, tourniquet_status: null }],
       watchdog_alerts: [
@@ -356,17 +358,17 @@ async function checkFile(browser, file) {
   assert(lines.mode && lines.patientsLeft === 0, `${rel}: overview alert data never enters the working set (patients ${lines.patientsLeft})`);
   assert(!/optional_name|identifying_description/.test(lines.selected.patients || ''), `${rel}: the overview patient read carries no name or identifying description (got ${lines.selected.patients})`);
   // The strip: one line per incident with alerts, the critical one first, then by how many.
-  assert(lines.strip.map((l) => l.id).join() === 'INC-2,INC-1,INC-3' && !lines.more, `${rel}: one line per incident, worst first, no "+N" (got ${JSON.stringify(lines.strip)})`);
-  const [lb, la, lc] = lines.strip;
+  assert(lines.strip.map((l) => l.id).join() === 'INC-2,INC-3,INC-1' && !lines.more, `${rel}: one line per incident, worst first, then by count, no "+N" (got ${JSON.stringify(lines.strip)})`);
+  const [lb, lc, la] = lines.strip;
   assert(lb.title.includes('אתר ב') && lb.title.includes('4 התראות') && lb.sub.includes('חסם עורקים') && lb.sub.includes('(+3)') && lb.onclick === "enterIncidentFromPicker('inc-b')",
     `${rel}: INC-2 line: location, 4 alerts, the critical tourniquet first, (+3), opens the incident (got ${JSON.stringify(lb)})`);
   assert(la.title.includes('2 התראות') && la.onclick === "enterIncidentFromPicker('inc-a')", `${rel}: INC-1 line: the red patient and the reinforcement request (got ${JSON.stringify(la)})`);
-  assert(lc.title.includes('התראה אחת') && lc.sub.includes('פצוע אדום') && lc.sub.includes('P001-CC') && !lc.sub.includes('(+'),
-    `${rel}: INC-3: a red patient waiting at the evacuation point still counts, one alert (got ${JSON.stringify(lc)})`);
+  assert(lc.title.includes('2 התראות') && lc.sub.includes('ממתין לפינוי 65') && lc.sub.includes('P002-CC') && lc.sub.includes('(+1)'),
+    `${rel}: INC-3: the 65-minute wait from the server's send time is its worst alert (WP-40); the red patient at the evacuation point is the +1 (got ${JSON.stringify(lc)})`);
   assert(lines.strip.every((l) => !l.ack), `${rel}: no line in the all-incidents view offers "בטיפול"`);
   // Behind the lines, the same per-patient alerts as inside an incident.
   const ids = lines.groups.map((g) => g.id);
-  ['P001-AA', 'P001-BB', 'P002-BB', 'P003-BB', 'P001-CC'].forEach((v) => assert(ids.includes(v), `${rel}: ${v} has alerts (got ${ids})`));
+  ['P001-AA', 'P001-BB', 'P002-BB', 'P003-BB', 'P001-CC', 'P002-CC'].forEach((v) => assert(ids.includes(v), `${rel}: ${v} has alerts (got ${ids})`));
   assert(!ids.includes('P004-BB'), `${rel}: a handed-over green patient raises no CC alert`);
   assert(!ids.includes('P002-AA'), `${rel}: a red patient already taken by a vehicle raises no alert (got ${ids})`);
   const byId = (v) => lines.groups.find((g) => g.id === v);
@@ -378,8 +380,42 @@ async function checkFile(browser, file) {
   const site = lines.groups.filter((g) => g.id === 'מוקד');
   assert(site.length === 2 && site.some((g) => g.titles.includes('בקשת תגבור') && g.inc === 'INC-1') && site.some((g) => g.titles.includes('נדרש תגבור פלוגתי') && g.inc === 'INC-2'),
     `${rel}: the open reinforcement request and the company-level supply escalation count, the resolved request and the PC-level supply request do not (got ${JSON.stringify(site)})`);
-  assert(lines.afterFailedTq.includes('P002-BB') && lines.afterFailedTq.length === 7, `${rel}: a failed tourniquet read keeps the last tourniquets, the alert stays (got ${lines.afterFailedTq})`);
+  assert(lines.afterFailedTq.includes('P002-BB') && lines.afterFailedTq.length === 8, `${rel}: a failed tourniquet read keeps the last tourniquets, the alert stays (got ${lines.afterFailedTq})`);
   assert(lines.source.includes('לפי נתוני השרת') && lines.source.includes('טרם נשלח'), `${rel}: the strip says the lines come from the server and miss what the field has not sent (got ${lines.source})`);
+
+  // 14. WP-40 (owner 2026-11-19): a patient still waiting for a vehicle 30 / 60 minutes after leaving
+  // for the נאפ״ל alerts PC and CC, counted from the send (not the arrival), every colour except black.
+  const wait = await page.evaluate(() => {
+    const now = Date.now(), min = (m) => now - m * 60000;
+    const base = { events: [], location: 'בניין 3', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', trapStatus: 'not_trapped', vitals: {}, lastVitalsAt: now - 60000, patientStatus: 'evacuating' };
+    const added = [
+      { ...base, id: 'w-29', visualId: 'W029', triage: 'yellow', evacSentAt: min(29) },
+      { ...base, id: 'w-35', visualId: 'W035', triage: 'green', evacSentAt: min(35), evacPointArrivedAt: min(20) },
+      { ...base, id: 'w-65', visualId: 'W065', triage: 'yellow', evacSentAt: min(65) },
+      { ...base, id: 'w-blk', visualId: 'W099', triage: 'black', evacSentAt: min(90) },
+      { ...base, id: 'w-done', visualId: 'W100', triage: 'green', evacSentAt: min(90), patientStatus: 'handed_over' },
+    ];
+    patients.push(...added);
+    const pick = (role) => roleAlertRows(role).filter((a) => a.type === 'EVAC_POINT_WAIT_LONG').map((a) => ({ id: a.patientId, severity: a.severity, title: a.title, detail: a.detail }));
+    const out = { pc: pick('pc'), cc: pick('cc'), medic: pick('medic') };
+    // Sending a patient records the time; the server's status_recorded_at gives other phones the same.
+    patients.push({ ...base, id: 'w-send', visualId: 'W200', triage: 'red', patientStatus: 'stabilizing' });
+    markPatientAtCollectionPoint('w-send');
+    out.localSent = Math.abs((patients.find((p) => p.id === 'w-send').evacSentAt || 0) - Date.now()) < 5000;
+    const rowAt = new Date(min(40)).toISOString();
+    out.remoteSent = remotePatientRecord({ id: 'w-r', incident_id: 'x', visual_id: 'W300', current_triage: 'red', current_status: 'evacuating', status_recorded_at: rowAt, access_status: 'free' }).evacSentAt === Date.parse(rowAt);
+    out.remoteNotEvac = remotePatientRecord({ id: 'w-r2', incident_id: 'x', visual_id: 'W301', current_triage: 'red', current_status: 'stabilizing', status_recorded_at: rowAt, access_status: 'free' }).evacSentAt === null;
+    patients.splice(0, patients.length, ...patients.filter((p) => !String(p.id).startsWith('w-')));
+    return out;
+  });
+  const waitIds = (list) => list.map((a) => a.id).sort().join();
+  assert(waitIds(wait.pc) === 'w-35,w-65' && waitIds(wait.cc) === 'w-35,w-65', `${rel}: PC and CC get the wait alert from 30 minutes, not at 29, not for black or a patient a vehicle took (pc ${JSON.stringify(wait.pc)}, cc ${waitIds(wait.cc)})`);
+  assert(!wait.medic.length, `${rel}: the wait alert is for PC and CC, not the medic`);
+  const w35 = wait.pc.find((a) => a.id === 'w-35'), w65 = wait.pc.find((a) => a.id === 'w-65');
+  assert(w35.severity === 'high' && w65.severity === 'critical', `${rel}: 30 minutes warns, 60 is critical (got ${w35.severity} / ${w65.severity})`);
+  assert(w35.title.includes('35') && w35.detail.includes('בנאפ״ל') && w35.detail.includes('20 דק׳ מההגעה'), `${rel}: counted from the send (35), arrival shown beside it (got ${JSON.stringify(w35)})`);
+  assert(w65.detail.includes('לא סומנה הגעה'), `${rel}: a patient never marked as arrived is caught too (got ${JSON.stringify(w65)})`);
+  assert(wait.localSent && wait.remoteSent && wait.remoteNotEvac, `${rel}: the send time comes from this phone and, for other phones, from the server's status_recorded_at (${JSON.stringify(wait)})`);
 
   assert(!errors.length, `${rel}: page errors: ${errors.join(' | ')}`);
   await context.close();

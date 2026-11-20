@@ -1001,7 +1001,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9977</div>
+      <div class="demo-kicker">Demo V2.9978</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1098,7 +1098,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9977</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9978</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1108,7 +1108,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9977</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9978</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3266,6 +3266,22 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   // sorted (pending / unknown) is its own value and is never shown as not urgent. The server
   // computes the same in get_rescue_patient_board().
   const RESCUE_PRIORITIES = ["urgent", "pending", "not_urgent"];
+  // Waiting for a vehicle after leaving for the נאפ״ל (WP-40, owner 2026-11-19): counted from when the
+  // patient was sent there, not from the recorded arrival, so a patient nobody marked as arrived
+  // is caught too. Every colour except black; 30 minutes warns, 60 minutes is critical. Only while
+  // the status is still "evacuating": once a vehicle takes the patient the clock is gone.
+  const EVAC_POINT_WAIT_WARN_MS = 30 * 60 * 1000;
+  const EVAC_POINT_WAIT_CRITICAL_MS = 60 * 60 * 1000;
+
+  function evacPointWaitAlert(patient, nowMs = Date.now()) {
+    if (!patient || patient.patientStatus !== "evacuating" || patient.triage === "black") return null;
+    const sentAt = Number(patient.evacSentAt);
+    if (!Number.isFinite(sentAt) || sentAt <= 0) return null;
+    const ms = nowMs - sentAt;
+    if (ms < EVAC_POINT_WAIT_WARN_MS) return null;
+    return { level: ms >= EVAC_POINT_WAIT_CRITICAL_MS ? "critical" : "warning", minutes: Math.floor(ms / 60000) };
+  }
+
   function rescueEvacPriority(triage, tourniquetActive) {
     if (triage === "red" || tourniquetActive === true) return "urgent";
     if (triage === "yellow" || triage === "green" || triage === "black") return "not_urgent";
@@ -3298,6 +3314,9 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     computeMstartTriage,
     detectDeterioration,
     elapsedMinutes,
+    EVAC_POINT_WAIT_CRITICAL_MS,
+    EVAC_POINT_WAIT_WARN_MS,
+    evacPointWaitAlert,
     isCriticalAlert,
     isDeviceSilent,
     isFinalPatientStatus,
@@ -3400,7 +3419,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.77';
+const APP_VERSION = '2.99.78';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -9934,6 +9953,12 @@ function patientAlertObjects(pts){
     if(p.triage==='red' && !['evacuating','evacuated','handed_over'].includes(p.patientStatus)){
       pushAlert(alerts,{...base,id:`evac-${p.id}`,type:'RED_WITHOUT_EVAC_STATUS',severity:'high',owner:'pc',audience:['pc','cc'],escalatesTo:'cc',escalateAfterMin:5,actionRequired:'request_evac',scope:'patient',category:'evac',title:`${p.visualId||p.id} — אדום ללא סטטוס פינוי`,detail:'נדרש תעדוף / הקצאת פינוי או אישור עיכוב'});
     }
+    // WP-40 (owner 2026-11-19): still waiting for a vehicle 30 / 60 minutes after leaving for the נאפ״ל.
+    const evacWait=C5Rules.evacPointWaitAlert(p);
+    if(evacWait){
+      const crit=evacWait.level==='critical';
+      pushAlert(alerts,{...base,id:`evac-wait-${p.id}`,type:'EVAC_POINT_WAIT_LONG',severity:crit?'critical':'high',owner:'pc',audience:['pc','cc'],escalatesTo:'cc',escalateAfterMin:crit?0:10,actionRequired:'request_evac',scope:'patient',category:'evac',title:`${p.visualId||p.id} — ממתין לפינוי ${evacWait.minutes} דק׳`,detail:isAtEvacPoint(p)?`בנאפ״ל · ${evacPointWaitMinutes(p)} דק׳ מההגעה · ${evacWait.minutes} דק׳ מהיציאה`:`יצא לנאפ״ל לפני ${evacWait.minutes} דק׳ · לא סומנה הגעה`});
+    }
     if(isVitalsOverdue(p)){
       pushAlert(alerts,{...base,id:`vitals-${p.id}`,type:redOrYellow?'STALE_VITALS_PRIORITY':'STALE_VITALS_GREEN',severity:redOrYellow?'high':'medium',owner:'medic',audience:redOrYellow?['medic','pc']:['medic'],escalatesTo:redOrYellow?'pc':null,escalateAfterMin:redOrYellow?5:null,actionRequired:'update_vitals',scope:'patient',category:redOrYellow?'data':'complete',title:`${p.visualId||p.id} — מדדים באיחור`,detail:`עדכון אחרון: ${timeAgoLabel(p.lastVitalsAt||patientClockStart(p))}`});
     }
@@ -11216,6 +11241,7 @@ function markPatientAtCollectionPoint(id){
   p.patientStatus='evacuating';
   // A new trip to the evacuation point: an arrival from an earlier one no longer applies (WP-18).
   p.evacPointArrivedAt=null; p.evacPointArrivedRole=null;
+  p.evacSentAt=Date.now(); // the 30/60-minute wait alert counts from here (WP-40)
   p.lastTouchedBy=getDeviceId();
   p.lastModifiedAt=new Date().toISOString();
   p.unsyncedEvents=(p.unsyncedEvents||0)+1;
@@ -14331,7 +14357,8 @@ function openEvacuationLabel(split){ return `${split.onScene.length} באתר ה
 // both "the rescuers are moving the patient to the evacuation point" and "arrived, waiting for
 // MDA"; arrival is its own event, PATIENT_EVAC_POINT_ARRIVED, recorded by any medic, paramedic,
 // physician or PC of the site, with the phone's time. Only an evacuating patient counts as
-// arrived. Waiting time is shown, never alerted on (owner: no threshold yet).
+// arrived. Waiting since the patient was sent alerts PC and CC at 30 / 60 minutes (WP-40,
+// C5Rules.evacPointWaitAlert); the minutes since arrival are shown beside it.
 const EVAC_POINT_ARRIVAL_ROLES=new Set(['medic','paramedic','physician','pc','admin']);
 const EVAC_POINT_ROLE_NAMES={medic:'חובש', paramedic:'פראמדיק', physician:'רופא', pc:'חוג״ד', admin:'מנהל מערכת'};
 function canMarkEvacPointArrival(p){
@@ -15005,7 +15032,7 @@ function addTriageCount(counts, triage){
   counts.total++;
 }
 // No name or identifying description: the overview needs triage, status, trapped and timing only.
-const OVERVIEW_PATIENT_COLUMNS='id,incident_id,visual_id,current_triage,current_status,access_status,needs_full_assessment,last_vitals_at,created_at';
+const OVERVIEW_PATIENT_COLUMNS='id,incident_id,visual_id,current_triage,current_status,status_recorded_at,access_status,needs_full_assessment,last_vitals_at,created_at';
 async function pullAllIncidentTriage(client){
   const ids=_openIncidents.map(i=>i.id);
   if(!ids.length){ _allIncidentTriage={}; _allIncidentTriageAt=Date.now(); _allIncidentAlertData={}; _allIncidentAlertsAt=Date.now(); return; }
@@ -15988,7 +16015,7 @@ setInterval(()=>{ if(currentUser) syncPullAll(); }, 45000);
 // so this stays a thin read + merge, not a second projector.
 // A patient with any unsynced local outbox entry is left untouched this round: the medic's own
 // in-flight edit wins locally until it's actually pushed, rather than being clobbered mid-edit.
-const PROJECTED_PATIENT_COLUMNS = 'id,incident_id,visual_id,current_triage,current_status,access_status,needs_full_assessment,is_pediatric,pediatric_age_years,last_vitals_at,version,optional_name,identifying_description,physician_death_confirmed_at,physician_death_confirmed_by';
+const PROJECTED_PATIENT_COLUMNS = 'id,incident_id,visual_id,current_triage,current_status,status_recorded_at,access_status,needs_full_assessment,is_pediatric,pediatric_age_years,last_vitals_at,version,optional_name,identifying_description,physician_death_confirmed_at,physician_death_confirmed_by';
 const VALID_LOCAL_TRIAGE = new Set(['red','yellow','green','black','pending']);
 const VALID_LOCAL_STATUS = new Set(['identified','stabilizing','observing','evacuating','handed_over','closed','self_evacuated','deceased']);
 
@@ -16103,6 +16130,13 @@ async function pullPatientLocations(incidentId){
   }
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
+// When the patient was sent to the נאפ״ל, from the server: status_recorded_at is the phone time of
+// the status event (database/013), so while the status is "evacuating" it is the send time (WP-40).
+function serverEvacSentAt(row){
+  if(row?.current_status!=='evacuating' || !row.status_recorded_at) return null;
+  const t=Date.parse(row.status_recorded_at);
+  return Number.isFinite(t) ? t : null;
+}
 // A patient another device created, built from its server row (PROJECTED_PATIENT_COLUMNS, or the
 // smaller OVERVIEW_PATIENT_COLUMNS of the CC all-incidents view).
 function remotePatientRecord(row){
@@ -16126,6 +16160,7 @@ function remotePatientRecord(row){
     _serverVersion:row.version, sourcedFromRemote:true,
     physicianDeathConfirmedAt:row.physician_death_confirmed_at?Date.parse(row.physician_death_confirmed_at):null,
     physicianDeathConfirmedBy:row.physician_death_confirmed_by||null,
+    evacSentAt:serverEvacSentAt(row),
     events:[{type:'REMOTE_PATIENT_DISCOVERED',time:nowT(),detail:`${row.visual_id} התקבל ממכשיר אחר (סנכרון)`}]
   };
 }
@@ -16165,6 +16200,7 @@ function applyProjectedPatientState(rows){
       if(serverTriage && serverTriage!=='pending'){ existing.triage=serverTriage; existing._triageSyncRef=serverTriage; }
       else if(!existing.triage || existing.triage==='pending'){ existing.triage=serverTriage; }
       if(status) existing.patientStatus=status;
+      if(status==='evacuating'){ const sentAt=serverEvacSentAt(row); if(sentAt) existing.evacSentAt=sentAt; }
       existing.accessibility=access.accessibility;
       existing.trapStatus=access.trapStatus;
       existing.needsFullAssessment=!!row.needs_full_assessment;

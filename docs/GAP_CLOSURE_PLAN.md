@@ -390,8 +390,8 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 | WP-37 | External report unlink tombstone | P3 | - |
 | WP-38 | A resupply delivered to a medic raises the bag | P2 | one design question |
 | WP-39 | The evacuation point is called נאפ"ל | P2 | - (decided 2026-11-18) |
-| WP-40 | 30 minutes waiting at the נאפ"ל alerts PC and CC | P2 | patients, start time (proposed) |
-| WP-41 | Platoon medics see a patient sent to the נאפ"ל | P2 | trigger, recipients (proposed) |
+| WP-40 | 30 minutes waiting at the נאפ"ל alerts PC and CC | P2 | - (decided 2026-11-19) |
+| WP-41 | Medical staff see a patient sent to / arriving at the נאפ"ל | P2 | - (decided 2026-11-19) |
 
 ---
 
@@ -675,27 +675,21 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 
 ---
 
-### WP-40: 30 minutes waiting at the נאפ"ל alerts the PC and CC (P2, owner 2026-11-18)
+### WP-40: 30 minutes waiting at the נאפ"ל alerts the PC and CC (P2, owner 2026-11-18/19)
 
-**Why.** WP-18 showed the waiting time at the evacuation point without an alert, until the owner set a threshold. Threshold set: 30 minutes, seen by the PC and the CC (inside the incident and on the CC's all-incidents page).
+**Why.** WP-18 showed the waiting time at the evacuation point without an alert, until the owner set a threshold. Owner, 2026-11-18: 30 minutes, seen by the PC and the CC. Owner, 2026-11-19: every colour except black; counted from when the patient was sent to the נאפ"ל, not from the recorded arrival ("it will catch most patients that should go to hospital", including one nobody marked as arrived); two levels.
 
-**Proposed, not yet confirmed by the owner:** every colour except black; counted from the recorded arrival (`evac_point_arrived_at`), as the waiting time shown today; one alert at 30 minutes, no second level. Ask before building if still open.
-
-**Steps.** The threshold and the check in `src/domain/rules.js` (with tests), an alert type in the alert pipeline for PC and CC, its tab mapping, `event-contract.json` if it is an alert type there; the CC overview computes it from the server rows it already reads (`evac_point_arrived_at` from `database/077`). No server watchdog change.
-
-**Verify.** Domain tests; `scripts/browser_evac_point_arrival_test.js` with a fake clock (29 min nothing, 30 min the alert on PC and CC, gone once evacuated).
+**Done (V2.99.78), no SQL.** `evacPointWaitAlert` in `src/domain/rules.js` (30 min warning, 60 min critical, only while `evacuating`, never black) with domain tests. The phone records `evacSentAt` on "יצא לנאפ״ל"; other phones read the send time from `patients.status_recorded_at` (set from the status event's phone time by `database/013`), added to the patient pulls and the CC overview read. Alert `EVAC_POINT_WAIT_LONG` for PC and CC, tab פעולה, listed under `not_events` in `event-contract.json`; its line shows minutes since leaving and, when marked, since arrival. `scripts/browser_command_panel_test.js` step 14 and the overview step. Known limit: `status_recorded_at` moves if another status event for the patient arrives while evacuating (none of today's flows send one).
 
 ---
 
-### WP-41: Platoon medics see a patient sent to the נאפ"ל (P2, owner 2026-11-18)
+### WP-41: Medical staff see a patient sent to and arriving at the נאפ"ל (P2, owner 2026-11-18/19)
 
-**Why.** Owner: every medic of the platoon should know a patient is on the way to the נאפ"ל, as a banner that closes after 15 seconds or on a tap.
+**Why.** Owner, 2026-11-18: the platoon's medical staff should know a patient is going to the נאפ"ל, as a banner that closes after 15 seconds or on a tap. Owner, 2026-11-19: both when the patient is sent and when they arrive; every medical role (medic, paramedic, physician); the banner offers "open the patient" or "close".
 
-**Proposed, not yet confirmed by the owner:** fires when a patient is sent (status `evacuating`), not on arrival; every medic of the incident except the phone that sent the patient; content "P004 · אדום · בדרך לנאפ"ל · מקומה 2"; several patients in one pull become one banner ("3 פצועים בדרך לנאפ"ל"); a tap only closes it. Phones learn it from the 45-second pull, so up to about a minute late, and an offline phone after it reconnects. Ask before building if still open.
+**Steps.** Detect, in the pull, a patient newly `evacuating` and a newly recorded arrival, once each per patient; skip the phone that recorded it; a banner like the tourniquet one with two buttons, 15-second timer; several patients in one pull become one banner. Phones learn it from the 45-second pull, so up to about a minute late, and an offline phone after it reconnects. No new event type.
 
-**Steps.** Detect the change to `evacuating` in the pull (`applyProjectedPatientState`), once per patient; a banner element like the tourniquet one, 15-second timer; no new event type.
-
-**Verify.** A browser test with a PC phone sending the patient and two medic phones: both medics get the banner, the sender does not, it closes after 15 s or on a tap, it does not repeat on the next pull.
+**Verify.** A browser test with a PC phone sending the patient, a medic and a paramedic phone: both get the banner on the send and on the arrival, the sender does not, it closes after 15 s, "open" opens the patient, it does not repeat on the next pull.
 
 ---
 
@@ -762,8 +756,8 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-36 Demo constants | P3 | Not started | | `SITE_A` x60, `PLT-A` x25 |
 | WP-37 Unlink tombstone | P3 | Not started | | `database/069` known limit |
 | WP-39 Evacuation point = נאפ"ל | P2 | Done (V2.99.77), no SQL | this PR | owner 2026-11-18; reverses WP-18's "נקודת פינוי"; one per site |
-| WP-40 30 min at the נאפ"ל alert | P2 | Not started | | owner 2026-11-18; PC + CC |
-| WP-41 Medic banner: patient to the נאפ"ל | P2 | Not started | | owner 2026-11-18; 15 s or tap |
+| WP-40 30 min at the נאפ"ל alert | P2 | Done (V2.99.78), no SQL | this PR | owner 2026-11-18/19: PC + CC, every colour but black, from the send, 30 warn / 60 critical |
+| WP-41 Banner: patient to / at the נאפ"ל | P2 | Not started | | owner 2026-11-18/19; send + arrival, all medical roles, open or close, 15 s |
 | WP-38 Resupply raises the medic's bag | P2 | Done (V2.99.74): `database/082` applied live by the owner, `sync-log` v18 deployed 2026-11-18; live two-phone check pending | #132 | owner 2026-11-18: the medic confirms, by what arrived; the PC's / logistics' "delivered" = handed over, waiting for the medic |
 
 ## Revisions after #73 (2026-10-19)
