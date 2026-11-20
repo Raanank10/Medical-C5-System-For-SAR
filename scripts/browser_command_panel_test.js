@@ -123,11 +123,11 @@ async function checkFile(browser, file) {
     const text = panel.textContent;
     const cut = (from, to) => text.slice(text.indexOf(from), to ? text.indexOf(to, text.indexOf(from)) : undefined);
     return {
-      summary: text.includes('בזירה 3 · בנקודת פינוי 1 (עד 7 דק׳) · פונו 1'),
-      evacPoint: cut('בנקודת פינוי — ממתינים לפינוי מד״א', 'פונו — לפי יעד'),
+      summary: text.includes('בזירה 3 · בנאפ״ל 1 (עד 7 דק׳) · פונו 1'),
+      evacPoint: cut('בנאפ״ל (נקודת איסוף פלוגתית) — ממתינים לפינוי מד״א', 'פונו — לפי יעד'),
       evacuated: cut('פונו — לפי יעד', 'משפך פינוי מחלקתי'),
       funnel: text.includes('משפך פינוי מחלקתי') && text.includes('תעדוף פינוי מחלקתי'),
-      truck: cut('בנקודת פינוי — ממתינים לפינוי מד״א', 'פונו — לפי יעד').includes('רכב חוג״ד בנקודה'),
+      truck: cut('בנאפ״ל (נקודת איסוף פלוגתית) — ממתינים לפינוי מד״א', 'פונו — לפי יעד').includes('רכב חוג״ד בנאפ״ל'),
       priority: cut('תעדוף פינוי מחלקתי', 'פונו לפני הגעת כוח רפואי'),
     };
   });
@@ -138,11 +138,11 @@ async function checkFile(browser, file) {
   // Owner 2026-10-23: patients at the evacuation point still wait for MDA, so they stay on the
   // evacuation-to-hospital list (green P004 too), marked as at the evacuation point; a handed-over
   // patient is not on it.
-  assert(/ממתין לפינוי מד״א · P004/.test(board.priority) && board.priority.includes('בנקודת פינוי') && board.priority.includes('P001') && !board.priority.includes('P006'),
+  assert(/ממתין לפינוי מד״א · P004/.test(board.priority) && board.priority.includes('בנאפ״ל') && board.priority.includes('P001') && !board.priority.includes('P006'),
     `${rel}: the evacuation priority list must include patients at the evacuation point (got "${board.priority.slice(0, 300)}")`);
   // WP-18: evacuating with no recorded arrival is "on the way"; arrived reads with the wait.
-  assert(await page.evaluate(() => STATUS_LABELS.evacuating === 'בדרך לנקודת פינוי' && patientStatusLabel(patients.find(p => p.id === 'cp-g1')) === 'בנקודת פינוי · ממתין 7 דק׳'),
-    `${rel}: the evacuating status reads "בדרך לנקודת פינוי" until the arrival, then "בנקודת פינוי" with the wait`);
+  assert(await page.evaluate(() => STATUS_LABELS.evacuating === 'בדרך לנאפ״ל' && patientStatusLabel(patients.find(p => p.id === 'cp-g1')) === 'בנאפ״ל · ממתין 7 דק׳'),
+    `${rel}: the evacuating status reads "בדרך לנאפ״ל" until the arrival, then "בנאפ״ל" with the wait`);
 
   // 7b. "בטיפול" in the strip acknowledges the patient and the strip updates at once.
   await page.click('#command-status-strip [data-alert-group="p:cp-r1"] .ack-btn');
@@ -209,11 +209,11 @@ async function checkFile(browser, file) {
     ]);
     return { before, after, pcRecIds, hints };
   });
-  assert(!advice.before.includes('ממתינים לאמבולנס בנקודת פינוי') && advice.before.includes('צוואר בקבוק פינוי באתר החילוץ') && advice.before.includes('אמבולנס הרופא'),
+  assert(!advice.before.includes('ממתינים לאמבולנס בנאפ״ל') && advice.before.includes('צוואר בקבוק פינוי באתר החילוץ') && advice.before.includes('אמבולנס הרופא'),
     `${rel}: one yellow waiting raises no ambulance request; the extraction-site advice names medics / the physician's ambulance`);
-  assert(advice.after.includes('ממתינים לאמבולנס בנקודת פינוי') && advice.after.includes('בקש אמבולנסים אזרחיים נוספים'), `${rel}: a red waiting at the evacuation point must raise the civilian-ambulance request`);
+  assert(advice.after.includes('ממתינים לאמבולנס בנאפ״ל') && advice.after.includes('בקש אמבולנסים אזרחיים נוספים'), `${rel}: a red waiting at the evacuation point must raise the civilian-ambulance request`);
   assert(advice.pcRecIds.includes('REC_EVAC_WAITING_AMBULANCE'), `${rel}: the PC must get the civilian-ambulance recommendation too (got ${advice.pcRecIds})`);
-  assert(advice.hints.includes('טיפול לפני החילוץ') && advice.hints.includes('החילוץ מעביר לנקודת פינוי') && !advice.hints.includes('שייך אמבולנס'),
+  assert(advice.hints.includes('טיפול לפני החילוץ') && advice.hints.includes('החילוץ מעביר לנאפ״ל') && !advice.hints.includes('שייך אמבולנס'),
     `${rel}: extraction-site hints: treat trapped patients before extraction, rescuers carry free ones; never "assign an ambulance"`);
 
   // 11. CC overview (owner, 2026-10-25): every open incident by triage colour in two tables, still at

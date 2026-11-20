@@ -217,7 +217,7 @@ assert.deepEqual(
 // FINAL_PATIENT_STATUSES / canChangePatientStatus: once a patient reaches deceased,
 // handed_over, evacuated, closed, or self_evacuated, mutation sites (handover, manual
 // triage override, sweep color override) must refuse to overwrite them. "evacuating" is
-// deliberately not final - a patient waiting at the site's evacuation point (נקודת פינוי) under
+// deliberately not final - a patient waiting at the site's evacuation point (נאפ״ל, נקודת איסוף פלוגתית) under
 // the platoon commander's supervision must still be able to reach handed_over.
 assert.equal(rules.isFinalPatientStatus("deceased"), true);
 assert.equal(rules.isFinalPatientStatus("handed_over"), true);
