@@ -1033,7 +1033,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9988</div>
+      <div class="demo-kicker">Demo V2.9989</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1130,7 +1130,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9988</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9989</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1140,7 +1140,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9988</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9989</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3243,8 +3243,19 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     if (Number.isFinite(next.pulse) && Number.isFinite(prev.pulse) && Math.abs(next.pulse - prev.pulse) >= 25) {
       flags.push(`⚡ דופק ${prev.pulse}→${next.pulse}`);
     }
+    // Breathing rate climbing (owner 2026-11-21): often the earliest sign, before SpO₂ falls. A rise
+    // of 8/min or more ending at 21 or above. The rate is counted over 30 s and doubled, so one
+    // missed breath is 2/min; 8 is four extra breaths in 30 s, past counting noise. 21+ is where the
+    // NEWS2 score starts (21-24 scores 2, 25+ scores 3). A rise that ends at 20 or below (10 -> 18)
+    // is a return towards normal, not a deterioration. Above 30 the casualty is red anyway (MSTART).
+    if (Number.isFinite(next.rr) && Number.isFinite(prev.rr) && prev.rr > 0
+        && next.rr - prev.rr >= RR_RISE_FLAG_PER_MIN && next.rr >= RR_RISE_FLAG_FLOOR) {
+      flags.push(`⬆ נשימות ${prev.rr}→${next.rr}`);
+    }
     return flags;
   }
+  const RR_RISE_FLAG_PER_MIN = 8;
+  const RR_RISE_FLAG_FLOOR = 21;
 
   function isRoutineAlert(patient, nowMs = Date.now()) {
     return isVitalsOverdue(patient, nowMs);
@@ -3526,7 +3537,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.88';
+const APP_VERSION = '2.99.89';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';

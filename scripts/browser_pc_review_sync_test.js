@@ -29,6 +29,7 @@ const P2 = '55555555-5555-4555-8555-000000000002';
 const P3 = '55555555-5555-4555-8555-000000000003';
 const P4 = '55555555-5555-4555-8555-000000000004';
 const P5 = '55555555-5555-4555-8555-000000000005';
+const P6 = '55555555-5555-4555-8555-000000000006';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -396,6 +397,22 @@ async function checkFile(browser, file) {
   await syncAll(m1.page);
   assert(rows(P5).length === 1 && rows(P5)[0].urgency === 'high' && rows(P5)[0].reason_codes[0] === 'yellow_trend' && /150→176/.test(rows(P5)[0].free_text) && /176→202/.test(rows(P5)[0].free_text),
     `${rel}: the trend request reaches the PC with both changes (got ${JSON.stringify(rows(P5))})`);
+
+  // 4c. Breathing rate climbing (14 -> 22 -> 30, still yellow: MSTART red is above 30) is a
+  // deterioration flag, so it drives the same trend card. A rise of 6 is not.
+  await addPatient(m1.page, P6, 'P006-T', 'yellow');
+  await m1.page.evaluate((id) => { const p = patients.find((x) => x.id === id); p.vitals.rr = 14; }, P6);
+  v = await saveVitals(m1.page, P6, { rr: 20 });
+  assert(!v.card && !(await m1.page.evaluate((id) => patients.find((p) => p.id === id).deterioration.length, P6)), `${rel}: a rise of 6/min is not a flag (got ${JSON.stringify(v)})`);
+  v = await saveVitals(m1.page, P6, { rr: 28 });
+  assert(v.triage === 'yellow' && !v.card && v.alert, `${rel}: 20 -> 28 is one flag, alert but no trend card yet (got ${JSON.stringify(v)})`);
+  v = await saveVitals(m1.page, P6, { rr: 30 });
+  assert(!v.card, `${rel}: 28 -> 30 is no flag, the count starts over (got ${JSON.stringify(v)})`);
+  await m1.page.evaluate((id) => { const p = patients.find((x) => x.id === id); p.vitals.rr = 14; p.deteriorationStreak = 0; }, P6);
+  v = await saveVitals(m1.page, P6, { rr: 22 });
+  v = await saveVitals(m1.page, P6, { rr: 30 });
+  assert(!v.rec && v.triage === 'yellow' && v.card === 'yellow-trend' && v.cardText.includes('נשימות 14→22') && v.cardText.includes('נשימות 22→30'),
+    `${rel}: breathing rate climbing on two re-checks shows the trend card (got ${JSON.stringify(v)})`);
 
   // 5. A second medic asks about the same casualty: two rows, one line for the PC.
   const m2 = await phone();
