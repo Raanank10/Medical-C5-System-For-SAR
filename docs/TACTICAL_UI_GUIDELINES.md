@@ -122,7 +122,7 @@ When Black is selected:
 
 ## Pediatric Medication Guardrail
 
-For children under age 8, the UI must not require exact weight before treatment. Use age group or age estimate locally, warn on adult-range doses, require double confirmation, and write override metadata into the event payload. The save action still completes locally; risk is escalated through watchdog alerts and AAR review.
+For children under age 8, the UI must not require exact weight before treatment. Use age group or age estimate locally, warn on adult-range doses, require double confirmation, and write override metadata into the event payload. The save action still completes locally; risk is escalated through watchdog alerts and AAR review. The age group chosen in the full form reaches the server (V2.99.84, `database/093`), so every other phone and command shows the casualty as a child and applies the same pediatric guard; casualties added by the sweep carry no age (the sweep does not ask for it), so other phones still show them as adults.
 
 ## Patient Detail Order (V2.99.65)
 

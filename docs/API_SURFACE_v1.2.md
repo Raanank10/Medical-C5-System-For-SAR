@@ -225,6 +225,8 @@ For patients under age 8, adult-range medication doses must not be blocked in th
     "medication": "Fentanyl",
     "dosage": "100 mcg",
     "route": "BUCCAL",
+    "estimated_weight_kg": 22,
+    "weight_estimate_kg": 22,
     "is_pediatric_override": true,
     "high_risk_override": {
       "required": true,
@@ -240,6 +242,9 @@ Backend projection:
 - missing or false `confirmed_twice` creates a critical `HIGH_RISK_CLINICAL_VIOLATION` watchdog alert
 - confirmed high-risk overrides create a warning `HIGH_RISK_PEDIATRIC_MEDICATION_OVERRIDE` alert for commander awareness and AAR review
 - the clinical event remains immutable either way
+- a pediatric patient's (`patients.is_pediatric`) medication with no weight raises a critical `PEDIATRIC_MEDICATION_MISSING_WEIGHT` alert. The phone sends the weight as both `estimated_weight_kg` and `weight_estimate_kg`, and the check accepts either name (`database/093`, V2.99.84; before it read only `weight_estimate_kg`, which the phone never sent)
+
+`patients.is_pediatric` / `pediatric_age_years` are set by `project_patient_age()` (`database/093`) from the create event (`PATIENT_CREATED` / `QUICK_PATIENT_CREATED`) payload: `patient_age_group` (`pediatric` / `adult`), `patient_age_band` (`infant` / `child` / `adult` / `elderly`) and `patient_age` (years or null), which the full patient form sends since V2.99.84. Pediatric means `patient_age_group = 'pediatric'` or an age under 8; a create event without `patient_age_group` (sweep markers, a life-saving action, a first-responder report, older phones) leaves the row as it is. Before `093` nothing set the column, so every other phone and command showed a child as an adult. Other phones read the flag back into the patient's age group (`remotePatientRecord`, and later updates in `applyProjectedPatientState`).
 
 ## Binary Trap Status Event
 
