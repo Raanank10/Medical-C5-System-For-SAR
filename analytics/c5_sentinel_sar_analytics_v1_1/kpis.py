@@ -12,6 +12,7 @@ The KPI engine reflects the v1.1 product architecture:
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from typing import Optional
 
 import numpy as np
@@ -202,6 +203,90 @@ class KPIEngine:
             return pd.DataFrame()
         return alerts[alerts["alert_type"].eq("DEAD_MAN_SWITCH")].copy()
 
+    def pc_review_response(self, incident_id: Optional[str] = None) -> pd.DataFrame:
+        """PC review of a deteriorating casualty (WP-26, database/094): one row per medic request.
+
+        Minutes from the medic's request to the PC's first answer (a delay or the decision) and to
+        the decision, the outcome, how often it was put off, and whether it waited past the 5-minute
+        "unanswered" mark. Reads the exported medical_resource_requests table (request_kind
+        'pc_review'); its status_history holds the timestamps, the outcome and every delay.
+        Empty when the table is not there (older exports, the seeded demo databases).
+
+        A review the server closed because the casualty left the scene (reason patient_left_scene,
+        094) is 'closed_patient_left'; it counts as unanswered only if 5 minutes had passed with no
+        answer before the casualty left. priority_update_unconfirmed: the outcome says the priority
+        was updated, but the events hold no triage change for that casualty between the request and
+        2 minutes after the decision (the outcome is a record, it does not change the triage).
+        """
+        if not self.db.table_exists("medical_resource_requests"):
+            return pd.DataFrame()
+        incident_id = self._incident_id(incident_id)
+        df = self.db.query(
+            "select id, incident_id, urgency, reason_codes_json, linked_patient_ids_json, status, status_history_json, requested_by_role, requested_at "
+            "from medical_resource_requests where request_kind = 'pc_review'" + (" and incident_id = ?" if incident_id else ""),
+            (incident_id,) if incident_id else (),
+        )
+        if df.empty:
+            return pd.DataFrame()
+        out = []
+        for r in df.itertuples(index=False):
+            try:
+                history = json.loads(r.status_history_json or "[]")
+            except (TypeError, ValueError):
+                history = []
+            requested = pd.to_datetime(r.requested_at, utc=True, errors="coerce")
+            answers = [h for h in history if isinstance(h, dict) and h.get("status") in ("acknowledged", "resolved") and h.get("by_role") in ("pc", "cc", "chamal", "physician", "admin")]
+            first = pd.to_datetime(answers[0].get("at"), utc=True, errors="coerce") if answers else pd.NaT
+            closed = next((h for h in answers if h.get("status") == "resolved"), None)
+            closed_at = pd.to_datetime(closed.get("at"), utc=True, errors="coerce") if closed else pd.NaT
+            minutes = lambda t: round((t - requested).total_seconds() / 60, 1) if pd.notna(t) and pd.notna(requested) else np.nan
+            try:
+                reasons = json.loads(r.reason_codes_json or "[]")
+            except (TypeError, ValueError):
+                reasons = []
+            to_first = minutes(first)
+            left = next((h for h in history if isinstance(h, dict) and h.get("reason") == "patient_left_scene"), None)
+            left_at = pd.to_datetime(left.get("at"), utc=True, errors="coerce") if left else pd.NaT
+            left_min = minutes(left_at)
+            outcome = (closed or {}).get("outcome")
+            if np.isnan(to_first):
+                unanswered = not (left is not None and not np.isnan(left_min) and left_min < 5)
+            else:
+                unanswered = to_first >= 5
+            try:
+                linked = json.loads(r.linked_patient_ids_json or "[]")
+            except (TypeError, ValueError):
+                linked = []
+            unconfirmed = False
+            if outcome == "priority_updated" and pd.notna(closed_at) and pd.notna(requested) and linked:
+                unconfirmed = not self._triage_changed(r.incident_id, linked[0], requested - pd.Timedelta(seconds=1), closed_at + pd.Timedelta(minutes=2))
+            out.append({
+                "request_id": r.id,
+                "incident_id": r.incident_id,
+                "urgency": r.urgency,
+                "reason": reasons[0] if reasons else None,
+                "status": r.status,
+                "minutes_to_first_answer": to_first,
+                "minutes_to_decision": minutes(closed_at),
+                "outcome": outcome if closed else ("closed_patient_left" if left else None),
+                "times_put_off": sum(1 for h in answers if h.get("snoozed_until")),
+                "unanswered_5_min": bool(unanswered),
+                "priority_update_unconfirmed": bool(unconfirmed),
+            })
+        return pd.DataFrame(out)
+
+    TRIAGE_EVENT_TYPES = ("MSTART_TRIAGE_OVERRIDE", "PATIENT_TRIAGE_UPDATED", "TRIAGE_SET", "PATIENT_TRIAGED_EXPECTANT")
+
+    def _triage_changed(self, incident_id, patient_id, start, end) -> bool:
+        ev = self.db.query(
+            "select local_timestamp from events where incident_id = ? and patient_id = ? and type in (%s)" % ",".join("?" * len(self.TRIAGE_EVENT_TYPES)),
+            (incident_id, patient_id, *self.TRIAGE_EVENT_TYPES),
+        )
+        if ev.empty:
+            return False
+        t = pd.to_datetime(ev["local_timestamp"], utc=True, errors="coerce")
+        return bool(((t >= start) & (t <= end)).any())
+
     def data_freshness(self) -> pd.DataFrame:
         state = self.db.device_sync_state()
         if state.empty:
@@ -303,6 +388,7 @@ class KPIEngine:
             "time_registration_to_handover": self.time_registration_to_handover(incident_id),
             "medic_to_critical_ratio": self.medic_to_critical_ratio(incident_id),
             "dead_man_switch_events": self.dead_man_switch_events(incident_id),
+            "pc_review_response": self.pc_review_response(incident_id),
             "data_freshness": self.data_freshness(),
             "current_inventory": self.current_inventory(incident_id),
             "stockout_risk": self.stockout_risk(incident_id),

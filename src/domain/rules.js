@@ -201,6 +201,47 @@
     return { minutes: policy.minutes, used: used + 1, max: policy.max, escalates: used + 1 >= policy.max };
   }
 
+  // PC review of a deteriorating casualty (WP-26, repo owner 2026-11-19/21).
+  // Which way an MSTART re-check moved the casualty. 'better' is only red -> yellow / green and
+  // yellow -> green: it offers update / keep, no PC review (a down-triage is the medic's call to
+  // confirm, not something to escalate). Every other change is 'worse' and asks for a decision with a
+  // PC review on offer: up the ladder, an unsorted casualty getting a category, a casualty who stops
+  // breathing (-> black) and a black casualty who breathes again (-> red: back in the evacuation order).
+  const PRIORITY_RANK = { green: 1, yellow: 2, red: 3 };
+  const MSTART_CATEGORIES = ["green", "yellow", "red", "black"];
+  function priorityRecommendationDirection(current, suggested) {
+    if (!MSTART_CATEGORIES.includes(suggested) || current === suggested) return null;
+    const from = PRIORITY_RANK[current];
+    const to = PRIORITY_RANK[suggested];
+    if (from && to && to < from) return "better";
+    return "worse";
+  }
+  // "I will come later" for the PC (owner 2026-11-21). A red casualty gets one 3-minute delay; others
+  // two of 5 minutes. Using the last one tells the CC (escalates); after that the only way out is to
+  // close the review. A review nobody has answered for 5 minutes (or whose delay ran out) is unanswered.
+  const PC_REVIEW_SNOOZE_POLICY = {
+    immediate: { minutes: 3, max: 1 },
+    high: { minutes: 5, max: 2 },
+    routine: { minutes: 5, max: 2 },
+  };
+  const PC_REVIEW_UNANSWERED_MS = 5 * 60 * 1000;
+  const PC_REVIEW_CLOSED_STATUSES = ["arrived", "resolved", "cancelled", "denied", "closed", "fulfilled"];
+  function pcReviewSnoozeOption(urgency, used) {
+    const policy = Object.prototype.hasOwnProperty.call(PC_REVIEW_SNOOZE_POLICY, urgency || "") ? PC_REVIEW_SNOOZE_POLICY[urgency] : PC_REVIEW_SNOOZE_POLICY.high;
+    const n = Math.max(0, Number(used) || 0);
+    if (n >= policy.max) return null;
+    return { minutes: policy.minutes, used: n + 1, max: policy.max, escalates: n + 1 >= policy.max };
+  }
+  // 'closed' | 'snoozed' (put off, time not up) | 'waiting' (under 5 minutes) | 'unanswered'.
+  function pcReviewState(review, nowMs = Date.now()) {
+    if (!review || PC_REVIEW_CLOSED_STATUSES.includes(review.status)) return "closed";
+    const until = Date.parse(review.snoozedUntil || "");
+    if (Number.isFinite(until)) return until > nowMs ? "snoozed" : "unanswered";
+    const at = Date.parse(review.createdAt || "");
+    if (!Number.isFinite(at)) return "waiting";
+    return nowMs - at >= PC_REVIEW_UNANSWERED_MS ? "unanswered" : "waiting";
+  }
+
   // { allowed, limitMs, reason }. reason is null when allowed, 'role' for a role that may not
   // convert, 'time' past the role's limit, or 'time_unknown' when the application time is not known
   // (it cannot be shown to be within the limit; every role, physician included, owner 2026-11-08).
@@ -593,6 +634,9 @@
     supplyCriticalThreshold,
     supplyRiskTier,
     SUPPLY_CANCEL_REASONS,
+    pcReviewSnoozeOption,
+    pcReviewState,
+    priorityRecommendationDirection,
     supplyCancelReasonValid,
     supplyRequestCancelAllowed,
     timeCodeToTodayMs,
