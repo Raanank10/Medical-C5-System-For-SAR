@@ -114,6 +114,24 @@ async function checkFile(browser, file) {
   assert(hro > 0 && pm > hro, `${rel}: the high-risk confirmation must follow the create event and precede the medication, got ${pTypes}`);
   assert(peds.added.every((e) => e.pid === peds.pid), `${rel}: pediatric override events must carry the patient id`);
   assert(peds.added[pm].payload.is_pediatric_override === true && peds.added[pm].payload.high_risk_override?.reason === 'test reason', `${rel}: the medication must carry the override`);
+  // database/093: the create event tells the server the casualty is a child, and the weight goes
+  // under both names (flag_pediatric_medication_missing_weight() reads weight_estimate_kg).
+  const pCreate = peds.added[0].payload;
+  assert(pCreate.patient_age_group === 'pediatric', `${rel}: the create event must carry patient_age_group, got ${JSON.stringify(pCreate)}`);
+  const pMed = peds.added[pm].payload;
+  assert(pMed.weight_estimate_kg > 0 && pMed.weight_estimate_kg === pMed.estimated_weight_kg, `${rel}: a pediatric medication must carry the weight under both names, got ${JSON.stringify(pMed)}`);
+  assert(peds.added[hro].payload.weight_estimate_kg > 0, `${rel}: the high-risk confirmation must carry weight_estimate_kg`);
+  assert(flow.a.added[0].payload.patient_age_group === 'adult', `${rel}: an adult's create event says adult, got ${flow.a.added[0].payload.patient_age_group}`);
+
+  // A remote patient picks up the server's age group when it arrives later (database/093).
+  const remoteAge = await page.evaluate(() => {
+    const id = 'dddddddd-0000-4000-8000-000000000001';
+    patients.push({ id, visualId: 'P-REMOTE', triage: 'yellow', patientStatus: 'identified', patientAgeGroup: 'adult', patientAge: null, sourcedFromRemote: true, _serverVersion: 1, events: [], txHistory: [], siteId: 'SITE_A' });
+    applyProjectedPatientState([{ id, visual_id: 'P-REMOTE', current_triage: 'yellow', current_status: 'identified', is_pediatric: true, pediatric_age_years: 5, version: 2 }]);
+    const p = patients.find((x) => x.id === id);
+    return { group: p.patientAgeGroup, age: p.patientAge };
+  });
+  assert(remoteAge.group === 'pediatric' && remoteAge.age === 5, `${rel}: a remote patient must take the server's pediatric flag, got ${JSON.stringify(remoteAge)}`);
 
   // 3. Vitals-update modal: treatments and medication reach the server for an existing patient.
   const modal = await page.evaluate(() => {

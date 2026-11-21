@@ -62,6 +62,19 @@ async function checkFile(browser, file) {
   assert(!fresh.html.includes('80♥') && !fresh.html.includes('null♥'), `${rel}: the CC patient list must not show a placeholder or null pulse`);
   assert(fresh.html.includes('—♥') && fresh.html.includes('מדדים אצל החובש'), `${rel}: the CC patient list must say the vitals are on the medic's device`);
 
+  // 1a'. Its patient card and list lines show the missing injury as not recorded, never "null" (V2.99.86).
+  const card = await page.evaluate(() => {
+    const p = patients.find((x) => x.visualId === 'P-REMOTE-1');
+    activeRoleDashboard = 'medic';
+    openPatient(p.id);
+    const screen = document.getElementById('screen-patient');
+    const injuryRow = [...screen.querySelectorAll('.summary-row')].find((r) => r.querySelector('.summary-key')?.textContent === 'פציעה');
+    goTo('dashboard');
+    return { injury: injuryRow?.querySelector('.summary-val')?.textContent, cardNull: /\bnull\b/.test(screen.innerText), listNull: /\bnull\b/.test(document.getElementById('screen-dashboard')?.innerText || '') };
+  });
+  assert(card.injury === 'לא תועד', `${rel}: a remote patient's injury row must read "לא תועד", got "${card.injury}"`);
+  assert(!card.cardNull && !card.listNull, `${rel}: the word "null" must not appear on the remote patient's card or the casualty list`);
+
   // 1b. A remote patient cached before V2.99.32 (baseline vitals) is cleared on the next pull,
   // even when the server version has not changed; one with real local vitals is left alone.
   const migrated = await page.evaluate(() => {
