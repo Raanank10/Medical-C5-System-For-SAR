@@ -1033,7 +1033,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9987</div>
+      <div class="demo-kicker">Demo V2.9988</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1130,7 +1130,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9987</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9988</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1140,7 +1140,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9987</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9988</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3021,6 +3021,19 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     if (from && to && to < from) return "better";
     return "worse";
   }
+  // A yellow casualty who keeps getting worse without crossing into red (owner 2026-11-21, option
+  // B): one flagged re-check can be pain, stress or a counting error, two in a row is a trend. The
+  // streak counts consecutive re-checks with a deterioration flag; a clean re-check or a new
+  // category starts it again. The prompt (PC review / paramedic / keep watching) shows from 2.
+  const YELLOW_TREND_MIN_STREAK = 2;
+  function nextDeteriorationStreak(previous, flagged, categoryChanged = false) {
+    if (!flagged) return 0;
+    if (categoryChanged) return 1; // counted again within the new category
+    return Math.max(0, Number(previous) || 0) + 1;
+  }
+  function shouldPromptYellowTrend(triage, streak, hasRecommendation) {
+    return triage === "yellow" && !hasRecommendation && (Number(streak) || 0) >= YELLOW_TREND_MIN_STREAK;
+  }
   // "I will come later" for the PC (owner 2026-11-21). A red casualty gets one 3-minute delay; others
   // two of 5 minutes. Using the last one tells the CC (escalates); after that the only way out is to
   // close the review. A review nobody has answered for 5 minutes (or whose delay ran out) is unanswered.
@@ -3439,7 +3452,9 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     supplyCriticalThreshold,
     supplyRiskTier,
     SUPPLY_CANCEL_REASONS,
+    nextDeteriorationStreak,
     pcReviewSnoozeOption,
+    shouldPromptYellowTrend,
     pcReviewState,
     priorityRecommendationDirection,
     supplyCancelReasonValid,
@@ -3511,7 +3526,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.87';
+const APP_VERSION = '2.99.88';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -12088,7 +12103,7 @@ function openPatient(id){
         <div style="background:var(--surface2);border-radius:12px;padding:10px 6px;text-align:center"><div style="font-family:var(--mono);font-size:30px;font-weight:800;line-height:1.1;color:${p.vitals.avpu==='A'?'var(--green)':p.vitals.avpu==='U'?'var(--red)':'var(--yellow)'}">${p.vitals.avpu||'—'}</div><div style="font-size:11px;color:var(--muted)">AVPU${vitalSourceTag(p,'avpu')}</div></div>
       </div>
       ${p.deterioration&&p.deterioration.length?`<div style="background:rgba(230,57,70,0.1);border:1px solid var(--red);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:700;font-size:12px;color:var(--red);margin-bottom:3px">⚠ הידרדרות זוהתה</div><div style="font-size:12px">${p.deterioration.join(' · ')}</div></div>`:''}
-      ${renderPriorityRecommendationCard(p)}${renderRedDeteriorationPrompt(p)}${renderPcReviewStatusCard(p)}
+      ${renderPriorityRecommendationCard(p)}${renderRedDeteriorationPrompt(p)}${renderYellowTrendPrompt(p)}${renderPcReviewStatusCard(p)}
     </div>
     ${patientTourniquetFixHtml(p)}
     <div class="summary-card">
@@ -12515,6 +12530,25 @@ function renderRedDeteriorationPrompt(p){
   const prompt=p.redDeteriorationPrompt; if(!prompt || p.triage!=='red' || p.priorityRecommendation) return '';
   const review=canRequestPcReview()?`<button class="tap-btn" onclick="answerRedDeteriorationPrompt('${p.id}','pc_review')">בקש חוג"ד</button>`:'';
   return `<div data-priority-card="red-worse" style="background:rgba(230,57,70,0.12);border:1px solid var(--red);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:800;font-size:12px;color:var(--red);margin-bottom:5px">פצוע אדום מידרדר</div><div style="font-size:12px;margin-bottom:8px">${escAttr((prompt.flags||[]).join(' · '))}</div><div class="tap-grid tap-grid-2">${review}<button class="tap-btn" onclick="answerRedDeteriorationPrompt('${p.id}','doctor')">בקש פראמדיק/רופא</button><button class="tap-btn" onclick="answerRedDeteriorationPrompt('${p.id}','watch')">המשך מעקב</button></div></div>`;
+}
+function renderYellowTrendPrompt(p){
+  const prompt=p.yellowTrendPrompt; if(!prompt || p.triage!=='yellow' || p.priorityRecommendation) return '';
+  const review=canRequestPcReview()?`<button class="tap-btn" onclick="answerYellowTrendPrompt('${p.id}','pc_review')">בקש חוג"ד</button>`:'';
+  return `<div data-priority-card="yellow-trend" style="background:rgba(255,193,7,0.12);border:1px solid var(--yellow);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:800;font-size:12px;color:var(--yellow);margin-bottom:5px">מגמת החמרה בפצוע צהוב · ${prompt.streak} בדיקות ברצף</div><div style="font-size:12px;margin-bottom:8px">${escAttr((prompt.flags||[]).join(' · '))}</div><div class="tap-grid tap-grid-2">${review}<button class="tap-btn" onclick="answerYellowTrendPrompt('${p.id}','doctor')">בקש פראמדיק/רופא</button><button class="tap-btn" onclick="answerYellowTrendPrompt('${p.id}','watch')">המשך מעקב</button></div></div>`;
+}
+// "המשך מעקב" hides the card; the streak goes on, so the next flagged re-check shows it again.
+function answerYellowTrendPrompt(id, action){
+  const p=patients.find(x=>x.id===id); if(!p) return;
+  if(action==='pc_review') requestPcReview(id, 'yellow_trend', {render:false});
+  else if(action==='doctor'){
+    createMedicalResourceRequest({resourceType:'paramedic',reasonCodes:['deterioration'],urgency:'high',siteId:p.siteId||'SITE_A',targetLocation:p.location||siteData.name,linkedPatientIds:[p.id],requestedByRole:'medic',requestedByName:currentMedicName(),freeText:'בקשת פראמדיק/רופא — מגמת החמרה בפצוע צהוב',auto:true});
+    p.events.unshift({type:'SENIOR_MEDICAL_REVIEW_REQUESTED',time:nowT(),detail:'בקשת פראמדיק/רופא — מגמת החמרה בפצוע צהוב',warn:true});
+  }
+  delete p.yellowTrendPrompt;
+  p.lastModifiedAt=new Date().toISOString();
+  saveDemoState();
+  renderDashboard();
+  openPatient(id);
 }
 function answerRedDeteriorationPrompt(id, action){
   const p=patients.find(x=>x.id===id); if(!p) return;
@@ -14135,6 +14169,17 @@ async function saveModalVitals(){
   // choice to ask the PC or a paramedic to look (owner 2026-11-21).
   if(flags.length && p.triage==='red' && !priorityRecommendation) p.redDeteriorationPrompt={at:new Date().toISOString(), flags:[...flags]};
   else if(!flags.length) delete p.redDeteriorationPrompt;
+  // A yellow casualty getting worse on two re-checks in a row without a new category (option B,
+  // owner 2026-11-21). The flags of both re-checks are shown, so the medic sees the trend.
+  const streakChanged=p.deteriorationStreakTriage!=null && p.deteriorationStreakTriage!==p.triage;
+  p.deteriorationStreak=C5Rules.nextDeteriorationStreak(p.deteriorationStreak, flags.length>0, streakChanged);
+  p.deteriorationStreakTriage=p.triage;
+  if(flags.length) p.deteriorationTrendFlags=[...(streakChanged?[]:(p.deteriorationTrendFlags||[]).slice(-6)), ...flags];
+  else delete p.deteriorationTrendFlags;
+  if(C5Rules.shouldPromptYellowTrend(p.triage, p.deteriorationStreak, !!priorityRecommendation)){
+    p.yellowTrendPrompt={at:new Date().toISOString(), streak:p.deteriorationStreak, flags:[...new Set(p.deteriorationTrendFlags||flags)]};
+    p.events.unshift({type:'YELLOW_DETERIORATION_TREND', time:nowT(), detail:`מגמת החמרה בפצוע צהוב · ${p.deteriorationStreak} בדיקות ברצף`, warn:true});
+  }else if(!flags.length) delete p.yellowTrendPrompt;
   if(criticalEvent || (!improving && ['red','black'].includes(priorityRecommendation))){
     clearAlertAcknowledgment(p, criticalEvent?'critical_vitals':'priority_'+priorityRecommendation);
   }
@@ -15108,7 +15153,7 @@ function queueReinforcementStatusEvent(req, {status=null, urgency=null, reason=n
 // second tap raises it to immediate. Two medics asking about one casualty is one line for the PC,
 // and one decision closes both (the server applies it to every open review of that casualty).
 const PC_REVIEW_OUTCOME_LABELS={priority_updated:'עודכנה קדימות', priority_kept:'נשארה קדימות', senior_requested:'הוזעק פראמדיק/רופא', evac_moved_up:'הוקדם פינוי'};
-const PC_REVIEW_REASON_LABELS={deterioration:'הידרדרות במדדים', red_worsening:'פצוע אדום מידרדר', manual:'בקשת חובש'};
+const PC_REVIEW_REASON_LABELS={deterioration:'הידרדרות במדדים', red_worsening:'פצוע אדום מידרדר', yellow_trend:'מגמת החמרה בצהוב', manual:'בקשת חובש'};
 const PC_REVIEW_URGENCY_RANK={routine:0, high:1, immediate:2};
 // A casualty who left the scene has no review line (the server closes its open reviews: 094).
 const PC_REVIEW_HIDDEN_STATUSES=new Set(['handed_over','deceased','self_evacuated','closed','evacuated']);
@@ -15133,7 +15178,7 @@ function requestPcReview(pid, trigger='manual', {render=true}={}){
       toast('בקשת חוג"ד כבר פתוחה — סומנה כדחופה');
     }else toast('בקשת חוג"ד כבר פתוחה');
   }else{
-    const flags=(p.deterioration||[]).length?p.deterioration:(p.redDeteriorationPrompt?.flags||[]);
+    const flags=trigger==='yellow_trend'&&p.yellowTrendPrompt?.flags?.length?p.yellowTrendPrompt.flags:(p.deterioration||[]).length?p.deterioration:(p.redDeteriorationPrompt?.flags||[]);
     const r={
       id:`REQ-${Date.now().toString(36).slice(-4).toUpperCase()}${uid().slice(0,3).toUpperCase()}`,
       resourceType:'pc_review', originDeviceId:getDeviceId(), requestedById:currentUser?.id||null,
