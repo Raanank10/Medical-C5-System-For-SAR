@@ -216,6 +216,19 @@
     if (from && to && to < from) return "better";
     return "worse";
   }
+  // A yellow casualty who keeps getting worse without crossing into red (owner 2026-11-21, option
+  // B): one flagged re-check can be pain, stress or a counting error, two in a row is a trend. The
+  // streak counts consecutive re-checks with a deterioration flag; a clean re-check or a new
+  // category starts it again. The prompt (PC review / paramedic / keep watching) shows from 2.
+  const YELLOW_TREND_MIN_STREAK = 2;
+  function nextDeteriorationStreak(previous, flagged, categoryChanged = false) {
+    if (!flagged) return 0;
+    if (categoryChanged) return 1; // counted again within the new category
+    return Math.max(0, Number(previous) || 0) + 1;
+  }
+  function shouldPromptYellowTrend(triage, streak, hasRecommendation) {
+    return triage === "yellow" && !hasRecommendation && (Number(streak) || 0) >= YELLOW_TREND_MIN_STREAK;
+  }
   // "I will come later" for the PC (owner 2026-11-21). A red casualty gets one 3-minute delay; others
   // two of 5 minutes. Using the last one tells the CC (escalates); after that the only way out is to
   // close the review. A review nobody has answered for 5 minutes (or whose delay ran out) is unanswered.
@@ -634,7 +647,9 @@
     supplyCriticalThreshold,
     supplyRiskTier,
     SUPPLY_CANCEL_REASONS,
+    nextDeteriorationStreak,
     pcReviewSnoozeOption,
+    shouldPromptYellowTrend,
     pcReviewState,
     priorityRecommendationDirection,
     supplyCancelReasonValid,

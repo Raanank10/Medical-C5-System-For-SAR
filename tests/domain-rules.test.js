@@ -417,6 +417,18 @@ assert.equal(rules.priorityRecommendationDirection("pending", "green"), "worse")
 assert.equal(rules.priorityRecommendationDirection("red", null), null);
 assert.equal(rules.priorityRecommendationDirection("black", "red"), "worse");
 assert.equal(rules.priorityRecommendationDirection("green", "yellow"), "worse");
+// Yellow trend (WP-26 follow-up, option B).
+assert.equal(rules.nextDeteriorationStreak(0, true), 1);
+assert.equal(rules.nextDeteriorationStreak(1, true), 2);
+assert.equal(rules.nextDeteriorationStreak(2, false), 0);
+assert.equal(rules.nextDeteriorationStreak(3, true, true), 1);
+assert.equal(rules.nextDeteriorationStreak(3, false, true), 0);
+assert.equal(rules.nextDeteriorationStreak(undefined, true), 1);
+assert.equal(rules.shouldPromptYellowTrend("yellow", 1, false), false);
+assert.equal(rules.shouldPromptYellowTrend("yellow", 2, false), true);
+assert.equal(rules.shouldPromptYellowTrend("yellow", 2, true), false);
+assert.equal(rules.shouldPromptYellowTrend("red", 3, false), false);
+assert.equal(rules.shouldPromptYellowTrend("green", 3, false), false);
 assert.deepEqual(rules.pcReviewSnoozeOption("immediate", 0), { minutes: 3, used: 1, max: 1, escalates: true });
 assert.equal(rules.pcReviewSnoozeOption("immediate", 1), null);
 assert.deepEqual(rules.pcReviewSnoozeOption("high", 0), { minutes: 5, used: 1, max: 2, escalates: false });

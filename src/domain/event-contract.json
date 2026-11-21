@@ -115,7 +115,8 @@
       "TOURNIQUET_ENTRY_CANCELLED",
       "TOURNIQUET_TIME_ALERT",
       "TRIAGE_SET",
-      "VITALS_UPDATED"
+      "VITALS_UPDATED",
+      "YELLOW_DETERIORATION_TREND"
     ],
     "Device-local audit or experiment-log entry (outbox and experiment export only)": [
       "ASSESSMENT_INCOMPLETE_ALERT",
