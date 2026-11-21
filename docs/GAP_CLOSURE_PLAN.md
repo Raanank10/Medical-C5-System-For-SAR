@@ -378,7 +378,7 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 | WP-24 | Command cancels a resupply request (was: CC "fulfilled by company" / "closed") | P2 | - (decided 2026-11-18) |
 | WP-25 | Medic incident type and mismatch report synced | P2 | - (decided 2026-10-23) |
 | WP-26 | PC deterioration review request synced | P2 | - (decided 2026-10-23, shape 2026-11-19/21) |
-| WP-27 | CC moves a site's patients to another platoon | P2 | one design question |
+| WP-27 | CC moves a site's patients to another platoon | P2 | - (decided 2026-11-21) |
 | WP-28 | The 27 never-sent event types | P2 | - (answered 2026-11-21) |
 | WP-29 | Dead Man's Switch on the server | P2 | recipients |
 | WP-30 | Telegram critical alerts (B1) | P2 | the 19 alert answers, a bot |
@@ -582,11 +582,24 @@ Verified: `scripts/rls_test_094_pc_review.sql` on a local PostgreSQL 16 with eve
 
 **Why.** Owner 2026-10-23: the CC moves a site's patients from one platoon to another (example: platoon A hands over to B for rest). Today `PATIENT_REASSIGNED_BETWEEN_PLATOONS` / `_WITHIN_PLATOON` are demo-only (`index.html` ~8052, `known_gaps` WP-7).
 
-**Open design question (ask first).** One incident belongs to one platoon (`045`, `053`). Moving a whole site = changing the incident's platoon (a CC version of `set_incident_platoon`, plus membership for the new platoon's medics and PC). Moving some patients only = splitting the site into two incidents. Recommendation: whole site only; splitting is a merge in reverse and much larger.
+**Decided with the owner 2026-11-21.**
+- Two CC actions on a site: handover (A out, B in) and reinforce (B helps, A stays; owner: "sometimes the second platoon comes to help and not to replace").
+- The medical platoon (a PC and his medics) is a company in the data model (`053`). Handover moves the whole company: B's PC, RCC and rescue chain take the site, the rescue platoon is chosen again.
+- Whole site only, no splitting.
+- Reinforce: A's PC stays the lead; B's PC joins and assigns his own medics (B's medics are not added automatically). The CC releases B.
+- A after a handover, and B after release: read-only until the CC ends it.
+- Who: cc, chamal, admin.
+- A record from a read-only phone that was offline over the change: accepted if its phone time is before the change, refused after it (a sync rejection on the phone).
+- Assumed (not answered): site-level actions in reinforce stay with A's PC. Today a reinforcing PC is a member and can do whatever a member PC can (for example close the site); `set_incident_platoon` stays with A's company.
 
-**Steps (whole site).** A `SECURITY DEFINER` RPC for cc/chamal/admin: sets the incident's platoon, adds the new platoon's PC and medics as members, keeps the old ones as read-only until they leave or the owner decides, writes an audited event. The incident-opened banner logic (`064`) informs the new platoon's RPC. Client: CC action on the incident row; both platoons' boards follow.
+**Built (V2.99.91, `database/095` + `096`, this PR).** See `docs/ARCHITECTURE.md` and `docs/API_SURFACE_v1.2.md`. `app.can_access_incident()` now means full access (a read-only membership does not count), so every write path closes to read-only people without editing each RPC; reads go through the new `app.can_view_incident()`. `incident_unit_links` records former and reinforcing companies. The CC panel is in the incident picker; the CC roster's "מי עובד במוקד" no longer moves a site to another company directly. `PATIENT_REASSIGNED_BETWEEN_PLATOONS` moved to `local_only` (signed in, the CC quick action opens the panel). `PATIENT_REASSIGNED_WITHIN_PLATOON` (one patient to another medic) is not WP-27 and stays in `known_gaps`.
 
-**Verify.** RLS impersonation for old PC, new PC, both medics, rolled back; extend `scripts/browser_platoon_security_test.js`. RLS change: owner verifies live, never auto-merged.
+**Verify.** `scripts/rls_test_096_unit_handover.sql`: 52 checks passed on a local Postgres built from the live definitions (2026-11-22); the owner runs it live after applying `095` then `096` (RLS change: owner verifies live, never auto-merged). `scripts/browser_platoon_security_test.js` extended.
+
+**Open.**
+- Buttons on a read-only phone are not disabled; the server refuses the record and the phone shows a sync rejection.
+- `merge_incident()` (`067`) does not move `incident_unit_links` from the source; a merged duplicate's read-only companies lose access with the source.
+- Live two-phone check (WP-21).
 
 ---
 
@@ -829,7 +842,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-24 Command cancels a resupply request | P2 | Done (V2.99.75): `083` + `084` applied live by the owner (objects checked 2026-11-20, not in the migration list); `SUPPLY_REQUEST_CANCELLED` in deployed `sync-log` (v20 and v21); rolled-back live check passed 2026-11-20; live phone check pending | #133 | rescoped 2026-11-18: CC holds no stock, so no "fulfilled by company"; medic's escalation stays with the PC; cancel with a reason (cc/chamal/admin while open, PC before escalation); direct writes to `supply_requests` closed |
 | WP-25 Medic incident type + mismatch | P2 | Done (V2.99.82): `089`, `090` live, `sync-log` v21 deployed, role check with real profiles passed 2026-11-20; `091` hardening applied live 2026-11-21 | #134, this PR | owner 2026-11-18: several types per incident; anyone adds, removing by the ladder rescue > PC/CC > medics against the adder (`090`). Medic's "not right" reports; PC/CC type section, never over rescue; one change at a time from boards. Removed from `known_gaps`. Every type in the picker, RCC table, stored report and analytics export: `092` (V2.99.83), applied live 2026-11-21 |
 | WP-26 PC deterioration review | P2 | Done (V2.99.87, `094` applied live 2026-11-21, live test passed) | #148 | owner 2026-11-19/21: option A (052 table, own `request_kind`), PC + CC alert, tap + outcome, "אחר כך". Removed from `known_gaps`. Two-phone check still with WP-21 |
-| WP-27 CC moves a site to another platoon | P2 | Not started, 1 design question | | owner 2026-10-23 (WP-7 remainder); RLS |
+| WP-27 CC moves a site to another platoon | P2 | Done in this PR (V2.99.91, `database/095` + `096`); not applied live: owner applies 095, then 096, then runs `scripts/rls_test_096_unit_handover.sql` | this PR | owner 2026-11-21: handover (whole company, A read-only) and reinforce (B's PC joins, A leads, CC releases); cc/chamal/admin; records from before the change accepted; RLS |
 | WP-28 27 never-sent event types | P2 | Done (V2.99.90), no SQL; `sync-log` v22 to deploy | this PR | owner 2026-11-21: 12 removed, 15 in `server_accepts_unused`, 7 in `server_writes`; `MEDIC_SITE_CLOSE_REQUESTED` is WP-42 |
 | WP-29 Dead Man's Switch on the server | P2 | Not started | | builds on 081's watchdog (live) |
 | WP-30 Telegram alerts (B1) | P2 | Waiting on owner's 19 answers | | |
