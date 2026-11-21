@@ -213,6 +213,15 @@ assert.deepEqual(
   rules.detectDeterioration({ pulse: 100, spo2: 98, avpu: "A" }, { pulse: 70, spo2: 92, avpu: "P" }),
   ["⬇ SpO₂ 98→92%", "⬇ AVPU A→P", "⚡ דופק 100→70"],
 );
+// Breathing rate climbing: rise of 8/min or more, ending at 21 or above.
+assert.deepEqual(rules.detectDeterioration({ rr: 16 }, { rr: 24 }), ["⬆ נשימות 16→24"]);
+assert.deepEqual(rules.detectDeterioration({ rr: 14 }, { rr: 20 }), []);   // rise 6, still normal
+assert.deepEqual(rules.detectDeterioration({ rr: 18 }, { rr: 24 }), []);   // rise 6: counting noise
+assert.deepEqual(rules.detectDeterioration({ rr: 10 }, { rr: 18 }), []);   // back towards normal
+assert.deepEqual(rules.detectDeterioration({ rr: 13 }, { rr: 21 }), ["⬆ נשימות 13→21"]);
+assert.deepEqual(rules.detectDeterioration({ rr: 28 }, { rr: 18 }), []);   // falling is not this flag
+assert.deepEqual(rules.detectDeterioration({ rr: 16 }, { rr: null }), []); // not counted this time
+assert.deepEqual(rules.detectDeterioration({ rr: 0 }, { rr: 12 }), []);    // apnoea -> breathing: MSTART's call
 
 // FINAL_PATIENT_STATUSES / canChangePatientStatus: once a patient reaches deceased,
 // handed_over, evacuated, closed, or self_evacuated, mutation sites (handover, manual
