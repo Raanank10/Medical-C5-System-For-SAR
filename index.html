@@ -1033,7 +1033,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9984</div>
+      <div class="demo-kicker">Demo V2.9985</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1130,7 +1130,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9984</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9985</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1140,7 +1140,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9984</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9985</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3467,7 +3467,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.84';
+const APP_VERSION = '2.99.85';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -6746,6 +6746,7 @@ function renderMedicActionPanel(){
       </div>
       <div class="demo-actions" style="margin:0;grid-template-columns:1fr 1fr">
         <button class="demo-mini-btn" onclick="startNewCasualtyInCurrentContext()" style="background:var(--red);border-color:var(--red);color:white">פצוע נוסף באזור הזה</button>
+        <button class="demo-mini-btn" data-full-form onclick="guardedNewPatient('extended')">פצוע חדש - טופס מלא</button>
         <button class="demo-mini-btn" onclick="goTo('dashboard')">הפצועים שלי</button>
         <button class="demo-mini-btn" onclick="promptZoneUpdate(true)">מוקד / אזור</button>
         <button class="demo-mini-btn" onclick="openMedicResupplySheet()" style="background:var(--surface2);border-color:var(--border);color:var(--muted)">חסר לי ציוד</button>
@@ -9329,7 +9330,7 @@ function goTo(screen){
   if(screen==='step3')     { const b=document.querySelector('#screen-step3 .btn-back'); if(b) b.setAttribute('onclick', "goTo('step1')"); }
   if(screen==='step4')     { setVitalsModeView(); setDeviceLabels(); checkStep4(); }
   if(screen==='step5')     showMstartSuggestion();
-  if(screen==='step7')     { renderTourniquetReminder(); renderLocalStockPanel(); updatePediatricTreatmentUi(); resetMarchOpenLetter(); renderMarchProgress(); setDeviceLabels(); checkStep7(); }
+  if(screen==='step7')     { applyMarchUpdateChrome(); renderTourniquetReminder(); renderLocalStockPanel(); updatePediatricTreatmentUi(); resetMarchOpenLetter(); renderMarchProgress(); setDeviceLabels(); checkStep7(); }
   if(screen==='step8')     renderSummary();
   if(screen==='commander') renderCommander();
   if(screen==='logistics') renderLogisticsOfficer();
@@ -9375,7 +9376,7 @@ function updateFlowChrome(screen){
   if(screen==='step4') setStepChrome('step4', isQuick?'שלב 2 / 6':'שלב 3 / 8');
   if(screen==='step5') setStepChrome('step5', isQuick?'שלב 3 / 6':'שלב 4 / 8');
   if(screen==='step6') setStepChrome('step6', isQuick?'שלב 4 / 6':'שלב 5 / 8');
-  if(screen==='step7') setStepChrome('step7','שלב 6 / 8');
+  if(screen==='step7') setStepChrome('step7', state.marchUpdatePid ? marchUpdateHeader() : 'שלב 6 / 8');
   if(screen==='step8') setStepChrome('step8', isBlack?'שלב 4 / 4':isQuick?'שלב 6 / 6':'שלב 8 / 8');
 }
 
@@ -9722,9 +9723,10 @@ function updateZoneContextBar(){
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px">
       <div style="font-size:12px;color:var(--muted);margin-bottom:8px">מוקד → אזור → פצוע</div>
       <div style="font-weight:800">${siteContextLine()}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
         <button class="demo-mini-btn" onclick="promptZoneUpdate()">שנה אזור</button>
         <button class="demo-mini-btn" onclick="startNewCasualtyInCurrentContext()">פצוע נוסף באזור הזה</button>
+        ${canRecordTreatments()?`<button class="demo-mini-btn" data-full-form onclick="guardedNewPatient('extended')">פצוע חדש - טופס מלא</button>`:''}
         <button class="demo-mini-btn" onclick="completeMstartSweep()">סיים סריקה באזור הזה</button>
       </div>
     </div>`;
@@ -12100,6 +12102,7 @@ function openPatient(id){
     ? `<button class="btn-primary bar-main-btn" style="background:var(--orange)" onclick="markPatientArrivedAtEvacPoint('${p.id}')">📍 הגיע לנאפ״ל</button>`
     : handoverBtn;
   const moreBtns=[
+    canRecordTreatments() ? `<button class="btn-secondary" data-march-open="${p.id}" onclick="openMarchForPatient('${p.id}')">🩺 טיפולים MARCH-PAWS</button>` : '',
     `<button class="btn-secondary" onclick="speakMist('${p.id}')">🔊 הקרא MIST</button>`,
     showCollectionPointBtn || showArrivedBtn ? handoverBtn : '',
     C5Rules.canChangePatientStatus(p) ? `<button class="btn-secondary" onclick="generateQrHandover('${p.id}')">🔗 מסירה מאובטחת — קישור QR</button>` : ''
@@ -13151,6 +13154,96 @@ function marchReviewSummaryHtml(review){
     return `<span style="color:${color};white-space:nowrap">${sec.letter} ${sec.label}: ${MARCH_REVIEW_LABELS[status]||'לא תועד'}</span>`;
   }).join('<br>');
 }
+// ── MARCH-PAWS for a casualty already on the board (V2.99.85, owner 2026-11-21) ──
+// The same step 7 screen, opened from the patient card (and so reachable by medics, paramedics and
+// physicians, whose add buttons open the sweep marker). Saving records the treatments, medications
+// and tourniquets for that casualty with the events the New Patient form sends, and the per-letter
+// review as a NOTE_ADDED (kind march_review). Documentation only, as in the form: no triage, status
+// or alert change. state.marchUpdatePid marks the mode, so a restored draft stays on its casualty.
+const TREATMENT_RECORDING_ROLES = new Set(['medic','paramedic','physician','pc','admin']); // AUTH_MATRIX "Record vitals and interventions"
+function canRecordTreatments(){
+  return TREATMENT_RECORDING_ROLES.has(currentUser ? (SERVER_ROLE_TO_CLIENT_ROLE[currentUser.role]||currentUser.role) : activeRoleDashboard);
+}
+function marchUpdatePatient(){
+  return state.marchUpdatePid ? patients.find(x=>x.id===state.marchUpdatePid)||null : null;
+}
+function marchUpdateHeader(){
+  const p=marchUpdatePatient();
+  return `טיפול בפצוע ${p ? (p.visualId||p.id) : ''}`.trim();
+}
+function openMarchForPatient(pid){
+  const p=patients.find(x=>x.id===pid); if(!p) return;
+  if(!canRecordTreatments()){ toast('תיעוד טיפולים - לגורם רפואי בלבד'); return; }
+  startNewPatient('extended');
+  state.marchUpdatePid=pid;
+  state.needsFullAssessment=false;
+  // The casualty's age group drives the pediatric dose guard and suggested doses here too.
+  state.patientAgeGroup=p.patientAgeGroup==='pediatric'?'pediatric':'adult';
+  state.patientAgeBand=ageBandOf(p);
+  state.patientAge=p.patientAge ?? null;
+  if(state.patientAgeGroup==='pediatric') applyPediatricSafeDefaults();
+  goTo('step7');
+}
+function applyMarchUpdateChrome(){
+  const p=marchUpdatePatient();
+  const back=document.querySelector('#screen-step7 .btn-back');
+  const btn=document.getElementById('btn-step7');
+  const history=document.getElementById('tx-history-block');
+  if(back) back.setAttribute('onclick', p ? 'cancelMarchUpdate()' : "goTo('step6')");
+  if(btn){ btn.textContent=p ? '✓ שמור טיפולים' : 'המשך למיקום'; btn.setAttribute('onclick', p ? 'saveMarchUpdate()' : "goTo('step2')"); }
+  if(history){
+    const rows=(p?.txHistory||[]).slice(0,5);
+    history.style.display=rows.length ? 'block' : 'none';
+    const list=document.getElementById('tx-history-list');
+    if(list) list.innerHTML=rows.map(r=>`<div class="summary-row"><span class="summary-key" style="font-family:var(--mono)">${escAttr(String(r.time||''))}</span><span class="summary-val">${escAttr(String(r.text||''))}</span></div>`).join('');
+  }
+}
+function cancelMarchUpdate(){
+  const pid=state.marchUpdatePid;
+  // Like leaving the New Patient form: items already taken from the bag are still sent (no patient).
+  state=freshPatientState();
+  clearActiveRecoveryState();
+  if(pid && patients.some(x=>x.id===pid)) openPatient(pid); else goTo('dashboard');
+}
+function saveMarchUpdate(){
+  const p=marchUpdatePatient();
+  if(!p){ toast('הפצוע לא נמצא - לא נשמר'); return; }
+  const review=marchReviewFromState();
+  if(!state.interventions.size && !Object.values(review).some(Boolean)){
+    toast('לא נבחר טיפול ולא סומן אף סעיף - לא נשמר');
+    return;
+  }
+  const medicName=currentMedicName();
+  const text=buildIntStr();
+  const tqEntries=tourniquetEntriesFromState();
+  if(tqEntries.length){
+    const list=ensureTourniquetArray(p);
+    tqEntries.forEach(tq=>{
+      tq.id=`TQ-${String(list.length+1).padStart(3,'0')}`;
+      tq.source='march_update';
+      list.push(tq);
+      p.events=p.events||[];
+      p.events.unshift({type:'TOURNIQUET_APPLIED',time:nowT(),detail:`${tq.id} · ${tq.limbLabel} · נרשם בטיפולי MARCH-PAWS`,warn:true});
+      queueTourniquetAppliedEvent(p, tq, {source:'march_update'});
+    });
+    syncLegacyTourniquetAlias(p);
+  }
+  queueIntakeClinicalEventsAtSave(p.id, 'march_update');
+  sendFormSupply(p.id);
+  const done=MARCH_PAWS_SECTIONS.filter(sec=>review[sec.id]).map(sec=>`${sec.letter} ${MARCH_REVIEW_LABELS[review[sec.id]]}`).join(' · ');
+  saveLocalEvent({type:'NOTE_ADDED', detail:`MARCH-PAWS · ${p.visualId||p.id} · ${done}`, warn:false, patient_id:p.id,
+    payload_json:{kind:'march_review', march_review:review, source:'march_update'}});
+  if(text){ p.txHistory=p.txHistory||[]; p.txHistory.unshift({time:nowT(), text, medic:medicName}); }
+  p.marchReview=review;
+  p.events=p.events||[];
+  p.events.unshift({type:'MARCH_PAWS_RECORDED', time:nowT(), detail:`MARCH-PAWS: ${done}${text?` · ${text}`:''}`, warn:false});
+  p.lastModifiedAt=new Date().toISOString();
+  state=freshState();
+  clearActiveRecoveryState();
+  saveDemoState();
+  openPatient(p.id);
+  toast('טיפולי MARCH-PAWS נשמרו');
+}
 function changeDose(key, delta){
   const lim={morphine:{min:1,max:30},fluids:{min:50,max:2000}}[key];
   const adjustedDelta=key==='morphine' && state.patientAgeGroup==='pediatric' && Math.abs(delta)===1 ? delta*0.5 : delta;
@@ -13462,7 +13555,7 @@ function queueMedicationEventsBeforeSave(){
 }
 // WP-3 (V2.99.37): medications, pediatric high-risk confirmations and treatments entered during
 // intake, sent with the new patient's id and after its create event so the server can place them.
-function queueIntakeClinicalEventsAtSave(patientId){
+function queueIntakeClinicalEventsAtSave(patientId, source='patient_flow'){
   medicationEntriesFromState().forEach(({med, override, payload})=>{
     if(override){
       saveLocalEvent({type:'HIGH_RISK_OVERRIDE_CONFIRMED', detail:`אישור חריגת מינון פדיאטרי — ${med.label} ${med.dosage}`, warn:true, patient_id:patientId,
@@ -13473,7 +13566,7 @@ function queueIntakeClinicalEventsAtSave(patientId){
   [...state.interventions].forEach(key=>{
     const label=key==='other_tx' ? ((document.getElementById('other-tx-text')?.value||'').trim()||'אחר') : (INT_LABELS[key]||key);
     const sec=marchSectionForKey(key);
-    queueTreatmentEvent(patientId, key, label, {source:'patient_flow', ...(sec?{march_section:sec.id}:{})});
+    queueTreatmentEvent(patientId, key, label, {source, ...(sec?{march_section:sec.id}:{})});
   });
 }
 
