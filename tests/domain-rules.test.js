@@ -406,6 +406,34 @@ assert.equal(rules.tourniquetSnoozeOption("decision", 1), null);
 assert.deepEqual(rules.tourniquetSnoozeOption("critical", undefined), { minutes: 1, used: 1, max: 1, escalates: true });
 assert.equal(rules.tourniquetSnoozeOption("critical", 1), null);
 assert.equal(rules.tourniquetSnoozeOption("", 0), null);
+
+// PC review of a deteriorating casualty (WP-26).
+assert.equal(rules.priorityRecommendationDirection("yellow", "red"), "worse");
+assert.equal(rules.priorityRecommendationDirection("red", "black"), "worse");
+assert.equal(rules.priorityRecommendationDirection("red", "yellow"), "better");
+assert.equal(rules.priorityRecommendationDirection("yellow", "green"), "better");
+assert.equal(rules.priorityRecommendationDirection("red", "red"), null);
+assert.equal(rules.priorityRecommendationDirection("pending", "green"), "worse");
+assert.equal(rules.priorityRecommendationDirection("red", null), null);
+assert.equal(rules.priorityRecommendationDirection("black", "red"), "worse");
+assert.equal(rules.priorityRecommendationDirection("green", "yellow"), "worse");
+assert.deepEqual(rules.pcReviewSnoozeOption("immediate", 0), { minutes: 3, used: 1, max: 1, escalates: true });
+assert.equal(rules.pcReviewSnoozeOption("immediate", 1), null);
+assert.deepEqual(rules.pcReviewSnoozeOption("high", 0), { minutes: 5, used: 1, max: 2, escalates: false });
+assert.deepEqual(rules.pcReviewSnoozeOption("high", 1), { minutes: 5, used: 2, max: 2, escalates: true });
+assert.equal(rules.pcReviewSnoozeOption("high", 2), null);
+assert.deepEqual(rules.pcReviewSnoozeOption("bogus", undefined), { minutes: 5, used: 1, max: 2, escalates: false });
+{
+  const t0 = Date.parse("2026-11-21T10:00:00Z");
+  const at = new Date(t0).toISOString();
+  assert.equal(rules.pcReviewState({ status: "pending", createdAt: at }, t0 + 4 * 60000), "waiting");
+  assert.equal(rules.pcReviewState({ status: "pending", createdAt: at }, t0 + 5 * 60000), "unanswered");
+  assert.equal(rules.pcReviewState({ status: "acknowledged", createdAt: at, snoozedUntil: new Date(t0 + 10 * 60000).toISOString() }, t0 + 9 * 60000), "snoozed");
+  assert.equal(rules.pcReviewState({ status: "acknowledged", createdAt: at, snoozedUntil: new Date(t0 + 10 * 60000).toISOString() }, t0 + 10 * 60000), "unanswered");
+  assert.equal(rules.pcReviewState({ status: "resolved", createdAt: at }, t0), "closed");
+  assert.equal(rules.pcReviewState({ status: "cancelled", createdAt: at }, t0), "closed");
+  assert.equal(rules.pcReviewState(null, t0), "closed");
+}
 assert.deepEqual(rules.tourniquetSnoozeOption("hours_3", 0), { minutes: 5, used: 1, max: 2, escalates: false });
 assert.deepEqual(rules.tourniquetSnoozeOption("hours_6", 1), { minutes: 5, used: 2, max: 2, escalates: true });
 assert.equal(rules.tourniquetSnoozeOption("hours_6", 2), null);

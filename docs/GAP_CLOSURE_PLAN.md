@@ -377,7 +377,7 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 | WP-23 | Injury time editable in the field | P2 | - (decided 2026-10-23) |
 | WP-24 | Command cancels a resupply request (was: CC "fulfilled by company" / "closed") | P2 | - (decided 2026-11-18) |
 | WP-25 | Medic incident type and mismatch report synced | P2 | - (decided 2026-10-23) |
-| WP-26 | PC deterioration review request synced | P2 | - (decided 2026-10-23) |
+| WP-26 | PC deterioration review request synced | P2 | - (decided 2026-10-23, shape 2026-11-19/21) |
 | WP-27 | CC moves a site's patients to another platoon | P2 | one design question |
 | WP-28 | The 27 never-sent event types | P2 | build / keep / remove per type |
 | WP-29 | Dead Man's Switch on the server | P2 | recipients |
@@ -553,6 +553,25 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 **Steps.** Decide the shape with the owner: a `medical_resource_requests` row with resource type `pc_review` (reuses `052`, its RLS and status flow; recommended) or its own event and table. Then the four places, the PC strip shows it as an alert line, the PC closes it.
 
 **Verify.** Extend `scripts/browser_reinforcement_sync_test.js` (medic, PC).
+
+**Status (2026-11-21, V2.99.84, `database/093`).** Built; **not applied live** (owner applies through the connector, then runs `scripts/rls_test_093_pc_review.sql`). Owner decisions 2026-11-19/21:
+1. Shape: option A. A `medical_resource_requests` row with its own `request_kind = 'pc_review'` (052's read policy, server-id status, newest-wins), kept out of every reinforcement count. `093` adds a second trigger beside 052's (the 087 pattern; 052 unchanged): only medic / paramedic / admin create it, only for a patient of the same incident; on a status update 052 accepted, it stores the outcome (`review_outcome`) or the delay (`snoozed_until`, `snooze_count`), then applies the same decision to every other open review of that casualty.
+2. When the medic sees "בקש חוג"ד": the deterioration card (worse), a new card for a red casualty who gets worse and stays red (it never had one), and by hand from the patient screen's "עוד". An improvement (red -> yellow / green, yellow -> green) has its own card with update / keep only and no alert; before this it was titled "הידרדרות" and raised an alert. `C5Rules.priorityRecommendationDirection` (black <-> red count as worse).
+3. One open review per casualty per phone; a second tap raises it to immediate. Urgency immediate for a red casualty, else high.
+4. PC + CC see it; one strip line per casualty (two medics = one line). The PC closes it with one of four outcomes (priority updated / kept / paramedic or doctor requested / evacuation moved up); "updated" opens the priority buttons, "paramedic" opens the request form. The PC may put it off ("אחר כך", owner 2026-11-21): a red casualty once for 3 minutes, others twice for 5 (`C5Rules.pcReviewSnoozeOption`); the CC sees who put it off and until when, and when the delays are used up.
+5. After 5 minutes with no answer (or when a delay runs out) the PC's line turns red and the CC's says "לא נענה". The PC's phone vibrates for a new review and when a delay ends.
+6. The medic's patient screen shows where it stands and, once closed, "חוג"ד סקר: <outcome>" with the PC's name and time (toast and vibration on arrival).
+7. KPI `pc_review_response()` in the analytics package (minutes to first answer and to decision, outcome, delays, unanswered past 5 minutes).
+
+Follow-up, same PR, owner 2026-11-21 (093 was not applied yet, so folded into it):
+8. A casualty who leaves the scene (handed_over, self_evacuated, deceased, closed) closes its open reviews on the server (`app.close_pc_reviews_on_patient_exit()`, status 'closed', reason `patient_left_scene`, no outcome); the strip drops the line as soon as the phone knows. The KPI reports it as `closed_patient_left` and counts it as unanswered only if 5 minutes passed first. Without this an abandoned review stayed open forever and inflated "unanswered".
+9. The incident's medics and paramedics read every pc_review row (`medical_resource_requests_read_pc_review_medics`; read only, every other request kind keeps 052's policy): the PC's decision belongs to the casualty, so a medic who takes over sees it. Writing is unchanged: only command changes a review's status (052).
+10. "עודכנה קדימות" with no triage change for that casualty between the request and 2 minutes after the decision is flagged: in-app AAR (four new cards, the PC insight names the casualties) and `pc_review_response().priority_update_unconfirmed`, plus a PC review section in the analytics report.
+11. Synced text keeps Hebrew quotes: `sanitizeRemoteText` turns `"` into ״ and `'` into ׳ instead of dropping them (names like חוג"ד were shown as חוגד).
+
+Found and fixed on the way: a re-check that did not count the pulse raised "CRITICAL: ירידה חדה — דופק 110→null" (a null pulse counted as a 100% drop) on every such save.
+
+Verified: `scripts/rls_test_093_pc_review.sql` on a local PostgreSQL 16 with every migration applied (22 checks: creation rules, 052 untouched, who reads what incl. a member medic reading every review but not others' reinforcement and a non-member reading none, medic cannot close, delay, same-casualty follow, 3 h delay refused, outcome, late older update ignored, unknown outcome dropped, casualty leaving closes an open review and leaves a closed one alone, refused events kept; also applied from scratch). The live 052 function was compared before writing 093 (same logic as the repo file; the live constraint name matches). `scripts/browser_pc_review_sync_test.js` (two medics, PC, CC). Left: a CC on the all-incidents view does not see other incidents' reviews (only the open incident's); the two-phone check in WP-21.
 
 ---
 
@@ -783,7 +802,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-23 Injury time editable | P2 | Done in this PR (V2.99.81, `database/088`); `088` applied live (objects checked 2026-11-20, not in the migration list) | this PR | owner 2026-10-23 and 2026-11-18: CC may not edit; watchdog rows, MIST and stored report follow the injury time; newest entry by phone time wins; `handover-consume` change not deployed |
 | WP-24 Command cancels a resupply request | P2 | Client done (V2.99.75); `database/083` + `084` applied live (objects checked 2026-11-20, not in the migration list); `SUPPLY_REQUEST_CANCELLED` in deployed `sync-log` (v20 and v21) | this PR | rescoped 2026-11-18: CC holds no stock, so no "fulfilled by company"; medic's escalation stays with the PC; cancel with a reason (cc/chamal/admin while open, PC before escalation); direct writes to `supply_requests` closed |
 | WP-25 Medic incident type + mismatch | P2 | Done (V2.99.82): `089`, `090` live, `sync-log` v21 deployed, role check with real profiles passed 2026-11-20; `091` hardening applied live 2026-11-21 | #134, this PR | owner 2026-11-18: several types per incident; anyone adds, removing by the ladder rescue > PC/CC > medics against the adder (`090`). Medic's "not right" reports; PC/CC type section, never over rescue; one change at a time from boards. Removed from `known_gaps`. Every type in the picker, RCC table, stored report and analytics export: `092` (V2.99.83), applied live 2026-11-21 |
-| WP-26 PC deterioration review | P2 | Not started | | owner 2026-10-23 (WP-5 `known_gaps`) |
+| WP-26 PC deterioration review | P2 | Built (V2.99.84, `093`), not applied live | this PR | owner 2026-11-19/21: option A (052 table, own `request_kind`), PC + CC alert, tap + outcome, "אחר כך". Removed from `known_gaps`. Owner applies `093` through the connector and runs `scripts/rls_test_093_pc_review.sql` |
 | WP-27 CC moves a site to another platoon | P2 | Not started, 1 design question | | owner 2026-10-23 (WP-7 remainder); RLS |
 | WP-28 27 never-sent event types | P2 | Waiting on owner's list | | |
 | WP-29 Dead Man's Switch on the server | P2 | Not started | | builds on 081's watchdog (live) |

@@ -1033,7 +1033,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9983</div>
+      <div class="demo-kicker">Demo V2.9984</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1130,7 +1130,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9983</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9984</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1140,7 +1140,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9983</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9984</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3006,6 +3006,47 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     return { minutes: policy.minutes, used: used + 1, max: policy.max, escalates: used + 1 >= policy.max };
   }
 
+  // PC review of a deteriorating casualty (WP-26, repo owner 2026-11-19/21).
+  // Which way an MSTART re-check moved the casualty. 'better' is only red -> yellow / green and
+  // yellow -> green: it offers update / keep, no PC review (a down-triage is the medic's call to
+  // confirm, not something to escalate). Every other change is 'worse' and asks for a decision with a
+  // PC review on offer: up the ladder, an unsorted casualty getting a category, a casualty who stops
+  // breathing (-> black) and a black casualty who breathes again (-> red: back in the evacuation order).
+  const PRIORITY_RANK = { green: 1, yellow: 2, red: 3 };
+  const MSTART_CATEGORIES = ["green", "yellow", "red", "black"];
+  function priorityRecommendationDirection(current, suggested) {
+    if (!MSTART_CATEGORIES.includes(suggested) || current === suggested) return null;
+    const from = PRIORITY_RANK[current];
+    const to = PRIORITY_RANK[suggested];
+    if (from && to && to < from) return "better";
+    return "worse";
+  }
+  // "I will come later" for the PC (owner 2026-11-21). A red casualty gets one 3-minute delay; others
+  // two of 5 minutes. Using the last one tells the CC (escalates); after that the only way out is to
+  // close the review. A review nobody has answered for 5 minutes (or whose delay ran out) is unanswered.
+  const PC_REVIEW_SNOOZE_POLICY = {
+    immediate: { minutes: 3, max: 1 },
+    high: { minutes: 5, max: 2 },
+    routine: { minutes: 5, max: 2 },
+  };
+  const PC_REVIEW_UNANSWERED_MS = 5 * 60 * 1000;
+  const PC_REVIEW_CLOSED_STATUSES = ["arrived", "resolved", "cancelled", "denied", "closed", "fulfilled"];
+  function pcReviewSnoozeOption(urgency, used) {
+    const policy = Object.prototype.hasOwnProperty.call(PC_REVIEW_SNOOZE_POLICY, urgency || "") ? PC_REVIEW_SNOOZE_POLICY[urgency] : PC_REVIEW_SNOOZE_POLICY.high;
+    const n = Math.max(0, Number(used) || 0);
+    if (n >= policy.max) return null;
+    return { minutes: policy.minutes, used: n + 1, max: policy.max, escalates: n + 1 >= policy.max };
+  }
+  // 'closed' | 'snoozed' (put off, time not up) | 'waiting' (under 5 minutes) | 'unanswered'.
+  function pcReviewState(review, nowMs = Date.now()) {
+    if (!review || PC_REVIEW_CLOSED_STATUSES.includes(review.status)) return "closed";
+    const until = Date.parse(review.snoozedUntil || "");
+    if (Number.isFinite(until)) return until > nowMs ? "snoozed" : "unanswered";
+    const at = Date.parse(review.createdAt || "");
+    if (!Number.isFinite(at)) return "waiting";
+    return nowMs - at >= PC_REVIEW_UNANSWERED_MS ? "unanswered" : "waiting";
+  }
+
   // { allowed, limitMs, reason }. reason is null when allowed, 'role' for a role that may not
   // convert, 'time' past the role's limit, or 'time_unknown' when the application time is not known
   // (it cannot be shown to be within the limit; every role, physician included, owner 2026-11-08).
@@ -3398,6 +3439,9 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     supplyCriticalThreshold,
     supplyRiskTier,
     SUPPLY_CANCEL_REASONS,
+    pcReviewSnoozeOption,
+    pcReviewState,
+    priorityRecommendationDirection,
     supplyCancelReasonValid,
     supplyRequestCancelAllowed,
     timeCodeToTodayMs,
@@ -3467,7 +3511,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.83';
+const APP_VERSION = '2.99.84';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -5117,6 +5161,9 @@ let demoRevision = 0;
 let modalOpenedLastModified = null;
 let vitalCountdowns = {};
 let reinforcementRequests = [];
+// PC review requests (WP-26, database/093): kept apart from reinforcementRequests so they never
+// count as a reinforcement or equipment request anywhere.
+let pcReviews = [];
 let reinforcementDraft = {resourceType:null, reasonCodes:new Set(), urgency:'high', targetLocation:'', freeText:''};
 let resupplyDraft = {items:new Set(), quantity:1, note:'', linkedPatientId:null, urgency:'high', reason:'manual_request'};
 let pcTruckStock = {...PC_TRUCK_BASELINE};
@@ -6279,7 +6326,7 @@ function clearDemoScenario({confirmReset=true}={}){
   if(blockDemoDataWhileLoggedIn()) return false;
   if(!safeScopedDemoReset({confirmReset})) return false;
   patients=[];
-  reinforcementRequests=[];
+  reinforcementRequests=[]; pcReviews=[];
   pcTruckStock={...PC_TRUCK_BASELINE};
   companyStock={...COMPANY_STOCK_BASELINE};
   siteData=emptySiteData();
@@ -6314,6 +6361,7 @@ function clearDemoPatientsOnly({confirmReset=true}={}){
   if(confirmReset && !confirm('פעולה זו תנקה את נתוני הפצועים בדמו בלבד. להמשיך?')) return false;
   patients=[];
   reinforcementRequests=reinforcementRequests.filter(r=>r.type!=='death_certification_request' && r.type!=='medical_reinforcement' && r.type!=='resupply');
+  pcReviews=[];
   pcTruckStock={...PC_TRUCK_BASELINE};
   _outboxCache=[];
   try{ localStorage.removeItem(OUTBOX_KEY); }catch(e){}
@@ -6343,7 +6391,7 @@ function saveDemoState(){
         }
       }
       demoRevision += 1;
-      await secureSetItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:6,appVersion:APP_VERSION,revision:demoRevision,savedAt:new Date().toISOString(),experimentStartedAt,experimentPhase,siteData,patients,reinforcementRequests,pcTruckStock,companyStock,handledPatientIds,medicIncidentAssignments,demoSyncMode,lastSyncAt}));
+      await secureSetItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:6,appVersion:APP_VERSION,revision:demoRevision,savedAt:new Date().toISOString(),experimentStartedAt,experimentPhase,siteData,patients,reinforcementRequests,pcReviews,pcTruckStock,companyStock,handledPatientIds,medicIncidentAssignments,demoSyncMode,lastSyncAt}));
     }catch(e){}
   });
 }
@@ -6362,6 +6410,7 @@ function loadStoredDemoState(){
       patients=saved.patients.filter(p=>!REMOVED_DEMO_PATIENT_IDS.has(p.id));
       reinforcementRequests=(Array.isArray(saved.reinforcementRequests)?saved.reinforcementRequests:[])
         .filter(r=>!String(r.id||'').startsWith('REQ-OMNI-') && !(r.linkedPatientIds||[r.patientId]).some(id=>REMOVED_DEMO_PATIENT_IDS.has(id)));
+      pcReviews=(Array.isArray(saved.pcReviews)?saved.pcReviews:[]).filter(r=>r && typeof r==='object' && r.id);
       pcTruckStock={...PC_TRUCK_BASELINE, ...(saved.pcTruckStock||{})};
       companyStock={...COMPANY_STOCK_BASELINE, ...(saved.companyStock||{})};
       medicIncidentAssignments=(saved.medicIncidentAssignments && typeof saved.medicIncidentAssignments==='object')?saved.medicIncidentAssignments:{};
@@ -6384,7 +6433,7 @@ function loadStoredDemoState(){
       experimentPhase=saved.experimentPhase||experimentPhase;
       allSites.find(s=>s.id==='SITE_A').externalReports=siteData.externalReports||[];
       // D1: a tourniquet that crossed a time level while the app was closed alerts on open.
-      setTimeout(()=>checkTourniquetTimeAlerts(), 0);
+      setTimeout(()=>{ checkTourniquetTimeAlerts(); checkPcReviewAlerts(); }, 0);
       return true;
     }catch(e){ return false; }
   });
@@ -6412,14 +6461,14 @@ let _demoSandbox=null; // {snapshot, screen, timers:[]}
 function inDemoSandbox(){ return !!_demoSandbox; }
 function snapshotSandboxState(){
   return structuredClone({
-    patients, reinforcementRequests, siteData, pcTruckStock, companyStock, siteAuthority,
+    patients, reinforcementRequests, pcReviews, siteData, pcTruckStock, companyStock, siteAuthority,
     medicIncidentAssignments, handledPatientIds, activeRoleDashboard, demoSyncMode, lastSyncAt, experimentPhase,
     rescueActiveSiteId, state,
     externalReports:allSites.map(s=>({id:s.id, reports:s.externalReports||[]}))
   });
 }
 function restoreSandboxState(snap){
-  patients=snap.patients; reinforcementRequests=snap.reinforcementRequests; siteData=snap.siteData;
+  patients=snap.patients; reinforcementRequests=snap.reinforcementRequests; pcReviews=snap.pcReviews||[]; siteData=snap.siteData;
   pcTruckStock=snap.pcTruckStock; companyStock=snap.companyStock; siteAuthority=snap.siteAuthority;
   medicIncidentAssignments=snap.medicIncidentAssignments; handledPatientIds=snap.handledPatientIds; activeRoleDashboard=snap.activeRoleDashboard;
   demoSyncMode=snap.demoSyncMode; lastSyncAt=snap.lastSyncAt; experimentPhase=snap.experimentPhase;
@@ -6451,7 +6500,7 @@ function demoSandboxStep(delayMs, text, fn){
 function startBriefingDemo(){
   if(_demoSandbox) return;
   _demoSandbox={snapshot:snapshotSandboxState(), screen:activeScreenId(), timers:[]};
-  patients=[]; reinforcementRequests=[];
+  patients=[]; reinforcementRequests=[]; pcReviews=[];
   pcTruckStock={...PC_TRUCK_BASELINE}; companyStock={...COMPANY_STOCK_BASELINE};
   medicIncidentAssignments={};
   state=freshState();
@@ -8303,7 +8352,9 @@ function renderCommandStatusStrip(role, pts, alerts){
   const c={red:0,yellow:0,green:0,black:0,trapped:0};
   pts.forEach(p=>{ if(c[p.triage]!==undefined) c[p.triage]++; if(normalizeTrapStatus(p)==='trapped') c.trapped++; });
   const cell=(n,label,color)=>`<div class="cmd-strip-count" style="border-top-color:${color}"><b>${n}</b>${label}</div>`;
-  const groups=commandAlertGroups(alerts);
+  // PC review requests (WP-26) get their own lines, always shown, with "סקירה" / "אחר כך".
+  const reviewLines=alerts.filter(a=>a.type==='PC_REVIEW_REQUEST').map(a=>commandPcReviewLineHtml(a, role)).join('');
+  const groups=commandAlertGroups(alerts.filter(a=>a.type!=='PC_REVIEW_REQUEST'));
   const shown=commandStripExpanded ? groups : groups.slice(0,1);
   const more=groups.length>1 ? `<button class="cmd-strip-chip cmd-strip-more" onclick="toggleCommandStrip()">${commandStripExpanded?'סגור ▴':`+${groups.length-1} התראות ▾`}</button>` : '';
   const tqColor=tq?.cls==='critical'?'var(--red)':tq?.cls==='warn'?'var(--orange)':tq?.cls==='notice'?'var(--yellow)':'var(--border)';
@@ -8312,10 +8363,12 @@ function renderCommandStatusStrip(role, pts, alerts){
       <span id="role-strip-conn" class="cmd-conn ${contact.level}">${escAttr(serverContactLabel(contact))}</span>
       ${tq?`<button class="cmd-strip-chip" style="border-color:${tqColor}" onclick="openPatient('${tq.patient.id}')">⏱ חסם ${tq.minutes} דק׳ · ${escAttr(tq.patient.visualId||tq.patient.id)}</button>`:''}
       ${blocked?`<button class="cmd-strip-chip blocked" onclick="openCommandBlockedEvents('${role}')">⛔ ${blocked} אירועים חסומים</button>`:''}
+      ${commandPcReviewChipsHtml(role)}
       ${role==='cc'&&currentUser?`<button class="cmd-strip-chip" data-cc-all-incidents onclick="enterCcAllIncidentsView()">‹ כל האירועים</button>`:''}
       ${more}
     </div>
     <div class="cmd-strip-counts">${cell(c.red,'אדום','var(--red)')}${cell(c.yellow,'צהוב','var(--yellow)')}${cell(c.green,'ירוק','var(--green)')}${cell(c.black,'שחור','var(--muted)')}${cell(c.trapped,'לכודים','var(--orange)')}</div>
+    ${reviewLines?`<div class="cmd-strip-reviews">${reviewLines}</div>`:''}
     <div class="cmd-strip-alerts${commandStripExpanded?' expanded':''}">${shown.map(commandAlertLineHtml).join('')}</div>
   </div>`;
 }
@@ -10865,6 +10918,7 @@ function buildAlertObjects(pts=patients){
   const alerts=patientAlertObjects(pts);
   serverWatchdogAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
   tourniquetSnoozeAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
+  pcReviewAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
   duplicateCandidates(pts).forEach(([a,b],idx)=>pushAlert(alerts,{id:`dup-${a.id}-${b.id}`,type:'DUPLICATE_SUSPECTED',severity:'medium',owner:'pc',audience:['pc','chamal'],escalatesTo:null,actionRequired:'merge_duplicate',scope:'site',category:'integrity',siteId:a.siteId||b.siteId||'SITE_A',patientId:a.id,title:`חשד לכפילות ${a.id} ↔ ${b.id}`,detail:'בדיקה ידנית בלבד; אין מיזוג הרסני של אירועים'}));
   const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id)):siteExternalReports(cmdActiveSite);
   if(currentUser){
@@ -11135,7 +11189,7 @@ function openTourniquetAlert(patientId, tqId){
   renderTourniquetTimeAlert();
   if(p) openPatient(p.id);
 }
-setInterval(()=>{ renderAlerts(); renderDashboard(); checkTourniquetTimeAlerts(); updateDemoStatus(); },30000);
+setInterval(()=>{ renderAlerts(); renderDashboard(); checkTourniquetTimeAlerts(); checkPcReviewAlerts(); updateDemoStatus(); },30000);
 
 // LEGACY_FULL_ASSESSMENT_DO_NOT_DELETE_WITHOUT_TESTS
 // ── Fix 7: block new patient if no site open ──────────────
@@ -12029,7 +12083,7 @@ function openPatient(id){
         <div style="background:var(--surface2);border-radius:12px;padding:10px 6px;text-align:center"><div style="font-family:var(--mono);font-size:30px;font-weight:800;line-height:1.1;color:${p.vitals.avpu==='A'?'var(--green)':p.vitals.avpu==='U'?'var(--red)':'var(--yellow)'}">${p.vitals.avpu||'—'}</div><div style="font-size:11px;color:var(--muted)">AVPU${vitalSourceTag(p,'avpu')}</div></div>
       </div>
       ${p.deterioration&&p.deterioration.length?`<div style="background:rgba(230,57,70,0.1);border:1px solid var(--red);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:700;font-size:12px;color:var(--red);margin-bottom:3px">⚠ הידרדרות זוהתה</div><div style="font-size:12px">${p.deterioration.join(' · ')}</div></div>`:''}
-      ${p.priorityRecommendation?`<div style="background:rgba(255,107,53,0.12);border:1px solid var(--orange);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:800;font-size:12px;color:var(--orange);margin-bottom:5px">הידרדרות במדדים — מומלץ לשקול שינוי קדימות</div><div style="font-size:12px;margin-bottom:8px">${TRIAGE_LABELS[p.priorityRecommendation.current]||p.priorityRecommendation.current} → ${TRIAGE_LABELS[p.priorityRecommendation.suggested]||p.priorityRecommendation.suggested}</div><div class="tap-grid tap-grid-2"><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','update')">עדכן קדימות</button><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','keep')">השאר קדימות</button><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','pc_review')">בקש חוג"ד</button><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','doctor')">בקש פראמדיק/רופא</button></div></div>`:''}
+      ${renderPriorityRecommendationCard(p)}${renderRedDeteriorationPrompt(p)}${renderPcReviewStatusCard(p)}
     </div>
     ${patientTourniquetFixHtml(p)}
     <div class="summary-card">
@@ -12056,7 +12110,7 @@ function openPatient(id){
       <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px">ניתן להוסיף מידע גם אחרי חילוץ. הדיווח יכלול את שם האירוע והפלוגה המטפלת.</div>
       <button class="btn-secondary" onclick="openLateExternalPatientUpdate('${p.id}')">הוסף עדכון לפצוע מחולץ</button>
     </div>`:''}
-    <div class="summary-card">
+    <div class="summary-card" id="triage-override-card">
       <div style="font-weight:700;font-size:14px;margin-bottom:10px">סיווג פינוי — עקיפת מפקד ידנית</div>
       <div class="tap-grid tap-grid-4">
         <button class="tap-btn triage-red" onclick="manualTriageOverride('${p.id}','red')">אדום</button>
@@ -12101,6 +12155,7 @@ function openPatient(id){
     : handoverBtn;
   const moreBtns=[
     `<button class="btn-secondary" onclick="speakMist('${p.id}')">🔊 הקרא MIST</button>`,
+    canRequestPcReview() && C5Rules.canChangePatientStatus(p) ? `<button class="btn-secondary" data-pc-review-request onclick="requestPcReview('${p.id}','manual')">👁 בקש חוג"ד${openPcReviewsForPatient(p.id).some(isMyPcReview)?' (פתוחה)':''}</button>` : '',
     showCollectionPointBtn || showArrivedBtn ? handoverBtn : '',
     C5Rules.canChangePatientStatus(p) ? `<button class="btn-secondary" onclick="generateQrHandover('${p.id}')">🔗 מסירה מאובטחת — קישור QR</button>` : ''
   ].filter(Boolean).join('');
@@ -12435,6 +12490,39 @@ function speakMist(id){
     toast('לא ניתן להקריא כרגע');
   }
 }
+// Deterioration cards on the patient screen (WP-26, owner 2026-11-21). "Worse" keeps the four
+// choices; "better" only offers update / keep (no "הידרדרות" title, no PC review). A red casualty
+// who gets worse without a new category gets its own card with the PC review and the paramedic.
+// "בקש חוג"ד" is the field medic's button: a PC or CC on this screen already is the review.
+function canRequestPcReview(){ return PC_REVIEW_REQUEST_ROLES.has(evacuationActorRole()||'medic'); }
+const PC_REVIEW_REQUEST_ROLES=new Set(['medic','paramedic','admin']);
+function renderPriorityRecommendationCard(p){
+  const rec=p.priorityRecommendation; if(!rec) return '';
+  const from=TRIAGE_LABELS[rec.current]||rec.current, to=TRIAGE_LABELS[rec.suggested]||rec.suggested;
+  if(rec.direction==='better'){
+    return `<div data-priority-card="better" style="background:rgba(52,199,89,0.10);border:1px solid var(--green);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:800;font-size:12px;color:var(--green);margin-bottom:5px">שיפור במדדים — שקול עדכון קדימות</div><div style="font-size:12px;margin-bottom:8px">${from} → ${to} · ודא במדידה חוזרת לפני הורדת קדימות</div><div class="tap-grid tap-grid-2"><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','update')">עדכן קדימות</button><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','keep')">השאר קדימות</button></div></div>`;
+  }
+  const review=canRequestPcReview()?`<button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','pc_review')">בקש חוג"ד</button>`:'';
+  return `<div data-priority-card="worse" style="background:rgba(255,107,53,0.12);border:1px solid var(--orange);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:800;font-size:12px;color:var(--orange);margin-bottom:5px">הידרדרות במדדים — מומלץ לשקול שינוי קדימות</div><div style="font-size:12px;margin-bottom:8px">${from} → ${to}</div><div class="tap-grid tap-grid-2"><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','update')">עדכן קדימות</button><button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','keep')">השאר קדימות</button>${review}<button class="tap-btn" onclick="confirmPriorityRecommendation('${p.id}','doctor')">בקש פראמדיק/רופא</button></div></div>`;
+}
+function renderRedDeteriorationPrompt(p){
+  const prompt=p.redDeteriorationPrompt; if(!prompt || p.triage!=='red' || p.priorityRecommendation) return '';
+  const review=canRequestPcReview()?`<button class="tap-btn" onclick="answerRedDeteriorationPrompt('${p.id}','pc_review')">בקש חוג"ד</button>`:'';
+  return `<div data-priority-card="red-worse" style="background:rgba(230,57,70,0.12);border:1px solid var(--red);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:800;font-size:12px;color:var(--red);margin-bottom:5px">פצוע אדום מידרדר</div><div style="font-size:12px;margin-bottom:8px">${escAttr((prompt.flags||[]).join(' · '))}</div><div class="tap-grid tap-grid-2">${review}<button class="tap-btn" onclick="answerRedDeteriorationPrompt('${p.id}','doctor')">בקש פראמדיק/רופא</button><button class="tap-btn" onclick="answerRedDeteriorationPrompt('${p.id}','watch')">המשך מעקב</button></div></div>`;
+}
+function answerRedDeteriorationPrompt(id, action){
+  const p=patients.find(x=>x.id===id); if(!p) return;
+  if(action==='pc_review') requestPcReview(id, 'red_worsening', {render:false});
+  else if(action==='doctor'){
+    createMedicalResourceRequest({resourceType:'paramedic',reasonCodes:['red_patient'],urgency:'immediate',siteId:p.siteId||'SITE_A',targetLocation:p.location||siteData.name,linkedPatientIds:[p.id],requestedByRole:'medic',requestedByName:currentMedicName(),freeText:'בקשת פראמדיק/רופא — פצוע אדום מידרדר',auto:true});
+    p.events.unshift({type:'SENIOR_MEDICAL_REVIEW_REQUESTED',time:nowT(),detail:'בקשת פראמדיק/רופא — פצוע אדום מידרדר',warn:true});
+  }
+  delete p.redDeteriorationPrompt;
+  p.lastModifiedAt=new Date().toISOString();
+  saveDemoState();
+  renderDashboard();
+  openPatient(id);
+}
 function confirmPriorityRecommendation(id, action){
   const p=patients.find(x=>x.id===id); if(!p || !p.priorityRecommendation) return;
   const rec=p.priorityRecommendation;
@@ -12445,7 +12533,7 @@ function confirmPriorityRecommendation(id, action){
   }else if(action==='keep'){
     p.events.unshift({type:'PRIORITY_RECOMMENDATION_DECLINED',time:nowT(),detail:'הידרדרות נצפתה אך הקדימות נשארה ללא שינוי',warn:false});
   }else if(action==='pc_review'){
-    p.events.unshift({type:'PC_REVIEW_REQUESTED_FOR_DETERIORATION',time:nowT(),detail:'התבקשה סקירת חוג"ד בעקבות הידרדרות במדדים',warn:true});
+    requestPcReview(id, 'deterioration', {render:false});
   }else if(action==='doctor'){
     createMedicalResourceRequest({resourceType:'paramedic',reasonCodes:['red_patient'],urgency:'high',siteId:p.siteId||'SITE_A',targetLocation:p.location||siteData.name,linkedPatientIds:[p.id],requestedByRole:'medic',requestedByName:currentMedicName(),freeText:'בקשת פראמדיק/רופא בעקבות הידרדרות במדדים',auto:true});
     p.events.unshift({type:'SENIOR_MEDICAL_REVIEW_REQUESTED',time:nowT(),detail:'בקשת פראמדיק/רופא בעקבות הידרדרות במדדים',warn:true});
@@ -13895,11 +13983,13 @@ async function saveModalVitals(){
   const timeDeltaMin = p.lastVitalsAt ? (Date.now() - p.lastVitalsAt) / 60000 : null;
   let criticalEvent = null;
   if(timeDeltaMin && timeDeltaMin <= 30){
-    const pulseDrop = prev.pulse > 0 ? ((prev.pulse - next.pulse) / prev.pulse * 100) : 0;
+    // A pulse not counted this time (null, V2.99.60) is not a drop to zero (WP-26: it raised a false
+    // CRITICAL on every re-check that skipped the pulse).
+    const pulseDrop = prev.pulse > 0 && Number.isFinite(next.pulse) ? ((prev.pulse - next.pulse) / prev.pulse * 100) : 0;
     const bpRank={radial_strong:0,radial:0,radial_weak:1,weak:1,carotid_strong:2,carotid:2,carotid_weak:3,absent:4};
     const bpWorsened = (bpRank[next.bp_estimate]||0) > (bpRank[prev.bp_estimate]||0);
     if(pulseDrop >= 20 || bpWorsened){
-      criticalEvent = `🚨 CRITICAL: ירידה חדה — דופק ${prev.pulse}→${next.pulse}` +
+      criticalEvent = `🚨 CRITICAL: ירידה חדה — דופק ${prev.pulse??'לא נספר'}→${next.pulse??'לא נספר'}` +
         (bpWorsened ? `, לחץ דם ${BP_LABELS[prev.bp_estimate]?.split('—')[0]}→${BP_LABELS[next.bp_estimate]?.split('—')[0]}` : '') +
         ` תוך ${timeDeltaMin.toFixed(0)} דקות`;
     }
@@ -13919,22 +14009,31 @@ async function saveModalVitals(){
   const yellowOnlyForMissingRr = effective.rr==null && rawSuggestion==='yellow' && !['weak','radial_weak'].includes(effective.bp_estimate);
   const suggestedPriority = yellowOnlyForMissingRr ? null : rawSuggestion;
   const priorityRecommendation = suggestedPriority && suggestedPriority !== p.triage ? suggestedPriority : null;
+  // WP-26 (owner 2026-11-21): an improvement is not a deterioration. It gets its own card (update /
+  // keep, no PC review) and raises no alert; a change the other way keeps the four choices.
+  const recDirection=C5Rules.priorityRecommendationDirection(p.triage, priorityRecommendation);
+  const improving=recDirection==='better';
   if(priorityRecommendation){
     p.priorityRecommendation={
       suggested:priorityRecommendation,
       current:p.triage,
-      reason:'הידרדרות במדדים — מומלץ לשקול שינוי קדימות',
+      direction:recDirection||'worse',
+      reason:improving?'שיפור במדדים — שקול עדכון קדימות':'הידרדרות במדדים — מומלץ לשקול שינוי קדימות',
       at:new Date().toISOString(),
       by:medicName
     };
     p.events.unshift({
-      type:'DETERIORATION_PRIORITY_RECOMMENDED',
+      type:improving?'IMPROVEMENT_PRIORITY_RECOMMENDED':'DETERIORATION_PRIORITY_RECOMMENDED',
       time:nowT(),
-      detail:`הידרדרות במדדים — מומלץ לשקול שינוי קדימות: ${TRIAGE_LABELS[p.triage]||p.triage} → ${TRIAGE_LABELS[priorityRecommendation]||priorityRecommendation}`,
-      warn:['red','black'].includes(priorityRecommendation)
+      detail:`${improving?'שיפור במדדים — שקול עדכון קדימות':'הידרדרות במדדים — מומלץ לשקול שינוי קדימות'}: ${TRIAGE_LABELS[p.triage]||p.triage} → ${TRIAGE_LABELS[priorityRecommendation]||priorityRecommendation}`,
+      warn:!improving && ['red','black'].includes(priorityRecommendation)
     });
   }
-  if(criticalEvent || ['red','black'].includes(priorityRecommendation)){
+  // A red casualty who gets worse stays red, so MSTART suggests nothing: the medic still gets the
+  // choice to ask the PC or a paramedic to look (owner 2026-11-21).
+  if(flags.length && p.triage==='red' && !priorityRecommendation) p.redDeteriorationPrompt={at:new Date().toISOString(), flags:[...flags]};
+  else if(!flags.length) delete p.redDeteriorationPrompt;
+  if(criticalEvent || (!improving && ['red','black'].includes(priorityRecommendation))){
     clearAlertAcknowledgment(p, criticalEvent?'critical_vitals':'priority_'+priorityRecommendation);
   }
 
@@ -13949,7 +14048,7 @@ async function saveModalVitals(){
   p.lastTouchedBy = medicName;
   p.lastModifiedAt = new Date().toISOString();
   p.unsyncedEvents=(p.unsyncedEvents||0)+1;
-  p.alert = flags.length > 0 || !!criticalEvent || !!priorityRecommendation;
+  p.alert = flags.length > 0 || !!criticalEvent || (!!priorityRecommendation && !improving);
   if(!p.vitalsHistory) p.vitalsHistory = [];
   p.vitalsHistory.push({t:Date.now(), pulse:next.pulse, spo2:next.spo2, rr:next.rr, avpu:next.avpu, bp_estimate:next.bp_estimate});
 
@@ -14896,6 +14995,332 @@ function queueReinforcementStatusEvent(req, {status=null, urgency=null, reason=n
   saveLocalEvent({type:'MEDICAL_REINFORCEMENT_STATUS_UPDATED',detail:`${req.id} → ${status||urgency}`,
     payload_json:{request_id:req.id, server_request_id:req.serverId||null, status, urgency, reason}, warn:false});
 }
+// ── PC review of a deteriorating casualty (WP-26, database/093, owner 2026-11-19/21) ──
+// The medic's "בקש חוג"ד" becomes a medical_resource_requests row (request_kind 'pc_review'):
+// created by the field medic (from the deterioration card, the red-casualty card or the patient
+// screen's "עוד"), read by the PC and CC of the incident and by the requester (052's RLS). The PC
+// closes it with an outcome or puts it off ("אחר כך", C5Rules.pcReviewSnoozeOption); a review
+// nobody answered for 5 minutes, or whose delay ran out, turns red on the PC's strip and is marked
+// "לא נענה" on the CC's. Kept in pcReviews, never in reinforcementRequests, so it is not counted
+// as a reinforcement or equipment request anywhere. One open review per casualty per phone: a
+// second tap raises it to immediate. Two medics asking about one casualty is one line for the PC,
+// and one decision closes both (the server applies it to every open review of that casualty).
+const PC_REVIEW_OUTCOME_LABELS={priority_updated:'עודכנה קדימות', priority_kept:'נשארה קדימות', senior_requested:'הוזעק פראמדיק/רופא', evac_moved_up:'הוקדם פינוי'};
+const PC_REVIEW_REASON_LABELS={deterioration:'הידרדרות במדדים', red_worsening:'פצוע אדום מידרדר', manual:'בקשת חובש'};
+const PC_REVIEW_URGENCY_RANK={routine:0, high:1, immediate:2};
+// A casualty who left the scene has no review line (the server closes its open reviews: 093).
+const PC_REVIEW_HIDDEN_STATUSES=new Set(['handed_over','deceased','self_evacuated','closed','evacuated']);
+function pcReviewIsOpen(r){ return C5Rules.pcReviewState(r)!=='closed'; }
+function pcReviewsForPatient(pid){ return pcReviews.filter(r=>(r.linkedPatientIds||[]).includes(pid)); }
+function openPcReviewsForPatient(pid){ return pcReviewsForPatient(pid).filter(pcReviewIsOpen); }
+function isMyPcReview(r){ return r.originDeviceId===getDeviceId() || (!!currentUser && r.requestedById===currentUser.id); }
+function pcReviewTime(iso){ const t=Date.parse(iso||''); return Number.isFinite(t)?new Date(t).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):''; }
+function queuePcReviewStatus(r, {status=null, urgency=null, outcome=null, snoozedUntil=null, reason=null}={}){
+  saveLocalEvent({type:'MEDICAL_REINFORCEMENT_STATUS_UPDATED', detail:`${r.id} → ${status||urgency}${outcome?` · ${outcome}`:''}`, siteId:r.siteId,
+    payload_json:{request_id:r.id, server_request_id:r.serverId||null, status, urgency, outcome, snoozed_until:snoozedUntil, reason, siteId:r.siteId}, warn:false});
+}
+function requestPcReview(pid, trigger='manual', {render=true}={}){
+  const p=patients.find(x=>x.id===pid); if(!p) return null;
+  const urgency=p.triage==='red'||trigger==='red_worsening'?'immediate':'high';
+  const mineOpen=openPcReviewsForPatient(pid).find(isMyPcReview);
+  if(mineOpen){
+    if(mineOpen.urgency!=='immediate'){
+      mineOpen.urgency='immediate';
+      mineOpen.statusHistory=(mineOpen.statusHistory||[]).concat([{status:mineOpen.status, urgency:'immediate', at:new Date().toISOString(), by:currentMedicName()}]);
+      queuePcReviewStatus(mineOpen, {urgency:'immediate', reason:'repeat_request'});
+      toast('בקשת חוג"ד כבר פתוחה — סומנה כדחופה');
+    }else toast('בקשת חוג"ד כבר פתוחה');
+  }else{
+    const flags=(p.deterioration||[]).length?p.deterioration:(p.redDeteriorationPrompt?.flags||[]);
+    const r={
+      id:`REQ-${Date.now().toString(36).slice(-4).toUpperCase()}${uid().slice(0,3).toUpperCase()}`,
+      resourceType:'pc_review', originDeviceId:getDeviceId(), requestedById:currentUser?.id||null,
+      requestedByName:(currentUser&&_myDisplayName)||currentMedicName(), requestedByRole:currentUser?mapServerRole(currentUser.role):'medic',
+      siteId:p.siteId||'SITE_A', linkedPatientIds:[pid], urgency, reasonCodes:[trigger],
+      targetLocation:p.location||'', freeText:flags.join(' · ').slice(0,300), status:'pending',
+      createdAt:new Date().toISOString(), statusHistory:[{status:'pending', urgency, at:new Date().toISOString(), by:currentMedicName()}],
+      snoozedUntil:null, snoozeCount:0, outcome:null
+    };
+    pcReviews.unshift(r);
+    saveLocalEvent({type:'MEDICAL_REINFORCEMENT_REQUESTED', detail:`בקשת חוג"ד · ${p.visualId||p.id}`, siteId:r.siteId, warn:true,
+      payload_json:{id:r.id, resourceType:'pc_review', urgency, reasonCodes:[trigger], linkedPatientIds:[pid], siteId:r.siteId, targetLocation:r.targetLocation, freeText:r.freeText, autoGenerated:false}});
+    toast('נשלחה בקשת סקירה לחוג"ד');
+  }
+  p.events.unshift({type:'PC_REVIEW_REQUESTED_FOR_DETERIORATION', time:nowT(), detail:`התבקשה סקירת חוג"ד · ${PC_REVIEW_REASON_LABELS[trigger]||trigger}`, warn:true});
+  p.lastModifiedAt=new Date().toISOString();
+  saveDemoState();
+  if(render){ renderDashboard(); openPatient(pid); }
+  return mineOpen||pcReviews[0];
+}
+// One line per casualty: the open reviews of that casualty together (several medics may ask).
+function pcReviewGroups(pts=patients, nowMs=Date.now()){
+  const groups=new Map();
+  pcReviews.forEach(r=>{
+    const state=C5Rules.pcReviewState(r, nowMs);
+    if(state==='closed') return;
+    const pid=(r.linkedPatientIds||[])[0];
+    const p=pts.find(x=>x.id===pid);
+    if(!p || PC_REVIEW_HIDDEN_STATUSES.has(p.patientStatus)) return;
+    if(!groups.has(pid)) groups.set(pid,{p, reviews:[]});
+    groups.get(pid).reviews.push({r, state});
+  });
+  return [...groups.values()].map(g=>{
+    g.reviews.sort((a,b)=>(Date.parse(a.r.createdAt)||0)-(Date.parse(b.r.createdAt)||0));
+    g.primary=(g.reviews.find(x=>x.r.serverId)||g.reviews[0]).r;
+    g.urgency=g.reviews.reduce((u,x)=>PC_REVIEW_URGENCY_RANK[x.r.urgency]>PC_REVIEW_URGENCY_RANK[u]?x.r.urgency:u,'routine');
+    g.state=g.reviews.some(x=>x.state==='unanswered')?'unanswered':g.reviews.some(x=>x.state==='waiting')?'waiting':'snoozed';
+    g.snoozeCount=Math.max(...g.reviews.map(x=>Number(x.r.snoozeCount)||0));
+    g.snoozedUntil=g.state==='snoozed'?Math.min(...g.reviews.map(x=>Date.parse(x.r.snoozedUntil)||Infinity)):null;
+    g.createdAt=g.reviews[0].r.createdAt;
+    g.ageMin=Math.max(0,Math.floor((nowMs-(Date.parse(g.createdAt)||nowMs))/60000));
+    g.names=[...new Set(g.reviews.map(x=>x.r.requestedByName).filter(Boolean))];
+    g.reasons=[...new Set(g.reviews.flatMap(x=>x.r.reasonCodes||[]))];
+    g.flags=g.reviews.map(x=>x.r.freeText).find(Boolean)||'';
+    g.snoozedBy=g.state==='snoozed'?(g.primary.lastUpdatedByName||'חוג"ד'):null;
+    return g;
+  });
+}
+function pcReviewAlertObjects(pts){
+  return pcReviewGroups(pts).map(g=>{
+    const who=g.names.join(', ')||'חובש';
+    const reason=g.reasons.map(x=>PC_REVIEW_REASON_LABELS[x]||x).join(' / ');
+    const base={id:`pc-review-${g.p.id}`, type:'PC_REVIEW_REQUEST', patientId:g.p.id, siteId:g.p.siteId||'SITE_A', createdAt:g.createdAt,
+      owner:'pc', escalatesTo:'cc', escalateAfterMin:5, actionRequired:'pc_review', scope:'patient', category:'urgent', pcReview:true};
+    if(g.state==='snoozed'){
+      const limit=!C5Rules.pcReviewSnoozeOption(g.urgency, g.snoozeCount);
+      return {...base, severity:limit?'high':'medium', audience:['cc','chamal'],
+        title:`${g.p.visualId||g.p.id} — בקשת חוג"ד · נדחה ע״י ${g.snoozedBy} עד ${pcReviewTime(new Date(g.snoozedUntil).toISOString())}`,
+        detail:`${reason} · ${who}${limit?' · נוצלו הדחיות':''}`};
+    }
+    const unanswered=g.state==='unanswered';
+    return {...base, severity:unanswered||g.urgency==='immediate'?'critical':'high', audience:['pc','cc','chamal'],
+      title:`${g.p.visualId||g.p.id} — בקשת חוג"ד · ${reason}${unanswered?` · לא נענה ${g.ageMin} דק׳`:''}`,
+      detail:`${who} · ${pcReviewTime(g.createdAt)}${g.flags?` · ${g.flags}`:''}${g.snoozeCount?` · נדחה ${g.snoozeCount}×`:''}`};
+  });
+}
+function pcReviewActorRole(){ return evacuationActorRole(); }
+function commandPcReviewLineHtml(alert, role){
+  const g=pcReviewGroups().find(x=>x.p.id===alert.patientId); if(!g) return '';
+  const cls=alert.severity==='critical'?'crit':alert.severity==='high'?'high':'med';
+  const opt=role==='pc' && g.state!=='snoozed' ? C5Rules.pcReviewSnoozeOption(g.urgency, g.snoozeCount) : null;
+  const snooze=opt?`<button class="ack-btn" data-pc-review-action="snooze" onclick="event.stopPropagation();snoozePcReview('${g.p.id}')">אחר כך ${opt.minutes} דק׳</button>`:'';
+  return `<div class="cmd-strip-alert ${cls}" data-pc-review="${escAttr(g.p.id)}" data-pc-review-state="${g.state}" onclick="openPcReviewSheet('${g.p.id}')">
+    <span class="cmd-strip-alert-id">${escAttr(g.p.visualId||g.p.id)}</span>
+    <div style="flex:1;min-width:0"><div class="cmd-strip-alert-title">${escAttr(TRIAGE_LABELS[g.p.triage]||'')} · ${escAttr(String(alert.title).replace(`${g.p.visualId||g.p.id} — `,''))}</div><div class="cmd-strip-alert-sub">${escAttr(alert.detail||'')}</div></div>
+    <button class="ack-btn" data-pc-review-action="review" onclick="event.stopPropagation();openPcReviewSheet('${g.p.id}')">סקירה</button>${snooze}
+  </div>`;
+}
+// The PC's own delays shrink to a chip in the strip until they come back.
+function commandPcReviewChipsHtml(role){
+  if(role!=='pc') return '';
+  return pcReviewGroups().filter(g=>g.state==='snoozed').map(g=>
+    `<button class="cmd-strip-chip" data-pc-review-chip="${escAttr(g.p.id)}" onclick="openPcReviewSheet('${g.p.id}')">⏸ חוג"ד ${escAttr(g.p.visualId||g.p.id)} עד ${pcReviewTime(new Date(g.snoozedUntil).toISOString())}</button>`).join('');
+}
+function openPcReviewSheet(pid){
+  const g=pcReviewGroups().find(x=>x.p.id===pid);
+  closePcReviewSheet();
+  if(!g){ toast('אין בקשת חוג"ד פתוחה לפצוע'); return; }
+  const el=document.createElement('div');
+  el.id='pc-review-sheet';
+  el.setAttribute('role','dialog');
+  el.style.cssText='position:fixed;inset:0;z-index:602;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end';
+  const btn=(k)=>`<button class="tap-btn" data-pc-review-outcome="${k}" onclick="closePcReview('${pid}','${k}')">${PC_REVIEW_OUTCOME_LABELS[k]}</button>`;
+  el.innerHTML=`<div style="background:var(--surface);border-top:2px solid var(--orange);border-radius:16px 16px 0 0;padding:16px;width:100%;max-height:80vh;overflow-y:auto" onclick="event.stopPropagation()">
+    <div style="font-weight:900;font-size:16px">סקירת חוג"ד · ${escAttr(g.p.visualId||g.p.id)} · ${escAttr(TRIAGE_LABELS[g.p.triage]||'')}</div>
+    <div style="font-size:12px;color:var(--muted);margin:4px 0 10px">${escAttr(g.names.join(', ')||'חובש')} · ${pcReviewTime(g.createdAt)} · ${g.ageMin} דק׳${g.flags?` · ${escAttr(g.flags)}`:''}</div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:6px">מה הוחלט?</div>
+    <div class="tap-grid tap-grid-2">${['priority_updated','priority_kept','senior_requested','evac_moved_up'].map(btn).join('')}</div>
+    <div class="tap-grid tap-grid-2" style="margin-top:8px"><button class="tap-btn" onclick="closePcReviewSheet();openPatient('${pid}')">פתח פצוע</button><button class="tap-btn" onclick="closePcReviewSheet()">סגור</button></div>
+  </div>`;
+  el.onclick=()=>closePcReviewSheet();
+  document.body.appendChild(el);
+}
+function closePcReviewSheet(){ document.getElementById('pc-review-sheet')?.remove(); }
+// Closing records the decision only. "עודכנה קדימות" opens the patient's priority buttons and
+// "הוזעק פראמדיק/רופא" the request form, so the record and the real action do not drift apart.
+function closePcReview(pid, outcome){
+  if(!PC_REVIEW_OUTCOME_LABELS[outcome]) return;
+  const g=pcReviewGroups().find(x=>x.p.id===pid);
+  closePcReviewSheet();
+  if(!g) return;
+  const at=new Date().toISOString(), by=(currentUser&&_myDisplayName)||displayUser('USR-BARAK');
+  g.reviews.forEach(({r})=>{
+    r.status='resolved'; r.outcome=outcome; r.snoozedUntil=null;
+    r.statusHistory=(r.statusHistory||[]).concat([{status:'resolved', outcome, at, by}]);
+    r.lastUpdatedByName=by; r.lastUpdatedAt=at;
+  });
+  queuePcReviewStatus(g.primary, {status:'resolved', outcome});
+  g.p.events.unshift({type:'PC_REVIEW_CLOSED', time:nowT(), detail:`סקירת חוג"ד: ${PC_REVIEW_OUTCOME_LABELS[outcome]}`, warn:false});
+  saveDemoState();
+  toast(`סקירת חוג"ד נסגרה · ${PC_REVIEW_OUTCOME_LABELS[outcome]}`);
+  if(outcome==='priority_updated'){
+    openPatient(pid);
+    setTimeout(()=>{ const c=document.getElementById('triage-override-card'); if(c){ c.scrollIntoView({block:'center'}); c.style.outline='2px solid var(--orange)'; } toast('בחר קדימות חדשה'); }, 60);
+  }else if(outcome==='senior_requested'){
+    openReinforcementRequest({resourceType:'paramedic', urgency:g.urgency==='immediate'?'immediate':'high', reasonCodes:['red_patient'], targetLocation:g.p.location||'', freeText:`סקירת חוג"ד · ${g.p.visualId||g.p.id}`});
+  }else refreshActiveScreenData();
+}
+function snoozePcReview(pid){
+  const g=pcReviewGroups().find(x=>x.p.id===pid); if(!g) return;
+  const opt=C5Rules.pcReviewSnoozeOption(g.urgency, g.snoozeCount);
+  if(!opt){ toast('אין דחיות נוספות — סגור את הבקשה'); openPcReviewSheet(pid); return; }
+  const now=Date.now(), until=new Date(now+opt.minutes*60000).toISOString(), by=(currentUser&&_myDisplayName)||displayUser('USR-BARAK');
+  g.reviews.forEach(({r})=>{
+    r.status='acknowledged'; r.snoozedUntil=until; r.snoozeCount=opt.used; r.lastUpdatedByName=by; r.lastUpdatedAt=new Date(now).toISOString();
+    r.statusHistory=(r.statusHistory||[]).concat([{status:'acknowledged', snoozedUntil:until, at:new Date(now).toISOString(), by}]);
+  });
+  queuePcReviewStatus(g.primary, {status:'acknowledged', snoozedUntil:until, reason:'pc_review_snoozed'});
+  saveDemoState();
+  toast(`תזכורת בעוד ${opt.minutes} דק׳${opt.escalates?' · מ״פ יראה שנדחה':''}`);
+  schedulePcReviewCheck();
+  refreshActiveScreenData();
+}
+// The PC's phone vibrates once for a new review and once when a delay runs out; every phone
+// re-renders when a review crosses the 5-minute mark or a delay ends.
+let _pcReviewTimer=null;
+function seenPcReviewKeys(){ try{ return new Set(JSON.parse(localStorage.getItem('c5_seen_pc_reviews')||'[]')); }catch(e){ return new Set(); } }
+function checkPcReviewAlerts(){
+  const role=pcReviewActorRole();
+  const groups=pcReviewGroups();
+  if(role==='pc'){
+    const seen=seenPcReviewKeys();
+    const fresh=groups.filter(g=>g.state!=='snoozed').flatMap(g=>g.reviews.map(x=>`${x.r.serverId||x.r.id}:${x.r.snoozedUntil||'new'}`)).filter(k=>!seen.has(k));
+    if(fresh.length){
+      haptic([200,100,200]);
+      fresh.forEach(k=>seen.add(k));
+      try{ localStorage.setItem('c5_seen_pc_reviews', JSON.stringify([...seen].slice(-300))); }catch(e){}
+      if(document.getElementById('command-status-strip')) refreshActiveScreenData();
+    }
+  }
+  schedulePcReviewCheck(groups);
+}
+function schedulePcReviewCheck(groups=pcReviewGroups()){
+  clearTimeout(_pcReviewTimer);
+  const now=Date.now();
+  const next=groups.map(g=>g.state==='snoozed'?g.snoozedUntil:g.state==='waiting'?(Date.parse(g.createdAt)||now)+5*60000:null).filter(t=>Number.isFinite(t)&&t>now);
+  if(next.length) _pcReviewTimer=setTimeout(()=>{ refreshActiveScreenData(); checkPcReviewAlerts(); }, Math.min(...next)-now+250);
+}
+// Patient screen: where the review stands, for the medic who asked and for command.
+function renderPcReviewStatusCard(p){
+  const list=pcReviewsForPatient(p.id); if(!list.length) return '';
+  const open=list.filter(pcReviewIsOpen);
+  const role=pcReviewActorRole();
+  if(open.length){
+    const g=pcReviewGroups([p]).find(x=>x.p.id===p.id);
+    const state=g?.state||'waiting';
+    const action=['pc','cc','chamal','admin'].includes(role)?`<button class="tap-btn" style="margin-top:8px" onclick="openPcReviewSheet('${p.id}')">סקירה</button>`:'';
+    const text=state==='snoozed'?`חוג"ד ראה — יחזור עד ${pcReviewTime(new Date(g.snoozedUntil).toISOString())}`
+      : `נשלחה בקשת חוג"ד · ${pcReviewTime(open[0].createdAt)}${state==='unanswered'?' · לא נענתה':' · ממתין'}`;
+    const unsent=open.some(r=>!r.serverId && isMyPcReview(r)) && currentUser ? ' · ממתין לשליחה' : '';
+    return `<div data-pc-review-status="${state}" style="background:var(--surface2);border:1px solid ${state==='unanswered'?'var(--red)':'var(--orange)'};border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:800;font-size:12px">${escAttr(text)}${unsent}</div>${action}</div>`;
+  }
+  const last=list.filter(r=>['resolved','closed'].includes(r.status)).sort((a,b)=>(Date.parse(b.lastUpdatedAt)||0)-(Date.parse(a.lastUpdatedAt)||0))[0];
+  if(!last) return '';
+  if(last.status==='closed'){
+    const left=(last.statusHistory||[]).some(h=>h.reason==='patient_left_scene');
+    return `<div data-pc-review-status="closed-exit" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:800;font-size:12px">בקשת חוג"ד נסגרה${left?' — הפצוע יצא מהזירה':''}</div></div>`;
+  }
+  const label=PC_REVIEW_OUTCOME_LABELS[last.outcome]||'נסגר';
+  return `<div data-pc-review-status="closed" style="background:var(--surface2);border:1px solid var(--green);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:800;font-size:12px">חוג"ד סקר: ${escAttr(label)}${last.lastUpdatedByName?` · ${escAttr(last.lastUpdatedByName)}`:''}${last.lastUpdatedAt?` · ${pcReviewTime(last.lastUpdatedAt)}`:''}</div></div>`;
+}
+function pcReviewColumns(){ return `${MEDICAL_REQUEST_COLUMNS},review_outcome,snoozed_until,snooze_count`; }
+// Its own query: until 093 is applied the extra columns do not exist and the query errors, which
+// must not break the reinforcement pull (which skips pc_review rows: no label for them).
+async function pullPcReviews(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  let result;
+  try{ result=await client.from('medical_resource_requests').select(pcReviewColumns()).eq('incident_id', incidentId).eq('request_kind','pc_review').order('requested_at',{ascending:false}).limit(200); }
+  catch(e){ return; }
+  if(result.error || !Array.isArray(result.data)) return;
+  const siteId=siteIdForIncident(incidentId);
+  if(!siteId) return;
+  applyRemotePcReviews(result.data, siteId);
+}
+function applyRemotePcReviews(rows, siteId){
+  const me=getDeviceId();
+  let changed=false;
+  const closedMine=[];
+  rows.forEach(row=>{
+    if(!row || row.request_kind!=='pc_review' || !MEDICAL_REQUEST_ID_RE.test(String(row.id||''))) return;
+    const linked=(Array.isArray(row.linked_patient_ids)?row.linked_patient_ids:[]).filter(x=>MEDICAL_REQUEST_ID_RE.test(String(x)));
+    if(!linked.length) return;
+    let r=pcReviews.find(x=>x.serverId===row.id || (row.origin_device_id===me && x.id===row.origin_client_request_id));
+    const before=r?JSON.stringify([r.status,r.urgency,r.serverId,r.snoozedUntil,r.outcome]):null;
+    if(!r){
+      r={id:row.id, resourceType:'pc_review', fromServer:true, originDeviceId:row.origin_device_id||null, requestedById:row.requested_by||null,
+        requestedByName:sanitizeRemoteText(row.requested_by_name)||'—', requestedByRole:mapServerRole(row.requested_by_role||''),
+        siteId, linkedPatientIds:linked, reasonCodes:(Array.isArray(row.reason_codes)?row.reason_codes:[]).filter(x=>/^[a-z_]{1,40}$/.test(String(x))),
+        targetLocation:sanitizeRemoteText(row.target_location)||'', freeText:sanitizeRemoteText(row.free_text, 300), createdAt:row.requested_at,
+        status:'pending', urgency:'high', statusHistory:[], snoozedUntil:null, snoozeCount:0, outcome:null};
+      pcReviews.unshift(r);
+    }
+    r.serverId=row.id;
+    if(!hasPendingMedicalRequestPush(r)){
+      const wasOpen=pcReviewIsOpen(r);
+      if(REINFORCEMENT_STATUS_LABELS[row.status]) r.status=row.status;
+      if(REINFORCEMENT_URGENCY_LABELS[row.urgency]) r.urgency=row.urgency;
+      r.outcome=PC_REVIEW_OUTCOME_LABELS[row.review_outcome]?row.review_outcome:null;
+      r.snoozedUntil=row.status==='acknowledged' && Number.isFinite(Date.parse(row.snoozed_until||''))?row.snoozed_until:null;
+      r.snoozeCount=Number.isFinite(row.snooze_count)?row.snooze_count:0;
+      r.statusHistory=(Array.isArray(row.status_history)?row.status_history:[]).slice(-30).map(h=>({
+        status:String(h?.status||''), at:h?.at||null, by:sanitizeRemoteText(h?.by_name)||mapServerRole(h?.by_role||''),
+        byRole:/^[a-z_]{1,20}$/.test(String(h?.by_role||''))?h.by_role:null,
+        reason:/^[a-z_]{1,40}$/.test(String(h?.reason||''))?h.reason:null,
+        outcome:PC_REVIEW_OUTCOME_LABELS[h?.outcome]?h.outcome:null}));
+      r.lastUpdatedByName=sanitizeRemoteText(row.status_updated_by_name);
+      r.lastUpdatedAt=row.status_updated_at||null;
+      if(wasOpen && r.status==='resolved' && isMyPcReview(r) && before!==null) closedMine.push(r);
+    }
+    if(before!==JSON.stringify([r.status,r.urgency,r.serverId,r.snoozedUntil,r.outcome])) changed=true;
+  });
+  closedMine.forEach(r=>{
+    const p=patients.find(x=>x.id===r.linkedPatientIds[0]);
+    if(p) p.events.unshift({type:'PC_REVIEW_CLOSED', time:nowT(), detail:`סקירת חוג"ד: ${PC_REVIEW_OUTCOME_LABELS[r.outcome]||'נסגר'}`, warn:false});
+    haptic(60);
+    toast(`חוג"ד סקר את ${p?.visualId||'הפצוע'}: ${PC_REVIEW_OUTCOME_LABELS[r.outcome]||'נסגר'}`);
+  });
+  if(changed){ saveDemoState(); refreshActiveScreenData(); checkPcReviewAlerts(); }
+}
+// After-action figures for PC reviews (WP-26 follow-up, owner 2026-11-21). An answer is the first
+// acknowledged / resolved entry (only command can set those, 052). A review counts as unanswered
+// when 5 minutes passed with no answer, unless the casualty left the scene first. "עודכנה קדימות"
+// with no priority change for that casualty between the request and 2 minutes after the decision
+// is flagged: the outcome is only a record, so it can disagree with what was done.
+const PC_REVIEW_TRIAGE_EVENT_TYPES=new Set(['MSTART_TRIAGE_OVERRIDE','PATIENT_TRIAGE_UPDATED','TRIAGE_SET','PATIENT_TRIAGED_EXPECTANT']);
+function patientTriageChangeTimes(pid){
+  const p=patients.find(x=>x.id===pid);
+  const local=(p?.events||[]).filter(e=>PC_REVIEW_TRIAGE_EVENT_TYPES.has(e.type)).map(e=>eventTimestampMs(e,p));
+  const queued=getOutbox().filter(e=>PC_REVIEW_TRIAGE_EVENT_TYPES.has(e.type) && (e.patient_id||e.payload_json?.patient_id||e.payload_json?.patientId)===pid).map(e=>Date.parse(e.local_timestamp||e.createdAt||''));
+  const pulled=_pulledEvents.filter(e=>PC_REVIEW_TRIAGE_EVENT_TYPES.has(e.type) && e.patient_id===pid).map(e=>Date.parse(e.local_timestamp||e.server_timestamp||''));
+  return [...local,...queued,...pulled].filter(Number.isFinite);
+}
+function pcReviewAarStats(){
+  const rows=pcReviews.map(r=>{
+    const created=Date.parse(r.createdAt||'');
+    const hist=r.statusHistory||[];
+    const answer=hist.find(h=>['acknowledged','resolved'].includes(h.status) && h.byRole!=='medic' && h.byRole!=='system');
+    const answeredAt=answer?Date.parse(answer.at||''):NaN;
+    const exit=hist.find(h=>h.reason==='patient_left_scene');
+    const exitAt=exit?Date.parse(exit.at||''):NaN;
+    const decision=hist.filter(h=>h.status==='resolved').pop();
+    const decidedAt=decision?Date.parse(decision.at||''):NaN;
+    const minutes=Number.isFinite(created)&&Number.isFinite(answeredAt)?(answeredAt-created)/60000:null;
+    const leftEarly=Number.isFinite(exitAt) && Number.isFinite(created) && exitAt-created<5*60000 && !(minutes!==null && minutes<5);
+    const unanswered=Number.isFinite(created) && !leftEarly && (minutes===null ? (Number.isFinite(exitAt)||Date.now()-created>=5*60000) : minutes>=5);
+    let unconfirmed=false;
+    if(r.outcome==='priority_updated' && Number.isFinite(created) && Number.isFinite(decidedAt)){
+      const pid=(r.linkedPatientIds||[])[0];
+      unconfirmed=!patientTriageChangeTimes(pid).some(t=>t>=created-1000 && t<=decidedAt+2*60000);
+    }
+    return {r, minutes, unanswered, unconfirmed, exited:Number.isFinite(exitAt)};
+  });
+  const answered=rows.map(x=>x.minutes).filter(m=>m!==null).sort((a,b)=>a-b);
+  const median=answered.length?answered[Math.floor((answered.length-1)/2)]:null;
+  return {total:rows.length, median, unanswered:rows.filter(x=>x.unanswered).length, unconfirmed:rows.filter(x=>x.unconfirmed).length,
+    unconfirmedIds:rows.filter(x=>x.unconfirmed).map(x=>patients.find(p=>p.id===(x.r.linkedPatientIds||[])[0])?.visualId||'?'), exited:rows.filter(x=>x.exited).length};
+}
 function renderReinforcementPanel(){
   const body=document.getElementById('cmd-reinforcement-requests'); if(!body) return;
   const visible=reinforcementRequests.filter(r=>commandRole!=='pc' || (r.siteId||'SITE_A')===pcPlatoonSite());
@@ -15632,6 +16057,7 @@ function renderAar(){
   const manualOverrideCount=patients.filter(p=>p.mstart?.overrideReason).length + outbox.filter(e=>String(e.type||'').includes('OVERRIDE')).length;
   const pcAckCount=patients.filter(p=>p.alertAcknowledgedAt).length;
   const ccAssignedCount=reinforcementRequests.filter(r=>(r.statusHistory||[]).some(h=>['assigned','en_route','fulfilled_by_company'].includes(h.status))).length;
+  const pcReviewStats=pcReviewAarStats();
   document.getElementById('aar-kpis').innerHTML=`
     <div class="aar-card"><div class="aar-num">${total}</div><div class="aar-label">סה״כ פצועים</div></div>
     <div class="aar-card"><div class="aar-num" style="color:var(--red)">${red}</div><div class="aar-label">אדומים פעילים</div></div>
@@ -15663,6 +16089,10 @@ function renderAar(){
     <div class="aar-card"><div class="aar-num">${manualOverrideCount}</div><div class="aar-label">חריגות / עקיפות ידניות</div></div>
     <div class="aar-card"><div class="aar-num">${pcAckCount}</div><div class="aar-label">אישורי חוג"ד להתראות</div></div>
     <div class="aar-card"><div class="aar-num">${ccAssignedCount}</div><div class="aar-label">שיוכי משאב מ״פ</div></div>
+    <div class="aar-card" data-aar="pc-review-total"><div class="aar-num">${pcReviewStats.total}</div><div class="aar-label">בקשות סקירת חוג"ד</div></div>
+    <div class="aar-card" data-aar="pc-review-median"><div class="aar-num">${pcReviewStats.median===null?'—':pcReviewStats.median.toFixed(1)}</div><div class="aar-label">דק׳ עד תשובת חוג"ד (חציון)</div></div>
+    <div class="aar-card" data-aar="pc-review-unanswered"><div class="aar-num" style="color:${pcReviewStats.unanswered?'var(--red)':'var(--green)'}">${pcReviewStats.unanswered}</div><div class="aar-label">סקירות שלא נענו תוך 5 דק׳</div></div>
+    <div class="aar-card" data-aar="pc-review-unconfirmed"><div class="aar-num" style="color:${pcReviewStats.unconfirmed?'var(--orange)':'var(--green)'}">${pcReviewStats.unconfirmed}</div><div class="aar-label">"עודכנה קדימות" ללא שינוי קדימות</div></div>
   `;
   const patientEvents=patients.flatMap(p=>(p.events||[]).map(e=>({...e,pid:p.visualId||p.id,triage:p.triage,loc:p.location,_ts:eventTimestampMs(e,p)})));
   const localEvents=outbox.map(e=>{
@@ -15704,7 +16134,7 @@ function renderAar(){
     {title:'מה המחברת הייתה מפספסת?', body:`${patients.filter(p=>assessmentDebtList(p).includes('missing_vitals')).length} פצועים ללא מדדים מלאים אחרי סריקה · ${activeTqTotal} חסמים פעילים · ${multipleTqPatients} פצועים עם כמה חסמים · ${ineffectiveTqTotal} חסמים לא יעילים · ${Number.isFinite(secondTqAfterFailure)?`חסם שני הונח ${secondTqAfterFailure} דק׳ אחרי דימום ממשיך`:'אין עיכוב חסם שני מתועד'} · ${resupplyOpen} בקשות ציוד ממתינות · ${reinforcementRequests.filter(r=>r.resourceType==='doctor_death_cert'&&isRequestOpen(r)).length} חשד לנפטר ממתין לאישור רופא.`},
     {title:'מה למדנו לפעם הבאה?', body:`הסריקה הסתיימה מהר, אבל ${patients.filter(p=>assessmentDebtList(p).includes('missing_vitals')).length} פצועים עדיין צריכים מדדים מלאים. ${patients.filter(p=>p.tourniquet).length?'חסם הונח ונדרש לוודא פינוי/בדיקה בזמן.':'לא נרשם חסם בסריקה.'} ${resupplyOpen?'בקשת השלמת ציוד עדיין פתוחה — לבדוק אם נפתחה מוקדם מספיק.':'חוסר ציוד זוהה או נסגר ללא בקשה פתוחה.'}`},
     {title:'חובש', body: overdue.length ? `${overdue.length} פצועים עברו את יעד עדכון המדדים; נדרש חזרה למדדים כשאפשר.` : 'כל הפצועים הפעילים בתוך חלון המדדים.'},
-    {title:'חוג"ד', body:`${openAlerts} התראות פתוחות דורשות החלטת חוג"ד או חובש. נפתחו ${pcRequests} בקשות תגבור.`},
+    {title:'חוג"ד', body:`${openAlerts} התראות פתוחות דורשות החלטת חוג"ד או חובש. נפתחו ${pcRequests} בקשות תגבור.${pcReviewStats.total?` ${pcReviewStats.total} בקשות סקירה מחובשים, ${pcReviewStats.unanswered} לא נענו תוך 5 דק׳.`:''}${pcReviewStats.unconfirmed?` "עודכנה קדימות" נרשם בלי שינוי קדימות בפועל: ${escAttr(pcReviewStats.unconfirmedIds.join(', '))}.`:''}`},
     {title:'מ״פ רפואה', body:`${ccOpenRequests} בקשות משאב פתוחות ברמת פלוגה; בדוק רופא/פראמדיק וצווארי בקבוק פינוי.`},
     {title:'לוגיסטיקה', body: logisticsShortages || resupplyOpen ? `${logisticsShortages} פריטי ציוד מתחת לסף · ${supplyConsumed} צריכות ציוד · ${resupplyOpen} בקשות השלמה פתוחות.` : 'אין חוסר ציוד קריטי פתוח.'},
     {title:'פינוי', body:`${handed}/${total} פצועים הועברו או נסגרו בתרחיש.`}
@@ -16229,7 +16659,7 @@ function resetWorkingStateForIncident(inc){
   // patients[] is a view of one incident. Its server rows come back on the next pull; unsynced
   // local events stay in the outbox, already pinned to their own incident (saveLocalEvent).
   patients=[];
-  reinforcementRequests=[];
+  reinforcementRequests=[]; pcReviews=[];
   _pulledEvents=[];
   _remoteExternalReports={};
   if(state && Array.isArray(state.localEvents)) state.localEvents=state.localEvents.filter(e=>e.incident_id===inc.id);
@@ -16288,7 +16718,7 @@ function deactivateIncidentContext(){
   _platoonsByCompany={};
   hideOpenIncidentDupes(); // another user's company incidents must not stay on screen
   patients=[];
-  reinforcementRequests=[];
+  reinforcementRequests=[]; pcReviews=[];
   _pulledEvents=[];
   _remoteExternalReports={};
   clearWorkingSiteData();
@@ -16540,7 +16970,7 @@ async function handleClosedIncidentOnDevice(incidentId){
 function removeClosedIncidentFromDevice(incidentId){
   if(activeIncident?.id===incidentId){
     patients=[];
-    reinforcementRequests=[];
+    reinforcementRequests=[]; pcReviews=[];
     _pulledEvents=[];
     _remoteExternalReports={};
     clearWorkingSiteData();
@@ -16958,7 +17388,7 @@ async function syncPush(){
   if(outbox.some(e=>e.type==='SITE_PRE_EVACUATION_REPORTED' && doneIds.has(e.local_event_id))) pullPreEvacuation(SITE_TO_INCIDENT_ID.SITE_A);
   // Same for a reinforcement / death-certification request: pick up the server id right away, so
   // a status change made next on this device can be matched from any device (WP-5).
-  if(outbox.some(e=>['MEDICAL_REINFORCEMENT_REQUESTED','DOCTOR_DEATH_CERTIFICATION_REQUESTED','MEDICAL_REINFORCEMENT_STATUS_UPDATED'].includes(e.type) && doneIds.has(e.local_event_id))) Object.values(SITE_TO_INCIDENT_ID).forEach(id=>pullMedicalResourceRequests(id));
+  if(outbox.some(e=>['MEDICAL_REINFORCEMENT_REQUESTED','DOCTOR_DEATH_CERTIFICATION_REQUESTED','MEDICAL_REINFORCEMENT_STATUS_UPDATED'].includes(e.type) && doneIds.has(e.local_event_id))) Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullMedicalResourceRequests(id); pullPcReviews(id); });
 }
 setInterval(()=>{ if(currentUser) syncPush(); }, 45000);
 
@@ -17083,8 +17513,10 @@ const REMOTE_LOCATION_PLACEHOLDER='לא צוין (התקבל ממכשיר אחר
 // Text another user typed (zone, destination, report fields) now reaches this phone, and much of
 // the UI renders patient fields and timeline details as raw HTML. Strip markup characters on the
 // way in rather than trusting every render site to escape.
+// Markup characters are dropped. Quotes become their Hebrew forms (״ gershayim, ׳ geresh) instead of
+// being dropped, so names like חוג"ד / מ'פ stay readable; neither is special in HTML (WP-26 follow-up).
 function sanitizeRemoteText(value, max=200){
-  return value==null ? '' : String(value).replace(/[<>"'`&]/g,'').slice(0,max);
+  return value==null ? '' : String(value).replace(/"/g,'״').replace(/'/g,'׳').replace(/[<>`&]/g,'').slice(0,max);
 }
 function patientLocationPayload(p){
   const loc={};
@@ -17406,7 +17838,7 @@ function applyServerTourniquets(rows, incidentId, timeMeta=null){
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
 function pullProjectedPatientStateAll(){
-  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullEvacPointArrivals(id); pullExternalReports(id); pullInjuryTimes(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); pullAlertAcknowledgments(id); pullRemoteTreatments(id); pullRemoteVitals(id); pullServerWatchdogAlerts(id); pullTourniquetSnoozes(id); });
+  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullEvacPointArrivals(id); pullExternalReports(id); pullInjuryTimes(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); pullPcReviews(id); pullAlertAcknowledgments(id); pullRemoteTreatments(id); pullRemoteVitals(id); pullServerWatchdogAlerts(id); pullTourniquetSnoozes(id); });
 }
 // ── Pre-evacuation report pull (V2.99.36, database/050) ──
 // incident_pre_evacuations is the server's verdict on who owns the report (first medical
