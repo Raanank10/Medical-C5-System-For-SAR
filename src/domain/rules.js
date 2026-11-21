@@ -438,8 +438,19 @@
     if (Number.isFinite(next.pulse) && Number.isFinite(prev.pulse) && Math.abs(next.pulse - prev.pulse) >= 25) {
       flags.push(`⚡ דופק ${prev.pulse}→${next.pulse}`);
     }
+    // Breathing rate climbing (owner 2026-11-21): often the earliest sign, before SpO₂ falls. A rise
+    // of 8/min or more ending at 21 or above. The rate is counted over 30 s and doubled, so one
+    // missed breath is 2/min; 8 is four extra breaths in 30 s, past counting noise. 21+ is where the
+    // NEWS2 score starts (21-24 scores 2, 25+ scores 3). A rise that ends at 20 or below (10 -> 18)
+    // is a return towards normal, not a deterioration. Above 30 the casualty is red anyway (MSTART).
+    if (Number.isFinite(next.rr) && Number.isFinite(prev.rr) && prev.rr > 0
+        && next.rr - prev.rr >= RR_RISE_FLAG_PER_MIN && next.rr >= RR_RISE_FLAG_FLOOR) {
+      flags.push(`⬆ נשימות ${prev.rr}→${next.rr}`);
+    }
     return flags;
   }
+  const RR_RISE_FLAG_PER_MIN = 8;
+  const RR_RISE_FLAG_FLOOR = 21;
 
   function isRoutineAlert(patient, nowMs = Date.now()) {
     return isVitalsOverdue(patient, nowMs);
