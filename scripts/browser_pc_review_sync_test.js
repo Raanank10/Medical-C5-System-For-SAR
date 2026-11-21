@@ -28,6 +28,7 @@ const P1 = '55555555-5555-4555-8555-000000000001';
 const P2 = '55555555-5555-4555-8555-000000000002';
 const P3 = '55555555-5555-4555-8555-000000000003';
 const P4 = '55555555-5555-4555-8555-000000000004';
+const P5 = '55555555-5555-4555-8555-000000000005';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -372,6 +373,27 @@ async function checkFile(browser, file) {
   await clickInCard(m1.page, 'red-worse', 'בקש חוג"ד');
   await syncAll(m1.page);
   assert(rows(P3).length === 1 && rows(P3)[0].urgency === 'immediate' && rows(P3)[0].reason_codes[0] === 'red_worsening', `${rel}: red worsening is an immediate review (got ${JSON.stringify(rows(P3))})`);
+
+  // 4b. Option B (owner 2026-11-21): a yellow casualty getting worse on two re-checks in a row,
+  // still yellow, gets the trend card; one flagged re-check does not; a clean re-check starts over.
+  await addPatient(m1.page, P5, 'P005-T', 'yellow');
+  v = await saveVitals(m1.page, P5, { pulse: 122 });
+  assert(!v.rec && v.triage === 'yellow' && !v.card, `${rel}: one flagged re-check is not a trend (got ${JSON.stringify(v)})`);
+  v = await saveVitals(m1.page, P5, { pulse: 148 });
+  assert(!v.rec && v.card === 'yellow-trend' && v.cardText.includes('2 בדיקות ברצף') && v.cardText.includes('96→122') && v.cardText.includes('122→148') && v.cardText.includes('בקש חוג"ד'),
+    `${rel}: two flagged re-checks in a row show the trend card with both changes (got ${JSON.stringify(v)})`);
+  await clickInCard(m1.page, 'yellow-trend', 'המשך מעקב');
+  assert(!(await m1.page.evaluate((id) => !!document.querySelector('[data-priority-card="yellow-trend"]') || !!patients.find((p) => p.id === id).yellowTrendPrompt, P5)), `${rel}: "המשך מעקב" hides the card`);
+  v = await saveVitals(m1.page, P5, { pulse: 150 });
+  assert(!v.card && (await m1.page.evaluate((id) => patients.find((p) => p.id === id).deteriorationStreak, P5)) === 0, `${rel}: a clean re-check starts the count over`);
+  v = await saveVitals(m1.page, P5, { pulse: 176 });
+  assert(!v.card, `${rel}: after a clean re-check one flag is again not a trend`);
+  v = await saveVitals(m1.page, P5, { pulse: 202 });
+  assert(v.card === 'yellow-trend' && !v.cardText.includes('96→122'), `${rel}: the trend card comes back with only the new trend (got ${JSON.stringify(v)})`);
+  await clickInCard(m1.page, 'yellow-trend', 'בקש חוג"ד');
+  await syncAll(m1.page);
+  assert(rows(P5).length === 1 && rows(P5)[0].urgency === 'high' && rows(P5)[0].reason_codes[0] === 'yellow_trend' && /150→176/.test(rows(P5)[0].free_text) && /176→202/.test(rows(P5)[0].free_text),
+    `${rel}: the trend request reaches the PC with both changes (got ${JSON.stringify(rows(P5))})`);
 
   // 5. A second medic asks about the same casualty: two rows, one line for the PC.
   const m2 = await phone();
