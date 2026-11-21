@@ -77,6 +77,8 @@ function handle(server, req) {
     if (req.name === 'get_incident_command_state') return { data: null, error: { message: 'access denied' } };
     return { data: null, error: null };
   }
+  // WP-29 (database/095): the rescue chain may read watchdog_alerts for the Dead Man's Switch only.
+  if (req.table === 'watchdog_alerts' && req.eq && req.eq.alert_type === 'DEAD_MAN_SWITCH') { server.dmsReads = (server.dmsReads || 0) + 1; return { data: [], error: null }; }
   if (['patients', 'tourniquets', 'watchdog_alerts', 'vw_patient_treatment_history'].includes(req.table)) { server.clinicalReads += 1; return { data: [], error: null }; }
   if (req.table === 'incident_site_authority') {
     const ids = req.in.incident_id || (req.eq.incident_id ? [req.eq.incident_id] : []);

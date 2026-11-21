@@ -5,6 +5,10 @@
 // already raise the same thing from its own data, marked "(שרת)", for command and the medic. It
 // proves client behavior only; the live read policy (app.can_read_incident_patients) decides who
 // sees what, and the job itself was verified live (rolled back) when 072 was applied.
+// WP-29 (database/095, step 9): the server's Dead Man's Switch for a silent medic, listed for PC
+// and CC (not the medic), in the RCC / RPC strip, hidden once this phone sees a newer heartbeat
+// from that medic, gone when resolved. The fake read policy mirrors 095: the rescue chain reads
+// DEAD_MAN_SWITCH rows only.
 //
 // Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_server_watchdog_test.js
@@ -21,6 +25,8 @@ const MEDIC = '11111111-1111-4111-8111-111111111111';
 const PATIENT = '55555555-5555-4555-8555-555555555555';
 const OTHER = '66666666-6666-4666-8666-666666666666';
 const UNKNOWN = '77777777-7777-4777-8777-777777777777';
+const PC = '22222222-2222-4222-8222-222222222222';
+const RCC = '44444444-4444-4444-8444-444444444444';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -29,6 +35,8 @@ function assert(condition, message) {
 const USERS = {
   'cc@test': { id: CC, role: 'cc', display_name: 'מ"פ בדיקה' },
   'medic@test': { id: MEDIC, role: 'medic', display_name: 'חובש ראשון' },
+  'pc@test': { id: PC, role: 'pc', display_name: 'חוג"ד בדיקה' },
+  'rcc@test': { id: RCC, role: 'rcc', display_name: 'מ"פ חילוץ בדיקה' },
 };
 const BLANKET = ['cc', 'chamal', 'admin', 'rpc', 'rcc', 'physician'];
 const userById = (id) => Object.values(USERS).find((u) => u.id === id);
@@ -38,12 +46,13 @@ function newServer() {
   const now = new Date().toISOString();
   return {
     incidents: [{ id: INC1, visual_id: 'INC-TEST-1', status: 'active', location_name: 'מוקד בדיקה 1', address: null, incident_type: null, metadata: {} }],
-    members: [MEDIC].map((id) => ({ incident_id: INC1, profile_id: id, role_at_incident: userById(id).role, assigned_by: null, created_at: now })),
+    members: [MEDIC, PC].map((id) => ({ incident_id: INC1, profile_id: id, role_at_incident: userById(id).role, assigned_by: null, created_at: now })),
     events: [],
     rejected: [],
     alerts: [],
     alertReads: [],
     tourniquets: [],
+    presence: [],
   };
 }
 
@@ -97,8 +106,15 @@ function handle(server, req) {
   if (req.table === 'watchdog_alerts') {
     server.alertReads.push(clone(req));
     // read policy: the incident's members and blanket command roles; only open alerts are asked for.
-    const rows = server.alerts.filter((a) => a.resolved_at == null && server.incidents.some((i) => i.id === a.incident_id && canSee(i))).filter(match);
+    const rows = server.alerts.filter((a) => a.resolved_at == null && server.incidents.some((i) => i.id === a.incident_id && canSee(i)))
+      // database/074 + 095: the rescue chain reads the Dead Man's Switch only
+      .filter((a) => !['rpc', 'rcc'].includes(u.role) || a.alert_type === 'DEAD_MAN_SWITCH')
+      .filter(match);
     return { data: clone(req.limit ? rows.slice(0, req.limit) : rows), error: null };
+  }
+  if (req.table === 'device_presence') {
+    if (req.op === 'upsert') return { data: null, error: null };
+    return { data: clone(server.presence.filter((d) => server.incidents.some((i) => i.id === d.incident_id && canSee(i))).filter(match)), error: null };
   }
   return { data: req.single ? null : [], error: null };
 }
@@ -241,7 +257,7 @@ async function checkFile(browser, file) {
   await cc.page.waitForTimeout(500);
   // The per-incident pull (eq); since V2.99.68 the CC's all-incidents view also reads every open incident's alerts (in).
   const read = SERVER.alertReads.find((r) => r.userId === CC && r.eq.incident_id);
-  assert(read && read.eq.incident_id === INC1 && read.is && read.is.resolved_at === null && JSON.stringify(read.in.alert_type) === JSON.stringify(['TOURNIQUET_TIME_NOTICE', 'TOURNIQUET_TIME_WARNING', 'TOURNIQUET_TIME_DECISION', 'TOURNIQUET_TIME_CRITICAL', 'VITALS_OVERDUE']),
+  assert(read && read.eq.incident_id === INC1 && read.is && read.is.resolved_at === null && JSON.stringify(read.in.alert_type) === JSON.stringify(['TOURNIQUET_TIME_NOTICE', 'TOURNIQUET_TIME_WARNING', 'TOURNIQUET_TIME_DECISION', 'TOURNIQUET_TIME_CRITICAL', 'VITALS_OVERDUE', 'DEAD_MAN_SWITCH']),
     `${rel}: the pull must ask for this incident's open watchdog alerts (got ${JSON.stringify(read)})`);
 
   // 2. CC: only what this phone does not raise itself, marked as from the server.
@@ -301,7 +317,58 @@ async function checkFile(browser, file) {
   const dec = l.find((a) => a.id === 'server-tq-a-other-decision');
   assert(dec && dec.title.includes('P-OTHER') && dec.title.includes('100 דקות') && dec.title.includes('(שרת)') && dec.severity === 'high', `${rel}: the server's 100-minute alert must be listed (got ${JSON.stringify(l)})`);
 
-  const errors = [...m.errors, ...cc.errors];
+  // 9. WP-29: the server's Dead Man's Switch (database/095). The medic has been silent 12 minutes.
+  const dmsName = '<img src=x onerror=window.__xss=2>חובש ראשון';
+  const dms = (id, extra = {}) => ({ id, incident_id: INC1, patient_id: null, actor_id: MEDIC, alert_type: 'DEAD_MAN_SWITCH', severity: 'critical', triggered_at: min(2), resolved_at: null,
+    payload_json: { source: 'server_watchdog', medic_name: dmsName, role: 'medic', open_patients: 2, last_contact_at: min(12), last_heartbeat_at: min(14), last_event_at: min(12), minutes: 10 }, ...extra });
+  SERVER.alerts.push(dms('a-dms'), { ...dms('a-dms-legacy'), payload_json: { medic: 'Medic Levi' } });
+  SERVER.presence.push({ incident_id: INC1, actor_id: MEDIC, device_id: 'dev-medic', last_heartbeat_at: min(14), sync_status: 'online', current_patient_id: null });
+  await cc.page.evaluate(() => Promise.all([pullDevicePresenceAll(), ...Object.values(SITE_TO_INCIDENT_ID).map((id) => pullServerWatchdogAlerts(id))]));
+  await cc.page.waitForTimeout(300);
+  l = (await listed(cc.page, 'cc')).filter((a) => a.type === 'SERVER_DEAD_MAN_SWITCH');
+  assert(l.length === 1 && l[0].id === 'server-dms-a-dms' && l[0].severity === 'critical' && !l[0].patientId, `${rel}: CC must list one Dead Man's Switch, no patient, the legacy row ignored (got ${JSON.stringify(l)})`);
+  assert(l[0].title.includes('אין קשר 12 דק׳ (שרת)') && l[0].title.includes('חובש') && l[0].detail.includes('2 פצועים') && l[0].detail.includes('לפי השרת'), `${rel}: DMS text counts from the last contact (got ${JSON.stringify(l[0])})`);
+  const p = await phone();
+  await login(p.page, 'pc@test');
+  await enter(p.page);
+  await pullAlerts(p.page);
+  assert((await listed(p.page, 'pc')).some((a) => a.id === 'server-dms-a-dms'), `${rel}: the PC must list the Dead Man's Switch`);
+  await pullAlerts(m.page);
+  assert(!(await listed(m.page, 'medic')).some((a) => a.type === 'SERVER_DEAD_MAN_SWITCH'), `${rel}: the medic is not an audience of the Dead Man's Switch`);
+  // rendered on the command screen without markup from the payload
+  await p.page.evaluate(() => { const d = document.createElement('div'); d.id = '__dms'; d.innerHTML = commandAlertGroups(buildAlertObjects(patients).filter((a) => a.type === 'SERVER_DEAD_MAN_SWITCH')).map(commandAlertLineHtml).join(''); document.body.appendChild(d); });
+  const dmsText = await p.page.textContent('#__dms');
+  assert(dmsText.includes('אין קשר') && !(await p.page.evaluate(() => window.__xss)) && !(await p.page.evaluate(() => !!document.querySelector('#__dms img'))), `${rel}: DMS line rendered as text (got ${dmsText})`);
+  // CC all-incidents view (WP-33): the incident line counts it
+  const ov = await cc.page.evaluate(async (inc) => { await refreshOpenIncidents(); await pullAllIncidentAlertData(getSupabaseClient(), [inc], []); return ccOverviewAlertGroups().flatMap((g) => g.alerts.map((a) => a.type)); }, INC1);
+  assert(ov.includes('SERVER_DEAD_MAN_SWITCH'), `${rel}: the CC all-incidents view must include the Dead Man's Switch (got ${JSON.stringify(ov)})`);
+
+  // RCC: reads the Dead Man's Switch only, shown in its strip
+  const r = await phone();
+  await login(r.page, 'rcc@test');
+  await r.page.evaluate(() => refreshOpenIncidents());
+  await r.page.waitForTimeout(300);
+  const rccRead = SERVER.alertReads.filter((q) => q.userId === RCC);
+  assert(rccRead.length && rccRead.every((q) => q.eq.alert_type === 'DEAD_MAN_SWITCH' || (q.in.alert_type || []).includes('DEAD_MAN_SWITCH')), `${rel}: the RCC reads watchdog alerts for the Dead Man's Switch (got ${JSON.stringify(rccRead)})`);
+  await r.page.evaluate(() => { const d = document.createElement('div'); d.id = '__rcc'; d.innerHTML = renderRccPanel(); document.body.appendChild(d); });
+  const rccLine = await r.page.textContent('#__rcc [data-rcc-dms="a-dms"]').catch(() => null);
+  assert(rccLine && rccLine.includes('אין קשר') && rccLine.includes('2 פצועים') && !(await r.page.evaluate(() => !!document.querySelector('#__rcc img'))) && !(await r.page.evaluate(() => window.__xss)), `${rel}: the RCC strip shows the Dead Man's Switch as text (got ${rccLine})`);
+  assert(!(await r.page.evaluate(() => !!document.querySelector('#__rcc [data-rcc-dms="a-dms-legacy"]'))), `${rel}: a row not from the server watchdog is not shown to the RCC`);
+
+  // A heartbeat newer than the contact the alert was raised on: hidden here before the server resolves it
+  SERVER.presence[0].last_heartbeat_at = min(0);
+  await cc.page.evaluate(() => pullDevicePresenceAll());
+  await cc.page.waitForTimeout(300);
+  assert(!(await listed(cc.page, 'cc')).some((a) => a.type === 'SERVER_DEAD_MAN_SWITCH'), `${rel}: a newer heartbeat seen here hides the Dead Man's Switch`);
+  // resolved by the server: gone for the PC and the RCC
+  SERVER.alerts.find((a) => a.id === 'a-dms').resolved_at = min(0);
+  await pullAlerts(p.page);
+  assert(!(await listed(p.page, 'pc')).some((a) => a.type === 'SERVER_DEAD_MAN_SWITCH'), `${rel}: a resolved Dead Man's Switch disappears for the PC`);
+  await r.page.evaluate(() => refreshOpenIncidents());
+  await r.page.waitForTimeout(300);
+  assert(!(await r.page.evaluate(() => renderRccPanel().includes('data-rcc-dms='))), `${rel}: a resolved Dead Man's Switch disappears from the RCC strip`);
+
+  const errors = [...m.errors, ...cc.errors, ...p.errors, ...r.errors];
   assert(errors.length === 0, `${rel}: page errors: ${errors.join(' | ')}`);
   for (const c of contexts) await c.close();
   console.log(`${rel}: server watchdog alerts browser test passed`);

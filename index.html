@@ -1033,7 +1033,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9989</div>
+      <div class="demo-kicker">Demo V2.9990</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1130,7 +1130,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9989</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9990</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1140,7 +1140,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9989</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9990</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3537,7 +3537,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.89';
+const APP_VERSION = '2.99.90';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -8470,6 +8470,7 @@ let _rccEvacFeed=[];                 // newest first
 let _rccEvacSeen=null;               // `${incident}:${patient}` -> last stage; null until the first baseline
 let _rccBannerItems=[], _rccBannerTimer=null;
 let _rescueIncidentBoards={}, _rescueIncidentAuthority={}, _rescueBoardsAt=null;
+let _rescueDeadManAlerts=[]; // WP-29: open server Dead Man's Switch alerts of every open incident (database/095 lets RCC / RPC read this type only)
 let _rescueIncidentPlatoon={}, _rescueIncidentPlatoonKnown=false;
 const RCC_FEED_MAX=30;
 const RESCUE_STAGE_RANK={on_site:0, moving:1, evacuating_unknown:2, at_point:3, evacuated:4};
@@ -8739,6 +8740,12 @@ async function pullRescueAllIncidents(client){
   _rescueIncidentBoards=boards;
   if(ids.length){
     try{
+      const r=await client.from('watchdog_alerts').select('id,incident_id,actor_id,alert_type,severity,triggered_at,payload_json').in('incident_id', ids).is('resolved_at', null).eq('alert_type', SERVER_DMS_TYPE).limit(200);
+      if(!r.error && Array.isArray(r.data)) _rescueDeadManAlerts=serverDeadManRows(r.data);
+    }catch(e){}
+  }else _rescueDeadManAlerts=[];
+  if(ids.length){
+    try{
       const r=await client.from('incident_site_authority').select(SITE_AUTHORITY_COLUMNS).in('incident_id', ids);
       if(!r.error && Array.isArray(r.data)){ const out={}; r.data.forEach(row=>{ if(row?.incident_id) out[row.incident_id]=row; }); _rescueIncidentAuthority=out; }
     }catch(e){}
@@ -8758,8 +8765,23 @@ async function pullRescueAllIncidents(client){
 }
 
 // ── Rendering ──
+function rccDeadManAlerts(overview){
+  if(!currentUser) return [];
+  const incId=activeIncident?.id||null;
+  return _rescueDeadManAlerts.filter(a=>overview || a.incident_id===incId).filter(a=>serverDeadManStillSilent(a));
+}
+function rccDeadManLineHtml(a){
+  const line=serverDeadManLine(a);
+  const inc=_openIncidents.find(i=>i.id===a.incident_id);
+  const where=inc ? incidentDisplayName(inc) : '';
+  return `<div class="cmd-strip-alert crit" data-rcc-dms="${escAttr(a.id)}" onclick="rccOpenIncident('${escAttr(a.incident_id)}')">
+    <span class="cmd-strip-alert-id">⚠</span>
+    <div style="flex:1;min-width:0"><div class="cmd-strip-alert-title">${escAttr(line.title)}</div><div class="cmd-strip-alert-sub">${escAttr(line.detail)}${where?` · ${escAttr(where)}`:''}</div></div>
+  </div>`;
+}
 function renderRccStrip(pts, overview){
   const contact=serverContactState();
+  const dms=rccDeadManAlerts(overview);
   const c=rescueStageCounts(pts);
   const cell=(n,label,color)=>`<div class="cmd-strip-count" style="border-top-color:${color}"><b>${n}</b>${label}</div>`;
   const feed=_rccEvacFeed;
@@ -8773,6 +8795,7 @@ function renderRccStrip(pts, overview){
       ${more}
     </div>
     <div class="cmd-strip-counts">${cell(c.trappedUrgent,'לכוד דחוף','var(--red)')}${cell(c.trapped,'סה״כ לכודים','var(--orange)')}${cell(c.atPoint,'בנאפ״ל','var(--orange)')}${cell(c.evacuated,'פונו לבי״ח','var(--green)')}${cell(c.total,'סה״כ באירוע','var(--text)')}</div>
+    ${dms.length?`<div class="cmd-strip-alerts expanded" data-rcc-dms-list>${dms.map(rccDeadManLineHtml).join('')}</div>`:''}
     <div class="cmd-strip-alerts${rccFeedExpanded?' expanded':''}" data-rcc-feed-list>${shown.map(rccFeedLineHtml).join('')||'<div class="cmd-strip-alert-sub" style="padding:6px 2px;font-size:12px">אין עדכוני פינוי עדיין · הודעה תופיע כשפצוע מגיע לנאפ״ל או מפונה לבית חולים</div>'}</div>
   </div>`;
 }
@@ -10948,6 +10971,7 @@ function patientAlertObjects(pts){
 function buildAlertObjects(pts=patients){
   const alerts=patientAlertObjects(pts);
   serverWatchdogAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
+  if(currentUser) serverDeadManAlertObjects().forEach(a=>pushAlert(alerts,a));
   tourniquetSnoozeAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
   pcReviewAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
   duplicateCandidates(pts).forEach(([a,b],idx)=>pushAlert(alerts,{id:`dup-${a.id}-${b.id}`,type:'DUPLICATE_SUSPECTED',severity:'medium',owner:'pc',audience:['pc','chamal'],escalatesTo:null,actionRequired:'merge_duplicate',scope:'site',category:'integrity',siteId:a.siteId||b.siteId||'SITE_A',patientId:a.id,title:`חשד לכפילות ${a.id} ↔ ${b.id}`,detail:'בדיקה ידנית בלבד; אין מיזוג הרסני של אירועים'}));
@@ -16638,7 +16662,7 @@ async function pullAllIncidentAlertData(client, ids, patientRows){
   const query=async build=>{ try{ const r=await build(); return !r.error && Array.isArray(r.data) ? r.data : null; }catch(e){ return null; } };
   const [tqRows, wdRows, reqRows, supplyLists]=await Promise.all([
     query(()=>client.from('tourniquets').select(SERVER_TOURNIQUET_COLUMNS+',incident_id').in('incident_id', ids).eq('is_active', true)),
-    query(()=>client.from('watchdog_alerts').select('id,incident_id,patient_id,alert_type,severity,triggered_at,payload_json').in('incident_id', ids).is('resolved_at', null).in('alert_type', SERVER_WATCHDOG_TYPES).limit(1000)),
+    query(()=>client.from('watchdog_alerts').select('id,incident_id,patient_id,actor_id,alert_type,severity,triggered_at,payload_json').in('incident_id', ids).is('resolved_at', null).in('alert_type', [...SERVER_WATCHDOG_TYPES, SERVER_DMS_TYPE]).limit(1000)),
     query(()=>client.from('medical_resource_requests').select(MEDICAL_REQUEST_COLUMNS).in('incident_id', ids).order('requested_at',{ascending:false}).limit(500)),
     Promise.all(ids.map(id=>query(()=>client.rpc('get_supply_request_queue', {p_incident_id:id}))))
   ]);
@@ -16657,6 +16681,7 @@ async function pullAllIncidentAlertData(client, ids, patientRows){
     out[id]={
       patients:pts,
       watchdog:wdRows ? wdRows.filter(a=>a.incident_id===id && a.patient_id && SERVER_WATCHDOG_TYPES.includes(a.alert_type) && a.payload_json?.source==='server_watchdog') : keep('watchdog'),
+      dms:wdRows ? serverDeadManRows(wdRows.filter(a=>a.incident_id===id), id) : keep('dms'),
       requests:reqRows ? reqRows.filter(r=>r.incident_id===id).map(overviewRequestFromRow).filter(Boolean) : keep('requests'),
       supply:supplyLists[i] ? supplyLists[i].filter(r=>r.request_level==='pc_to_logo' && supplyRowOpen(r)) : keep('supply')
     };
@@ -16687,6 +16712,7 @@ function ccOverviewAlertGroups(nowMs=Date.now()){
   _openIncidents.forEach(inc=>{
     const d=_allIncidentAlertData[inc.id]; if(!d) return;
     const alerts=[...patientAlertObjects(d.patients), ...serverWatchdogAlertObjects(d.patients, nowMs, d.watchdog),
+      ...serverDeadManAlertObjects(d.dms||[], nowMs),
       ...requestAlertObjects(d.requests), ...d.supply.map(supplyEscalationAlertObject)].filter(a=>a.audience.includes('cc'));
     commandAlertGroups(alerts).forEach(g=>out.push({...g, key:`${inc.id}|${g.key}`, incident:inc, patient:g.patientId?d.patients.find(p=>p.id===g.patientId)||null:null}));
   });
@@ -18187,13 +18213,15 @@ async function pullServerWatchdogAlerts(incidentId){
   const client=getSupabaseClient();
   if(!client) return;
   let r;
-  try{ r=await client.from('watchdog_alerts').select('id,patient_id,alert_type,severity,triggered_at,payload_json').eq('incident_id', incidentId).is('resolved_at', null).in('alert_type', SERVER_WATCHDOG_TYPES).limit(500); }
+  try{ r=await client.from('watchdog_alerts').select('id,patient_id,actor_id,alert_type,severity,triggered_at,payload_json').eq('incident_id', incidentId).is('resolved_at', null).in('alert_type', [...SERVER_WATCHDOG_TYPES, SERVER_DMS_TYPE]).limit(500); }
   catch(e){ return; }
   if(r.error || !Array.isArray(r.data)) return;
   const rows=r.data.filter(a=>a && a.patient_id && SERVER_WATCHDOG_TYPES.includes(a.alert_type) && a.payload_json?.source==='server_watchdog');
-  const before=JSON.stringify(serverWatchdogAlertsByIncident[incidentId]||[]);
+  const dms=serverDeadManRows(r.data, incidentId);
+  const before=JSON.stringify([serverWatchdogAlertsByIncident[incidentId]||[], serverDeadManAlertsByIncident[incidentId]||[]]);
   serverWatchdogAlertsByIncident[incidentId]=rows;
-  if(JSON.stringify(rows)!==before) refreshActiveScreenData();
+  serverDeadManAlertsByIncident[incidentId]=dms;
+  if(JSON.stringify([rows, dms])!==before) refreshActiveScreenData();
 }
 // Same ranks as C5Rules.tourniquetAlertRank; TOURNIQUET_TIME_DECISION (100 min) comes from database/079.
 const SERVER_TQ_LEVEL_RANK={TOURNIQUET_TIME_NOTICE:1, TOURNIQUET_TIME_WARNING:2, TOURNIQUET_TIME_DECISION:3, TOURNIQUET_TIME_CRITICAL:4};
@@ -18226,6 +18254,47 @@ function serverWatchdogAlertObjects(pts=patients, nowMs=Date.now(), rows=Object.
     out.push({...base, id:`server-tq-${a.id}`, type:'SERVER_TOURNIQUET_TIME', severity, category:'urgent', title:`${p.visualId||p.id} — חסם עורקים ${label} (שרת)`, detail:`${limb?tourniquetLimbMeta(limb).label+' · ':''}${minutes!=null?`${minutes} דק׳ · `:''}לפי השרת`});
   });
   return out;
+}
+// WP-29 (database/095, owner 2026-11-21): the server's Dead Man's Switch. A medic / paramedic who
+// registered a patient still in their hands, with no heartbeat from any of their devices and no
+// record reaching the server for 10 minutes, is raised by the minute job with no phone open. PC and
+// CC see it in their alert list, the rescue chain (RCC / RPC) in its strip; the medic does not. No
+// phone raises its own alert for this (the medic load board and the devices panel only mark a
+// device "שקט"), so it is listed unless this phone has already seen a heartbeat from that medic
+// newer than the contact the server raised it on (the next minute job resolves it).
+const SERVER_DMS_TYPE='DEAD_MAN_SWITCH';
+const serverDeadManAlertsByIncident={};
+function serverDeadManRows(data, incidentId){
+  return (Array.isArray(data)?data:[]).filter(a=>a && a.alert_type===SERVER_DMS_TYPE && a.actor_id && a.payload_json?.source==='server_watchdog')
+    .map(a=>({...a, incident_id:a.incident_id||incidentId}));
+}
+function serverDeadManStillSilent(a, presence=_remoteDevicePresence){
+  const contact=Date.parse(a.payload_json?.last_contact_at||'');
+  if(!Number.isFinite(contact)) return true;
+  return !(presence||[]).some(d=>d && d.actor_id===a.actor_id && (Date.parse(d.last_heartbeat_at)||0)>contact);
+}
+function serverDeadManLine(a, nowMs=Date.now()){
+  const payload=a.payload_json||{};
+  const contact=Date.parse(payload.last_contact_at||'');
+  const minutes=Number.isFinite(contact) ? Math.max(0, Math.floor((nowMs-contact)/60000)) : (Number.isFinite(Number(payload.minutes)) ? Math.max(0, Math.round(Number(payload.minutes))) : null);
+  const name=sanitizeRemoteText(payload.medic_name, 60) || 'חובש';
+  const roleLabel=payload.role==='paramedic' ? 'פראמדיק' : 'חובש';
+  const count=Number.isFinite(Number(payload.open_patients)) ? Math.max(0, Math.round(Number(payload.open_patients))) : null;
+  const time=Number.isFinite(contact) ? new Date(contact).toTimeString().slice(0,5) : null;
+  return {
+    name, roleLabel, minutes, count,
+    title:`${roleLabel} ${name} — אין קשר${minutes!=null?` ${minutes} דק׳`:''} (שרת)`,
+    detail:`${count!=null?`${count} פצועים שרשם עדיין בשטח · `:''}המכשיר לא דיווח ולא הגיע ממנו רישום${time?` מאז ${time}`:''} · לפי השרת`
+  };
+}
+function serverDeadManAlertObjects(rows=Object.values(serverDeadManAlertsByIncident).flat(), nowMs=Date.now(), presence=_remoteDevicePresence){
+  return (rows||[]).filter(a=>serverDeadManStillSilent(a, presence)).map(a=>{
+    const line=serverDeadManLine(a, nowMs);
+    const siteId=Object.keys(SITE_TO_INCIDENT_ID).find(k=>SITE_TO_INCIDENT_ID[k]===a.incident_id)||'SITE_A';
+    return {id:`server-dms-${a.id}`, type:'SERVER_DEAD_MAN_SWITCH', severity:'critical', owner:'pc', audience:['pc','cc'], escalatesTo:null, escalateAfterMin:null,
+      actionRequired:'acknowledge', scope:'site', category:'forces', siteId, actorId:a.actor_id, createdAt:a.triggered_at||new Date().toISOString(), source:'server',
+      title:line.title, detail:line.detail};
+  });
 }
 // ── Tourniquet alert delays from other phones (repo owner, 2026-10-26) ──
 // A medic's "remind me later" on a tourniquet alert is sent as WATCHDOG_ALERT with payload reason

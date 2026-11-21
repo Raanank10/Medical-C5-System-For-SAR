@@ -612,6 +612,10 @@ Verified: `scripts/rls_test_094_pc_review.sql` on a local PostgreSQL 16 with eve
 
 **Verify.** Rolled-back live run: stale heartbeat raises, a fresh one resolves, second run idempotent; extend `scripts/browser_server_watchdog_test.js`. Threshold change rules apply (CLAUDE.md).
 
+**Owner, 2026-11-21.** (1) Who sees it: PC, CC and the rescue chain (RCC / RPC); not the medic. (2) Silent: no heartbeat from any of the medic's devices AND no event stored by the server from them for 10 minutes, by the server's time (a late offline push is contact). Asked because the heartbeat is a 45-second timer in the page that a locked screen stops, so heartbeat alone would fire on every medic working with the phone in a pocket; this still fires when nothing is synced for 10 minutes. (3) Whose patients: the medic's own, not handed over. (4) One alert per medic, not per device.
+
+**Done (V2.99.90, `database/095`, not applied live).** Found while building: the server has no assigned medic on a patient (the phone's `assignedMedicId` is local, reassignment is not modelled, WP-7), so `patients.created_by` (the registrant, set by `sync-log`) stands for it. Open = the watchdog's own list (not closed / deceased / evacuating / handed_over / self_evacuated), so a patient waiting at the נאפ"ל still counts. Medic and paramedic profiles that are active only. `app.run_clinical_watchdog()` is 081's body plus step 4 in its own sub-block (a failure there leaves the tourniquet and vitals alerts); `app.medic_last_contact_at()`; dedupe `dms:<medic>:<epoch of last contact>`; resolved by a newer heartbeat or event, or when none of the medic's patients is open. A new policy lets RCC / RPC read `DEAD_MAN_SWITCH` rows only (074's clinical rule holds for every other alert). The phone lists it for PC and CC (and in the CC all-incidents line), and in the RCC / RPC strip, marked "(שרת)", hidden once the phone sees a newer heartbeat from that medic. `generate_dead_man_switch_alerts()` from `001` is dead code (never scheduled), left as is. `DEAD_MAN_SWITCH_ESCALATED` stays for WP-28. Tested: `scripts/rls_test_095_server_dead_mans_switch.sql` (22 checks, local PostgreSQL 16 with stand-ins), `scripts/browser_server_watchdog_test.js` step 9. **Open:** apply `095` live and a rolled-back live run; measure in WP-21 how often a medic working with the screen locked raises it before touching the 10 minutes.
+
 ---
 
 ### WP-30: Telegram critical alerts (P2, B1, needs the owner's answers)
@@ -807,7 +811,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-26 PC deterioration review | P2 | Done (V2.99.87, `094` applied live 2026-11-21, live test passed) | #148 | owner 2026-11-19/21: option A (052 table, own `request_kind`), PC + CC alert, tap + outcome, "אחר כך". Removed from `known_gaps`. Two-phone check still with WP-21 |
 | WP-27 CC moves a site to another platoon | P2 | Not started, 1 design question | | owner 2026-10-23 (WP-7 remainder); RLS |
 | WP-28 27 never-sent event types | P2 | Waiting on owner's list | | |
-| WP-29 Dead Man's Switch on the server | P2 | Not started | | builds on 081's watchdog (live) |
+| WP-29 Dead Man's Switch on the server | P2 | Client + `095` done (V2.99.90); `095` not applied live, rolled-back live run pending | this PR | owner 2026-11-21: PC, CC, RCC / RPC; no heartbeat and no event 10 min; the medic's own registered open patients; per medic. Locked-screen false alarms to measure in WP-21 |
 | WP-30 Telegram alerts (B1) | P2 | Waiting on owner's 19 answers | | |
 | WP-31 MARCH completion + hands-on PC | P2 | Waiting on clinical criteria | | B2 |
 | WP-32 Evacuation point leftovers | P2 | Step 1 done by `085` (RCC panel, #141): the rescue board tells moving from arrived (`evac_point_arrived_at`). Open: waiting time in the stored report | #141 | WP-18 remainder |
