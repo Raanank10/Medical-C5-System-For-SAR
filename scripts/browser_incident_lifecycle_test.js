@@ -77,6 +77,7 @@ const FAKE_SUPABASE = `
       const status='active'; // database/064 (D10): no drafts
       const inc={id:params.p_incident_id,visual_id:'INC-TEST-'+params.p_incident_id.slice(0,6).toUpperCase(),status,
         location_name:params.p_location_name,address:params.p_address,incident_type:params.p_incident_type,
+        incident_types:params.p_incident_type?[params.p_incident_type]:[],
         opened_at:new Date().toISOString(),opened_by:me.id,opened_by_role:me.role,metadata:{}};
       incidents.push(inc); save('incidents',incidents);
       members.push({incident_id:inc.id,profile_id:me.id}); save('members',members);
@@ -336,11 +337,14 @@ async function checkFile(browser, file) {
   await page.waitForSelector('#screen-role-dashboard.active', { timeout: 5000 });
   await page.waitForFunction(() => isCcOverviewMode() && !!document.querySelector('[data-incident-triage-table="onSite"] tr.tappable'), null, { timeout: 5000 });
   assert((await page.textContent('[data-incident-triage-table="onSite"]')).includes('Synthetic Site Alpha'), `${rel}: CC all-incidents view should list the incident`);
+  // WP-25 (database/090, 092): the incident gains a second type; list_open_incidents returns them all.
+  await page.evaluate(() => { const list = JSON.parse(localStorage.getItem('__fake_incidents') || '[]'); list.forEach((i) => { i.incident_type = 'mass_shooting'; i.incident_types = ['mass_shooting', 'explosion']; }); localStorage.setItem('__fake_incidents', JSON.stringify(list)); });
   // The picker, with its server counts, is still one tap away.
   await page.click('button:has-text("רשימת אירועים · פתיחה ומיזוג כפילויות")');
   await page.waitForSelector('#screen-incident-picker.active', { timeout: 5000 });
   await page.waitForFunction(() => document.getElementById('incident-picker-list').textContent.includes('אדומים פעילים'), { timeout: 5000 });
   assert((await page.textContent('#incident-picker-list')).includes('Synthetic Site Alpha'), `${rel}: CC picker should list the incident`);
+  assert((await page.textContent('#incident-picker-list [data-incident-card-types]')).includes('ירי המוני + פיצוץ'), `${rel}: the picker must show every incident type (database/092)`);
 
   await page.click('#incident-picker-list button:has-text("כניסה")');
   await page.waitForSelector('#screen-role-dashboard.active', { timeout: 5000 });

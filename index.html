@@ -1033,7 +1033,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9981</div>
+      <div class="demo-kicker">Demo V2.9983</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1130,7 +1130,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9981</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9983</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1140,7 +1140,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9981</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9983</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -1166,7 +1166,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="flow-content">
     <div id="enroute-assignment-card" style="margin-bottom:14px"></div>
-    <div class="field-label">סוג אירוע</div>
+    <div class="field-label">סוג אירוע (אפשר יותר מאחד)</div>
     <div class="tap-grid tap-grid-2" id="enroute-incident-type-grid" style="margin-bottom:8px">
       <button class="tap-btn" data-incident-type="missile_strike_structural_collapse" onclick="selectEnrouteIncidentType('missile_strike_structural_collapse')"><span class="icon">🏚️</span>קריסת מבנה / טיל</button>
       <button class="tap-btn" data-incident-type="mass_shooting" onclick="selectEnrouteIncidentType('mass_shooting')"><span class="icon">🎯</span>ירי המוני</button>
@@ -3467,7 +3467,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.81';
+const APP_VERSION = '2.99.83';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3514,6 +3514,10 @@ const SYNC_ELIGIBLE_EVENT_TYPES = new Set([
   'PATIENT_CREATED','QUICK_PATIENT_CREATED','PATIENT_IDENTIFIED','PATIENT_INJURY_UPDATED',
   'PATIENT_LOCATION_UPDATED','PATIENT_ACCESS_UPDATED','PATIENT_TRIAGE_UPDATED','PATIENT_STATUS_UPDATED',
   'PATIENT_EVAC_POINT_ARRIVED','PATIENT_EXTRACTED',
+  // A medic's incident-type pick / disagreement (WP-25, database/089-090). The server decides: it
+  // sets the type when the incident has none or the medic corrects their own pick, otherwise it
+  // becomes a report on the PC, CC and rescue boards.
+  'INCIDENT_TYPE_SET_BY_MEDIC','INCIDENT_TYPE_MISMATCH_REPORTED',
   'PATIENT_T_INJURY_UPDATED','PATIENT_HANDED_OVER','PATIENT_TRIAGED_EXPECTANT','VITALS_RECORDED',
   'MINIMAL_TRIAGE_RECORDED','SABCDE_RECORDED','MSTART_SUGGESTED','JUMPSTART_SUGGESTED','MSTART_OVERRIDE',
   'JUMPSTART_OVERRIDE','TOURNIQUET_APPLIED','TOURNIQUET_REASSESSMENT','TOURNIQUET_RELEASED','TOURNIQUET_TIME_RECORDED',
@@ -5236,18 +5240,36 @@ function ensureSiteStatusFields(siteId=rescueActiveSiteId){
   if(!s.siteClear) s.siteClear={cleared:false,clearedAt:null,clearedByRole:null};
   if(s.lastRescueStatusChange===undefined) s.lastRescueStatusChange=null;
   if(s.incidentTypeSource===undefined) s.incidentTypeSource=null;
+  // Several types per incident (WP-25, owner 2026-11-18). incidentType / incidentTypeSource stay as
+  // the first type and its source, for every reader that still wants one.
+  if(!Array.isArray(s.incidentTypes)){
+    s.incidentTypes=s.incidentType?[s.incidentType]:[];
+    s.incidentTypeSources=s.incidentType&&s.incidentTypeSource?{[s.incidentType]:s.incidentTypeSource}:{};
+  }
+  if(!s.incidentTypeSources) s.incidentTypeSources={};
   return s;
 }
+function setSiteIncidentTypes(s, types, sources){
+  s.incidentTypes=types.filter((t,i)=>INCIDENT_TYPE_LABELS[t] && types.indexOf(t)===i);
+  s.incidentTypeSources={};
+  s.incidentTypes.forEach(t=>{ if(sources&&sources[t]) s.incidentTypeSources[t]=sources[t]; });
+  s.incidentType=s.incidentTypes[0]||null;
+  s.incidentTypeSource=s.incidentType?(s.incidentTypeSources[s.incidentType]||null):null;
+}
+function siteIncidentTypes(siteId){ return ensureSiteStatusFields(siteId).incidentTypes; }
+function siteHasIncidentType(siteId, type){ return siteIncidentTypes(siteId).includes(type); }
 function rescueSetIncidentType(role, type, siteId=rescueActiveSiteId){
+  // Rescue is the top of the ladder: a tap adds the type, a tap on a present type removes it.
   const s=ensureSiteStatusFields(siteId);
-  s.incidentType=type;
-  s.incidentTypeSource={role,byLabel:rescueReporterLabel(role),at:Date.now()};
-  s.lastRescueStatusChange={type:'incident_type',by:role,byLabel:rescueReporterLabel(role),detail:`סוג אירוע עודכן: ${INCIDENT_TYPE_LABELS[type]||type}`,at:Date.now()};
-  saveLocalEvent({type:'INCIDENT_TYPE_SET',detail:`${type} by ${role} at ${siteId}`,payload_json:{role,siteId,incidentType:type,timestamp:new Date().toISOString()}});
+  const had=s.incidentTypes.includes(type);
+  const src={role,byLabel:rescueReporterLabel(role),profileId:currentUser?.id||null,at:Date.now()};
+  setSiteIncidentTypes(s, had?s.incidentTypes.filter(t=>t!==type):[...s.incidentTypes,type], {...s.incidentTypeSources,[type]:src});
+  s.lastRescueStatusChange={type:'incident_type',by:role,byLabel:rescueReporterLabel(role),detail:`סוג אירוע ${had?'הוסר':'נוסף'}: ${INCIDENT_TYPE_LABELS[type]||type}`,at:Date.now()};
+  saveLocalEvent({type:'INCIDENT_TYPE_SET',detail:`${type} ${had?'removed':'added'} by ${role} at ${siteId}`,payload_json:{role,siteId,incidentType:type,action:had?'remove':'add',incidentTypes:s.incidentTypes,timestamp:new Date().toISOString()}});
   saveDemoState();
-  if(currentUser && activeIncident && siteId==='SITE_A') writeIncidentTypeToServer(activeIncident.id, type, role);
+  if(currentUser && activeIncident && siteId==='SITE_A') queueIncidentTypeChange(activeIncident.id, type, had?'remove':'add', role);
   renderRoleDashboard(role);
-  showIncidentTypeBriefModal(type, siteId);
+  if(!had) showIncidentTypeBriefModal(type, siteId);
 }
 // A building collapse can come with any incident type (explosion, shooting, accident), not only a
 // missile strike. The medic's building-state choice on the Movement screen, or rescue's
@@ -5285,8 +5307,10 @@ function closeIncidentTypeBriefModal(e){ if(e.target.id==='incident-type-brief-m
 // Movement screen ("מסך תנועה") then pre-fills what the PC and rescue chain already know.
 // The real, synced version belongs on incident_memberships (assigned_by) and is a separate
 // follow-up - see currentSiteId() for why a signed-in medic stays on SITE_A until then.
-// MEDIC_ASSIGNED_TO_INCIDENT / INCIDENT_TYPE_MISMATCH_REPORTED / SITE_PREFILL_CORRECTED are
-// deliberately outside SYNC_ELIGIBLE_EVENT_TYPES (like INCIDENT_TYPE_SET), so never pushed.
+// MEDIC_ASSIGNED_TO_INCIDENT / SITE_PREFILL_CORRECTED are deliberately outside
+// SYNC_ELIGIBLE_EVENT_TYPES (like INCIDENT_TYPE_SET), so never pushed. The medic's incident-type
+// pick and mismatch report are synced since WP-25 (INCIDENT_TYPE_SET_BY_MEDIC /
+// INCIDENT_TYPE_MISMATCH_REPORTED, database/089-090).
 let medicIncidentAssignments={}; // medicUserId -> {siteId, assignedById, assignedByName, assignedAt, address, note}
 // Patients each user registered or treated on this phone: userId (or 'local' signed out) -> [patientId].
 // Scope stays the whole site (every medic there still sees every patient); this only marks
@@ -5313,44 +5337,92 @@ function siteShortName(siteId){
   const site=allSites.find(s=>s.id===siteId);
   return (site?.name||siteId).split('—')[0].trim();
 }
-function incidentTypeSourceLabel(siteId){
+function incidentTypeSourceLabel(siteId, type){
   const s=ensureSiteStatusFields(siteId);
-  if(!s.incidentType) return '';
-  if(!s.incidentTypeSource) return 'נקבע מראש';
-  return `נקבע ע״י ${s.incidentTypeSource.byLabel} · ${timeAgoLabel(s.incidentTypeSource.at)}`;
+  const t=type||s.incidentType;
+  if(!t || !s.incidentTypes.includes(t)) return '';
+  const src=s.incidentTypeSources[t];
+  if(!src) return 'נקבע מראש';
+  const mine=currentUser && src.profileId && src.profileId===currentUser.id;
+  return `נוסף ע״י ${mine?'אתה':src.byLabel} · ${timeAgoLabel(src.at)}`;
+}
+// Every type with who added it: "פיצוץ (נוסף ע״י ...) + ירי המוני (...)".
+function incidentTypesSourceLine(siteId){
+  const s=ensureSiteStatusFields(siteId);
+  return s.incidentTypes.map(t=>`${INCIDENT_TYPE_LABELS[t]} (${incidentTypeSourceLabel(siteId,t)})`).join(' + ');
 }
 // Rescue chain (rpc/rcc) has final site authority (docs/ROLE_COMMAND_MODEL_v2.8.md): a medic
 // may set the incident type only while none is set, or replace one a medic set. A medic pick
 // that differs from rescue's is recorded as a mismatch for the PC, never applied over it.
-function incidentTypeLockedForMedic(siteId){
+// Signed in (WP-25, owner 2026-11-18, database/090): authority ladder rescue (rpc/rcc) > PC/CC >
+// medics. A medic sets the type while the incident has none (first to reach the server wins) and
+// may correct their own pick until anyone else changes it; any other different pick is a mismatch
+// report for PC/CC/rescue. The server is the referee: this phone's lock only chooses the wording,
+// and both events go through the same server rule.
+const INCIDENT_TYPE_MEDICAL_ROLES=['medic','paramedic','physician'];
+// May this phone's user remove `type` (database/090 incident_type_may_remove): rescue/admin any,
+// PC/CC/chamal one added by command or medical (unknown adder: offered, the server decides), a
+// medic only one they added themselves. Signed out: a medic removes a type a medic added.
+function incidentTypeRoleTierOf(role){
+  if(['rpc','rcc','admin'].includes(role)) return 3;
+  if(['pc','cc','chamal'].includes(role)) return 2;
+  if(INCIDENT_TYPE_MEDICAL_ROLES.includes(role)) return 1;
+  return 0;
+}
+function canRemoveIncidentType(siteId, type, role){
   const s=ensureSiteStatusFields(siteId);
-  return !!s.incidentType && s.incidentTypeSource?.role!=='medic';
+  if(!s.incidentTypes.includes(type)) return false;
+  const src=s.incidentTypeSources[type];
+  if(!currentUser) return src?.role==='medic' || !['medic','paramedic','physician'].includes(role);
+  const mine=incidentTypeRoleTierOf(role||currentUser.role);
+  if(mine===3) return true;
+  if(mine===2) return incidentTypeRoleTierOf(src?.role)<=2;
+  if(mine===1) return !!src && INCIDENT_TYPE_MEDICAL_ROLES.includes(src.role) && src.profileId===currentUser.id;
+  return false;
+}
+function incidentTypeLockedForMedic(siteId, type){
+  const s=ensureSiteStatusFields(siteId);
+  const t=type||s.incidentType;
+  if(!t || !s.incidentTypes.includes(t)) return false;
+  return !canRemoveIncidentType(siteId, t, currentUser?.role||'medic');
 }
 function selectEnrouteIncidentType(type){
+  // A tap adds a type (anyone adds, owner 2026-11-18). A tap on a present type removes it when
+  // this medic added it; on someone else's it sends a "not right" report for PC/CC/rescue.
   const siteId=currentSiteId();
   const s=ensureSiteStatusFields(siteId);
-  if(incidentTypeLockedForMedic(siteId)){
-    if(type===s.incidentType){
-      siteData.medicIncidentTypeReport=null;
-      saveDemoState();
-      renderEnrouteIncidentContext();
-      showIncidentTypeBriefModal(type, siteId);
-      return;
-    }
-    siteData.medicIncidentTypeReport={siteId,type,at:Date.now()};
-    saveLocalEvent({type:'INCIDENT_TYPE_MISMATCH_REPORTED',detail:`medic reported ${type}, rescue set ${s.incidentType} at ${siteId}`,warn:true,payload_json:{role:'medic',siteId,reportedType:type,authoritativeType:s.incidentType,authoritativeRole:s.incidentTypeSource?.role||null,timestamp:new Date().toISOString()}});
+  const role=currentUser&&INCIDENT_TYPE_MEDICAL_ROLES.includes(currentUser.role)?currentUser.role:'medic';
+  const ts=new Date().toISOString();
+  if(!s.incidentTypes.includes(type)){
+    setSiteIncidentTypes(s, [...s.incidentTypes,type], {...s.incidentTypeSources,[type]:{role,byLabel:currentMedicName(),profileId:currentUser?.id||null,at:Date.now()}});
+    if(siteData.incidentTypeOverrideNotice?.type===type) siteData.incidentTypeOverrideNotice=null;
+    if(siteData.medicIncidentTypeReport?.type===type) siteData.medicIncidentTypeReport=null;
+    if(currentUser) saveLocalEvent({type:'INCIDENT_TYPE_SET_BY_MEDIC',detail:`medic added ${type} at ${siteId}`,payload_json:{role:'medic',siteId,reportedType:type,action:'add',timestamp:ts}});
+    else saveLocalEvent({type:'INCIDENT_TYPE_SET',detail:`${type} added by medic at ${siteId}`,payload_json:{role:'medic',siteId,incidentType:type,action:'add',timestamp:ts}});
     saveDemoState();
     renderEnrouteIncidentContext();
-    toast(`סוג האירוע נקבע ע״י חילוץ (${INCIDENT_TYPE_LABELS[s.incidentType]}) · הפער נשלח לחוג"ד`);
+    showIncidentTypeBriefModal(type, siteId);
     return;
   }
-  s.incidentType=type;
-  s.incidentTypeSource={role:'medic',byLabel:currentMedicName(),at:Date.now()};
-  siteData.medicIncidentTypeReport=null;
-  saveLocalEvent({type:'INCIDENT_TYPE_SET',detail:`${type} by medic at ${siteId}`,payload_json:{role:'medic',siteId,incidentType:type,timestamp:new Date().toISOString()}});
+  if(canRemoveIncidentType(siteId, type, role)){
+    setSiteIncidentTypes(s, s.incidentTypes.filter(t=>t!==type), s.incidentTypeSources);
+    if(currentUser) saveLocalEvent({type:'INCIDENT_TYPE_SET_BY_MEDIC',detail:`medic removed ${type} at ${siteId}`,payload_json:{role:'medic',siteId,reportedType:type,action:'remove',timestamp:ts}});
+    else saveLocalEvent({type:'INCIDENT_TYPE_SET',detail:`${type} removed by medic at ${siteId}`,payload_json:{role:'medic',siteId,incidentType:type,action:'remove',timestamp:ts}});
+    saveDemoState();
+    renderEnrouteIncidentContext();
+    toast(`${INCIDENT_TYPE_LABELS[type]} הוסר`);
+    return;
+  }
+  // Someone else's type: the type stays; the medic's view goes to PC/CC/rescue.
+  siteData.medicIncidentTypeReport={siteId,type,at:Date.now()};
+  if(currentUser) saveLocalEvent({type:'INCIDENT_TYPE_SET_BY_MEDIC',detail:`medic asks to remove ${type} at ${siteId}`,warn:true,payload_json:{role:'medic',siteId,reportedType:type,action:'remove',timestamp:ts}});
+  else saveLocalEvent({type:'INCIDENT_TYPE_SET',detail:`medic disputes ${type} at ${siteId}`,warn:true,payload_json:{role:'medic',siteId,incidentType:type,action:'dispute',timestamp:ts}});
   saveDemoState();
   renderEnrouteIncidentContext();
-  showIncidentTypeBriefModal(type, siteId);
+  // Never claim it was sent: it is queued, and only a signed-in phone pushes it.
+  toast(currentUser
+    ? `${INCIDENT_TYPE_LABELS[type]} נוסף ע״י ${s.incidentTypeSources[type]?.byLabel||'אחר'} · הדיווח שאינו נכון יישלח לחוג"ד ולחילוץ`
+    : `${INCIDENT_TYPE_LABELS[type]} נוסף ע״י אחר · הדיווח נשמר במכשיר בלבד`);
 }
 // Movement screen, below the incident type (V2.99.57). The building-state section opens by itself
 // only for a missile strike. For any other type (or none yet) one question asks whether a building
@@ -5387,8 +5459,8 @@ function enrouteIncidentDetails(type){
   if(!siteData.incidentDetails) siteData.incidentDetails={};
   return siteData.incidentDetails[type] || (siteData.incidentDetails[type]={});
 }
-function setEnrouteIncidentDetail(key, value){
-  const type=ensureSiteStatusFields(currentSiteId()).incidentType;
+function setEnrouteIncidentDetail(type, key, value){
+  if(!siteHasIncidentType(currentSiteId(), type)) return;
   const field=(INCIDENT_DETAIL_FIELDS[type]||[]).find(f=>f.key===key);
   if(!field) return;
   const d=enrouteIncidentDetails(type);
@@ -5407,7 +5479,7 @@ function enrouteBuildingInvolved(){
 }
 // The building section and the floor / apartment fields (V2.99.63) show together.
 function enrouteBuildingShown(){
-  return ensureSiteStatusFields(currentSiteId()).incidentType==='missile_strike_structural_collapse' || enrouteBuildingInvolved();
+  return siteHasIncidentType(currentSiteId(),'missile_strike_structural_collapse') || enrouteBuildingInvolved();
 }
 function setEnrouteBuildingInvolved(involved){
   siteData.buildingInvolved=!!involved;
@@ -5421,7 +5493,7 @@ function setEnrouteBuildingInvolved(involved){
 function renderEnrouteSiteDetails(){
   const siteId=currentSiteId();
   const s=ensureSiteStatusFields(siteId);
-  const isMissile=s.incidentType==='missile_strike_structural_collapse';
+  const isMissile=s.incidentTypes.includes('missile_strike_structural_collapse');
   const involved=enrouteBuildingInvolved();
   const ask=document.getElementById('enroute-building-ask');
   const section=document.getElementById('enroute-building-section');
@@ -5441,16 +5513,20 @@ function renderEnrouteSiteDetails(){
     : '"כן" פותח את סוג המבנה ומוסיף לתדריך פציעות מעיכה ולכודים.';
   const wrap=document.getElementById('enroute-incident-details');
   if(!wrap) return;
-  const fields=INCIDENT_DETAIL_FIELDS[s.incidentType];
-  if(!fields){ wrap.innerHTML=''; return; }
-  const d=enrouteIncidentDetails(s.incidentType);
+  // The questions of every type on the incident, each under its own heading when there are several.
+  const withFields=s.incidentTypes.filter(t=>INCIDENT_DETAIL_FIELDS[t]);
+  if(!withFields.length){ wrap.innerHTML=''; return; }
   const warnings=[];
-  wrap.innerHTML=fields.map(f=>{
-    const picked=v=>f.multi?(Array.isArray(d[f.key])&&d[f.key].includes(v)):d[f.key]===v;
-    if(!f.multi && f.warn && f.warn[d[f.key]]) warnings.push(f.warn[d[f.key]]);
-    return `<div class="field-label">${escAttr(f.label)}</div>
+  wrap.innerHTML=withFields.map(type=>{
+    const d=enrouteIncidentDetails(type);
+    const head=withFields.length>1||s.incidentTypes.length>1?`<div class="field-label" data-incident-detail-type="${escAttr(type)}" style="color:var(--accent)">${escAttr(INCIDENT_TYPE_LABELS[type])}</div>`:'';
+    return head+INCIDENT_DETAIL_FIELDS[type].map(f=>{
+      const picked=v=>f.multi?(Array.isArray(d[f.key])&&d[f.key].includes(v)):d[f.key]===v;
+      if(!f.multi && f.warn && f.warn[d[f.key]]) warnings.push(f.warn[d[f.key]]);
+      return `<div class="field-label">${escAttr(f.label)}</div>
       <div class="tap-grid ${f.options.length===3?'tap-grid-3':'tap-grid-2'}" data-incident-detail="${escAttr(f.key)}" style="margin-bottom:10px">${f.options.map(([v,l])=>
-        `<button class="tap-btn${picked(v)?' selected':''}" data-detail-value="${escAttr(v)}" onclick="setEnrouteIncidentDetail('${f.key}','${v}')">${escAttr(l)}</button>`).join('')}</div>`;
+        `<button class="tap-btn${picked(v)?' selected':''}" data-detail-value="${escAttr(v)}" onclick="setEnrouteIncidentDetail('${type}','${f.key}','${v}')">${escAttr(l)}</button>`).join('')}</div>`;
+    }).join('');
   }).join('') + warnings.map(w=>`<div class="role-row" data-incident-detail-warning style="border-color:var(--red);margin-bottom:10px"><div class="role-row-title" style="color:var(--red)">⚠ ${escAttr(w)}</div></div>`).join('');
 }
 function renderEnrouteIncidentContext(){
@@ -5467,7 +5543,7 @@ function renderEnrouteIncidentContext(){
     body=`<div class="role-row" style="border-color:var(--accent)">
       <div class="role-row-title">שובצת לאירוע ע״י ${escAttr(a.assignedByName)} · ${escAttr(siteShortName(a.siteId))} · ${timeAgoLabel(a.assignedAt)}</div>
       <div class="role-row-sub">מידע קיים (ניתן לתקן בשדות למטה):</div>
-      <div class="role-row-sub">• סוג אירוע: ${escAttr(s.incidentType?`${typeLabel} (${incidentTypeSourceLabel(siteId)})`:'לא נקבע עדיין - בחר למטה')}</div>
+      <div class="role-row-sub">• סוג אירוע: ${escAttr(s.incidentTypes.length?incidentTypesSourceLine(siteId):'לא נקבע עדיין - בחר למטה')}</div>
       <div class="role-row-sub">• ${escAttr(siteStatusSummaryLine(siteId))}</div>
       <div class="role-row-sub">• ${sitePts} פצועים כבר רשומים באתר (כולל דיווחי חילוץ ראשוניים)</div>
       ${a.address?`<div class="role-row-sub">• כתובת מחוג"ד: ${escAttr(a.address)}</div>`:''}
@@ -5481,21 +5557,31 @@ function renderEnrouteIncidentContext(){
   }
   card.innerHTML=badge+body;
   document.querySelectorAll('#enroute-incident-type-grid .tap-btn').forEach(b=>{
-    b.classList.toggle('selected', b.dataset.incidentType===s.incidentType);
+    b.classList.toggle('selected', s.incidentTypes.includes(b.dataset.incidentType));
   });
   const note=document.getElementById('enroute-incident-type-note');
   if(note){
     const report=siteData.medicIncidentTypeReport;
-    if(report && report.siteId===siteId && s.incidentType && report.type!==s.incidentType){
-      note.style.color='var(--yellow)';
-      note.textContent=`דיווחת "${INCIDENT_TYPE_LABELS[report.type]}" אבל חילוץ קבע "${typeLabel}". סוג החילוץ נשאר בתוקף; הפער מוצג לחוג"ד.`;
-    }else if(incidentTypeLockedForMedic(siteId)){
-      note.style.color='var(--muted)';
-      note.textContent=`${incidentTypeSourceLabel(siteId)} · לחיצה על סוג אחר תדווח פער לחוג"ד ולא תשנה את הסוג.`;
-    }else{
-      note.style.color='var(--muted)';
-      note.textContent=s.incidentType?`${incidentTypeSourceLabel(siteId)}${currentUser?' · נשמר במכשיר שלך בלבד':''} · חילוץ יכול לעדכן את הסוג בהמשך.`:'בחירת סוג אירוע מציגה תבנית פציעות צפויה.';
+    const serverNote=myIncidentTypeReportNote();
+    const overridden=siteData.incidentTypeOverrideNotice;
+    const queued=currentUser && myIncidentTypeReportStatus()?.state==='queued';
+    const parts=[];
+    let warn=false;
+    if(currentUser && overridden && !s.incidentTypes.includes(overridden.type)){
+      parts.push(`"${INCIDENT_TYPE_LABELS[overridden.type]}" שהוספת הוסר ע״י ${overridden.byLabel}.`); warn=true;
     }
+    if(report && report.siteId===siteId && s.incidentTypes.includes(report.type)){
+      parts.push(`דיווחת ש"${INCIDENT_TYPE_LABELS[report.type]}" לא נכון. הוא נשאר עד החלטת חוג"ד / מ"פ / חילוץ.${currentUser?'':' הדיווח נשמר במכשיר שלך בלבד.'}`); warn=true;
+    }
+    if(s.incidentTypes.length) parts.push(incidentTypesSourceLine(siteId));
+    if(queued){ parts.push('ממתין לשליחה לשרת'); warn=true; }
+    else if(serverNote) parts.push(serverNote);
+    parts.push(s.incidentTypes.length
+      ? 'לחיצה על סוג נוסף מוסיפה אותו · על סוג שהוספת: מסירה · על סוג של אחר: דיווח שאינו נכון'
+      : 'בחירת סוג אירוע מציגה תבנית פציעות צפויה · אפשר לבחור יותר מסוג אחד');
+    if(!currentUser && s.incidentTypes.length) parts.push('נשמר במכשיר שלך בלבד');
+    note.style.color=warn?'var(--yellow)':'var(--muted)';
+    note.textContent=parts.join(' · ');
   }
   renderEnrouteSiteDetails();
 }
@@ -5588,7 +5674,7 @@ let _myRealAssignment=null; // newest assignment: {incidentId, siteId, assignedB
 let _activeIncidentRow=null; // {id, address, incident_type, metadata} of the active incident
 let _dismissedAssignmentKey=(()=>{ try{ return localStorage.getItem('c5_dismissed_assignment'); }catch(e){ return null; } })();
 let _assignmentPullBusy=false;
-const _pendingIncidentTypeWrites={}; // incidentId -> {type, role} while a rescue write hasn't landed
+const _pendingIncidentTypeWrites={}; // incidentId -> [{type, action, role}] board changes not yet on the server
 function isSignedInMedic(){ return !!currentUser && ['medic','paramedic'].includes(currentUser.role); }
 function canAssignMedicsOnServer(){ return !!currentUser && !!activeIncident && INCIDENT_COMMAND_ROLES.has(currentUser.role); }
 // The assignment that applies to the screen in front of the user: local demo assignment, or (signed
@@ -5636,40 +5722,114 @@ async function assignRealMedic(profileId, address, note){
   if(mem.error) throw mem.error;
   if(address) activeIncident.address=address;
 }
-async function writeIncidentTypeToServer(incidentId, type, role){
+// A board's (rescue panel, PC/CC buttons) type changes go to the server one by one through
+// change_incident_type() (database/090): applied to the server's current list, so this phone's
+// copy never drops a type someone else added meanwhile. Queued and retried while offline.
+function queueIncidentTypeChange(incidentId, type, action, role){
+  const q=_pendingIncidentTypeWrites[incidentId] || (_pendingIncidentTypeWrites[incidentId]=[]);
+  q.push({type, action, role});
+  return flushIncidentTypeChanges(incidentId);
+}
+async function flushIncidentTypeChanges(incidentId){
   const client=getSupabaseClient();
-  if(!client || !currentUser || !incidentId) return;
-  _pendingIncidentTypeWrites[incidentId]={type, role};
-  try{
-    await updateIncidentWithMetadata(client, incidentId, metadata=>{
-      metadata.incident_type_set_by={role, by_label:rescueReporterLabel(role), at:new Date().toISOString()};
-      return {incident_type:type, metadata};
-    });
-    if(_pendingIncidentTypeWrites[incidentId]?.type===type) delete _pendingIncidentTypeWrites[incidentId];
-    if(activeIncident?.id===incidentId) activeIncident.incident_type=type;
-  }catch(e){
-    toast('סוג האירוע נשמר במכשיר אך לא בשרת · ינסה שוב בסנכרון הבא');
+  const q=_pendingIncidentTypeWrites[incidentId];
+  if(!client || !currentUser || !q || !q.length) return;
+  while(q.length){
+    const op=q[0];
+    let r;
+    try{ r=await client.rpc('change_incident_type',{p_incident_id:incidentId, p_type:op.type, p_action:op.action}); }
+    catch(e){ toast('סוג האירוע נשמר במכשיר אך לא בשרת · ינסה שוב בסנכרון הבא'); return; }
+    if(r.error){
+      if(r.error.code==='42501' || /may not|no access/.test(r.error.message||'')){
+        // Refused by the ladder: drop it, and the pull below puts the server's list back.
+        q.shift();
+        toast(`${INCIDENT_TYPE_LABELS[op.type]||op.type}: נוסף בדרג גבוה יותר · לא הוסר`);
+        continue;
+      }
+      toast('סוג האירוע נשמר במכשיר אך לא בשרת · ינסה שוב בסנכרון הבא');
+      return;
+    }
+    q.shift();
   }
+  delete _pendingIncidentTypeWrites[incidentId];
+  if(activeIncident?.id===incidentId){
+    await pullActiveIncidentRow(client);
+    await pullIncidentTypeReports(client); // the server closed reports for a removed type
+    if(activeScreenId()==='role-dashboard') renderRoleDashboard(activeRoleDashboard);
+  }
+}
+// Back-compat name: a whole list from older callers becomes add/remove changes against this phone's copy.
+function writeIncidentTypesToServer(incidentId, types, role){
+  const s=ensureSiteStatusFields('SITE_A');
+  const server=_activeIncidentRow?.incident_types||[];
+  types.filter(t=>!server.includes(t)).forEach(t=>queueIncidentTypeChange(incidentId,t,'add',role));
+  server.filter(t=>!types.includes(t)).forEach(t=>queueIncidentTypeChange(incidentId,t,'remove',role));
+  return s;
 }
 // The server's incident type is the rescue/opening authority for the incident: it wins over a
 // type picked locally on this phone (docs/ROLE_COMMAND_MODEL_v2.8.md, "rescue wins").
-function applyServerIncidentType(row){
-  if(!row || !INCIDENT_TYPE_LABELS[row.incident_type]) return;
-  if(_pendingIncidentTypeWrites[row.id]) return; // this phone's own newer write hasn't landed yet
-  const s=ensureSiteStatusFields('SITE_A');
-  const by=row.metadata?.incident_type_set_by;
-  s.incidentType=row.incident_type;
-  s.incidentTypeSource=by ? {role:by.role||'rpc', byLabel:by.by_label||'חילוץ', at:Date.parse(by.at||'')||Date.now()}
+const INCIDENT_TYPE_REPORTER_ROLE_LABELS={medic:'חובש',paramedic:'פראמדיק',physician:'רופא'};
+// Who set it, as one label: "<name> (<role>)". The server stamps the profile's name (database/086).
+function incidentTypeSetterLabel(by){
+  const role=by?.role;
+  const roleLabel=['rpc','rcc'].includes(role)?rescueReporterLabel(role)
+    :(INCIDENT_TYPE_REPORTER_ROLE_LABELS[role]||ROLE_LABELS[mapServerRole(role)]||role||'חילוץ');
+  const name=sanitizeRemoteText(by?.by_label||'');
+  return name && name!==roleLabel && name!==role ? `${name} (${roleLabel})` : roleLabel;
+}
+function incidentTypeSourceFromStamp(by){
+  return by ? {role:by.role||'rpc', byLabel:incidentTypeSetterLabel(by), profileId:by.profile_id||null, at:Date.parse(by.at||'')||Date.now()}
     : {role:'incident_open', byLabel:'פתיחת האירוע', at:Date.now()};
+}
+// This phone's changes not on the server yet, in order: board changes and the medic's queued events.
+function pendingIncidentTypeOps(incidentId){
+  const ops=(_pendingIncidentTypeWrites[incidentId]||[]).map(o=>({type:o.type,action:o.action,role:o.role}));
+  getOutbox().filter(e=>!e.synced && e.type==='INCIDENT_TYPE_SET_BY_MEDIC' && (!e.incident_id || e.incident_id===incidentId))
+    .forEach(e=>ops.push({type:e.payload_json?.reportedType, action:e.payload_json?.action==='remove'?'remove':'add', role:'medic', medic:true}));
+  return ops;
+}
+function applyServerIncidentType(row){
+  if(!row) return;
+  const serverTypes=(Array.isArray(row.incident_types)?row.incident_types:(row.incident_type?[row.incident_type]:[])).filter(t=>INCIDENT_TYPE_LABELS[t]);
+  const s=ensureSiteStatusFields('SITE_A');
+  const prevTypes=[...s.incidentTypes], prevSources={...s.incidentTypeSources};
+  const stamps=row.metadata?.incident_types_set_by||{};
+  const sources={};
+  serverTypes.forEach((t,i)=>{ sources[t]=incidentTypeSourceFromStamp(stamps[t]||(i===0?row.metadata?.incident_type_set_by:null)); });
+  // This phone's own unsent changes stay on top until they are sent (a medic's remove of someone
+  // else's type is only a report, so it does not hide the type).
+  let types=[...serverTypes];
+  for(const op of pendingIncidentTypeOps(row.id)){
+    if(!INCIDENT_TYPE_LABELS[op.type]) continue;
+    if(op.action==='add' && !types.includes(op.type)){ types.push(op.type); sources[op.type]=prevSources[op.type]||{role:op.role,byLabel:'אתה',profileId:currentUser?.id||null,at:Date.now()}; }
+    if(op.action==='remove' && types.includes(op.type)){
+      const src=sources[op.type];
+      const own=!op.medic || (src && INCIDENT_TYPE_MEDICAL_ROLES.includes(src.role) && src.profileId===currentUser?.id);
+      if(own) types=types.filter(t=>t!==op.type);
+    }
+  }
+  // A medic whose own type was removed by someone else is told, never silently switched.
+  if(currentUser && INCIDENT_TYPE_MEDICAL_ROLES.includes(currentUser.role)){
+    prevTypes.filter(t=>!types.includes(t) && prevSources[t]?.profileId===currentUser.id).forEach(t=>{
+      const by=row.metadata?.incident_types_removed?.[t];
+      if(by && by.profile_id===currentUser.id) return; // their own removal from another phone
+      const byLabel=by?incidentTypeSetterLabel(by):'דרג פיקוד';
+      siteData.incidentTypeOverrideNotice={type:t,byLabel,at:Date.now()};
+      toast(`"${INCIDENT_TYPE_LABELS[t]}" שהוספת הוסר ע״י ${byLabel}`);
+      try{ navigator.vibrate && navigator.vibrate([150,80,150]); }catch(e){}
+    });
+  }
+  setSiteIncidentTypes(s, types, sources);
 }
 async function pullActiveIncidentRow(client){
   if(!activeIncident) { _activeIncidentRow=null; return; }
   let r;
-  try{ r=await client.from('incidents').select('id,address,incident_type,metadata').eq('id',activeIncident.id).single(); }catch(e){ return; }
+  try{ r=await client.from('incidents').select('id,address,incident_type,incident_types,metadata').eq('id',activeIncident.id).single(); }catch(e){ return; }
   if(r.error || !r.data) return;
   _activeIncidentRow=r.data;
   if(r.data.address) activeIncident.address=r.data.address;
-  if(r.data.incident_type) activeIncident.incident_type=r.data.incident_type;
+  activeIncident.incident_type=r.data.incident_type||null;
+  activeIncident.incident_types=Array.isArray(r.data.incident_types)?r.data.incident_types:(r.data.incident_type?[r.data.incident_type]:[]);
   applyServerIncidentType(r.data);
 }
 // ── Rescue site authority from the server (WP-8, database/060) ──
@@ -5710,6 +5870,124 @@ function applyServerSiteAuthority(row){
   }
   const newest=changes.sort((a,b)=>b.at-a.at)[0];
   if(newest && (!s.lastRescueStatusChange || newest.at>=(s.lastRescueStatusChange.at||0))) s.lastRescueStatusChange=newest;
+}
+// ── Medic incident-type proposals and mismatch reports (WP-25, database/089-090) ──
+// A medic's pick while the incident has no type (proposal) or a pick that differs from the set
+// type (mismatch), projected into incident_type_reports. The server decides which one it is from
+// incidents.incident_type when the event lands. Every member of the incident reads the table;
+// PC, CC, RPC, RCC and admin close a report through resolve_incident_type_report(): "accept" sets
+// the incident's type (once a type is set, rpc/rcc/admin only), "keep" closes it and changes
+// nothing. Open reports stay on the PC/CC/rescue boards until then.
+let _incidentTypeReports=[]; // rows for the active incident, newest first
+const INCIDENT_TYPE_REPORT_COLUMNS='id,incident_id,reported_by,reported_by_role,reported_by_name,reported_type,type_at_report,reported_at,resolved_at,resolved_by_role,resolved_by_name,resolution';
+const INCIDENT_TYPE_REPORT_CLOSERS=['pc','cc','rpc','rcc','admin'];
+async function pullIncidentTypeReports(client){
+  if(!activeIncident){ _incidentTypeReports=[]; return; }
+  let r;
+  try{ r=await client.from('incident_type_reports').select(INCIDENT_TYPE_REPORT_COLUMNS).eq('incident_id',activeIncident.id).order('reported_at',{ascending:false}).limit(50); }catch(e){ return; }
+  if(r.error || !Array.isArray(r.data)) return;
+  _incidentTypeReports=r.data.filter(x=>x && x.incident_id===activeIncident.id && INCIDENT_TYPE_LABELS[x.reported_type]);
+}
+function openIncidentTypeReports(){
+  if(!currentUser || !activeIncident) return [];
+  return _incidentTypeReports.filter(x=>!x.resolved_at && x.incident_id===activeIncident.id);
+}
+function incidentTypeReportCurrentTypes(){ return currentUser&&activeIncident ? ensureSiteStatusFields('SITE_A').incidentTypes : []; }
+function canCloseIncidentTypeReport(){ return !!currentUser && INCIDENT_TYPE_REPORT_CLOSERS.includes(currentUser.role); }
+function incidentTypeReporterLabel(x){
+  const roleLabel=INCIDENT_TYPE_REPORTER_ROLE_LABELS[x.reported_by_role]||'חובש';
+  const name=sanitizeRemoteText(x.reported_by_name||'');
+  return name?`${name} (${roleLabel})`:roleLabel;
+}
+// Removing a reported type follows the ladder against whoever added it (server-checked too).
+function canAcceptIncidentTypeReport(type){
+  return canCloseIncidentTypeReport() && canRemoveIncidentType('SITE_A', type, currentUser.role);
+}
+// PC/CC type section (WP-25): add any type; remove one added by command or a medic, not by rescue.
+function commandSetIncidentType(type){
+  if(!currentUser || !activeIncident || !['pc','cc','chamal','admin'].includes(currentUser.role) || !INCIDENT_TYPE_LABELS[type]) return;
+  const s=ensureSiteStatusFields('SITE_A');
+  const had=s.incidentTypes.includes(type);
+  if(had && !canRemoveIncidentType('SITE_A', type, currentUser.role)){ toast(`${INCIDENT_TYPE_LABELS[type]} נוסף ע״י חילוץ · רק מ"מ / מ"פ חילוץ מסירים`); return; }
+  const src={role:currentUser.role,byLabel:incidentTypeSetterLabel({role:currentUser.role,by_label:_myDisplayName||''}),profileId:currentUser.id,at:Date.now()};
+  setSiteIncidentTypes(s, had?s.incidentTypes.filter(t=>t!==type):[...s.incidentTypes,type], {...s.incidentTypeSources,[type]:src});
+  saveLocalEvent({type:'INCIDENT_TYPE_SET',detail:`${type} ${had?'removed':'added'} by ${currentUser.role}`,payload_json:{role:currentUser.role,siteId:'SITE_A',incidentType:type,action:had?'remove':'add',incidentTypes:s.incidentTypes,timestamp:new Date().toISOString()}});
+  saveDemoState();
+  toast(`${INCIDENT_TYPE_LABELS[type]} ${had?'הוסר':'נוסף'}`);
+  queueIncidentTypeChange(activeIncident.id, type, had?'remove':'add', currentUser.role);
+  if(activeScreenId()==='role-dashboard') renderRoleDashboard(activeRoleDashboard);
+}
+function renderCommandIncidentTypeSection(){
+  if(!currentUser || !activeIncident || !['pc','cc','chamal','admin'].includes(currentUser.role)) return '';
+  const s=ensureSiteStatusFields('SITE_A');
+  const line=s.incidentTypes.length?escAttr(incidentTypesSourceLine('SITE_A')):'לא נקבע עדיין';
+  const buttons=`<div class="demo-actions" style="margin:6px 0 0;grid-template-columns:1fr 1fr">${Object.keys(INCIDENT_TYPE_LABELS).map(t=>{
+    const on=s.incidentTypes.includes(t), locked=on && !canRemoveIncidentType('SITE_A', t, currentUser.role);
+    return `<button class="demo-mini-btn${on?' selected':''}" data-command-incident-type="${t}" data-on="${on?1:0}"${locked?' disabled title="נוסף ע״י חילוץ"':''} onclick="commandSetIncidentType('${t}')">${on?'✓ ':''}${escAttr(INCIDENT_TYPE_LABELS[t])}${locked?' 🔒':''}</button>`;
+  }).join('')}</div>`;
+  const hint=s.incidentTypes.some(t=>!canRemoveIncidentType('SITE_A', t, currentUser.role))?'<div class="role-row-sub">🔒 נוסף ע״י חילוץ · רק מ"מ / מ"פ חילוץ מסירים</div>':'<div class="role-row-sub">לחיצה מוסיפה סוג · לחיצה על סוג מסומן מסירה אותו</div>';
+  return roleSection('סוג אירוע (אפשר יותר מאחד)', `<div class="role-row" data-command-incident-type-row><div class="role-row-title">${line}</div>${buttons}${hint}</div>`);
+}
+function renderIncidentTypeReportsSection(){
+  const open=openIncidentTypeReports();
+  if(!open.length) return '';
+  const canClose=canCloseIncidentTypeReport();
+  const rows=open.map(x=>{
+    const reported=INCIDENT_TYPE_LABELS[x.reported_type];
+    const present=incidentTypeReportCurrentTypes().includes(x.reported_type);
+    const canAccept=present && canAcceptIncidentTypeReport(x.reported_type);
+    const adder=ensureSiteStatusFields('SITE_A').incidentTypeSources[x.reported_type]?.byLabel;
+    const title=`בקשה להסיר סוג אירוע: "${escAttr(reported)}"`;
+    const sub=`${escAttr(incidentTypeReporterLabel(x))} חושב שהסוג לא נכון · ${timeAgoLabel(Date.parse(x.reported_at)||Date.now())}${adder?` · נוסף ע״י ${escAttr(adder)}`:''} · נשאר עד החלטה`;
+    const id=escAttr(x.id);
+    const buttons=canClose?`<div class="demo-actions" style="margin:6px 0 0;grid-template-columns:1fr 1fr">
+      ${canAccept?`<button class="demo-mini-btn" data-type-report-action="accept" onclick="resolveIncidentTypeReport('${id}','accept')">הסר: ${escAttr(reported)}</button>`:''}
+      <button class="demo-mini-btn" data-type-report-action="keep"${canAccept?'':' style="grid-column:1/-1"'} onclick="resolveIncidentTypeReport('${id}','keep')">השאר: ${escAttr(reported)}</button>
+    </div>`:'';
+    return `<div class="role-row" data-type-report-id="${id}" style="border-color:var(--yellow)"><div class="role-row-title">${title}</div><div class="role-row-sub">${sub}</div>${buttons}</div>`;
+  }).join('');
+  return roleSection(`דיווחי סוג אירוע מחובשים (${open.length})`, rows);
+}
+let _typeReportResolving=false;
+async function resolveIncidentTypeReport(id, action){
+  const client=getSupabaseClient();
+  if(!client || !currentUser){ toast('נדרשת התחברות לשרת'); return; }
+  if(_typeReportResolving) return;
+  _typeReportResolving=true;
+  try{
+    const r=await client.rpc('resolve_incident_type_report',{p_id:id, p_action:action});
+    if(r.error){ toast('הדיווח לא נסגר: '+(r.error.message||'שגיאת שרת')); return; }
+    const res=r.data||{};
+    toast(res.changed===false?'הדיווח כבר נסגר':action==='accept'?'הסוג הוסר · הדיווח נסגר':'הדיווח נסגר · הסוג נשאר');
+    await pullActiveIncidentRow(client);
+    await pullIncidentTypeReports(client);
+  }catch(e){
+    toast('הדיווח לא נסגר · נדרש חיבור לשרת');
+  }finally{
+    _typeReportResolving=false;
+  }
+  if(activeScreenId()==='role-dashboard') renderRoleDashboard(activeRoleDashboard);
+}
+// The medic's own newest report, for the Movement screen note: queued / waiting / handled.
+function myIncidentTypeReportStatus(){
+  if(!currentUser || !activeIncident) return null;
+  const queued=getOutbox().some(e=>!e.synced && ['INCIDENT_TYPE_SET_BY_MEDIC','INCIDENT_TYPE_MISMATCH_REPORTED'].includes(e.type) && (!e.incident_id || e.incident_id===activeIncident.id));
+  if(queued) return {state:'queued'};
+  const mine=_incidentTypeReports.find(x=>x.reported_by===currentUser.id && x.resolution!=='superseded');
+  if(!mine) return null;
+  if(!mine.resolved_at) return {state:'open', row:mine};
+  return {state:'closed', row:mine};
+}
+function myIncidentTypeReportNote(){
+  const st=myIncidentTypeReportStatus();
+  if(!st) return '';
+  if(st.state==='queued') return 'ממתין לשליחה לחוג"ד ולחילוץ (אין קשר לשרת עדיין)';
+  const x=st.row, label=INCIDENT_TYPE_LABELS[x.reported_type];
+  if(st.state==='open') return `הדיווח ש"${label}" לא נכון נשלח · ממתין להחלטת חוג"ד / מ"פ / חילוץ`;
+  const by=sanitizeRemoteText(x.resolved_by_name||'')||ROLE_LABELS[mapServerRole(x.resolved_by_role)]||'';
+  if(x.resolution==='accepted') return `"${label}" הוסר${by?` ע״י ${by}`:''} לפי הדיווח שלך`;
+  if(x.resolution==='kept_current') return `הדיווח על "${label}" נבדק${by?` ע״י ${by}`:''} · הסוג נשאר`;
+  return '';
 }
 async function pullMyAssignment(client){
   if(!isSignedInMedic()) return;
@@ -5778,9 +6056,10 @@ async function runIncidentAssignmentPull(){
   if(!client) return;
   _assignmentPullBusy=true;
   try{
-    for(const [incId, w] of Object.entries(_pendingIncidentTypeWrites)) await writeIncidentTypeToServer(incId, w.type, w.role);
+    for(const incId of Object.keys(_pendingIncidentTypeWrites)) await flushIncidentTypeChanges(incId);
     await pullActiveIncidentRow(client);
     await pullIncidentSiteAuthority(client);
+    await pullIncidentTypeReports(client);
     await pullRemoteSweeps(client);
     await pullRealPlatoons(client);
     const prevKey=assignmentKey(_myRealAssignment);
@@ -5862,10 +6141,21 @@ function rescueConfirmSiteClear(role, siteId=rescueActiveSiteId){
   renderRoleDashboard(role);
   toast('האתר הוכרז נקי · חוג"ד ומ״פ רפואה יראו עדכון');
 }
+// Every type of an incident row from the server (list_open_incidents, the stored report): the
+// incident_types list since database/090/092, else the single incident_type an older server or an
+// older stored report carries. '' when none.
+function incidentTypesFromRow(row){
+  const list=Array.isArray(row?.incident_types)&&row.incident_types.length ? row.incident_types : (row?.incident_type?[row.incident_type]:[]);
+  return list.filter((t,i)=>list.indexOf(t)===i);
+}
+function incidentTypesRowLabel(row){
+  return incidentTypesFromRow(row).map(t=>INCIDENT_TYPE_LABELS[t]||t).join(' + ');
+}
 function incidentTypeLabel(siteId=rescueActiveSiteId){
   const s=ensureSiteStatusFields(siteId);
-  if(!s.incidentType) return siteHasBuildingCollapse(siteId)?'לא נבחר · קריסת מבנה':'לא נבחר';
-  return (INCIDENT_TYPE_LABELS[s.incidentType]||s.incidentType)+(collapseAddsToType(s.incidentType, siteId)?' + קריסת מבנה':'');
+  if(!s.incidentTypes.length) return siteHasBuildingCollapse(siteId)?'לא נבחר · קריסת מבנה':'לא נבחר';
+  const collapse=!s.incidentTypes.includes('missile_strike_structural_collapse') && siteHasBuildingCollapse(siteId);
+  return s.incidentTypes.map(t=>INCIDENT_TYPE_LABELS[t]||t).join(' + ')+(collapse?' + קריסת מבנה':'');
 }
 function siteStatusSummaryLine(siteId=rescueActiveSiteId){
   const s=ensureSiteStatusFields(siteId);
@@ -6234,7 +6524,7 @@ function endBriefingDemo(){
 // patients and writes nothing, so it is safe on a phone that is also carrying real data.
 const GUIDED_TOUR_STEPS = [
   {role:'pc', sel:'.role-top-grid', title:'חוג״ד · תמונת מצב מהירה', text:'פצועי המחלקה, התראות לפעולה, בקשות פתוחות ומוקדים. זה הדבר הראשון שחוג״ד רואה.'},
-  {role:'pc', section:'סטטוס אתר', title:'סטטוס אתר מהחילוץ', text:'מה שמ״מ / מ״פ חילוץ קבעו: סוג אירוע, T0, מצב מבנה ואתר נקי. חוג״ד מקבל עדכון, לא מאשר.'},
+  {role:'pc', section:'סטטוס אתר', title:'סטטוס אתר מהחילוץ', text:'מה שמ״מ / מ״פ חילוץ קבעו: סוג אירוע, T0, מצב מבנה ואתר נקי. חוג״ד מקבל עדכון, לא מאשר. סוג אירוע: חובש קובע כשאין סוג; חוג״ד יכול לשנות סוג שקבע חובש, לא סוג שקבע חילוץ.'},
   {role:'pc', section:'משימות חוג״ד עכשיו', title:'משימות עכשיו', text:'מה דורש החלטה שלך עכשיו, מחולק למיידי / מבצעי / השלמה.'},
   {role:'pc', section:'עומס חובשים', title:'עומס חובשים', text:'לכל חובש: כמה פצועים, אדומים, לכודים, חסמים ומתי עדכן לאחרונה. מכאן גם משייכים חובש לאירוע.'},
   {role:'pc', sel:'.stat-grid', title:'ספירת מיון', text:'אדום / צהוב / ירוק / לכודים במחלקה, מתעדכן מכל החובשים.'},
@@ -7285,6 +7575,8 @@ function renderPcResponsibilityBoard(){
   const waiting=myPts.filter(p=>p.patientStatus==='evacuating' || (['red','yellow'].includes(p.triage) && !['evacuated','handed_over','deceased'].includes(p.patientStatus))).length;
   return {
     overview:`${roleSection('סטטוס אתר (מפ"ק חילוץ)', roleRow('עדכון אחרון', siteStatusSummaryLine()))}
+      ${renderCommandIncidentTypeSection()}
+      ${renderIncidentTypeReportsSection()}
       ${roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds('pc'), {truckSiteId:pcPlatoonSite()}))}
       ${renderCommandEvacuationFunnel(myPts,'משפך פינוי מחלקתי')}
       ${renderCollapsibleSection('pc-evac-priority','תעדוף פינוי מחלקתי', companyEvacuationPriorityRows(myPts), myPts.length, {criticalCount:myPts.filter(p=>p.triage==='red'&&!['evacuated','handed_over','deceased'].includes(p.patientStatus)).length, emptyMessage:waiting?'אין פצועים במיקוד הנוכחי':'אין פצועים הממתינים לפינוי'})}
@@ -7891,6 +8183,8 @@ function renderCcCommandBoard(){
   // One string per command-panel tab (V2.99.62).
   return {
     overview:`${roleSection('כל האירועים — פצועים לפי מיון', renderAllIncidentsTriageTable())}
+    ${renderCommandIncidentTypeSection()}
+    ${renderIncidentTypeReportsSection()}
     ${roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds('cc')))}
     ${renderCcEvacuationFunnel()}
     ${renderCollapsibleSection('cc-evac-priority','תעדוף פינוי פלוגתי', companyEvacuationPriorityRows(focusedPts), focusedPts.length, {criticalCount:patients.filter(p=>p.triage==='red'&&!['evacuated','handed_over','deceased'].includes(p.patientStatus)).length, emptyMessage:'אין פצועים במיקוד הנוכחי'})}
@@ -8213,7 +8507,7 @@ function rccIncidentRows(){
     const a=mine?ensureSiteStatusFields('SITE_A'):null;
     const board=_rescueIncidentBoards[inc.id];
     return {key:inc.id, name:incidentDisplayName(inc),
-      typeLabel:mine?incidentTypeLabel('SITE_A'):(INCIDENT_TYPE_LABELS[inc.incident_type]||'לא נבחר'),
+      typeLabel:mine?incidentTypeLabel('SITE_A'):(incidentTypesRowLabel(inc)||'לא נבחר'),
       building:mine?a.buildingStatus:(BUILDING_STATUS_LABELS[auth.building_status]?auth.building_status:null),
       t0:mine?(a.t0||inc.t_zero):(auth.official_t0||inc.t_zero||null),
       openedAt:inc.opened_at||null,
@@ -8482,8 +8776,11 @@ function renderRccSiteManagement(siteId, pts){
   const closed=isIncidentClosedForSite(siteId);
   const official=currentUser ? !!a.t0 : (a.incidentStatus==='official'||a.incidentStatus==='closed');
   const types=[['missile_strike_structural_collapse','קריסת מבנה / טיל'],['mass_shooting','ירי המוני'],['vehicle_accident','תאונת דרכים'],['explosion','פיצוץ']];
-  const typeHtml=types.map(([k,label])=>rccChoiceButton(label, a.incidentType===k, `rescueSetIncidentType('${rescueCmdRole()}','${k}','${siteId}')`, `data-rcc-type="${k}"`)).join('');
-  const buildingRelevant=RCC_BUILDING_TYPES.has(a.incidentType) || siteHasBuildingCollapse(siteId) || !!a.buildingStatus || rccBuildingExpanded;
+  // Several types per incident (WP-25): a tap adds a type, a tap on a ticked one removes it (rescue
+  // is the top of the ladder). Medics' "not right" reports are listed under the buttons.
+  const typeHtml=types.map(([k,label])=>rccChoiceButton(label, a.incidentTypes.includes(k), `rescueSetIncidentType('${rescueCmdRole()}','${k}','${siteId}')`, `data-rcc-type="${k}"`)).join('');
+  const typeReports=currentUser && siteId==='SITE_A' ? renderIncidentTypeReportsSection() : '';
+  const buildingRelevant=a.incidentTypes.some(t=>RCC_BUILDING_TYPES.has(t)) || siteHasBuildingCollapse(siteId) || !!a.buildingStatus || rccBuildingExpanded;
   const buildings=[['stable','יציב'],['unstable','לא יציב'],['progressive_collapse','קריסה מתמשכת'],['safe_to_enter','בטוח לכניסה']];
   const buildingHtml=buildingRelevant
     ? `<div class="rcc-field-label">מצב המבנה</div><div class="demo-actions rcc-choices" data-rcc-building>${buildings.map(([k,label])=>rccChoiceButton(label, a.buildingStatus===k, `rescueUpdateBuildingStatus('${rescueCmdRole()}','${k}','${siteId}')`, `data-rcc-building-status="${k}"`)).join('')}</div>`
@@ -8500,8 +8797,9 @@ function renderRccSiteManagement(siteId, pts){
     <div class="role-section-title">ניהול אתר</div>
     ${official?`<div class="role-row-sub" style="margin-bottom:8px">T0 ${a.t0?new Date(a.t0).toTimeString().slice(0,5):''} · לפני ${a.t0?minutesSinceIso(a.t0):'—'} דק׳${closed?' · האירוע סגור':''}</div>`
       :`<button class="demo-mini-btn" style="width:100%;margin-bottom:8px" data-rcc-official onclick="rescueOpenOfficialIncident('${rescueCmdRole()}','${siteId}')">פתח אירוע רשמי + T0</button>`}
-    <div class="rcc-field-label">סוג אירוע</div>
+    <div class="rcc-field-label">סוג אירוע (אפשר יותר מאחד)</div>
     <div class="demo-actions rcc-choices" data-rcc-types>${typeHtml}</div>
+    ${typeReports}
     ${buildingHtml}
     <div class="rcc-field-label">אתר נקי וסגירה</div>
     ${clearLine}
@@ -10569,7 +10867,12 @@ function buildAlertObjects(pts=patients){
   tourniquetSnoozeAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
   duplicateCandidates(pts).forEach(([a,b],idx)=>pushAlert(alerts,{id:`dup-${a.id}-${b.id}`,type:'DUPLICATE_SUSPECTED',severity:'medium',owner:'pc',audience:['pc','chamal'],escalatesTo:null,actionRequired:'merge_duplicate',scope:'site',category:'integrity',siteId:a.siteId||b.siteId||'SITE_A',patientId:a.id,title:`חשד לכפילות ${a.id} ↔ ${b.id}`,detail:'בדיקה ידנית בלבד; אין מיזוג הרסני של אירועים'}));
   const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id)):siteExternalReports(cmdActiveSite);
-  const typeReport=siteData.medicIncidentTypeReport;
+  if(currentUser){
+    openIncidentTypeReports().forEach(x=>pushAlert(alerts,{id:`incident-type-report-${x.id}`,type:'INCIDENT_TYPE_MISMATCH',severity:'medium',owner:'pc',audience:['pc','cc'],escalatesTo:null,actionRequired:'acknowledge',scope:'site',category:'integrity',siteId:'SITE_A',
+      title:'בקשה להסיר סוג אירוע',
+      detail:`${INCIDENT_TYPE_LABELS[x.reported_type]} · ${incidentTypeReporterLabel(x)} חושב שאינו נכון · נשאר עד החלטה`}));
+  }
+  const typeReport=currentUser?null:siteData.medicIncidentTypeReport;
   if(typeReport){
     const auth=ensureSiteStatusFields(typeReport.siteId);
     if(auth.incidentType && auth.incidentType!==typeReport.type) pushAlert(alerts,{id:`incident-type-mismatch-${typeReport.siteId}`,type:'INCIDENT_TYPE_MISMATCH',severity:'medium',owner:'pc',audience:['pc','cc'],escalatesTo:null,actionRequired:'acknowledge',scope:'site',category:'integrity',siteId:typeReport.siteId,title:'פער בסוג אירוע: חובש מול חילוץ',detail:`חילוץ: ${INCIDENT_TYPE_LABELS[auth.incidentType]} · חובש: ${INCIDENT_TYPE_LABELS[typeReport.type]} · סוג החילוץ נשאר בתוקף`});
@@ -15942,7 +16245,7 @@ function clearWorkingSiteData(){
 async function activateIncident(inc){
   if(!inc || !currentUser) return;
   const prev=activeIncident?.id===inc.id ? activeIncident : null;
-  activeIncident={id:inc.id, visual_id:inc.visual_id, status:inc.status, location_name:inc.location_name, address:inc.address||'', incident_type:inc.incident_type||null, draft_resolution:inc.draft_resolution||null,
+  activeIncident={id:inc.id, visual_id:inc.visual_id, status:inc.status, location_name:inc.location_name, address:inc.address||'', incident_type:inc.incident_type||null, incident_types:incidentTypesFromRow(inc), draft_resolution:inc.draft_resolution||null,
     opened_by:inc.opened_by!==undefined?inc.opened_by:(prev?prev.opened_by:undefined), false_alarm:!!(inc.false_alarm||prev?.false_alarm),
     t_zero:inc.t_zero||prev?.t_zero||null}; // the alert time, injury time's default (WP-23)
   if(_workingIncidentId!==inc.id){ resetWorkingStateForIncident(inc); _workingIncidentId=inc.id; }
@@ -16029,7 +16332,7 @@ function renderIncidentPicker(){
       const enterLabel=isCurrent?'המשך באירוע':(inc.is_member||hasBlanketIncidentAccess())?'כניסה':'הצטרף לאירוע';
       return `<div class="incident-card ${inc.status==='draft'?'draft':''}">
         <div class="incident-card-head"><strong>${escAttr(inc.visual_id||'')} · ${escAttr(inc.location_name||'')}</strong><span class="incident-status-badge ${escAttr(inc.status)}">${escAttr(SERVER_INCIDENT_STATUS_LABELS[inc.status]||inc.status)}</span></div>
-        <div class="incident-card-meta">${inc.address?escAttr(inc.address)+' · ':''}${inc.incident_type?escAttr(INCIDENT_TYPE_LABELS[inc.incident_type]||inc.incident_type)+' · ':''}נפתח ${inc.opened_at?new Date(inc.opened_at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):''}${inc.opened_by_name?' ע״י '+escAttr(inc.opened_by_name):''} · ${inc.patient_count||0} פצועים${counts}</div>
+        <div class="incident-card-meta">${inc.address?escAttr(inc.address)+' · ':''}${incidentTypesRowLabel(inc)?`<span data-incident-card-types>${escAttr(incidentTypesRowLabel(inc))}</span> · `:''}נפתח ${inc.opened_at?new Date(inc.opened_at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):''}${inc.opened_by_name?' ע״י '+escAttr(inc.opened_by_name):''} · ${inc.patient_count||0} פצועים${counts}</div>
         <div class="incident-card-actions"><button onclick="enterIncidentFromPicker('${escAttr(inc.id)}')">${enterLabel}</button>${canMergeIncidents() && ['active','staging'].includes(inc.status) && _openIncidents.length>1 ? `<button onclick="toggleIncidentMergePanel('${escAttr(inc.id)}')">מיזוג כפילות</button>`:''}</div>
         ${_mergePanelFor===inc.id && canMergeIncidents() ? incidentMergePanelHtml(inc) : ''}
       </div>`;
@@ -16299,7 +16602,7 @@ function renderIncidentReport(){
     : `<div class="aar-box" id="aar-golden-hour"><div class="aar-k">שעת זהב · מפציעה עד מסירה</div><div class="demo-strip-sub">לא נכלל בגרסה זו של הדוח</div></div>`;
   const rows=(rep.patient_rows||[]).map(r=>`<tr><td>${escAttr(r.visual_id||'')}</td><td>${escAttr(TRIAGE_LABELS[r.triage]||r.triage||'')}</td><td>${escAttr(AAR_STATUS_LABELS[r.status]||r.status||'')}</td><td>${r.minutes_from_open??'—'}</td><td>${r.minutes_to_handover??'—'}</td><td>${ghCell(r)}</td><td>${escAttr(r.evacuation_destination||'—')}</td><td>${escAttr(r.mda_classification||'—')}</td><td>${r.tourniquets||0}</td></tr>`).join('');
   el.innerHTML=`
-    <div class="aar-head"><div><strong>${escAttr(inc.visual_id||'')} · ${escAttr(inc.location_name||'')}</strong><div class="demo-strip-sub">נפתח ${fmt(inc.opened_at)} · נסגר ${fmt(inc.closed_at)} · ${inc.duration_minutes??'—'} דקות${inc.false_alarm?' · אזעקת שווא':''}${inc.closed_with_override?' · נסגר בעקיפה':''}</div></div><div>${versionPicker}</div></div>
+    <div class="aar-head"><div><strong>${escAttr(inc.visual_id||'')} · ${escAttr(inc.location_name||'')}</strong>${incidentTypesRowLabel(inc)?`<div class="demo-strip-sub" data-aar-incident-types>סוג אירוע: ${escAttr(incidentTypesRowLabel(inc))}</div>`:''}<div class="demo-strip-sub">נפתח ${fmt(inc.opened_at)} · נסגר ${fmt(inc.closed_at)} · ${inc.duration_minutes??'—'} דקות${inc.false_alarm?' · אזעקת שווא':''}${inc.closed_with_override?' · נסגר בעקיפה':''}</div></div><div>${versionPicker}</div></div>
     ${late>0?`<div class="aar-warn">${late} רשומות הגיעו לשרת אחרי הסגירה ואינן בדוח זה. פתיחה וסגירה מחדש של האירוע תשמור גרסה מלאה.</div>`:''}
     <div class="aar-note">דוח סטטיסטי בלבד: ללא שמות וללא פרטים מזהים. פצועים מוצגים לפי מספר זמני.</div>
     <div class="aar-grid">

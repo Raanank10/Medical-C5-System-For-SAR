@@ -18,6 +18,7 @@ Update the status table at the bottom of this file in the same PR that finishes 
 - Bump `APP_VERSION` and the visible version labels together, one version per merged PR. `check_repo.py` fails if they disagree.
 - New SQL goes in a new numbered file (round 1 started at `database/047_...`; for round 2 see "Numbering in this round"). Never edit an applied migration. Every new trigger function: `SECURITY DEFINER`, `set search_path`, and `revoke execute ... from public, anon, authenticated` (see `046`). Run `get_advisors` after applying.
 - Any new event type must be added in four places at once: the `event_type` enum (migration), `ROLE_ALLOWED_EVENT_TYPES` in `supabase/functions/sync-log/index.ts`, `SYNC_ELIGIBLE_EVENT_TYPES` in the HTML, and the contract list from WP-1.
+- Apply migrations through the Supabase connector (`apply_migration`) or the Supabase CLI, never by pasting into the dashboard SQL editor (owner 2026-11-21). A paste is not recorded in the live migration list (WP-35), and a long file pasted from a phone was auto-indented line by line until it was cut off mid-function (`090`, 2026-11-20: "unterminated dollar-quoted string"; nothing was applied). Name the migration after the repo file (`090_incident_types_ladder`).
 - Deploy order when a WP has server parts: migration, then `sync-log` Edge Function, then client. The client must keep working if the migration is not applied yet (separate queries, tolerate missing columns), as `044` did.
 - Clinical, sync-conflict and RLS changes are never auto-merged. The owner verifies them live against the real accounts (CLAUDE.md, "Safety and data policy").
 - Synthetic data only.
@@ -532,6 +533,8 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 
 ### WP-25: Medic incident type and mismatch report synced (P2, owner 2026-10-23)
 
+**Status (2026-11-21, V2.99.82, `database/089`-`091`).** Live: `089` applied by the owner in the SQL editor; `090` applied 2026-11-20 through the connector after the editor paste failed (see Rules); `sync-log` v21 deployed (v20 plus WP-25's five lines). Checked live inside a rolled-back transaction with real profiles: two medics add shooting + explosion and both stay; a medic's removal of another medic's type becomes a report; RPC adds and is stamped `rpc`; PC removing rescue's type is refused, a medic's type allowed; CC keeps a report; a logistics officer is refused; the reports table is read by members only and refuses direct inserts. `get_advisors` then flagged two of 090's helpers callable by any signed-in user with no incident check (`incident_type_adder` would show who added a type to someone else's incident) and four helpers without a fixed `search_path`: fixed in `091_incident_types_hardening` (revoke from authenticated; `search_path = ''`), tested on local PostgreSQL 16 (the 20 scenarios unchanged, a direct call refused, `change_incident_type` and the check constraint unaffected). `091` applied live 2026-11-21 through the connector (`091_incident_types_hardening`): `get_advisors` no longer lists the two helpers or the four `search_path` warnings, and a rolled-back check with real profiles still passes (medic add, PC refused over rescue, PC removes a medic's type, a direct helper call refused). Left: the two-phone check in WP-21. Owner decisions 2026-11-18, three rounds, final: (1) an incident may have **several types** (a suicide bomber can open fire and then explode), all equal, no main type; (2) **anyone adds** a type, **removing follows the ladder** rescue (rpc/rcc) > PC/CC > medics against whoever added that type; (3) PC/CC never remove a type rescue added; (4) a medic removes a type they added themselves; someone else's is a "not right" report PC/CC/RPC/RCC keep or accept by the same ladder. Built in `database/090_incident_types_ladder.sql` (see `docs/ARCHITECTURE.md`). This also removes an inconsistency: a medic opening an incident could already set its type through `open_incident` (064). Found and fixed during the build: boards writing their whole type list would have dropped a type another phone added meanwhile, so boards send one change at a time (`change_incident_type`). Tested on a local PostgreSQL 16 with stand-in tables (20 scenarios) and in `scripts/browser_rescue_site_authority_test.js` (two medics, PC, CC, RPC, RCC phones; four client guards mutation-checked). Also fixed: the medic's toast "הפער נשלח לחוג"ד" was false (the event never left the phone). Follow-up done in `092_incident_types_in_lists_and_report` (V2.99.83, applied live 2026-11-21 by the owner in the SQL editor, so not in the migration list): `list_open_incidents` returns `incident_types` (dropped and recreated from its live body, grants restored), the stored report carries `incident.incident_types` (live `app.build_incident_aar` wrapped, nothing else changed: same 19 top-level keys), the incident picker, the RCC table of other incidents and the stored report header show every type (older servers and older stored reports fall back to `incident_type`), and the analytics export writes `incident_types_json`. Checked against the live schema in a rolled-back transaction before applying; after applying (2026-11-21): `list_open_incidents` returns `incident_types` for a real CC profile and refuses anon, a stored report still has 19 top-level keys and carries `incident.incident_types`, and `get_advisors` shows nothing new. The text below is the original plan.
+
 **Why.** WP-8 follow-up: a signed-in medic's incident-type pick stays on the phone, and `INCIDENT_TYPE_MISMATCH_REPORTED` (event contract `known_gaps`) never reaches the PC or rescue.
 
 **Steps.**
@@ -636,6 +639,25 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 ### WP-35: Record what is applied live (P3)
 
 **Why.** Files applied in the SQL editor are missing from the live migration list (checked 2026-11-13: `042`, `053`, `073`, `074`, `075`, `077` and others exist live as objects but have no migration row), and live names differ from repo numbers. Nobody can tell from the live history what is applied.
+
+**Progress (2026-11-20/21).** `081`-`092` checked read-only against the live project (every column, function, trigger and enum value each file creates): all applied. Only `085`, `090` and `091` are in the live migration list; the others were applied in the SQL editor.
+
+| File | Applied live | In the migration list | Checked by |
+|---|---|---|---|
+| `081_tourniquet_time_entry` | yes (4/4 columns, 3/3 functions) | no | objects, 2026-11-20 |
+| `082_resupply_receipt_by_medic` | yes (3/3 columns) | no | objects, 2026-11-20 |
+| `083_supply_request_cancelled_enum` | yes (enum value) | no | objects, 2026-11-20 |
+| `084_supply_request_cancel` | yes (4/4 columns) | no | objects, 2026-11-20 |
+| `085_rescue_board_evac_point` | yes (enum value, 4/4 functions, trigger) | yes (`085_rescue_board_evac_point`) | objects + list |
+| `086_extraction_needs_medic_check` | yes (`app.project_patient_extracted` carries the 60-minute rule) | no | objects, 2026-11-20 |
+| `087_rescue_extraction_medic_request` | yes (2/2 functions, 2/2 triggers) | no | objects, 2026-11-20 |
+| `088_injury_time_entry` | yes (5/5 columns, 2/2 functions, trigger) | no | objects, 2026-11-20 |
+| `089_incident_type_report_enum` | yes (both enum values) | no | objects, 2026-11-20 |
+| `090_incident_types_ladder` | yes (column, table, 11 functions, 3 triggers; rolled-back role check with real profiles) | yes (`090_incident_types_ladder`) | objects + list |
+| `091_incident_types_hardening` | yes (2026-11-21) | yes (`091_incident_types_hardening`) | objects + list + `get_advisors` |
+| `092_incident_types_in_lists_and_report` | yes (2026-11-21, SQL editor) | no | objects + grants + rolled-back real-profile check + `get_advisors` |
+
+No rows were written to the migration list to make it look complete: a row there would claim the file was applied as a migration when it was pasted. `004`-`080` are still to check.
 
 **Steps.** Read-only: for each `database/0NN_*.sql`, probe one object it creates (function, column, policy, enum value) and record applied / not applied, the live migration name if any, and who applied it, in a new table in `docs/ARCHITECTURE.md` "Backend Deployment Status" (or a new `docs/LIVE_SCHEMA_STATUS.md` added to `REQUIRED_PATHS`). No writes to the database. This is the input for Phase 4C.
 
@@ -758,19 +780,19 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-20 Finish #128, apply 079-081 | P1 | Done: 079, 080, 081 and `sync-log` v17 live, checked 2026-11-17 | #128 | 100-minute check on a real tourniquet runs in WP-21 |
 | WP-21 Live two-phone run | P1 | Not started | | WP-0 part 2 plus WP-17/18/19, D1 offline, WP-10 install, T6 |
 | WP-22 Open sync rejections | P2 | Done 2026-11-19: 55 closed with reasons (8 test data, 47 not recoverable), 0 open, rows kept | this PR | all in closed incidents, so admin only; stored copies removed by the nightly privacy job |
-| WP-23 Injury time editable | P2 | Done in this PR (V2.99.81, `database/088`); 088 not applied live yet (owner applies) | this PR | owner 2026-10-23 and 2026-11-18: CC may not edit; watchdog rows, MIST and stored report follow the injury time; newest entry by phone time wins; `handover-consume` change not deployed |
-| WP-24 Command cancels a resupply request | P2 | Done (V2.99.75): `083` + `084` applied live by the owner, `sync-log` v20 deployed 2026-11-20; rolled-back live check passed; live phone check pending | #133 | rescoped 2026-11-18: CC holds no stock, so no "fulfilled by company"; medic's escalation stays with the PC; cancel with a reason (cc/chamal/admin while open, PC before escalation); direct writes to `supply_requests` closed |
-| WP-25 Medic incident type + mismatch | P2 | Not started | | owner 2026-10-23 (WP-8 follow-up) |
+| WP-23 Injury time editable | P2 | Done in this PR (V2.99.81, `database/088`); `088` applied live (objects checked 2026-11-20, not in the migration list) | this PR | owner 2026-10-23 and 2026-11-18: CC may not edit; watchdog rows, MIST and stored report follow the injury time; newest entry by phone time wins; `handover-consume` change not deployed |
+| WP-24 Command cancels a resupply request | P2 | Done (V2.99.75): `083` + `084` applied live by the owner (objects checked 2026-11-20, not in the migration list); `SUPPLY_REQUEST_CANCELLED` in deployed `sync-log` (v20 and v21); rolled-back live check passed 2026-11-20; live phone check pending | #133 | rescoped 2026-11-18: CC holds no stock, so no "fulfilled by company"; medic's escalation stays with the PC; cancel with a reason (cc/chamal/admin while open, PC before escalation); direct writes to `supply_requests` closed |
+| WP-25 Medic incident type + mismatch | P2 | Done (V2.99.82): `089`, `090` live, `sync-log` v21 deployed, role check with real profiles passed 2026-11-20; `091` hardening applied live 2026-11-21 | #134, this PR | owner 2026-11-18: several types per incident; anyone adds, removing by the ladder rescue > PC/CC > medics against the adder (`090`). Medic's "not right" reports; PC/CC type section, never over rescue; one change at a time from boards. Removed from `known_gaps`. Every type in the picker, RCC table, stored report and analytics export: `092` (V2.99.83), applied live 2026-11-21 |
 | WP-26 PC deterioration review | P2 | Not started | | owner 2026-10-23 (WP-5 `known_gaps`) |
 | WP-27 CC moves a site to another platoon | P2 | Not started, 1 design question | | owner 2026-10-23 (WP-7 remainder); RLS |
 | WP-28 27 never-sent event types | P2 | Waiting on owner's list | | |
 | WP-29 Dead Man's Switch on the server | P2 | Not started | | builds on 081's watchdog (live) |
 | WP-30 Telegram alerts (B1) | P2 | Waiting on owner's 19 answers | | |
 | WP-31 MARCH completion + hands-on PC | P2 | Waiting on clinical criteria | | B2 |
-| WP-32 Evacuation point leftovers | P2 | Not started | | WP-18 remainder |
+| WP-32 Evacuation point leftovers | P2 | Step 1 done by `085` (RCC panel, #141): the rescue board tells moving from arrived (`evac_point_arrived_at`). Open: waiting time in the stored report | #141 | WP-18 remainder |
 | WP-33 CC all-incidents alert rule | P3 | Done (V2.99.76), no SQL | this PR | owner 2026-11-18: one line per incident; a red patient counts until a vehicle takes them; "פצוע אדום" no longer fires after a vehicle took the patient |
 | WP-34 Test gaps | P3 | Not started | | AAR screen test, analytics pytest in CI |
-| WP-35 Record what is applied live | P3 | Not started | | read-only |
+| WP-35 Record what is applied live | P3 | Started: `081`-`092` checked 2026-11-20/21 (all applied; only `085`, `090`, `091` listed); `004`-`080` left | | read-only |
 | WP-36 Demo constants | P3 | Not started | | `SITE_A` x60, `PLT-A` x25 |
 | WP-37 Unlink tombstone | P3 | Not started | | `database/069` known limit |
 | WP-39 Evacuation point = נאפ"ל | P2 | Done (V2.99.77), no SQL | this PR | owner 2026-11-18; reverses WP-18's "נקודת פינוי"; one per site |
