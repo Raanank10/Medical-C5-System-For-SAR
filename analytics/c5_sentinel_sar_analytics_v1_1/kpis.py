@@ -204,7 +204,7 @@ class KPIEngine:
         return alerts[alerts["alert_type"].eq("DEAD_MAN_SWITCH")].copy()
 
     def pc_review_response(self, incident_id: Optional[str] = None) -> pd.DataFrame:
-        """PC review of a deteriorating casualty (WP-26, database/093): one row per medic request.
+        """PC review of a deteriorating casualty (WP-26, database/094): one row per medic request.
 
         Minutes from the medic's request to the PC's first answer (a delay or the decision) and to
         the decision, the outcome, how often it was put off, and whether it waited past the 5-minute
@@ -213,7 +213,7 @@ class KPIEngine:
         Empty when the table is not there (older exports, the seeded demo databases).
 
         A review the server closed because the casualty left the scene (reason patient_left_scene,
-        093) is 'closed_patient_left'; it counts as unanswered only if 5 minutes had passed with no
+        094) is 'closed_patient_left'; it counts as unanswered only if 5 minutes had passed with no
         answer before the casualty left. priority_update_unconfirmed: the outcome says the priority
         was updated, but the events hold no triage change for that casualty between the request and
         2 minutes after the decision (the outcome is a record, it does not change the triage).
