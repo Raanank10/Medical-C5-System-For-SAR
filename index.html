@@ -1033,7 +1033,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9983</div>
+      <div class="demo-kicker">Demo V2.9984</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1130,7 +1130,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9983</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9984</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1140,7 +1140,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9983</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9984</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3467,7 +3467,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.83';
+const APP_VERSION = '2.99.84';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -13444,6 +13444,8 @@ function medicationEntriesFromState(){
       dosage:med.dosage,
       route:med.route,
       estimated_weight_kg:state.patientAgeGroup==='pediatric'?estimatedPediatricWeight():null,
+      // The name flag_pediatric_medication_missing_weight() has always read (database/093).
+      weight_estimate_kg:state.patientAgeGroup==='pediatric'?estimatedPediatricWeight():null,
       is_pediatric_override:!!override,
       ...(override?{high_risk_override:{required:true, confirmed_twice:true, reason:override.reason}}:{})
     }};
@@ -13464,7 +13466,7 @@ function queueIntakeClinicalEventsAtSave(patientId){
   medicationEntriesFromState().forEach(({med, override, payload})=>{
     if(override){
       saveLocalEvent({type:'HIGH_RISK_OVERRIDE_CONFIRMED', detail:`אישור חריגת מינון פדיאטרי — ${med.label} ${med.dosage}`, warn:true, patient_id:patientId,
-        payload_json:{medication:med.label, dosage:med.dosage, route:med.route, estimated_weight_kg:estimatedPediatricWeight(), confirmed_twice:true, reason:override.reason}});
+        payload_json:{medication:med.label, dosage:med.dosage, route:med.route, estimated_weight_kg:estimatedPediatricWeight(), weight_estimate_kg:estimatedPediatricWeight(), confirmed_twice:true, reason:override.reason}});
     }
     saveLocalEvent({type:'MEDICATION_ADMINISTERED', detail:`${med.label} ${med.dosage}`, warn:!!override, patient_id:patientId, payload_json:payload});
   });
@@ -13664,6 +13666,10 @@ function savePatient(){
     payload_json:{visual_id:newId,triage:state.triage,needs_full_assessment:quickCapture,capture_mode:state.flowMode,
       // Injury zones are projected into patients.injury_zones from the create event (WP-3).
       injury_zones:[...(state.injuryZones||[])], injury_mechanism:effectiveInjury,
+      // The server sets patients.is_pediatric / pediatric_age_years from these, so other phones
+      // and command see a child as a child (database/093, V2.99.84).
+      patient_age_group:state.patientAgeGroup||'adult', patient_age_band:state.patientAgeBand||'adult',
+      patient_age:Number.isFinite(Number(state.patientAge)) && state.patientAge!==null && state.patientAge!=='' ? Number(state.patientAge) : null,
       // Kept in the event log for audit/AAR; the server projects no column from it (V2.99.62).
       ...(state.flowMode!=='quick' && state.triage!=='black' ? {march_review:marchReviewFromState()} : {})}});
   // Vitals taken in the full flow: the server sets last_vitals_at (and clears
@@ -17216,6 +17222,12 @@ function applyProjectedPatientState(rows){
         changed=true;
       }
       if(existing._serverVersion!=null && row.version!=null && row.version<=existing._serverVersion) continue;
+      // Another phone's patient: the age group the server projected from its create event
+      // (database/093), which may land after this phone first saw the patient.
+      if(existing.sourcedFromRemote && row.is_pediatric!=null){
+        const group=row.is_pediatric?'pediatric':'adult', age=row.pediatric_age_years||null;
+        if(existing.patientAgeGroup!==group || existing.patientAge!==age){ existing.patientAgeGroup=group; existing.patientAge=age; changed=true; }
+      }
       const before=JSON.stringify([existing.triage,existing.patientStatus,existing.accessibility,existing.trapStatus,existing.needsFullAssessment,existing.fullName,existing.temporaryDescription,existing.physicianDeathConfirmedAt]);
       // Server 'pending'/null means the server has no triage for this patient yet (e.g. a patient
       // created before V2.99.27, whose field triage never reached the server) - it must never
@@ -19323,6 +19335,7 @@ function confirmPediatricOverride(){
       dosage:pending.dosage,
       route:pending.route,
       estimated_weight_kg:estimatedPediatricWeight(),
+      weight_estimate_kg:estimatedPediatricWeight(),
       confirmed_twice:true,
       reason:'Emergency administration due to severe trauma; weight estimated via age group.'
     }
