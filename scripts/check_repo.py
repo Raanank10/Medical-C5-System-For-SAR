@@ -382,6 +382,37 @@ def check_event_contract(errors: list[str]) -> None:
             errors,
         )
 
+    # WP-28: a synced type the phone never writes must say why (the server writes it, or the server
+    # accepts it but nothing is built yet), so new sessions do not assume the feature exists.
+    explained: dict[str, str] = {}
+    for section in ("server_writes", "server_accepts_unused"):
+        for key, types in contract.get(section, {}).items():
+            if key == "_about":
+                continue
+            for event_type in types:
+                if event_type in explained:
+                    fail(
+                        f"src/domain/event-contract.json: {event_type} is listed twice "
+                        f"({explained[event_type]} and {section} [{key}]).",
+                        errors,
+                    )
+                explained[event_type] = f"{section} [{key}]"
+                if event_type not in synced:
+                    fail(f"src/domain/event-contract.json: {event_type} is in {section} but not in 'synced'.", errors)
+                elif event_type in emitted:
+                    fail(
+                        f"src/domain/event-contract.json: {event_type} is in {section} but index.html writes it; "
+                        "take it out of that section.",
+                        errors,
+                    )
+    for event_type in sorted(synced - emitted - set(explained)):
+        fail(
+            f"src/domain/event-contract.json: {event_type} is synced but index.html never writes it. Build it, "
+            "remove it (SYNC_ELIGIBLE_EVENT_TYPES, 'synced', sync-log), or list it under 'server_writes' / "
+            "'server_accepts_unused' with the reason (WP-28).",
+            errors,
+        )
+
 
 def main() -> int:
     errors: list[str] = []

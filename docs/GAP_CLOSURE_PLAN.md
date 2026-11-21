@@ -364,7 +364,7 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 3. WP-22 after WP-19, so the rejected stock movements can be resent instead of closed.
 4. WP-23 to WP-27, one at a time (they all touch `index.html`; owner decisions from 2026-10-23).
 5. WP-29 builds on 081's `run_clinical_watchdog()` (live since WP-20).
-6. WP-28, WP-30, WP-31 and WP-33 wait for an owner answer; ask it first in the session.
+6. WP-30 and WP-31 wait for an owner answer; ask it first in the session. (WP-28 answered and done 2026-11-21; WP-33 done.)
 7. WP-32 and WP-34 to WP-37 any time.
 8. WP-38 after WP-19 (owner 2026-11-18); WP-24 touches the same flow.
 
@@ -379,7 +379,7 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 | WP-25 | Medic incident type and mismatch report synced | P2 | - (decided 2026-10-23) |
 | WP-26 | PC deterioration review request synced | P2 | - (decided 2026-10-23, shape 2026-11-19/21) |
 | WP-27 | CC moves a site's patients to another platoon | P2 | one design question |
-| WP-28 | The 27 never-sent event types | P2 | build / keep / remove per type |
+| WP-28 | The 27 never-sent event types | P2 | - (answered 2026-11-21) |
 | WP-29 | Dead Man's Switch on the server | P2 | recipients |
 | WP-30 | Telegram critical alerts (B1) | P2 | the 19 alert answers, a bot |
 | WP-31 | MARCH completion rule and hands-on PC | P2 | clinical criteria |
@@ -393,6 +393,7 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 | WP-39 | The evacuation point is called נאפ"ל | P2 | - (decided 2026-11-18) |
 | WP-40 | 30 minutes waiting at the נאפ"ל alerts PC and CC | P2 | - (decided 2026-11-19) |
 | WP-41 | Medical staff see a patient sent to / arriving at the נאפ"ל | P2 | - (decided 2026-11-19) |
+| WP-42 | Medic asks to close their site (`MEDIC_SITE_CLOSE_REQUESTED`) | P2 | who approves, what "closed" changes |
 
 ---
 
@@ -589,7 +590,18 @@ Verified: `scripts/rls_test_094_pc_review.sql` on a local PostgreSQL 16 with eve
 
 ---
 
-### WP-28: The 27 never-sent event types (P2, needs the owner's list)
+### WP-28: The 27 never-sent event types (P2, owner answered 2026-11-21)
+
+**Done (V2.99.90, no SQL, `sync-log` v22 to deploy).** Recomputed on `main` @ `4f8d082` (V2.99.86), rechecked by `check_repo.py` on `f41e1de` (V2.99.89), and checked live (read-only count of `events` per type, 2026-11-21): 33 synced types were never written by the phone; 7 are incident lifecycle types the server's RPCs write; the other 26 had 0 rows live. `NOTE_ADDED` dropped off the 10-23 list (built for the MARCH-PAWS review); `INCIDENT_TYPE_MISMATCH_REPORTED` joined it (WP-25 stopped writing it). Owner decisions:
+- **Removed (12)** from `SYNC_ELIGIBLE_EVENT_TYPES`, the contract's `synced` and `sync-log`: the 8 pre-WP-19 inventory types (`SUPPLY_REQUEST_CREATED`, `INVENTORY_LEDGER_ENTRY`, `INVENTORY_INITIALIZED`, `INVENTORY_TRANSFER_OUT`, `INVENTORY_TRANSFER_IN`, `PLATOON_STOCK_INITIALIZED`, `PLATOON_STOCK_REFILLED`, `DIRECT_LOGO_TO_MEDIC_REFILL`), `SYNC_CONFLICT`, `CONFLICT_LOG_ENTRY`, `DEAD_MAN_SWITCH_ESCALATED` (server list only) and `PATIENT_IDENTIFIED`. `PATIENT_IDENTIFIED` is removed, not built: identity is a direct write (`update_patient_identity()`) so `finalize_incident_aar()` can delete it; as an event the name would sit in the immutable log (docs/PATIENT_IDENTITY_LIFECYCLE.md). Enum values, projection triggers and `events_insert_by_role` (`074`) are unchanged; `admin` can still send any type.
+- **Kept, listed in the contract's new `server_accepts_unused` (15):** `MEDIC_SITE_CLOSE_REQUESTED` (WP-42), `INCIDENT_TYPE_MISMATCH_REPORTED` (an outbox from before V2.99.82 may still hold one), and 13 owed with no WP: `PATIENT_INJURY_UPDATED`, `MINIMAL_TRIAGE_RECORDED`, `SABCDE_RECORDED`, `MSTART_SUGGESTED`, `JUMPSTART_SUGGESTED`, `JUMPSTART_OVERRIDE`, `TOURNIQUET_CONTEXT_UPDATED`, `TREATMENT_SAFETY_WARNING`, `HIGH_RISK_CLINICAL_VIOLATION`, `WATCHDOG_RESOLVED`, `VOICE_MEMO_ADDED`, `COMMAND_CONTEXT_NOTE_ADDED`, `AAR_CONTEXT_NOTE_ADDED`.
+- **New contract section `server_writes`** for the 7 incident lifecycle types.
+- `check_repo.py` now fails when a synced type is never written by `index.html` and is in neither section, or when a listed type starts being written, so the gap cannot reopen silently.
+- Follow-up noticed, not done: since D10 (`064`) no drafts are created, so `INCIDENT_DRAFT_CREATED` / `_MERGED` / `_REJECTED` may be dead on the server too; check before a later cleanup.
+
+**Still to do (owner).** Deploy `sync-log` v22 from `main`'s file after merge. Until it is deployed the server still accepts the removed types (harmless: nothing sends them).
+
+The original plan follows.
 
 **Why.** 34 synced types are never written by the phone; 7 are lifecycle types the server writes itself, so 27 are allowed but unused (list in the event contract: `synced` minus what `index.html` emits). They mislead new sessions into assuming features exist.
 
@@ -608,7 +620,7 @@ Verified: `scripts/rls_test_094_pc_review.sql` on a local PostgreSQL 16 with eve
 
 **Depends on.** WP-20: `081` replaces `app.run_clinical_watchdog()` again; start from 081's body, not 072's or 079's.
 
-**Steps.** In the watchdog: for each open incident, a medic/paramedic member whose `device_presence.last_heartbeat_at` is older than 10 minutes while they have patients not handed over raises one `DEAD_MAN_SWITCH` alert (dedupe per device per silence), resolved by the next heartbeat. Ask the owner who sees it (proposal: PC and CC of the incident). Client: list it like the other server alerts, marked "(שרת)", only when the phone does not already show its own. Then decide in WP-28 whether `DEAD_MAN_SWITCH_ESCALATED` stays.
+**Steps.** In the watchdog: for each open incident, a medic/paramedic member whose `device_presence.last_heartbeat_at` is older than 10 minutes while they have patients not handed over raises one `DEAD_MAN_SWITCH` alert (dedupe per device per silence), resolved by the next heartbeat. Ask the owner who sees it (proposal: PC and CC of the incident). Client: list it like the other server alerts, marked "(שרת)", only when the phone does not already show its own. `DEAD_MAN_SWITCH_ESCALATED` was removed in WP-28 (owner 2026-11-21): raise the watchdog alert, not that event.
 
 **Verify.** Rolled-back live run: stale heartbeat raises, a fresh one resolves, second run idempotent; extend `scripts/browser_server_watchdog_test.js`. Threshold change rules apply (CLAUDE.md).
 
@@ -754,6 +766,18 @@ No rows were written to the migration list to make it look complete: a row there
 
 ---
 
+### WP-42: Medic asks to close their site (P2, from WP-28, owner 2026-11-21)
+
+**Why.** `docs/C5_SENTINEL_SAR_MVP_SPEC_v1.2.md` "Medic Site Close Rule": a medic may ask to close their site only after every patient they registered is handed over; חוג"ד / מ"פ רפואה / חמ"ל may reject or reopen it. Today only PC and rescue can mark a site clear (`SITE_CLEAR_CONFIRMED`); the medic has no "done here" signal, so the PC cannot see who is free to move. `MEDIC_SITE_CLOSE_REQUESTED` is in the enum, `sync-log` (medic, paramedic) and `074`'s insert policy, and is listed in the contract's `server_accepts_unused`.
+
+**Before starting, ask the owner.** (1) Who approves: PC only, or PC, CC and חמ"ל? (2) What an approved close changes: only a board badge "חובש סיים", or the medic leaves the incident's membership? (3) Is it blocked by patients the medic treated but did not register?
+
+**Steps.** Client: a "סיימתי באתר" action on the medic's screen, enabled only when the rule holds, sends the event. Server: project it (a `site_close_requests` row or columns on the membership), an approve / reject RPC for the chosen roles, audited. Boards show it. Take the type out of `server_accepts_unused` when the phone writes it (`check_repo.py` enforces it).
+
+**Verify.** RLS impersonation for medic, other medic, PC, rolled back; a two-device browser test.
+
+---
+
 ## Tracks outside this plan's PRs
 
 These need a decision, people or money rather than a code change in this repo. Listed so nothing is lost:
@@ -806,7 +830,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-25 Medic incident type + mismatch | P2 | Done (V2.99.82): `089`, `090` live, `sync-log` v21 deployed, role check with real profiles passed 2026-11-20; `091` hardening applied live 2026-11-21 | #134, this PR | owner 2026-11-18: several types per incident; anyone adds, removing by the ladder rescue > PC/CC > medics against the adder (`090`). Medic's "not right" reports; PC/CC type section, never over rescue; one change at a time from boards. Removed from `known_gaps`. Every type in the picker, RCC table, stored report and analytics export: `092` (V2.99.83), applied live 2026-11-21 |
 | WP-26 PC deterioration review | P2 | Done (V2.99.87, `094` applied live 2026-11-21, live test passed) | #148 | owner 2026-11-19/21: option A (052 table, own `request_kind`), PC + CC alert, tap + outcome, "אחר כך". Removed from `known_gaps`. Two-phone check still with WP-21 |
 | WP-27 CC moves a site to another platoon | P2 | Not started, 1 design question | | owner 2026-10-23 (WP-7 remainder); RLS |
-| WP-28 27 never-sent event types | P2 | Waiting on owner's list | | |
+| WP-28 27 never-sent event types | P2 | Done (V2.99.90), no SQL; `sync-log` v22 to deploy | this PR | owner 2026-11-21: 12 removed, 15 in `server_accepts_unused`, 7 in `server_writes`; `MEDIC_SITE_CLOSE_REQUESTED` is WP-42 |
 | WP-29 Dead Man's Switch on the server | P2 | Not started | | builds on 081's watchdog (live) |
 | WP-30 Telegram alerts (B1) | P2 | Waiting on owner's 19 answers | | |
 | WP-31 MARCH completion + hands-on PC | P2 | Waiting on clinical criteria | | B2 |
@@ -819,6 +843,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-39 Evacuation point = נאפ"ל | P2 | Done (V2.99.77), no SQL | this PR | owner 2026-11-18; reverses WP-18's "נקודת פינוי"; one per site |
 | WP-40 30 min at the נאפ"ל alert | P2 | Done (V2.99.78), no SQL | this PR | owner 2026-11-18/19: PC + CC, every colour but black, from the send, 30 warn / 60 critical |
 | WP-41 Banner: patient to / at the נאפ"ל | P2 | Done (V2.99.79), no SQL | this PR | owner 2026-11-18/19; send + arrival, medic / paramedic / physician, open or close, 15 s |
+| WP-42 Medic asks to close their site | P2 | Not started, design questions | | from WP-28; spec v1.2 Medic Site Close Rule |
 | WP-38 Resupply raises the medic's bag | P2 | Done (V2.99.74): `database/082` applied live by the owner, `sync-log` v18 deployed 2026-11-18; live two-phone check pending | #132 | owner 2026-11-18: the medic confirms, by what arrived; the PC's / logistics' "delivered" = handed over, waiting for the medic |
 
 ## Revisions after #73 (2026-10-19)

@@ -1,9 +1,8 @@
 {
-  "_about": "Every event type index.html writes must appear in exactly one list. scripts/check_repo.py enforces it, so an event that silently never leaves the phone fails CI instead of going unnoticed. Add a new type to 'synced' (and to SYNC_ELIGIBLE_EVENT_TYPES, sync-log ROLE_ALLOWED_EVENT_TYPES and the event_type enum), to 'local_only' with a reason, or to 'known_gaps' with the work package that will sync it. See docs/GAP_CLOSURE_PLAN.md WP-1.",
+  "_about": "Every event type index.html writes must appear in exactly one list. scripts/check_repo.py enforces it, so an event that silently never leaves the phone fails CI instead of going unnoticed. Add a new type to 'synced' (and to SYNC_ELIGIBLE_EVENT_TYPES, sync-log ROLE_ALLOWED_EVENT_TYPES and the event_type enum), to 'local_only' with a reason, or to 'known_gaps' with the work package that will sync it. See docs/GAP_CLOSURE_PLAN.md WP-1. A synced type the phone never writes goes in 'server_writes' (a server RPC writes it) or 'server_accepts_unused' (allowed, not built yet), also enforced (WP-28).",
   "synced": [
     "PATIENT_CREATED",
     "QUICK_PATIENT_CREATED",
-    "PATIENT_IDENTIFIED",
     "PATIENT_INJURY_UPDATED",
     "PATIENT_LOCATION_UPDATED",
     "PATIENT_ACCESS_UPDATED",
@@ -43,24 +42,14 @@
     "INCIDENT_CLOSED",
     "INCIDENT_REOPENED",
     "MEDIC_SITE_CLOSE_REQUESTED",
-    "SUPPLY_REQUEST_CREATED",
     "SUPPLY_REQUEST_DISPATCHED",
     "SUPPLY_REQUEST_IN_TRANSIT",
     "SUPPLY_REQUEST_RECEIVED",
-    "INVENTORY_LEDGER_ENTRY",
-    "INVENTORY_INITIALIZED",
-    "INVENTORY_TRANSFER_OUT",
-    "INVENTORY_TRANSFER_IN",
-    "PLATOON_STOCK_INITIALIZED",
-    "PLATOON_STOCK_REFILLED",
-    "DIRECT_LOGO_TO_MEDIC_REFILL",
     "EXTERNAL_REPORT_CREATED",
     "EXTERNAL_REPORT_LINKED",
     "WATCHDOG_ALERT",
     "WATCHDOG_ACKNOWLEDGED",
     "WATCHDOG_RESOLVED",
-    "SYNC_CONFLICT",
-    "CONFLICT_LOG_ENTRY",
     "TREATMENT_SAFETY_WARNING",
     "COMMAND_CONTEXT_NOTE_ADDED",
     "VOICE_MEMO_ADDED",
@@ -88,6 +77,42 @@
     "INCIDENT_TYPE_SET_BY_MEDIC",
     "INCIDENT_TYPE_MISMATCH_REPORTED"
   ],
+  "server_writes": {
+    "_about": "Synced types the phone never writes because a server RPC writes them (database/038, 040, 053, 064, 067). Each must also be in 'synced'. WP-28.",
+    "Incident lifecycle RPCs (open, confirm, close, reopen, merge; drafts since D10/064 are no longer created)": [
+      "INCIDENT_DRAFT_CREATED",
+      "INCIDENT_OPENED",
+      "INCIDENT_CONFIRMED",
+      "INCIDENT_DRAFT_MERGED",
+      "INCIDENT_DRAFT_REJECTED",
+      "INCIDENT_CLOSED",
+      "INCIDENT_REOPENED"
+    ]
+  },
+  "server_accepts_unused": {
+    "_about": "Synced types the server accepts but index.html does not write yet (0 rows live on 2026-11-21). Each must also be in 'synced'. Do not assume the feature exists. WP-28, owner 2026-11-21.",
+    "WP-42: medic asks to close their site once every patient they registered is handed over": [
+      "MEDIC_SITE_CLOSE_REQUESTED"
+    ],
+    "Legacy outbox: written before V2.99.82; WP-25 sends INCIDENT_TYPE_SET_BY_MEDIC and the server decides. Kept so an old queued event still syncs": [
+      "INCIDENT_TYPE_MISMATCH_REPORTED"
+    ],
+    "Owed, no WP yet (clinical records and notes the phone keeps elsewhere or not at all)": [
+      "PATIENT_INJURY_UPDATED",
+      "MINIMAL_TRIAGE_RECORDED",
+      "SABCDE_RECORDED",
+      "MSTART_SUGGESTED",
+      "JUMPSTART_SUGGESTED",
+      "JUMPSTART_OVERRIDE",
+      "TOURNIQUET_CONTEXT_UPDATED",
+      "TREATMENT_SAFETY_WARNING",
+      "HIGH_RISK_CLINICAL_VIOLATION",
+      "WATCHDOG_RESOLVED",
+      "VOICE_MEMO_ADDED",
+      "COMMAND_CONTEXT_NOTE_ADDED",
+      "AAR_CONTEXT_NOTE_ADDED"
+    ]
+  },
   "local_only": {
     "Patient-card timeline entry shown on this device only; the clinical fact itself is sent by a synced event or is display text": [
       "AIRWAY_BREATHING_RECHECK",
