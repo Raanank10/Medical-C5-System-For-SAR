@@ -245,7 +245,7 @@ class TestFullSummary:
             "vitals_reassessment_compliance", "golden_hour_compliance", "high_risk_violations",
             "tourniquet_reassessment_due", "patient_progression_funnel",
             "time_registration_to_handover", "medic_to_critical_ratio",
-            "dead_man_switch_events", "data_freshness", "current_inventory",
+            "dead_man_switch_events", "pc_review_response", "data_freshness", "current_inventory",
             "stockout_risk", "sync_latency", "sync_error_summary",
         }
         assert set(summary.keys()) == expected_keys
@@ -256,3 +256,41 @@ class TestFullSummary:
         summary = empty_kpi.full_summary()
         for key, df in summary.items():
             assert isinstance(df, pd.DataFrame), f"{key} did not return a DataFrame"
+
+
+class TestPcReviewResponse:
+    """WP-26: PC review of a deteriorating casualty, from the exported medical_resource_requests."""
+
+    def _add(self, db, rows):
+        import json, sqlite3
+        with sqlite3.connect(db.path) as conn:
+            conn.execute("create table if not exists medical_resource_requests(id text primary key, incident_id text not null, request_kind text, resource_type text, quantity integer, urgency text, reason_codes_json text not null default '[]', linked_patient_ids_json text not null default '[]', target_location text, free_text text, auto_generated integer, status text, status_history_json text not null default '[]', requested_by text, requested_by_role text, requested_at text, status_updated_by text, status_updated_by_role text, status_updated_at text)")
+            for r in rows:
+                conn.execute("insert into medical_resource_requests(id, incident_id, request_kind, resource_type, urgency, reason_codes_json, status, status_history_json, requested_by_role, requested_at) values (?,?,?,?,?,?,?,?,?,?)",
+                             (r["id"], "inc_001", r.get("kind", "pc_review"), r.get("kind", "pc_review"), r["urgency"], json.dumps(r["reasons"]), r["status"], json.dumps(r["history"]), "medic", r["at"]))
+
+    def test_no_table_is_empty(self, kpi):
+        assert kpi.pc_review_response("inc_001").empty
+
+    def test_times_outcome_and_delays(self, kpi):
+        t = "2026-11-21T10:00:00+00:00"
+        self._add(kpi.db, [
+            {"id": "r1", "urgency": "immediate", "reasons": ["red_worsening"], "status": "resolved", "at": t, "history": [
+                {"status": "pending", "at": t, "by_role": "medic"},
+                {"status": "acknowledged", "at": "2026-11-21T10:02:00+00:00", "by_role": "pc", "snoozed_until": "2026-11-21T10:05:00+00:00"},
+                {"status": "resolved", "at": "2026-11-21T10:06:30+00:00", "by_role": "pc", "outcome": "evac_moved_up"}]},
+            {"id": "r2", "urgency": "high", "reasons": ["manual"], "status": "pending", "at": t, "history": [
+                {"status": "pending", "at": t, "by_role": "medic"},
+                {"status": "resolved", "at": "2026-11-21T10:01:00+00:00", "by_role": "medic"}]},
+            {"id": "x", "kind": "reinforcement", "urgency": "high", "reasons": [], "status": "pending", "at": t, "history": []},
+        ])
+        df = kpi.pc_review_response("inc_001").set_index("request_id")
+        assert list(df.index) == ["r1", "r2"]
+        assert df.loc["r1", "minutes_to_first_answer"] == 2.0
+        assert df.loc["r1", "minutes_to_decision"] == 6.5
+        assert df.loc["r1", "outcome"] == "evac_moved_up"
+        assert df.loc["r1", "times_put_off"] == 1
+        assert df.loc["r1", "unanswered_5_min"] == False
+        # A medic's own "resolved" is not an answer (the server refuses it too): still unanswered.
+        assert math.isnan(df.loc["r2", "minutes_to_first_answer"])
+        assert df.loc["r2", "unanswered_5_min"] == True
