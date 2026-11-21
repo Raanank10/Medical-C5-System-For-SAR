@@ -291,6 +291,39 @@ class TestPcReviewResponse:
         assert df.loc["r1", "outcome"] == "evac_moved_up"
         assert df.loc["r1", "times_put_off"] == 1
         assert df.loc["r1", "unanswered_5_min"] == False
+        assert df.loc["r1", "priority_update_unconfirmed"] == False
         # A medic's own "resolved" is not an answer (the server refuses it too): still unanswered.
         assert math.isnan(df.loc["r2", "minutes_to_first_answer"])
         assert df.loc["r2", "unanswered_5_min"] == True
+
+    def test_patient_left_and_unconfirmed_priority_update(self, kpi):
+        import json, sqlite3
+        t = "2026-11-21T10:00:00+00:00"
+        self._add(kpi.db, [
+            # Casualty left after 2 minutes, nobody answered: closed, not counted as unanswered.
+            {"id": "l1", "urgency": "high", "reasons": ["manual"], "status": "closed", "at": t, "history": [
+                {"status": "pending", "at": t, "by_role": "medic"},
+                {"status": "closed", "at": "2026-11-21T10:02:00+00:00", "by_role": "system", "reason": "patient_left_scene"}]},
+            # Left after 9 minutes with no answer: unanswered.
+            {"id": "l2", "urgency": "high", "reasons": ["manual"], "status": "closed", "at": t, "history": [
+                {"status": "pending", "at": t, "by_role": "medic"},
+                {"status": "closed", "at": "2026-11-21T10:09:00+00:00", "by_role": "system", "reason": "patient_left_scene"}]},
+            # "Priority updated" with no triage event: flagged. u2 has one: not flagged.
+            {"id": "u1", "urgency": "high", "reasons": ["deterioration"], "status": "resolved", "at": t, "history": [
+                {"status": "pending", "at": t, "by_role": "medic"},
+                {"status": "resolved", "at": "2026-11-21T10:03:00+00:00", "by_role": "pc", "outcome": "priority_updated"}]},
+            {"id": "u2", "urgency": "high", "reasons": ["deterioration"], "status": "resolved", "at": t, "history": [
+                {"status": "pending", "at": t, "by_role": "medic"},
+                {"status": "resolved", "at": "2026-11-21T10:03:00+00:00", "by_role": "pc", "outcome": "priority_updated"}]},
+        ])
+        with sqlite3.connect(kpi.db.path) as conn:
+            conn.execute("update medical_resource_requests set linked_patient_ids_json = ? where id = 'u1'", (json.dumps(["p001"]),))
+            conn.execute("update medical_resource_requests set linked_patient_ids_json = ? where id = 'u2'", (json.dumps(["p002"]),))
+            conn.execute("insert into events(id, incident_id, patient_id, type, payload_json, device_id, local_event_id, clinical_timestamp, local_timestamp, server_timestamp) values ('ev-t93', 'inc_001', 'p002', 'MSTART_TRIAGE_OVERRIDE', '{}', 'dev-pc', 'ev-t93', ?, ?, ?)",
+                         ("2026-11-21T10:03:30+00:00",) * 3)
+        df = kpi.pc_review_response("inc_001").set_index("request_id")
+        assert df.loc["l1", "outcome"] == "closed_patient_left"
+        assert df.loc["l1", "unanswered_5_min"] == False
+        assert df.loc["l2", "unanswered_5_min"] == True
+        assert df.loc["u1", "priority_update_unconfirmed"] == True
+        assert df.loc["u2", "priority_update_unconfirmed"] == False

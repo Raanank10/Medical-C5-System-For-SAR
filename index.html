@@ -15008,7 +15008,8 @@ function queueReinforcementStatusEvent(req, {status=null, urgency=null, reason=n
 const PC_REVIEW_OUTCOME_LABELS={priority_updated:'עודכנה קדימות', priority_kept:'נשארה קדימות', senior_requested:'הוזעק פראמדיק/רופא', evac_moved_up:'הוקדם פינוי'};
 const PC_REVIEW_REASON_LABELS={deterioration:'הידרדרות במדדים', red_worsening:'פצוע אדום מידרדר', manual:'בקשת חובש'};
 const PC_REVIEW_URGENCY_RANK={routine:0, high:1, immediate:2};
-const PC_REVIEW_HIDDEN_STATUSES=new Set(['handed_over','deceased']);
+// A casualty who left the scene has no review line (the server closes its open reviews: 093).
+const PC_REVIEW_HIDDEN_STATUSES=new Set(['handed_over','deceased','self_evacuated','closed','evacuated']);
 function pcReviewIsOpen(r){ return C5Rules.pcReviewState(r)!=='closed'; }
 function pcReviewsForPatient(pid){ return pcReviews.filter(r=>(r.linkedPatientIds||[]).includes(pid)); }
 function openPcReviewsForPatient(pid){ return pcReviewsForPatient(pid).filter(pcReviewIsOpen); }
@@ -15213,8 +15214,12 @@ function renderPcReviewStatusCard(p){
     const unsent=open.some(r=>!r.serverId && isMyPcReview(r)) && currentUser ? ' · ממתין לשליחה' : '';
     return `<div data-pc-review-status="${state}" style="background:var(--surface2);border:1px solid ${state==='unanswered'?'var(--red)':'var(--orange)'};border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:800;font-size:12px">${escAttr(text)}${unsent}</div>${action}</div>`;
   }
-  const last=list.filter(r=>r.status==='resolved').sort((a,b)=>(Date.parse(b.lastUpdatedAt)||0)-(Date.parse(a.lastUpdatedAt)||0))[0];
+  const last=list.filter(r=>['resolved','closed'].includes(r.status)).sort((a,b)=>(Date.parse(b.lastUpdatedAt)||0)-(Date.parse(a.lastUpdatedAt)||0))[0];
   if(!last) return '';
+  if(last.status==='closed'){
+    const left=(last.statusHistory||[]).some(h=>h.reason==='patient_left_scene');
+    return `<div data-pc-review-status="closed-exit" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:800;font-size:12px">בקשת חוג"ד נסגרה${left?' — הפצוע יצא מהזירה':''}</div></div>`;
+  }
   const label=PC_REVIEW_OUTCOME_LABELS[last.outcome]||'נסגר';
   return `<div data-pc-review-status="closed" style="background:var(--surface2);border:1px solid var(--green);border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:800;font-size:12px">חוג"ד סקר: ${escAttr(label)}${last.lastUpdatedByName?` · ${escAttr(last.lastUpdatedByName)}`:''}${last.lastUpdatedAt?` · ${pcReviewTime(last.lastUpdatedAt)}`:''}</div></div>`;
 }
@@ -15261,6 +15266,8 @@ function applyRemotePcReviews(rows, siteId){
       r.snoozeCount=Number.isFinite(row.snooze_count)?row.snooze_count:0;
       r.statusHistory=(Array.isArray(row.status_history)?row.status_history:[]).slice(-30).map(h=>({
         status:String(h?.status||''), at:h?.at||null, by:sanitizeRemoteText(h?.by_name)||mapServerRole(h?.by_role||''),
+        byRole:/^[a-z_]{1,20}$/.test(String(h?.by_role||''))?h.by_role:null,
+        reason:/^[a-z_]{1,40}$/.test(String(h?.reason||''))?h.reason:null,
         outcome:PC_REVIEW_OUTCOME_LABELS[h?.outcome]?h.outcome:null}));
       r.lastUpdatedByName=sanitizeRemoteText(row.status_updated_by_name);
       r.lastUpdatedAt=row.status_updated_at||null;
@@ -15275,6 +15282,44 @@ function applyRemotePcReviews(rows, siteId){
     toast(`חוג"ד סקר את ${p?.visualId||'הפצוע'}: ${PC_REVIEW_OUTCOME_LABELS[r.outcome]||'נסגר'}`);
   });
   if(changed){ saveDemoState(); refreshActiveScreenData(); checkPcReviewAlerts(); }
+}
+// After-action figures for PC reviews (WP-26 follow-up, owner 2026-11-21). An answer is the first
+// acknowledged / resolved entry (only command can set those, 052). A review counts as unanswered
+// when 5 minutes passed with no answer, unless the casualty left the scene first. "עודכנה קדימות"
+// with no priority change for that casualty between the request and 2 minutes after the decision
+// is flagged: the outcome is only a record, so it can disagree with what was done.
+const PC_REVIEW_TRIAGE_EVENT_TYPES=new Set(['MSTART_TRIAGE_OVERRIDE','PATIENT_TRIAGE_UPDATED','TRIAGE_SET','PATIENT_TRIAGED_EXPECTANT']);
+function patientTriageChangeTimes(pid){
+  const p=patients.find(x=>x.id===pid);
+  const local=(p?.events||[]).filter(e=>PC_REVIEW_TRIAGE_EVENT_TYPES.has(e.type)).map(e=>eventTimestampMs(e,p));
+  const queued=getOutbox().filter(e=>PC_REVIEW_TRIAGE_EVENT_TYPES.has(e.type) && (e.patient_id||e.payload_json?.patient_id||e.payload_json?.patientId)===pid).map(e=>Date.parse(e.local_timestamp||e.createdAt||''));
+  const pulled=_pulledEvents.filter(e=>PC_REVIEW_TRIAGE_EVENT_TYPES.has(e.type) && e.patient_id===pid).map(e=>Date.parse(e.local_timestamp||e.server_timestamp||''));
+  return [...local,...queued,...pulled].filter(Number.isFinite);
+}
+function pcReviewAarStats(){
+  const rows=pcReviews.map(r=>{
+    const created=Date.parse(r.createdAt||'');
+    const hist=r.statusHistory||[];
+    const answer=hist.find(h=>['acknowledged','resolved'].includes(h.status) && h.byRole!=='medic' && h.byRole!=='system');
+    const answeredAt=answer?Date.parse(answer.at||''):NaN;
+    const exit=hist.find(h=>h.reason==='patient_left_scene');
+    const exitAt=exit?Date.parse(exit.at||''):NaN;
+    const decision=hist.filter(h=>h.status==='resolved').pop();
+    const decidedAt=decision?Date.parse(decision.at||''):NaN;
+    const minutes=Number.isFinite(created)&&Number.isFinite(answeredAt)?(answeredAt-created)/60000:null;
+    const leftEarly=Number.isFinite(exitAt) && Number.isFinite(created) && exitAt-created<5*60000 && !(minutes!==null && minutes<5);
+    const unanswered=Number.isFinite(created) && !leftEarly && (minutes===null ? (Number.isFinite(exitAt)||Date.now()-created>=5*60000) : minutes>=5);
+    let unconfirmed=false;
+    if(r.outcome==='priority_updated' && Number.isFinite(created) && Number.isFinite(decidedAt)){
+      const pid=(r.linkedPatientIds||[])[0];
+      unconfirmed=!patientTriageChangeTimes(pid).some(t=>t>=created-1000 && t<=decidedAt+2*60000);
+    }
+    return {r, minutes, unanswered, unconfirmed, exited:Number.isFinite(exitAt)};
+  });
+  const answered=rows.map(x=>x.minutes).filter(m=>m!==null).sort((a,b)=>a-b);
+  const median=answered.length?answered[Math.floor((answered.length-1)/2)]:null;
+  return {total:rows.length, median, unanswered:rows.filter(x=>x.unanswered).length, unconfirmed:rows.filter(x=>x.unconfirmed).length,
+    unconfirmedIds:rows.filter(x=>x.unconfirmed).map(x=>patients.find(p=>p.id===(x.r.linkedPatientIds||[])[0])?.visualId||'?'), exited:rows.filter(x=>x.exited).length};
 }
 function renderReinforcementPanel(){
   const body=document.getElementById('cmd-reinforcement-requests'); if(!body) return;
@@ -16012,6 +16057,7 @@ function renderAar(){
   const manualOverrideCount=patients.filter(p=>p.mstart?.overrideReason).length + outbox.filter(e=>String(e.type||'').includes('OVERRIDE')).length;
   const pcAckCount=patients.filter(p=>p.alertAcknowledgedAt).length;
   const ccAssignedCount=reinforcementRequests.filter(r=>(r.statusHistory||[]).some(h=>['assigned','en_route','fulfilled_by_company'].includes(h.status))).length;
+  const pcReviewStats=pcReviewAarStats();
   document.getElementById('aar-kpis').innerHTML=`
     <div class="aar-card"><div class="aar-num">${total}</div><div class="aar-label">סה״כ פצועים</div></div>
     <div class="aar-card"><div class="aar-num" style="color:var(--red)">${red}</div><div class="aar-label">אדומים פעילים</div></div>
@@ -16043,6 +16089,10 @@ function renderAar(){
     <div class="aar-card"><div class="aar-num">${manualOverrideCount}</div><div class="aar-label">חריגות / עקיפות ידניות</div></div>
     <div class="aar-card"><div class="aar-num">${pcAckCount}</div><div class="aar-label">אישורי חוג"ד להתראות</div></div>
     <div class="aar-card"><div class="aar-num">${ccAssignedCount}</div><div class="aar-label">שיוכי משאב מ״פ</div></div>
+    <div class="aar-card" data-aar="pc-review-total"><div class="aar-num">${pcReviewStats.total}</div><div class="aar-label">בקשות סקירת חוג"ד</div></div>
+    <div class="aar-card" data-aar="pc-review-median"><div class="aar-num">${pcReviewStats.median===null?'—':pcReviewStats.median.toFixed(1)}</div><div class="aar-label">דק׳ עד תשובת חוג"ד (חציון)</div></div>
+    <div class="aar-card" data-aar="pc-review-unanswered"><div class="aar-num" style="color:${pcReviewStats.unanswered?'var(--red)':'var(--green)'}">${pcReviewStats.unanswered}</div><div class="aar-label">סקירות שלא נענו תוך 5 דק׳</div></div>
+    <div class="aar-card" data-aar="pc-review-unconfirmed"><div class="aar-num" style="color:${pcReviewStats.unconfirmed?'var(--orange)':'var(--green)'}">${pcReviewStats.unconfirmed}</div><div class="aar-label">"עודכנה קדימות" ללא שינוי קדימות</div></div>
   `;
   const patientEvents=patients.flatMap(p=>(p.events||[]).map(e=>({...e,pid:p.visualId||p.id,triage:p.triage,loc:p.location,_ts:eventTimestampMs(e,p)})));
   const localEvents=outbox.map(e=>{
@@ -16084,7 +16134,7 @@ function renderAar(){
     {title:'מה המחברת הייתה מפספסת?', body:`${patients.filter(p=>assessmentDebtList(p).includes('missing_vitals')).length} פצועים ללא מדדים מלאים אחרי סריקה · ${activeTqTotal} חסמים פעילים · ${multipleTqPatients} פצועים עם כמה חסמים · ${ineffectiveTqTotal} חסמים לא יעילים · ${Number.isFinite(secondTqAfterFailure)?`חסם שני הונח ${secondTqAfterFailure} דק׳ אחרי דימום ממשיך`:'אין עיכוב חסם שני מתועד'} · ${resupplyOpen} בקשות ציוד ממתינות · ${reinforcementRequests.filter(r=>r.resourceType==='doctor_death_cert'&&isRequestOpen(r)).length} חשד לנפטר ממתין לאישור רופא.`},
     {title:'מה למדנו לפעם הבאה?', body:`הסריקה הסתיימה מהר, אבל ${patients.filter(p=>assessmentDebtList(p).includes('missing_vitals')).length} פצועים עדיין צריכים מדדים מלאים. ${patients.filter(p=>p.tourniquet).length?'חסם הונח ונדרש לוודא פינוי/בדיקה בזמן.':'לא נרשם חסם בסריקה.'} ${resupplyOpen?'בקשת השלמת ציוד עדיין פתוחה — לבדוק אם נפתחה מוקדם מספיק.':'חוסר ציוד זוהה או נסגר ללא בקשה פתוחה.'}`},
     {title:'חובש', body: overdue.length ? `${overdue.length} פצועים עברו את יעד עדכון המדדים; נדרש חזרה למדדים כשאפשר.` : 'כל הפצועים הפעילים בתוך חלון המדדים.'},
-    {title:'חוג"ד', body:`${openAlerts} התראות פתוחות דורשות החלטת חוג"ד או חובש. נפתחו ${pcRequests} בקשות תגבור.`},
+    {title:'חוג"ד', body:`${openAlerts} התראות פתוחות דורשות החלטת חוג"ד או חובש. נפתחו ${pcRequests} בקשות תגבור.${pcReviewStats.total?` ${pcReviewStats.total} בקשות סקירה מחובשים, ${pcReviewStats.unanswered} לא נענו תוך 5 דק׳.`:''}${pcReviewStats.unconfirmed?` "עודכנה קדימות" נרשם בלי שינוי קדימות בפועל: ${escAttr(pcReviewStats.unconfirmedIds.join(', '))}.`:''}`},
     {title:'מ״פ רפואה', body:`${ccOpenRequests} בקשות משאב פתוחות ברמת פלוגה; בדוק רופא/פראמדיק וצווארי בקבוק פינוי.`},
     {title:'לוגיסטיקה', body: logisticsShortages || resupplyOpen ? `${logisticsShortages} פריטי ציוד מתחת לסף · ${supplyConsumed} צריכות ציוד · ${resupplyOpen} בקשות השלמה פתוחות.` : 'אין חוסר ציוד קריטי פתוח.'},
     {title:'פינוי', body:`${handed}/${total} פצועים הועברו או נסגרו בתרחיש.`}
@@ -17463,8 +17513,10 @@ const REMOTE_LOCATION_PLACEHOLDER='לא צוין (התקבל ממכשיר אחר
 // Text another user typed (zone, destination, report fields) now reaches this phone, and much of
 // the UI renders patient fields and timeline details as raw HTML. Strip markup characters on the
 // way in rather than trusting every render site to escape.
+// Markup characters are dropped. Quotes become their Hebrew forms (״ gershayim, ׳ geresh) instead of
+// being dropped, so names like חוג"ד / מ'פ stay readable; neither is special in HTML (WP-26 follow-up).
 function sanitizeRemoteText(value, max=200){
-  return value==null ? '' : String(value).replace(/[<>"'`&]/g,'').slice(0,max);
+  return value==null ? '' : String(value).replace(/"/g,'״').replace(/'/g,'׳').replace(/[<>`&]/g,'').slice(0,max);
 }
 function patientLocationPayload(p){
   const loc={};

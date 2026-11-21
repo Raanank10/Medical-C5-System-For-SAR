@@ -197,7 +197,8 @@ function handle(server, req) {
   }
   if (req.table === 'medical_resource_requests') {
     // medical_resource_requests_read (database/052, decision D3).
-    const rows = visible(server.medical_resource_requests).filter((r) => READ_ALL.includes(u.role) || r.requested_by === u.id);
+    // 052, plus 093: the incident's medics / paramedics read every pc_review row.
+    const rows = visible(server.medical_resource_requests).filter((r) => READ_ALL.includes(u.role) || r.requested_by === u.id || (r.request_kind === 'pc_review' && ['medic', 'paramedic'].includes(u.role)));
     return { data: clone(rows), error: null };
   }
   if (req.table === 'patients') {
@@ -443,7 +444,7 @@ async function checkFile(browser, file) {
   assert(rows(P1).every((r) => r.status === 'resolved' && r.review_outcome === 'priority_kept'), `${rel}: one decision closes both reviews of P1 (got ${JSON.stringify(rows(P1))})`);
   await pullReviews(m1.page);
   const seen = await m1.page.evaluate((id) => { openPatient(id); const el = document.querySelector('[data-pc-review-status]'); return { state: el?.dataset.pcReviewStatus, text: el?.innerText || '', timeline: patients.find((p) => p.id === id).events.some((e) => e.type === 'PC_REVIEW_CLOSED') }; }, P1);
-  assert(seen.state === 'closed' && seen.text.includes('חוג"ד סקר: נשארה קדימות') && seen.text.includes('בדיקה') && seen.timeline, `${rel}: the medic sees the PC's decision (got ${JSON.stringify(seen)})`);
+  assert(seen.state === 'closed' && seen.text.includes('חוג"ד סקר: נשארה קדימות') && seen.text.includes('חוג״ד בדיקה') && seen.timeline, `${rel}: the medic sees the PC's decision (got ${JSON.stringify(seen)})`);
   html = await strip(pc.page, 'pc');
   assert(!html.includes('data-pc-review="55555555-5555-4555-8555-000000000001"'), `${rel}: a closed review leaves the strip`);
 
@@ -455,12 +456,40 @@ async function checkFile(browser, file) {
   await syncAll(pc.page);
   assert(rows(P3)[0].status === 'resolved' && rows(P3)[0].review_outcome === 'priority_updated', `${rel}: P3 closed with its outcome`);
 
-  // 13. Reading: the second medic sees only their own request.
+  // 13. Every medic of the incident sees the PC's decision, also on a casualty they did not ask about.
   await pullReviews(m2.page);
-  const own = await reviews(m2.page);
-  assert(own.length === 1 && own[0].by === 'חובש שני', `${rel}: a medic receives only their own review (got ${JSON.stringify(own)})`);
+  const all = await reviews(m2.page);
+  assert(all.length === rows().length && all.some((r) => r.by === 'חובש ראשון'), `${rel}: a medic receives every review of the incident (got ${JSON.stringify(all)})`);
+  await addPatient(m2.page, P3, 'P003-T', 'red');
+  const other = await m2.page.evaluate((id) => { openPatient(id); const el = document.querySelector('[data-pc-review-status]'); return { state: el?.dataset.pcReviewStatus, text: el?.innerText || '' }; }, P3);
+  assert(other.state === 'closed' && other.text.includes('עודכנה קדימות'), `${rel}: the second medic sees the PC's decision on the first medic's casualty (got ${JSON.stringify(other)})`);
 
-  // 14. Text another user typed reaches this phone stripped of markup characters.
+  // 14. The casualty leaves the scene: the server closes the open review (093); no line, the medic sees why.
+  await pullReviews(pc.page);
+  assert((await strip(pc.page, 'pc')).includes(`data-pc-review="${P4}"`), `${rel}: P4's review is on the PC's strip before the casualty leaves`);
+  // Before the server's close arrives the line already goes (the phone knows the casualty left) ...
+  await pc.page.evaluate((id) => { const p = patients.find((x) => x.id === id); if (p) p.patientStatus = 'handed_over'; }, P4);
+  assert(!(await strip(pc.page, 'pc')).includes(`data-pc-review="${P4}"`), `${rel}: a casualty who left the scene has no review line`);
+  // ... and the server closes the row.
+  const r4 = rows(P4)[0];
+  Object.assign(r4, { status: 'closed', snoozed_until: null, status_updated_at: new Date().toISOString() });
+  r4.status_history.push({ status: 'closed', at: new Date().toISOString(), by_name: 'מערכת', by_role: 'system', reason: 'patient_left_scene' });
+  await pullReviews(pc.page);
+  assert((await reviews(pc.page)).find((r) => r.serverId === r4.id)?.status === 'closed', `${rel}: the closed row reaches the PC`);
+  await pullReviews(m1.page);
+  const exit = await m1.page.evaluate((id) => { openPatient(id); const el = document.querySelector('[data-pc-review-status]'); return { state: el?.dataset.pcReviewStatus, text: el?.innerText || '' }; }, P4);
+  assert(exit.state === 'closed-exit' && exit.text.includes('הפצוע יצא מהזירה'), `${rel}: the medic sees the review closed because the casualty left (got ${JSON.stringify(exit)})`);
+
+  // 15. After-action figures on the PC's phone: "עודכנה קדימות" with no priority change is flagged,
+  // and stops being flagged once the priority really changes.
+  const aar = async () => pc.page.evaluate(() => { renderAar(); const v = (k) => document.querySelector(`[data-aar="${k}"] .aar-num`)?.textContent; return { total: v('pc-review-total'), median: v('pc-review-median'), unanswered: v('pc-review-unanswered'), unconfirmed: v('pc-review-unconfirmed'), insight: document.getElementById('aar-insights').innerText }; });
+  let a = await aar();
+  assert(a.unconfirmed === '1' && a.insight.includes('P003-T') && Number(a.total) >= 4 && a.median !== '—', `${rel}: the AAR flags the priority update that did not happen (got ${JSON.stringify(a)})`);
+  await pc.page.evaluate((id) => manualTriageOverride(id, 'black'), P3);
+  a = await aar();
+  assert(a.unconfirmed === '0', `${rel}: a real priority change clears the flag (got ${JSON.stringify(a)})`);
+
+  // 16. Text another user typed reaches this phone stripped of markup characters.
   SERVER.medical_resource_requests.push({ ...JSON.parse(JSON.stringify(rows(P3)[0])), id: 'bbbbbbbb-0000-4000-8000-000000000001', origin_client_request_id: 'REQ-EVIL', status: 'pending',
     review_outcome: '<b>', free_text: '<img src=x onerror=window.__xss=1>SpO₂', requested_by_name: '<script>window.__xss=1</script>', requested_at: new Date().toISOString() });
   await pullReviews(pc.page);

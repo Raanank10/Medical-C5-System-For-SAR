@@ -563,9 +563,15 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 6. The medic's patient screen shows where it stands and, once closed, "חוג"ד סקר: <outcome>" with the PC's name and time (toast and vibration on arrival).
 7. KPI `pc_review_response()` in the analytics package (minutes to first answer and to decision, outcome, delays, unanswered past 5 minutes).
 
+Follow-up, same PR, owner 2026-11-21 (093 was not applied yet, so folded into it):
+8. A casualty who leaves the scene (handed_over, self_evacuated, deceased, closed) closes its open reviews on the server (`app.close_pc_reviews_on_patient_exit()`, status 'closed', reason `patient_left_scene`, no outcome); the strip drops the line as soon as the phone knows. The KPI reports it as `closed_patient_left` and counts it as unanswered only if 5 minutes passed first. Without this an abandoned review stayed open forever and inflated "unanswered".
+9. The incident's medics and paramedics read every pc_review row (`medical_resource_requests_read_pc_review_medics`; read only, every other request kind keeps 052's policy): the PC's decision belongs to the casualty, so a medic who takes over sees it. Writing is unchanged: only command changes a review's status (052).
+10. "עודכנה קדימות" with no triage change for that casualty between the request and 2 minutes after the decision is flagged: in-app AAR (four new cards, the PC insight names the casualties) and `pc_review_response().priority_update_unconfirmed`, plus a PC review section in the analytics report.
+11. Synced text keeps Hebrew quotes: `sanitizeRemoteText` turns `"` into ״ and `'` into ׳ instead of dropping them (names like חוג"ד were shown as חוגד).
+
 Found and fixed on the way: a re-check that did not count the pulse raised "CRITICAL: ירידה חדה — דופק 110→null" (a null pulse counted as a 100% drop) on every such save.
 
-Verified: `scripts/rls_test_093_pc_review.sql` on a local PostgreSQL 16 with every migration applied (18 checks: creation rules, 052 untouched, who reads what, medic cannot close, delay, same-casualty follow, 3 h delay refused, outcome, late older update ignored, unknown outcome dropped, refused events kept). The live 052 function was compared before writing 093 (same logic as the repo file; the live constraint name matches). `scripts/browser_pc_review_sync_test.js` (two medics, PC, CC). Left: a CC on the all-incidents view does not see other incidents' reviews (only the open incident's); the two-phone check in WP-21.
+Verified: `scripts/rls_test_093_pc_review.sql` on a local PostgreSQL 16 with every migration applied (22 checks: creation rules, 052 untouched, who reads what incl. a member medic reading every review but not others' reinforcement and a non-member reading none, medic cannot close, delay, same-casualty follow, 3 h delay refused, outcome, late older update ignored, unknown outcome dropped, casualty leaving closes an open review and leaves a closed one alone, refused events kept; also applied from scratch). The live 052 function was compared before writing 093 (same logic as the repo file; the live constraint name matches). `scripts/browser_pc_review_sync_test.js` (two medics, PC, CC). Left: a CC on the all-incidents view does not see other incidents' reviews (only the open incident's); the two-phone check in WP-21.
 
 ---
 

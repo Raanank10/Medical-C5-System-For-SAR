@@ -25,6 +25,13 @@
 --      the event (the row's last_event_id is this event): the outcome on 'resolved', the snooze
 --      time on 'acknowledged'. Then it applies the same decision to the other open pc_review rows
 --      for the same casualty (two medics asking about one casualty is one review for the PC).
+-- 3. The incident's medics and paramedics read the pc_review rows too (owner 2026-11-21): the PC's
+--    decision belongs to the casualty, not to whoever asked, so a medic who takes over the casualty
+--    sees it. Only this request kind; every other kind keeps 052's policy (policies are OR-ed, as
+--    087 did for extraction_medic).
+-- 4. A casualty who leaves the scene (handed_over, self_evacuated, deceased, closed) closes its open
+--    reviews (status 'closed', reason 'patient_left_scene', no outcome), so a review nobody needs any
+--    more is not left open forever and is not counted as unanswered (owner 2026-11-21).
 -- Robustness (same as 044/050/052): bad payload values are dropped, never raised. A raise in an
 -- AFTER INSERT trigger would roll back the event insert and lose the field record. The event
 -- itself always stays in the append-only log.
@@ -231,3 +238,43 @@ drop trigger if exists trg_project_pc_review_request on events;
 create trigger trg_project_pc_review_request after insert on events
   for each row when (new.type::text in ('MEDICAL_REINFORCEMENT_REQUESTED', 'MEDICAL_REINFORCEMENT_STATUS_UPDATED'))
   execute function app.project_pc_review_request();
+
+-- 3. Read access for the incident's medics, pc_review rows only.
+drop policy if exists medical_resource_requests_read_pc_review_medics on medical_resource_requests;
+create policy medical_resource_requests_read_pc_review_medics on medical_resource_requests for select to authenticated
+  using (
+    request_kind = 'pc_review'
+    and app.current_user_role() in ('medic', 'paramedic')
+    and app.can_read_incident_patients(incident_id)
+  );
+
+-- 4. The casualty left the scene: its open reviews close.
+create or replace function app.close_pc_reviews_on_patient_exit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $function$
+begin
+  if new.current_status::text in ('handed_over', 'self_evacuated', 'deceased', 'closed')
+     and old.current_status is distinct from new.current_status then
+    update medical_resource_requests
+       set status = 'closed',
+           snoozed_until = null,
+           status_history = status_history || jsonb_build_array(jsonb_build_object(
+             'status', 'closed', 'at', now(), 'by_name', 'מערכת', 'by_role', 'system',
+             'reason', 'patient_left_scene', 'patient_status', new.current_status::text)),
+           status_updated_at = greatest(status_updated_at, now()),
+           version = version + 1
+     where incident_id = new.incident_id
+       and request_kind = 'pc_review'
+       and linked_patient_ids ? new.id::text
+       and status not in ('arrived', 'resolved', 'cancelled', 'denied', 'closed', 'fulfilled');
+  end if;
+  return new;
+end;
+$function$;
+revoke execute on function app.close_pc_reviews_on_patient_exit() from public, anon, authenticated;
+drop trigger if exists trg_close_pc_reviews_on_patient_exit on patients;
+create trigger trg_close_pc_reviews_on_patient_exit after update of current_status on patients
+  for each row execute function app.close_pc_reviews_on_patient_exit();

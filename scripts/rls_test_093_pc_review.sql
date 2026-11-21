@@ -56,12 +56,14 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', M1, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   select count(*) into n from medical_resource_requests where incident_id = X and request_kind = 'pc_review';
-  r := r || 'medic1 reads=' || n || ' (want 2); ';
+  r := r || 'medic1 reads=' || n || ' (want 3, every review of the incident); ';
   execute 'reset role';
   perform set_config('request.jwt.claims', json_build_object('sub', M3, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   select count(*) into n from medical_resource_requests where incident_id = X and request_kind = 'pc_review';
-  r := r || 'medic3 reads=' || n || ' (want 0); ';
+  r := r || 'medic3 (member, did not ask) reads=' || n || ' (want 3); ';
+  select count(*) into n from medical_resource_requests where incident_id = X and request_kind = 'reinforcement';
+  r := r || 'medic3 reads others reinforcement=' || n || ' (want 0); ';
   execute 'reset role';
   perform set_config('request.jwt.claims', json_build_object('sub', PC, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
@@ -120,9 +122,29 @@ begin
   select status || '/' || coalesce(review_outcome, '-') into s from medical_resource_requests where origin_client_request_id = 'REQ-T93-3';
   r := r || 'unknown outcome -> ' || s || ' (want resolved/-); ';
 
+  -- A medic who is not a member of incident Y does not read Y's reviews.
+  insert into events (incident_id, actor_id, actor_role, type, payload_json, device_id, local_event_id, local_timestamp) values
+    (Y, M1, 'medic', 'MEDICAL_REINFORCEMENT_REQUESTED', jsonb_build_object('id', 'REQ-T93-Y', 'resourceType', 'pc_review',
+       'linkedPatientIds', jsonb_build_array(PY::text)), 'dev-m1', 't93-15', t0);
+  perform set_config('request.jwt.claims', json_build_object('sub', M2, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  select count(*) into n from medical_resource_requests where incident_id = Y;
+  r := r || 'non-member medic reads Y=' || n || ' (want 0); ';
+  execute 'reset role';
+  perform set_config('request.jwt.claims', '', true);
+
+  -- The casualty leaves the scene: its open review closes; a closed one is not touched.
+  update patients set current_status = 'deceased' where id = PY;
+  select status || '/' || coalesce(review_outcome, '-') || '/' || (status_history->-1->>'reason') into s
+    from medical_resource_requests where origin_client_request_id = 'REQ-T93-Y';
+  r := r || 'patient left -> ' || s || ' (want closed/-/patient_left_scene); ';
+  update patients set current_status = 'handed_over' where id = P1;
+  select string_agg(status || '/' || coalesce(review_outcome, '-'), ',') into s from medical_resource_requests where linked_patient_ids ? P1::text and request_kind = 'pc_review';
+  r := r || 'already closed untouched -> ' || s || ' (want resolved/evac_moved_up,resolved/evac_moved_up); ';
+
   -- Every event stays in the log, refused ones included.
-  select count(*) into n from events where incident_id = X and local_event_id like 't93-%';
-  r := r || 'events kept=' || n || ' (want 14); ';
+  select count(*) into n from events where local_event_id like 't93-%' and incident_id in (X, Y);
+  r := r || 'events kept=' || n || ' (want 15); ';
 
   -- No restore needed: the exception below rolls back every change, profiles included.
   raise exception 'TEST93 RESULT: %', r;

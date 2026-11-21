@@ -211,6 +211,12 @@ class KPIEngine:
         "unanswered" mark. Reads the exported medical_resource_requests table (request_kind
         'pc_review'); its status_history holds the timestamps, the outcome and every delay.
         Empty when the table is not there (older exports, the seeded demo databases).
+
+        A review the server closed because the casualty left the scene (reason patient_left_scene,
+        093) is 'closed_patient_left'; it counts as unanswered only if 5 minutes had passed with no
+        answer before the casualty left. priority_update_unconfirmed: the outcome says the priority
+        was updated, but the events hold no triage change for that casualty between the request and
+        2 minutes after the decision (the outcome is a record, it does not change the triage).
         """
         if not self.db.table_exists("medical_resource_requests"):
             return pd.DataFrame()
@@ -239,6 +245,21 @@ class KPIEngine:
             except (TypeError, ValueError):
                 reasons = []
             to_first = minutes(first)
+            left = next((h for h in history if isinstance(h, dict) and h.get("reason") == "patient_left_scene"), None)
+            left_at = pd.to_datetime(left.get("at"), utc=True, errors="coerce") if left else pd.NaT
+            left_min = minutes(left_at)
+            outcome = (closed or {}).get("outcome")
+            if np.isnan(to_first):
+                unanswered = not (left is not None and not np.isnan(left_min) and left_min < 5)
+            else:
+                unanswered = to_first >= 5
+            try:
+                linked = json.loads(r.linked_patient_ids_json or "[]")
+            except (TypeError, ValueError):
+                linked = []
+            unconfirmed = False
+            if outcome == "priority_updated" and pd.notna(closed_at) and pd.notna(requested) and linked:
+                unconfirmed = not self._triage_changed(r.incident_id, linked[0], requested - pd.Timedelta(seconds=1), closed_at + pd.Timedelta(minutes=2))
             out.append({
                 "request_id": r.id,
                 "incident_id": r.incident_id,
@@ -247,11 +268,24 @@ class KPIEngine:
                 "status": r.status,
                 "minutes_to_first_answer": to_first,
                 "minutes_to_decision": minutes(closed_at),
-                "outcome": (closed or {}).get("outcome"),
+                "outcome": outcome if closed else ("closed_patient_left" if left else None),
                 "times_put_off": sum(1 for h in answers if h.get("snoozed_until")),
-                "unanswered_5_min": bool(np.isnan(to_first) or to_first >= 5),
+                "unanswered_5_min": bool(unanswered),
+                "priority_update_unconfirmed": bool(unconfirmed),
             })
         return pd.DataFrame(out)
+
+    TRIAGE_EVENT_TYPES = ("MSTART_TRIAGE_OVERRIDE", "PATIENT_TRIAGE_UPDATED", "TRIAGE_SET", "PATIENT_TRIAGED_EXPECTANT")
+
+    def _triage_changed(self, incident_id, patient_id, start, end) -> bool:
+        ev = self.db.query(
+            "select local_timestamp from events where incident_id = ? and patient_id = ? and type in (%s)" % ",".join("?" * len(self.TRIAGE_EVENT_TYPES)),
+            (incident_id, patient_id, *self.TRIAGE_EVENT_TYPES),
+        )
+        if ev.empty:
+            return False
+        t = pd.to_datetime(ev["local_timestamp"], utc=True, errors="coerce")
+        return bool(((t >= start) & (t <= end)).any())
 
     def data_freshness(self) -> pd.DataFrame:
         state = self.db.device_sync_state()

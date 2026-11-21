@@ -58,6 +58,18 @@ class ReportGenerator:
                 view[c] = view[c].dt.strftime("%H:%M:%S")
         return view.to_html(index=False, border=0, escape=False)
 
+    @classmethod
+    def _pc_review_section(cls, df) -> str:
+        """WP-26: PC reviews requested by medics. Omitted when there are none (older exports)."""
+        if df is None or df.empty:
+            return ""
+        answered = df["minutes_to_first_answer"].dropna()
+        median = f"{answered.median():.1f}" if not answered.empty else "—"
+        unconfirmed = int(df["priority_update_unconfirmed"].sum())
+        flag = (f"<p><b>\"עודכנה קדימות\" ללא שינוי קדימות בפועל: {unconfirmed}</b></p>" if unconfirmed else "")
+        return (f"<div class='section'><h2>סקירות חוג\"ד</h2><p>{len(df)} בקשות · חציון {median} דק׳ עד תשובה · "
+                f"{int(df['unanswered_5_min'].sum())} לא נענו תוך 5 דק׳</p>{flag}{cls._df_table(df.drop(columns=['incident_id']), max_rows=20)}</div>")
+
     def generate(self, incident_id: Optional[str] = None, title: str = "C5 Sentinel-SAR — AAR / Command Analytics") -> str:
         summary = self.kpi.full_summary(incident_id)
         cmd = summary["command_summary"]
@@ -90,6 +102,7 @@ class ReportGenerator:
         <div class='section'><h2>התראות Watchdog</h2><img src='data:image/png;base64,{img['alerts']}'></div>
         <div class='section'><h2>הפרות / חריגות בסיכון גבוה</h2>{self._df_table(summary['high_risk_violations'])}</div>
         <div class='section'><h2>שגיאות Sync / אירועים מורעלים</h2>{self._df_table(summary['sync_error_summary'])}</div>
+        {self._pc_review_section(summary.get('pc_review_response'))}
         <footer>C5 Sentinel-SAR analytics package v1.1 — prototype / no real patient data</footer>
         </div></body></html>"""
         return html
