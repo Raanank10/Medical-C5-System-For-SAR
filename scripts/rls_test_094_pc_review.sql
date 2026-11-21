@@ -1,5 +1,5 @@
--- Rolled-back test for database/093 (PC review of a deteriorating casualty, WP-26).
--- Run in the Supabase SQL editor after 093 is applied. It ends with an error on purpose so nothing
+-- Rolled-back test for database/094 (PC review of a deteriorating casualty, WP-26).
+-- Run in the Supabase SQL editor after 094 is applied. It ends with an error on purpose so nothing
 -- persists; the error text is the result. Every item should show the expected value.
 -- Uses the synthetic test accounts of the live project, looked up by role (two medics, a PC, a CC).
 do $test$

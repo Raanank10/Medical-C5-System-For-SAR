@@ -1,13 +1,13 @@
 // Real-browser test of the PC review of a deteriorating casualty across devices (WP-26,
-// database/093, V2.99.84). Two medics, a PC and a CC (four browser contexts, so four separate
+// database/094, V2.99.87). Two medics, a PC and a CC (four browser contexts, so four separate
 // devices) share one fake backend in this Node process, the harness of
-// scripts/browser_reinforcement_sync_test.js. The fake mirrors database/052 + 093:
+// scripts/browser_reinforcement_sync_test.js. The fake mirrors database/052 + 094:
 // - a pc_review row is created only by a medic / paramedic / admin, for a patient of the incident
 // - 052's status rules (only command changes status, the requester may raise urgency, newest wins),
-//   then 093's outcome on 'resolved', delay on 'acknowledged', and the same decision for every other
+//   then 094's outcome on 'resolved', delay on 'acknowledged', and the same decision for every other
 //   open review of the same casualty
 // - RLS (052): command reads every request, others only their own.
-// It proves client behavior only; database/093 itself is exercised by scripts/rls_test_093_pc_review.sql.
+// It proves client behavior only; database/094 itself is exercised by scripts/rls_test_094_pc_review.sql.
 //
 // Runs in CI through scripts/run_tests.js; also runs on its own.
 // Run: npm install && node scripts/browser_pc_review_sync_test.js
@@ -49,7 +49,9 @@ const REQ = 'MEDICAL_REINFORCEMENT_REQUESTED';
 const DEATH_REQ = 'DOCTOR_DEATH_CERTIFICATION_REQUESTED';
 const STATUS = 'MEDICAL_REINFORCEMENT_STATUS_UPDATED';
 const DEATH = 'PATIENT_DEATH_CONFIRMED';
-const ALLOWED = { pc: [REQ, DEATH_REQ, STATUS], cc: [REQ, DEATH_REQ, STATUS], medic: [REQ, DEATH_REQ, STATUS, 'VITALS_RECORDED'], physician: [REQ, DEATH_REQ, STATUS, DEATH] };
+// The PC's priority change in step 15 reaches the server through reconcileTriageSync() as
+// PATIENT_TRIAGE_UPDATED / PATIENT_TRIAGED_EXPECTANT, both in sync-log's CLINICAL_EVENTS for pc.
+const ALLOWED = { pc: [REQ, DEATH_REQ, STATUS, 'PATIENT_TRIAGE_UPDATED', 'PATIENT_TRIAGED_EXPECTANT'], cc: [REQ, DEATH_REQ, STATUS], medic: [REQ, DEATH_REQ, STATUS, 'VITALS_RECORDED'], physician: [REQ, DEATH_REQ, STATUS, DEATH] };
 const RESOURCES = ['one_medic', 'two_medics', 'paramedic', 'doctor_treatment', 'doctor_death_cert', 'urgent_evac', 'routine_evac', 'evac_coordination', 'cat_tourniquets', 'hemostatic_gauze', 'airway_equipment', 'iv_fluids', 'hypothermia_blankets', 'medical_equipment'];
 const STATUSES = ['pending', 'acknowledged', 'assigned', 'en_route', 'arrived', 'denied', 'cancelled', 'resolved', 'fulfilled', 'closed'];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -82,7 +84,7 @@ function projectRequest(server, evt, actorId) {
     return;
   }
   const clientId = p.id || p.request_id;
-  // database/093: resourceType 'pc_review' from a medic / paramedic / admin, for a patient of the incident.
+  // database/094: resourceType 'pc_review' from a medic / paramedic / admin, for a patient of the incident.
   if (evt.type === REQ && p.resourceType === 'pc_review') {
     if (!clientId || !['medic', 'paramedic', 'admin'].includes(u.role)) return;
     const linked = (p.linkedPatientIds || []).filter((x) => UUID.test(x) && server.patients.some((pt) => pt.id === x && pt.incident_id === evt.incident_id));
@@ -128,7 +130,7 @@ function projectRequest(server, evt, actorId) {
   if (Date.parse(row.status_updated_at) > Date.parse(evt.local_timestamp)) return;
   Object.assign(row, { status: status || row.status, urgency: urgency || row.urgency, status_updated_by_name: u.display_name, status_updated_by_role: u.role, status_updated_at: evt.local_timestamp });
   row.status_history.push(hist(row.status, row.urgency));
-  // database/093, after 052 accepted it: outcome / delay, then every other open review of the casualty.
+  // database/094, after 052 accepted it: outcome / delay, then every other open review of the casualty.
   if (row.request_kind !== 'pc_review' || !STATUS_ROLES.includes(u.role)) return;
   const last = row.status_history[row.status_history.length - 1];
   let outcome = null; let until = null;
@@ -198,7 +200,7 @@ function handle(server, req) {
   }
   if (req.table === 'medical_resource_requests') {
     // medical_resource_requests_read (database/052, decision D3).
-    // 052, plus 093: the incident's medics / paramedics read every pc_review row.
+    // 052, plus 094: the incident's medics / paramedics read every pc_review row.
     const rows = visible(server.medical_resource_requests).filter((r) => READ_ALL.includes(u.role) || r.requested_by === u.id || (r.request_kind === 'pc_review' && ['medic', 'paramedic'].includes(u.role)));
     return { data: clone(rows), error: null };
   }
@@ -290,7 +292,7 @@ async function pullReviews(page) {
 const reviews = (page) => page.evaluate(() => pcReviews.map((r) => ({ id: r.id, serverId: r.serverId || null, status: r.status, urgency: r.urgency, outcome: r.outcome, snoozedUntil: r.snoozedUntil, linked: r.linkedPatientIds, by: r.requestedByName })));
 const rows = (pid) => SERVER.medical_resource_requests.filter((r) => r.request_kind === 'pc_review' && (!pid || r.linked_patient_ids.includes(pid)));
 const VIT = { yellow: { rr: 18, pulse: 96, spo2: 96, avpu: 'A', bp_estimate: 'radial_weak' }, red: { rr: 20, pulse: 110, spo2: 92, avpu: 'A', bp_estimate: 'radial' } };
-// A casualty this phone registered (local) and the server row the 093 creation check looks for.
+// A casualty this phone registered (local) and the server row the 094 creation check looks for.
 async function addPatient(page, id, visualId, triage, local = true) {
   if (!SERVER.patients.some((p) => p.id === id)) SERVER.patients.push({ id, incident_id: INC1, visual_id: visualId, current_triage: triage, current_status: 'identified' });
   await page.evaluate(({ id, visualId, triage, vit }) => {
@@ -486,7 +488,7 @@ async function checkFile(browser, file) {
   const other = await m2.page.evaluate((id) => { openPatient(id); const el = document.querySelector('[data-pc-review-status]'); return { state: el?.dataset.pcReviewStatus, text: el?.innerText || '' }; }, P3);
   assert(other.state === 'closed' && other.text.includes('עודכנה קדימות'), `${rel}: the second medic sees the PC's decision on the first medic's casualty (got ${JSON.stringify(other)})`);
 
-  // 14. The casualty leaves the scene: the server closes the open review (093); no line, the medic sees why.
+  // 14. The casualty leaves the scene: the server closes the open review (094); no line, the medic sees why.
   await pullReviews(pc.page);
   assert((await strip(pc.page, 'pc')).includes(`data-pc-review="${P4}"`), `${rel}: P4's review is on the PC's strip before the casualty leaves`);
   // Before the server's close arrives the line already goes (the phone knows the casualty left) ...
