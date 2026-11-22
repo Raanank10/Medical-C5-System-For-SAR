@@ -748,6 +748,8 @@ textarea{resize:vertical;min-height:70px;}
 .incident-readonly-banner{display:none;background:rgba(245,197,24,0.16);border-bottom:2px solid #f5c518;padding:8px 16px;font-size:13px;font-weight:700;color:var(--text);}
 .incident-unit-panel .unit-link-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--border);font-size:12px;}
 .incident-unit-panel .unit-mode{display:flex;gap:8px;margin-bottom:8px;}
+.incident-readonly-banner button{margin-inline-start:8px;}
+.relief-waiting{margin-top:6px;font-size:12px;font-weight:400;}
 .incident-unit-panel .unit-mode button{flex:1;}
 .open-alert-banner{display:none;flex-direction:column;gap:8px;background:rgba(255,107,53,0.16);border-bottom:2px solid var(--orange);padding:10px 16px;font-size:13px;color:var(--text);}
 .open-alert-banner.pulse{animation:openAlertPulse 1.4s ease-in-out infinite;}
@@ -16856,6 +16858,10 @@ async function activateIncident(inc){
   activeIncident={id:inc.id, visual_id:inc.visual_id, status:inc.status, location_name:inc.location_name, address:inc.address||'', incident_type:inc.incident_type||null, incident_types:incidentTypesFromRow(inc), draft_resolution:inc.draft_resolution||null,
     opened_by:inc.opened_by!==undefined?inc.opened_by:(prev?prev.opened_by:undefined), false_alarm:!!(inc.false_alarm||prev?.false_alarm),
     t_zero:inc.t_zero||prev?.t_zero||null}; // the alert time, injury time's default (WP-23)
+  // WP-27: keep this phone's relief / read-only state across a re-entry, and ask the server now.
+  if(prev?.access_mode){ activeIncident.access_mode=prev.access_mode; activeIncident.read_only_since=prev.read_only_since||null; activeIncident.site_company_name=prev.site_company_name||null; }
+  else if(inc.read_only) activeIncident.access_mode='read_only';
+  refreshActiveIncidentAccess().then(()=>renderIncidentContext()).catch(()=>{});
   if(_workingIncidentId!==inc.id){ resetWorkingStateForIncident(inc); _workingIncidentId=inc.id; }
   siteData.name=siteData.name||inc.location_name||'';
   siteData.address=siteData.address||inc.address||'';
@@ -17132,9 +17138,11 @@ async function switchToMergedIncident(targetId, targetVisualId){
 // CC / chamal / admin, from the incident picker. Handover: the site becomes the other company's (its
 // PC, RCC and rescue chain), the old company sees it read-only until the CC ends that. Reinforce:
 // the other company's PC joins as a full member and assigns his own medics; the site stays with its
-// company and its PC leads; "release" makes the reinforcing company read-only. A read-only phone is
-// told so on the strip; a record it makes after the change is refused by the server and shows as a
-// sync rejection (records from before the change are still accepted).
+// company and its PC leads; "release" makes the reinforcing company read-only. Relief (owner
+// 2026-11-22): on a handover or a release the leaving company's medical staff keep recording until
+// each taps "הוחלפתי - מסרתי" (or his PC / the CC marks him); its RCC / RPC are read-only at once.
+// A read-only phone is told so on the strip; a record it makes after that is refused by the server
+// and shows as a sync rejection (records from before are still accepted).
 const INCIDENT_UNIT_CHANGE_ROLES=new Set(['cc','chamal','admin']);
 const INCIDENT_UNIT_NOTICE_ROLES=new Set(['pc','rcc','rpc']);
 const INCIDENT_FULL_ACCESS_ROLES=new Set(['cc','chamal','admin','physician']); // never read-only (app.can_access_incident)
@@ -17184,16 +17192,18 @@ function incidentUnitPanelHtml(inc){
   const companies=(Array.isArray(_realCompanies)?_realCompanies:[]).filter(c=>c.is_active!==false && c.id!==siteCompanyId
     && (_unitPanelMode==='handover' || !reinforcing.some(l=>l.company_id===c.id)));
   const time=t=>t?new Date(t).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):'';
+  const waiting=incidentReliefWaitingHtml(inc.id, links);
   const rows=[
     ...reinforcing.map(l=>`<div class="unit-link-row" data-unit-link="${escAttr(l.id)}"><span>🤝 ${escAttr(unitCompanyName(l.company_id,l.company_name))} מתגברת מ־${time(l.started_at)}</span><button onclick="releaseIncidentUnit('${id}','${escAttr(l.company_id)}')">שחרור תגבור</button></div>`),
     ...readOnly.map(l=>`<div class="unit-link-row" data-unit-link="${escAttr(l.id)}"><span>👁 ${escAttr(unitCompanyName(l.company_id,l.company_name))} · צפייה בלבד מ־${time(l.read_only_since)}${l.kind==='former'?' (העבירה את האתר)':' (תגבור שוחרר)'}</span><button onclick="endIncidentUnitAccess('${id}','${escAttr(l.company_id)}')">סיום גישה</button></div>`)
   ].join('');
   const explain=_unitPanelMode==='handover'
-    ? `העברת האתר: הפלוגה שתבחר/י מקבלת את האתר (החוג״ד, מ״פ החילוץ, והמחלקה תיבחר מחדש). ${escAttr(siteCompany)} תוכל לצפות בלבד עד שתסיים/י את הגישה. רישומים שלה אחרי ההעברה יידחו.`
+    ? `העברת האתר: הפלוגה שתבחר/י מקבלת את האתר (החוג״ד, מ״פ החילוץ, והמחלקה תיבחר מחדש). הצוות הרפואי של ${escAttr(siteCompany)} ממשיך לתעד עד שכל אחד מאשר "הוחלפתי - מסרתי", ואז צפייה בלבד עד שתסיים/י את הגישה. מ״פ ומ״מ החילוץ שלה בצפייה בלבד מיד.`
     : `תגבור: החוג״ד של הפלוגה שתבחר/י מצטרף לאתר ומשבץ את החובשים שלו. האתר נשאר של ${escAttr(siteCompany)} והחוג״ד שלה מוביל.`;
   return `<div class="incident-merge-panel incident-unit-panel" data-unit-panel="${id}">
     <div class="demo-strip-sub" style="margin-bottom:6px">פלוגת האתר: <b>${escAttr(siteCompany)}</b></div>
     ${rows}
+    ${waiting}
     <div class="unit-mode" style="margin-top:8px"><button data-unit-mode="handover" class="${_unitPanelMode==='handover'?'primary':''}" onclick="setIncidentUnitPanelMode('handover')">העברת האתר</button><button data-unit-mode="reinforce" class="${_unitPanelMode==='reinforce'?'primary':''}" onclick="setIncidentUnitPanelMode('reinforce')">תגבור</button></div>
     <div class="demo-strip-sub" style="margin-bottom:6px">${explain}</div>
     ${links?.error ? '<div class="login-error">טעינת שיוך הפלוגות נכשלה, בדוק/י חיבור</div>' : ''}
@@ -17231,19 +17241,19 @@ async function submitIncidentUnitChange(incidentId){
     {p_incident_id:incidentId, p_company_id:companyId, p_reason:reason, p_device_id:getDeviceId(), p_local_event_id:`incident-unit-${mode}-${newUuid()}`});
   if(r.error || !r.data){ if(err) err.textContent=(mode==='handover'?'ההעברה נכשלה: ':'התגבור נכשל: ')+(r.error?.message||'שגיאה'); return; }
   toast(mode==='handover'
-    ? `האתר הועבר ל${to} · ${r.data.memberships_read_only??0} אנשי הפלוגה הקודמת בצפייה בלבד · המחלקה תיבחר ע״י החוג״ד / מ״פ החילוץ`
+    ? `האתר הועבר ל${to} · ${r.data.relief_pending??0} מהצוות הרפואי הקודם ממתינים להחלפה · המחלקה תיבחר ע״י החוג״ד / מ״פ החילוץ`
     : `${to} מתגברת · ${r.data.pcs_added?'החוג״ד שלה צורף ומשבץ את החובשים':'לפלוגה אין חוג״ד פעיל, יש לשבץ ידנית'}`);
   await afterIncidentUnitChange(incidentId);
 }
 async function releaseIncidentUnit(incidentId, companyId){
-  if(!confirm(`לשחרר את ${unitCompanyName(companyId)} מהתגבור? היא תעבור לצפייה בלבד.`)) return;
+  if(!confirm(`לשחרר את ${unitCompanyName(companyId)} מהתגבור? הצוות הרפואי שלה ימשיך לתעד עד שכל אחד יאשר "הוחלפתי - מסרתי".`)) return;
   const r=await incidentUnitRpc('release_incident_unit', {p_incident_id:incidentId, p_company_id:companyId, p_reason:null, p_device_id:getDeviceId(), p_local_event_id:`incident-unit-release-${newUuid()}`});
   if(r.error){ toast('השחרור נכשל: '+(r.error.message||'')); return; }
-  toast(`${unitCompanyName(companyId)} שוחררה · צפייה בלבד`);
+  toast(`${unitCompanyName(companyId)} שוחררה · ממתינים להחלפה: ${r.data?.relief_pending??0}`);
   await afterIncidentUnitChange(incidentId);
 }
 async function endIncidentUnitAccess(incidentId, companyId){
-  if(!confirm(`לסיים את הגישה של ${unitCompanyName(companyId)} לאתר? היא לא תראה אותו יותר.`)) return;
+  if(!confirm(`לסיים את הגישה של ${unitCompanyName(companyId)} לאתר? היא לא תראה אותו יותר, וגם מי שעוד לא אישר החלפה יוחלף עכשיו.`)) return;
   const r=await incidentUnitRpc('end_incident_unit_access', {p_incident_id:incidentId, p_company_id:companyId, p_device_id:getDeviceId(), p_local_event_id:`incident-unit-end-${newUuid()}`});
   if(r.error){ toast('סיום הגישה נכשל: '+(r.error.message||'')); return; }
   toast(`הגישה של ${unitCompanyName(companyId)} הסתיימה`);
@@ -17259,26 +17269,55 @@ async function refreshActiveIncidentAccess(){
   if(!r) return; // offline: keep the last answer
   let mode=was;
   if(r.error){ if(r.error.code==='42501') mode='ended'; else return; }
-  else mode=r.my_access==='read_only'?'read_only':'full';
+  else mode=['read_only','relief_pending'].includes(r.my_access)?r.my_access:'full';
   activeIncident.access_mode=mode;
   activeIncident.read_only_since=r.error?activeIncident.read_only_since:(r.my_read_only_since||null);
   activeIncident.site_company_name=r.error?activeIncident.site_company_name:(r.company_name||null);
   persistActiveIncident();
   if(mode!==was && mode!=='full'){
     try{ navigator.vibrate?.([200,100,200]); }catch(e){}
-    toast(mode==='ended' ? 'הגישה שלך לאתר הסתיימה ע״י מ״פ רפואה' : 'האתר הועבר / התגבור שוחרר: צפייה בלבד. רישומים חדשים לא יתקבלו בשרת');
+    toast(mode==='ended' ? 'הגישה שלך לאתר הסתיימה ע״י מ״פ רפואה'
+      : mode==='relief_pending' ? 'האתר הועבר / התגבור שוחרר: המשך לתעד עד שתמסור את הפצועים, ואז "הוחלפתי - מסרתי"'
+      : 'הוחלפת: צפייה בלבד. רישומים חדשים לא יתקבלו בשרת');
   }
 }
 function isActiveIncidentReadOnly(){ return !!activeIncident && ['read_only','ended'].includes(activeIncident.access_mode); }
+// Who still waits for relief (the server lists the caller's company for a PC, everyone for the CC).
+// A PC or the CC can mark someone whose phone is gone; the person himself uses his own button.
+function incidentReliefWaitingHtml(incidentId, links, othersOnly){
+  const rows=(links?.relief_pending||[]).filter(x=>!(othersOnly && x.profile_id===currentUser?.id));
+  if(!rows.length || !(['pc'].includes(currentUser?.role) || canChangeIncidentUnit())) return '';
+  return `<div class="relief-waiting" data-relief-waiting="${escAttr(incidentId)}">ממתינים להחלפה: ${rows.map(x=>`<span class="unit-link-row" data-relief-row="${escAttr(x.profile_id)}"><span>${escAttr(x.display_name||'')} (${escAttr(ROLE_LABELS[SERVER_ROLE_TO_CLIENT_ROLE?.[x.role]||x.role]||x.role)})</span>${x.profile_id===currentUser?.id?'':`<button onclick="confirmIncidentRelief('${escAttr(x.profile_id)}','${escAttr(incidentId)}')">סמן כהוחלף</button>`}</span>`).join('')}</div>`;
+}
+async function confirmIncidentRelief(profileId, incidentId){
+  const incId=incidentId||activeIncident?.id;
+  if(!incId) return;
+  const self=!profileId || profileId===currentUser?.id;
+  const name=self?'':((_unitLinksByIncident[incId]?.relief_pending||[]).find(x=>x.profile_id===profileId)?.display_name||'');
+  if(!confirm(self ? 'מסרת את הפצועים לצוות המחליף? אחרי האישור תוכל/י רק לצפות באתר.' : `לסמן ש${name} הוחלף/ה? מעכשיו צפייה בלבד עבורו/ה.`)) return;
+  const r=await incidentUnitRpc('confirm_incident_relief', {p_incident_id:incId, p_profile_id:self?null:profileId, p_device_id:getDeviceId(), p_local_event_id:`incident-relief-${newUuid()}`});
+  if(r.error){ toast('האישור נכשל'+(navigator.onLine===false?': אין חיבור לשרת, נסה/י שוב כשיחזור':': '+(r.error.message||''))); return; }
+  toast(self?'הוחלפת: צפייה בלבד באתר':`${name} סומן/ה כהוחלף/ה`);
+  await afterIncidentUnitChange(incId);
+}
 function renderIncidentReadOnlyBanner(){
   const el=document.getElementById('incident-readonly-banner');
   if(!el) return;
-  if(!currentUser || !isActiveIncidentReadOnly()){ el.style.display='none'; el.textContent=''; return; }
+  const pending=currentUser && activeIncident?.access_mode==='relief_pending';
+  if(!currentUser || (!isActiveIncidentReadOnly() && !pending)){ el.style.display='none'; el.textContent=''; return; }
+  if(pending){
+    el.style.display='block';
+    el.innerHTML=`📤 האתר הועבר${activeIncident.site_company_name?' ל'+escAttr(activeIncident.site_company_name):''} · המשך/י לתעד עד שתמסור/י את הפצועים
+      <button data-relief-self onclick="confirmIncidentRelief(null)">הוחלפתי - מסרתי</button>${incidentReliefWaitingHtml(activeIncident.id, _unitLinksByIncident[activeIncident.id], true)}`;
+    return;
+  }
   const since=activeIncident.read_only_since?new Date(activeIncident.read_only_since).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):'';
   el.style.display='block';
-  el.textContent=activeIncident.access_mode==='ended'
-    ? '⛔ הגישה שלך לאתר הסתיימה. רישומים שלא נשלחו יישלחו; רישומים אחרי ההעברה יידחו.'
+  const text=activeIncident.access_mode==='ended'
+    ? '⛔ הגישה שלך לאתר הסתיימה. רישומים שלא נשלחו יישלחו; רישומים אחרי ההחלפה יידחו.'
     : `👁 צפייה בלבד${since?' מ־'+since:''}${activeIncident.site_company_name?' · האתר אצל '+activeIncident.site_company_name:''}. רישומים חדשים לא יתקבלו בשרת · פנה/י לחוג״ד או למ״פ רפואה`;
+  // A relieved PC can still mark his medics whose phones are gone.
+  el.innerHTML=escAttr(text)+(activeIncident.access_mode==='ended'?'':incidentReliefWaitingHtml(activeIncident.id, _unitLinksByIncident[activeIncident.id], true));
 }
 
 // B's PC / RCC / RPC: a site handed to their company, or their company sent to reinforce one.
@@ -17305,7 +17344,7 @@ function renderIncidentUnitNoticeBanner(){
     const where=`${escAttr(n.visual_id||'')} · ${escAttr(n.location_name||'')}`;
     const time=n.at?new Date(n.at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):'';
     const what=n.kind==='handover'
-      ? `<strong>📥 אתר הועבר לפלוגה שלך:</strong> ${where} · מ־${escAttr(n.from_company_name||'')} · ${time}${currentUser.role!=='rpc'?' · יש לבחור מחלקה ולשבץ חובשים':''}`
+      ? `<strong>📥 אתר הועבר לפלוגה שלך:</strong> ${where} · מ־${escAttr(n.from_company_name||'')} · ${time}${currentUser.role!=='rpc'?' · יש לבחור מחלקה ולשבץ חובשים':''}${n.relief_pending?` · ${n.relief_pending} מהצוות הקודם עדיין מחכים להחלפה`:''}`
       : `<strong>🤝 הפלוגה שלך נשלחה לתגבר:</strong> ${where} · האתר של ${escAttr(n.site_company_name||'')} · ${time} · שבץ/י את החובשים שלך`;
     return `<div class="open-alert-row" data-unit-notice="${escAttr(n.link_id)}"><div>${what}${n.reason?' · סיבה: '+escAttr(n.reason):''}</div>
       <div class="actions"><button onclick="acknowledgeIncidentUnitNotice('${escAttr(n.link_id)}')">ראיתי</button>${activeIncident?.id===n.incident_id?'':`<button onclick="enterIncidentFromUnitNotice('${escAttr(n.incident_id)}')">כניסה</button>`}</div></div>`;

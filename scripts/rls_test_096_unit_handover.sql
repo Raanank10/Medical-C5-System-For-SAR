@@ -1,4 +1,5 @@
--- Rolled-back test for database/096 (CC moves a site to another company / reinforces it, WP-27).
+-- Rolled-back test for database/096 (CC moves a site to another company / reinforces it, WP-27;
+-- relief before read-only, owner 2026-11-22).
 -- Run in the Supabase SQL editor after 095 and 096 are applied. It ends with an error on purpose so
 -- nothing persists; the error text is the result: every line should read "ok", and the last line
 -- counts the failures (want 0).
@@ -76,8 +77,8 @@ begin
     insert into _c values ('handover without reason', 'allowed', 'refused');
   exception when others then insert into _c values ('handover without reason', 'refused', 'refused'); end;
   j := public.handover_incident_unit(X, CB, 'A to rest', 'dev-cc', 't96-ho');
-  t_ho := (j->>'read_only_since')::timestamptz;
-  insert into _c values ('A memberships made read-only', j->>'memberships_read_only', '2');
+  t_ho := (j->>'changed_at')::timestamptz;
+  insert into _c values ('A medical staff wait for relief (PC + medic)', j->>'relief_pending', '2');
   begin
     perform public.handover_incident_unit(X, CB, 'again');
     insert into _c values ('handover to the same company again', 'allowed', 'refused');
@@ -91,7 +92,43 @@ begin
   select count(*) into n from unit_audit where target_incident_id = X and actor_id = CC and action in ('incident_unit_handed_over','incident_unit_changed');
   insert into _c values ('unit_audit rows (handed_over + changed)', n::text, '2');
 
-  -- ---- Old medic A: reads, cannot write now, records from before still accepted
+  -- ---- A medic before his relief: still writes
+  perform set_config('request.jwt.claims', json_build_object('sub', MA, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    insert into events (incident_id, actor_id, actor_role, type, device_id, local_event_id, local_timestamp)
+    values (X, MA, 'medic', 'NOTE_ADDED', 'dev-ma', 't96-2a', clock_timestamp());
+    insert into _c values ('A medic writes until relieved', 'yes', 'yes');
+  exception when others then insert into _c values ('A medic writes until relieved', 'no: ' || sqlerrm, 'yes'); end;
+  j := public.get_incident_unit_links(X);
+  insert into _c values ('A medic access label before relief', j->>'my_access', 'relief_pending');
+  execute 'reset role';
+
+  -- Only he, his PC or the CC confirm his relief.
+  perform set_config('request.jwt.claims', json_build_object('sub', PCB, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    perform public.confirm_incident_relief(X, MA);
+    insert into _c values ('B PC confirms A medic''s relief', 'allowed', 'refused');
+  exception when insufficient_privilege then insert into _c values ('B PC confirms A medic''s relief', 'refused', 'refused'); end;
+  execute 'reset role';
+
+  -- A's PC (kept as a member, waiting for relief himself) confirms for his medic.
+  perform set_config('request.jwt.claims', json_build_object('sub', PCA, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  j := public.get_incident_unit_links(X);
+  insert into _c values ('A PC sees his people waiting', jsonb_array_length(j->'relief_pending')::text, '2');
+  j := public.confirm_incident_relief(X, MA, 'dev-pca', 't96-rel-ma');
+  t_ho := (j->>'read_only_since')::timestamptz;
+  begin
+    perform public.confirm_incident_relief(X, MA);
+    insert into _c values ('relief confirmed twice', 'allowed', 'refused');
+  exception when others then insert into _c values ('relief confirmed twice', 'refused', 'refused'); end;
+  execute 'reset role';
+  select count(*) into n from events where incident_id = X and type = 'INCIDENT_UNIT_RELIEF_CONFIRMED';
+  insert into _c values ('relief event written', n::text, '1');
+
+  -- ---- A medic after relief: reads, cannot write now, records from before still accepted
   perform set_config('request.jwt.claims', json_build_object('sub', MA, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   select count(*) into n from patients where incident_id = X;
@@ -101,51 +138,46 @@ begin
   begin
     insert into events (incident_id, actor_id, actor_role, type, device_id, local_event_id, local_timestamp)
     values (X, MA, 'medic', 'NOTE_ADDED', 'dev-ma', 't96-2', clock_timestamp() + interval '1 second');
-    insert into _c values ('A medic new record refused', 'accepted', 'refused');
-  exception when insufficient_privilege then insert into _c values ('A medic new record refused', 'refused', 'refused'); end;
+    insert into _c values ('A medic new record refused after relief', 'accepted', 'refused');
+  exception when insufficient_privilege then insert into _c values ('A medic new record refused after relief', 'refused', 'refused'); end;
   begin
     insert into events (incident_id, actor_id, actor_role, type, device_id, local_event_id, local_timestamp)
     values (X, MA, 'medic', 'NOTE_ADDED', 'dev-ma', 't96-3', t_ho - interval '2 minutes');
-    insert into _c values ('A medic offline record from before accepted', 'accepted', 'accepted');
-  exception when others then insert into _c values ('A medic offline record from before accepted', 'refused: ' || sqlerrm, 'accepted'); end;
+    insert into _c values ('A medic offline record from before relief accepted', 'accepted', 'accepted');
+  exception when others then insert into _c values ('A medic offline record from before relief accepted', 'refused: ' || sqlerrm, 'accepted'); end;
   begin
     insert into patients (id, incident_id, visual_id, t_injury, created_by) values (gen_random_uuid(), X, 'T96-LATE', t_ho - interval '1 minute', MA);
-    insert into _c values ('A medic offline patient from before accepted', 'accepted', 'accepted');
-  exception when others then insert into _c values ('A medic offline patient from before accepted', 'refused: ' || sqlerrm, 'accepted'); end;
+    insert into _c values ('A medic offline patient from before relief accepted', 'accepted', 'accepted');
+  exception when others then insert into _c values ('A medic offline patient from before relief accepted', 'refused: ' || sqlerrm, 'accepted'); end;
   begin
     insert into patients (id, incident_id, visual_id, t_injury, created_by) values (gen_random_uuid(), X, 'T96-NEW', clock_timestamp() + interval '1 second', MA);
     insert into _c values ('A medic new patient refused', 'accepted', 'refused');
   exception when insufficient_privilege then insert into _c values ('A medic new patient refused', 'refused', 'refused'); end;
   j := public.get_incident_unit_links(X);
-  insert into _c values ('A medic access label', j->>'my_access', 'read_only');
+  insert into _c values ('A medic access label after relief', j->>'my_access', 'read_only');
   select count(*) into n from public.list_open_incidents() where id = X and read_only;
   insert into _c values ('A medic list shows X read-only', n::text, '1');
   execute 'reset role';
 
-  -- ---- Old PC A: reads, no writes, cannot assign
+  -- ---- A's PC, still waiting for relief: writes, but assigns nobody new
   perform set_config('request.jwt.claims', json_build_object('sub', PCA, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
-  select count(*) into n from incidents where id = X;
-  insert into _c values ('A PC sees X', n::text, '1');
-  select count(*) into n from public.list_open_incidents() where id = X and read_only and not is_member;
-  insert into _c values ('A PC list: read-only, not a member', n::text, '1');
-  update incidents set location_name = 'changed' where id = X;
-  get diagnostics n = row_count;
-  insert into _c values ('A PC updates X', n::text, '0');
-  begin
-    insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by) values (X, MA2, 'medic', PCA);
-    insert into _c values ('A PC assigns his medic to X', 'allowed', 'refused');
-  exception when insufficient_privilege then insert into _c values ('A PC assigns his medic to X', 'refused', 'refused'); end;
+  select count(*) into n from public.list_open_incidents() where id = X and not read_only;
+  insert into _c values ('A PC list: full while waiting', n::text, '1');
   begin
     insert into events (incident_id, actor_id, actor_role, type, device_id, local_event_id, local_timestamp)
-    values (X, PCA, 'pc', 'NOTE_ADDED', 'dev-pca', 't96-4', clock_timestamp() + interval '1 second');
-    insert into _c values ('A PC new record refused', 'accepted', 'refused');
-  exception when insufficient_privilege then insert into _c values ('A PC new record refused', 'refused', 'refused'); end;
+    values (X, PCA, 'pc', 'NOTE_ADDED', 'dev-pca', 't96-4', clock_timestamp());
+    insert into _c values ('A PC writes while waiting', 'yes', 'yes');
+  exception when others then insert into _c values ('A PC writes while waiting', 'no: ' || sqlerrm, 'yes'); end;
+  begin
+    insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by) values (X, MA2, 'medic', PCA);
+    insert into _c values ('A PC assigns another medic while waiting', 'allowed', 'refused');
+  exception when insufficient_privilege then insert into _c values ('A PC assigns another medic while waiting', 'refused', 'refused'); end;
   select count(*) into n from public.list_incident_unit_notices();
   insert into _c values ('A PC gets no notice', n::text, '0');
   execute 'reset role';
 
-  -- ---- A's rescue chain: read-only too
+  -- ---- A's rescue chain: read-only at once
   foreach s in array array[RCCA::text, RPCA::text] loop
     perform set_config('request.jwt.claims', json_build_object('sub', s, 'role', 'authenticated')::text, true);
     execute 'set local role authenticated';
@@ -187,7 +219,7 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   j := public.end_incident_unit_access(X, CA, 'dev-cc', 't96-end');
-  insert into _c values ('A members ended', j->>'members_ended', '2');
+  insert into _c values ('A members ended (PC still waiting is relieved too)', j->>'members_ended', '2');
   execute 'reset role';
   foreach s in array array[MA::text, PCA::text, RCCA::text, RPCA::text] loop
     perform set_config('request.jwt.claims', json_build_object('sub', s, 'role', 'authenticated')::text, true);
@@ -246,15 +278,18 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   j := public.release_incident_unit(Y, CB, 'done', 'dev-cc', 't96-rl');
-  insert into _c values ('release: B memberships read-only', j->>'memberships_read_only', '2');
+  insert into _c values ('release: B PC and medic wait for relief', j->>'relief_pending', '2');
   execute 'reset role';
-  foreach s in array array[PCB::text, MB::text] loop
-    perform set_config('request.jwt.claims', json_build_object('sub', s, 'role', 'authenticated')::text, true);
-    execute 'set local role authenticated';
-    insert into _c values ('after release: view/full (' || (select role::text from profiles where id = s::uuid) || ')',
-      app.can_view_incident(Y)::text || '/' || app.can_access_incident(Y)::text, 'true/false');
-    execute 'reset role';
-  end loop;
+  perform set_config('request.jwt.claims', json_build_object('sub', MB, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  insert into _c values ('after release, before relief: B medic full', app.can_access_incident(Y)::text, 'true');
+  perform public.confirm_incident_relief(Y, null, 'dev-mb', 't96-rel-mb');
+  insert into _c values ('B medic relieved himself: view/full', app.can_view_incident(Y)::text || '/' || app.can_access_incident(Y)::text, 'true/false');
+  execute 'reset role';
+  perform set_config('request.jwt.claims', json_build_object('sub', PCB, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  insert into _c values ('B PC not relieved yet: full', app.can_access_incident(Y)::text, 'true');
+  execute 'reset role';
 
   -- ---- Hand Y to B: B comes back full, A read-only
   perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
@@ -268,7 +303,7 @@ begin
   execute 'reset role';
   perform set_config('request.jwt.claims', json_build_object('sub', PCA, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
-  insert into _c values ('A PC read-only on Y', app.can_view_incident(Y)::text || '/' || app.can_access_incident(Y)::text, 'true/false');
+  insert into _c values ('A PC on Y after handover: waits for relief', (public.get_incident_unit_links(Y))->>'my_access', 'relief_pending');
   execute 'reset role';
 
   -- ---- Physician (unit manager, not cc) may not hand over

@@ -11,11 +11,19 @@
 -- - Whole site only: no splitting a site into two incidents.
 -- - Old company A after a handover, and B after its reinforcement is released: read-only (they see
 --   the board and the patients, they cannot write) until the CC ends their access.
+-- - Owner 2026-11-22: relief. On a handover or a release the leaving company's medical staff (pc,
+--   medic, paramedic) keep writing until each one confirms he was relieved ("הוחלפתי - מסרתי",
+--   confirm_incident_relief()); his own PC or the CC may confirm for him (a lost phone). Its
+--   rescue chain (rcc, rpc) is read-only at once. The leaving company's PC is made a member so he
+--   keeps writing although the site's company changed. "סיום גישה" relieves whoever is still
+--   waiting. A paramedic reaches every incident by role (045), so he is never read-only.
+-- - Every PC on a site has the same rights (owner 2026-11-22); only set_incident_platoon stays
+--   with the site's own company.
 -- - Who: cc, chamal, admin. The PC / RCC keep set_incident_platoon only.
 -- - B's medics: B's PC assigns them with the existing assign flow (pc_may_manage_membership).
 --   Nobody else of B is added; on reinforce only B's PC is.
 -- - A record from a read-only phone that was offline over the change is accepted when its phone
---   time is not later than the change (same spirit as 068's late records after a close); a later
+--   time is not later than the moment that person became read-only (his relief, for medical staff) (same spirit as 068's late records after a close); a later
 --   one is refused by RLS and shows on the phone as a sync rejection.
 --
 -- How read-only works. app.can_access_incident() now means full access: a read-only membership no
@@ -39,6 +47,12 @@
 -- ---------------------------------------------------------------------------------------------
 alter table incident_memberships add column if not exists read_only_since timestamptz;
 alter table incident_memberships add column if not exists access_ended_at timestamptz;
+alter table incident_memberships add column if not exists relief_pending_since timestamptz;
+alter table incident_memberships add column if not exists relieved_by uuid references profiles(id) on delete set null;
+comment on column incident_memberships.relief_pending_since is
+  'Set for the leaving company''s medical staff on a handover or a release (database/096): full access until relieved (read_only_since).';
+comment on column incident_memberships.relieved_by is
+  'Who confirmed the relief: the member himself, his PC or the CC (database/096).';
 comment on column incident_memberships.read_only_since is
   'Set when the member''s company handed the site over or its reinforcement was released (database/096): read-only from then on.';
 comment on column incident_memberships.access_ended_at is
@@ -418,8 +432,44 @@ as $function$
   where coalesce(p.company_id, pl.company_id) = p_company_id
 $function$;
 
--- Memberships of a company's people on a site: read-only from p_at, or back to full (p_at null).
-create or replace function app.set_company_memberships_read_only(p_incident_id uuid, p_company_id uuid, p_at timestamptz)
+-- The leaving company's people on a site from p_at: medical staff (pc, medic, paramedic) wait for
+-- relief and keep full access; rescue chain (rcc, rpc) is read-only at once. The company's active
+-- PCs who are not members yet are added waiting for relief, since they lose the company scope.
+create or replace function app.start_company_relief(p_incident_id uuid, p_company_id uuid, p_at timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_pending integer;
+  v_ro integer;
+  v_added integer;
+begin
+  insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by, relief_pending_since)
+  select p_incident_id, p.id, 'pc', auth.uid(), p_at
+  from profiles p
+  where p.role = 'pc' and p.is_active and p.company_id = p_company_id
+  on conflict (incident_id, profile_id) do nothing;
+  get diagnostics v_added = row_count;
+  update incident_memberships set relief_pending_since = p_at
+  where incident_id = p_incident_id and read_only_since is null and relief_pending_since is null
+    and role_at_incident in ('pc','medic','paramedic')
+    and profile_id in (select app.company_profile_ids(p_company_id));
+  select count(*) into v_pending from incident_memberships
+  where incident_id = p_incident_id and read_only_since is null and relief_pending_since is not null
+    and profile_id in (select app.company_profile_ids(p_company_id));
+  update incident_memberships set read_only_since = p_at
+  where incident_id = p_incident_id and read_only_since is null
+    and role_at_incident in ('rcc','rpc')
+    and profile_id in (select app.company_profile_ids(p_company_id));
+  get diagnostics v_ro = row_count;
+  return jsonb_build_object('relief_pending', v_pending, 'read_only', v_ro, 'pcs_kept', v_added);
+end;
+$function$;
+
+-- A company back on a site (it takes it over, or returns): its memberships are full again.
+create or replace function app.restore_company_memberships(p_incident_id uuid, p_company_id uuid)
 returns integer
 language plpgsql
 security definer
@@ -428,16 +478,10 @@ as $function$
 declare
   v_count integer;
 begin
-  if p_at is null then
-    update incident_memberships set read_only_since = null, access_ended_at = null
-    where incident_id = p_incident_id and read_only_since is not null and access_ended_at is null
-      and profile_id in (select app.company_profile_ids(p_company_id));
-  else
-    update incident_memberships set read_only_since = p_at
-    where incident_id = p_incident_id and read_only_since is null
-      and role_at_incident in ('pc','medic','paramedic','rcc','rpc')
-      and profile_id in (select app.company_profile_ids(p_company_id));
-  end if;
+  update incident_memberships set read_only_since = null, access_ended_at = null, relief_pending_since = null, relieved_by = null
+  where incident_id = p_incident_id and access_ended_at is null
+    and (read_only_since is not null or relief_pending_since is not null)
+    and profile_id in (select app.company_profile_ids(p_company_id));
   get diagnostics v_count = row_count;
   return v_count;
 end;
@@ -475,7 +519,7 @@ declare
   v_inc incidents;
   v_reason text := nullif(btrim(coalesce(p_reason, '')), '');
   v_now timestamptz := now();
-  v_ro integer := 0;
+  v_relief jsonb := '{}'::jsonb;
   v_back integer := 0;
   v_link uuid;
 begin
@@ -496,13 +540,13 @@ begin
                                      read_only_since, reason, created_by)
     values (p_incident_id, 'former', v_inc.company_id, v_inc.platoon_id, p_company_id, v_now, v_now, v_reason, auth.uid())
     returning id into v_link;
-    v_ro := app.set_company_memberships_read_only(p_incident_id, v_inc.company_id, v_now);
+    v_relief := app.start_company_relief(p_incident_id, v_inc.company_id, v_now);
   end if;
   -- B was on the site already: as reinforcement (it takes over) or as an earlier company (it returns).
   update incident_unit_links
   set ended_at = v_now, ended_by = auth.uid(), end_reason = case when link_kind = 'reinforcing' then 'took_over' else 'returned' end
   where incident_id = p_incident_id and company_id = p_company_id and ended_at is null;
-  v_back := app.set_company_memberships_read_only(p_incident_id, p_company_id, null);
+  v_back := app.restore_company_memberships(p_incident_id, p_company_id);
 
   -- The 053 guard checks the caller (cc/chamal/admin are unit managers) and writes unit_audit.
   update incidents set company_id = p_company_id, platoon_id = null, updated_at = v_now, version = version + 1
@@ -510,14 +554,15 @@ begin
 
   perform app.write_unit_audit('incident_unit_handed_over', p_company_id, null, null, p_incident_id,
     v_inc.company_id, p_company_id, v_inc.platoon_id, null,
-    jsonb_build_object('visual_id', v_inc.visual_id, 'reason', v_reason, 'memberships_read_only', v_ro, 'memberships_restored', v_back));
+    jsonb_build_object('visual_id', v_inc.visual_id, 'reason', v_reason, 'relief', v_relief, 'memberships_restored', v_back));
   perform app.append_incident_lifecycle_event(p_incident_id, 'INCIDENT_UNIT_HANDED_OVER',
     jsonb_build_object('from_company_id', v_inc.company_id, 'from_platoon_id', v_inc.platoon_id, 'to_company_id', p_company_id,
-                       'reason', v_reason, 'read_only_since', v_now, 'link_id', v_link),
+                       'reason', v_reason, 'changed_at', v_now, 'relief', v_relief, 'link_id', v_link),
     p_device_id, p_local_event_id);
   perform refresh_incident_command_state(p_incident_id);
   return jsonb_build_object('incident_id', p_incident_id, 'from_company_id', v_inc.company_id, 'to_company_id', p_company_id,
-                            'read_only_since', v_now, 'memberships_read_only', v_ro, 'memberships_restored', v_back);
+                            'changed_at', v_now, 'relief_pending', coalesce((v_relief->>'relief_pending')::int, 0),
+                            'read_only', coalesce((v_relief->>'read_only')::int, 0), 'memberships_restored', v_back);
 end;
 $function$;
 
@@ -556,7 +601,7 @@ begin
   -- An earlier stay of B (former, or a released reinforcement) ends; its people are full again.
   update incident_unit_links set ended_at = v_now, ended_by = auth.uid(), end_reason = 'returned'
   where incident_id = p_incident_id and company_id = p_company_id and ended_at is null;
-  v_back := app.set_company_memberships_read_only(p_incident_id, p_company_id, null);
+  v_back := app.restore_company_memberships(p_incident_id, p_company_id);
 
   insert into incident_unit_links (incident_id, link_kind, company_id, started_at, reason, created_by)
   values (p_incident_id, 'reinforcing', p_company_id, v_now, v_reason, auth.uid())
@@ -566,7 +611,7 @@ begin
   select p_incident_id, p.id, 'pc', auth.uid()
   from profiles p
   where p.role = 'pc' and p.is_active and p.company_id = p_company_id
-  on conflict (incident_id, profile_id) do update set read_only_since = null, access_ended_at = null;
+  on conflict (incident_id, profile_id) do update set read_only_since = null, access_ended_at = null, relief_pending_since = null, relieved_by = null;
   get diagnostics v_pcs = row_count;
 
   perform app.write_unit_audit('incident_unit_reinforced', p_company_id, null, null, p_incident_id,
@@ -593,7 +638,7 @@ declare
   v_inc incidents;
   v_now timestamptz := now();
   v_link uuid;
-  v_ro integer;
+  v_relief jsonb;
 begin
   perform app.require_unit_change_caller();
   v_inc := app.lock_open_site(p_incident_id);
@@ -604,16 +649,16 @@ begin
   if v_link is null then
     raise exception 'that company is not reinforcing the site' using errcode = '22023';
   end if;
-  v_ro := app.set_company_memberships_read_only(p_incident_id, p_company_id, v_now);
+  v_relief := app.start_company_relief(p_incident_id, p_company_id, v_now);
   perform app.write_unit_audit('incident_unit_released', p_company_id, null, null, p_incident_id,
     v_inc.company_id, v_inc.company_id, v_inc.platoon_id, v_inc.platoon_id,
-    jsonb_build_object('visual_id', v_inc.visual_id, 'reason', nullif(btrim(coalesce(p_reason,'')), ''), 'memberships_read_only', v_ro));
+    jsonb_build_object('visual_id', v_inc.visual_id, 'reason', nullif(btrim(coalesce(p_reason,'')), ''), 'relief', v_relief));
   perform app.append_incident_lifecycle_event(p_incident_id, 'INCIDENT_UNIT_RELEASED',
     jsonb_build_object('company_id', p_company_id, 'reason', nullif(btrim(coalesce(p_reason,'')), ''),
-                       'read_only_since', v_now, 'link_id', v_link),
+                       'changed_at', v_now, 'relief', v_relief, 'link_id', v_link),
     p_device_id, p_local_event_id);
-  return jsonb_build_object('incident_id', p_incident_id, 'company_id', p_company_id, 'read_only_since', v_now,
-                            'memberships_read_only', v_ro);
+  return jsonb_build_object('incident_id', p_incident_id, 'company_id', p_company_id, 'changed_at', v_now,
+                            'relief_pending', (v_relief->>'relief_pending')::int, 'read_only', (v_relief->>'read_only')::int);
 end;
 $function$;
 
@@ -641,8 +686,12 @@ begin
   if v_link is null then
     raise exception 'that company has no read-only access to the site' using errcode = '22023';
   end if;
-  update incident_memberships set access_ended_at = v_now
-  where incident_id = p_incident_id and read_only_since is not null and access_ended_at is null
+  -- Whoever still waits for relief is relieved now (by the CC) and ends with the rest.
+  update incident_memberships set read_only_since = coalesce(read_only_since, v_now),
+         relieved_by = case when read_only_since is null then auth.uid() else relieved_by end,
+         access_ended_at = v_now
+  where incident_id = p_incident_id and access_ended_at is null
+    and (read_only_since is not null or relief_pending_since is not null)
     and profile_id in (select app.company_profile_ids(p_company_id));
   get diagnostics v_members = row_count;
   perform app.write_unit_audit('incident_unit_access_ended', p_company_id, null, null, p_incident_id,
@@ -652,6 +701,78 @@ begin
     p_device_id, p_local_event_id);
   return jsonb_build_object('incident_id', p_incident_id, 'company_id', p_company_id, 'members_ended', v_members);
 end;
+$function$;
+
+-- "הוחלפתי - מסרתי": a leaving medic (or PC, paramedic) confirms he was relieved and becomes
+-- read-only. His company's PC or cc / chamal / admin may confirm for him. Records he made before
+-- the confirmation are still accepted when they arrive (app.can_write_incident_late()).
+create or replace function public.confirm_incident_relief(p_incident_id uuid, p_profile_id uuid default null,
+                                                         p_device_id text default null, p_local_event_id text default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_target uuid := coalesce(p_profile_id, auth.uid());
+  v_role text := app.current_user_role()::text;
+  v_target_company uuid;
+  v_now timestamptz := now();
+  v_done integer;
+begin
+  if v_role is null then
+    raise exception 'no active profile' using errcode = '42501';
+  end if;
+  select coalesce(p.company_id, pl.company_id) into v_target_company
+  from profiles p left join platoons pl on pl.id = p.platoon_id where p.id = v_target;
+  if not (v_target = auth.uid()
+          or v_role in ('cc','chamal','admin')
+          or (v_role = 'pc' and v_target_company is not null and v_target_company = app.my_company_id())) then
+    raise exception 'only the person himself, his PC or the CC may confirm his relief' using errcode = '42501';
+  end if;
+  update incident_memberships set read_only_since = v_now, relieved_by = auth.uid()
+  where incident_id = p_incident_id and profile_id = v_target
+    and relief_pending_since is not null and read_only_since is null;
+  get diagnostics v_done = row_count;
+  if v_done = 0 then
+    raise exception 'no relief is waiting for this person on this site' using errcode = '22023';
+  end if;
+  perform app.append_incident_lifecycle_event(p_incident_id, 'INCIDENT_UNIT_RELIEF_CONFIRMED',
+    jsonb_build_object('profile_id', v_target, 'company_id', v_target_company, 'confirmed_by', auth.uid(),
+                       'by_self', v_target = auth.uid(), 'read_only_since', v_now),
+    p_device_id, p_local_event_id);
+  return jsonb_build_object('incident_id', p_incident_id, 'profile_id', v_target, 'read_only_since', v_now);
+end;
+$function$;
+
+-- A PC waiting for relief does not assign more medics to the site (they would never be relieved).
+-- Otherwise the live definition (053/065).
+create or replace function app.pc_may_manage_membership(p_incident_id uuid, p_profile_id uuid, p_role_at_incident user_role)
+returns boolean
+language sql
+stable
+security definer
+set search_path to 'public'
+as $function$
+  select coalesce(
+    app.current_user_role() = 'pc'
+    and app.my_company_id() is not null
+    and p_profile_id <> auth.uid()
+    and p_role_at_incident in ('medic','paramedic')
+    and (
+      exists (select 1 from incident_memberships im where im.incident_id = p_incident_id and im.profile_id = auth.uid()
+              and im.read_only_since is null and im.relief_pending_since is null)
+      or exists (select 1 from incidents i where i.id = p_incident_id and i.company_id = app.my_company_id())
+    )
+    and exists (
+      select 1 from profiles p
+      left join platoons pl on pl.id = p.platoon_id
+      where p.id = p_profile_id
+        and p.role in ('medic','paramedic')
+        and coalesce(p.company_id, pl.company_id) = app.my_company_id()
+    ),
+    false
+  )
 $function$;
 
 -- ---------------------------------------------------------------------------------------------
@@ -669,11 +790,16 @@ declare
   v_inc incidents;
   v_full boolean := app.can_access_incident(p_incident_id);
   v_since timestamptz;
+  v_role text := app.current_user_role()::text;
+  v_pending timestamptz;
 begin
   if not app.can_view_incident(p_incident_id) then
     raise exception 'access denied to incident %', p_incident_id using errcode = '42501';
   end if;
   select * into v_inc from incidents where id = p_incident_id;
+  select im.relief_pending_since into v_pending from incident_memberships im
+  where im.incident_id = p_incident_id and im.profile_id = auth.uid()
+    and im.relief_pending_since is not null and im.read_only_since is null;
   if not v_full then
     select min(x) into v_since from (
       select im.read_only_since as x from incident_memberships im
@@ -689,8 +815,19 @@ begin
     'company_id', v_inc.company_id,
     'company_name', (select name from companies where id = v_inc.company_id),
     'platoon_id', v_inc.platoon_id,
-    'my_access', case when v_full then 'full' else 'read_only' end,
+    'my_access', case when not v_full then 'read_only' when v_pending is not null then 'relief_pending' else 'full' end,
     'my_read_only_since', v_since,
+    'my_relief_pending_since', v_pending,
+    -- Who still waits for relief: all for cc / chamal / admin / physician, the caller's company for a pc.
+    'relief_pending', coalesce((
+      select jsonb_agg(jsonb_build_object('profile_id', im.profile_id, 'display_name', p.display_name,
+               'role', im.role_at_incident, 'company_id', coalesce(p.company_id, pl.company_id),
+               'since', im.relief_pending_since) order by im.relief_pending_since, p.display_name)
+      from incident_memberships im join profiles p on p.id = im.profile_id left join platoons pl on pl.id = p.platoon_id
+      where im.incident_id = p_incident_id and im.relief_pending_since is not null and im.read_only_since is null
+        and (v_role in ('cc','chamal','admin','physician')
+             or (v_role = 'pc' and coalesce(p.company_id, pl.company_id) = app.my_company_id())
+             or im.profile_id = auth.uid())), '[]'::jsonb),
     'links', coalesce((
       select jsonb_agg(jsonb_build_object(
         'id', l.id, 'kind', l.link_kind, 'company_id', l.company_id, 'company_name', c.name,
@@ -703,9 +840,10 @@ $function$;
 
 -- B's people are told once: a site handed to their company (pc, rcc, and the company's rpcs until
 -- the platoon is chosen), or their company sent to reinforce one (pc). Last 12 hours, open sites.
-create or replace function public.list_incident_unit_notices()
+drop function if exists public.list_incident_unit_notices();
+create function public.list_incident_unit_notices()
 returns table(link_id uuid, incident_id uuid, visual_id text, location_name text, kind text,
-              from_company_name text, site_company_name text, at timestamptz, reason text)
+              from_company_name text, site_company_name text, at timestamptz, reason text, relief_pending integer)
 language plpgsql
 stable
 security definer
@@ -723,7 +861,10 @@ begin
          case when l.link_kind = 'former' then 'handover' else 'reinforce' end,
          (select name from companies where id = l.company_id),
          (select name from companies where id = i.company_id),
-         l.started_at, l.reason
+         l.started_at, l.reason,
+         (select count(*)::int from incident_memberships im
+          where im.incident_id = i.id and im.relief_pending_since is not null and im.read_only_since is null
+            and im.profile_id in (select app.company_profile_ids(l.company_id)))
   from incident_unit_links l
   join incidents i on i.id = l.incident_id
   where i.status in ('active','staging')
@@ -757,7 +898,10 @@ $function$;
 
 revoke all on function app.require_unit_change_caller() from public, anon, authenticated;
 revoke all on function app.company_profile_ids(uuid) from public, anon, authenticated;
-revoke all on function app.set_company_memberships_read_only(uuid, uuid, timestamptz) from public, anon, authenticated;
+revoke all on function app.start_company_relief(uuid, uuid, timestamptz) from public, anon, authenticated;
+revoke all on function app.restore_company_memberships(uuid, uuid) from public, anon, authenticated;
+revoke execute on function public.confirm_incident_relief(uuid, uuid, text, text) from public, anon;
+grant execute on function public.confirm_incident_relief(uuid, uuid, text, text) to authenticated;
 revoke all on function app.lock_open_site(uuid) from public, anon, authenticated;
 revoke execute on function public.handover_incident_unit(uuid, uuid, text, text, text) from public, anon;
 revoke execute on function public.reinforce_incident_unit(uuid, uuid, text, text, text) from public, anon;

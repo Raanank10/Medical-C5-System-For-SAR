@@ -9,3 +9,4 @@ alter type event_type add value if not exists 'INCIDENT_UNIT_HANDED_OVER';
 alter type event_type add value if not exists 'INCIDENT_UNIT_REINFORCED';
 alter type event_type add value if not exists 'INCIDENT_UNIT_RELEASED';
 alter type event_type add value if not exists 'INCIDENT_UNIT_ACCESS_ENDED';
+alter type event_type add value if not exists 'INCIDENT_UNIT_RELIEF_CONFIRMED';

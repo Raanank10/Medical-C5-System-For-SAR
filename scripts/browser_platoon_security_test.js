@@ -9,8 +9,9 @@
 // only; set_incident_unit for company-level command and, inside its own company, the rcc. The SQL
 // itself is tested by scripts/rls_test_053_platoons.sql (docs/RLS_AUDIT_v1.md, 053 follow-up).
 // WP-27 (database/096, V2.99.91): the CC hands a site to another company or brings one in to
-// reinforce it from the picker; the old / released company is read-only (strip banner, picker
-// badge, no join) until the CC ends its access; the new company's PC is told once. The fake
+// reinforce it from the picker; the leaving PC keeps recording until he taps "הוחלפתי - מסרתי"
+// (or the CC marks him), then is read-only (strip banner, picker badge, no join) until the CC
+// ends its access; the new company's PC is told once. The fake
 // mirrors 096's access rules; the SQL is tested by scripts/rls_test_096_unit_handover.sql.
 //
 // Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
@@ -100,9 +101,19 @@ function handle(server, req) {
     || (u.role === 'rpc' && !!myPlatoon && server.links.some((l) => l.incident_id === inc.id && l.link_kind === 'former' && l.platoon_id === myPlatoon && !l.ended_at));
   const canSee = (inc) => full(inc) || readOnly(inc);
   const UNIT_CHANGERS = ['cc', 'chamal', 'admin'];
-  const setCompanyReadOnly = (incId, company, at) => server.members
-    .filter((m) => m.incident_id === incId && companyOf(m.profile_id) === company && (at ? !m.read_only_since : (m.read_only_since && !m.access_ended_at)))
-    .map((m) => { m.read_only_since = at; return m; }).length;
+  // 096 relief: the leaving company's medical staff wait for relief (full), its rcc / rpc are
+  // read-only at once, its PCs are kept as members.
+  const startRelief = (incId, company, at) => {
+    Object.values(USERS).filter((x) => x.role === 'pc' && companyOf(x.id) === company && !server.members.some((m) => m.incident_id === incId && m.profile_id === x.id))
+      .forEach((x) => server.members.push({ incident_id: incId, profile_id: x.id, role_at_incident: 'pc', assigned_by: u.id, created_at: at, relief_pending_since: at }));
+    const mine = server.members.filter((m) => m.incident_id === incId && companyOf(m.profile_id) === company && !m.read_only_since);
+    mine.filter((m) => ['pc', 'medic', 'paramedic'].includes(m.role_at_incident) && !m.relief_pending_since).forEach((m) => { m.relief_pending_since = at; });
+    mine.filter((m) => ['rcc', 'rpc'].includes(m.role_at_incident)).forEach((m) => { m.read_only_since = at; });
+    return server.members.filter((m) => m.incident_id === incId && companyOf(m.profile_id) === company && m.relief_pending_since && !m.read_only_since).length;
+  };
+  const restore = (incId, company) => server.members
+    .filter((m) => m.incident_id === incId && companyOf(m.profile_id) === company && !m.access_ended_at && (m.read_only_since || m.relief_pending_since))
+    .map((m) => { m.read_only_since = null; m.relief_pending_since = null; return m; }).length;
   const denied = (msg) => ({ data: null, error: { code: '42501', message: msg } });
   if (req.kind === 'rpc') {
     const p = req.params || {};
@@ -151,35 +162,45 @@ function handle(server, req) {
       if (req.name !== 'end_incident_unit_access' && req.name !== 'release_incident_unit' && !String(p.p_reason || '').trim()) return { data: null, error: { code: '22023', message: 'a reason is required' } };
       if (req.name === 'handover_incident_unit') {
         if (inc.company_id === p.p_company_id) return { data: null, error: { code: '22023', message: 'the site already belongs to that company' } };
-        let ro = 0;
-        if (inc.company_id) { server.links.push({ id: 'link-' + (++seq), incident_id: inc.id, link_kind: 'former', company_id: inc.company_id, platoon_id: inc.platoon_id, to_company_id: p.p_company_id, started_at: at, read_only_since: at, reason: p.p_reason }); ro = setCompanyReadOnly(inc.id, inc.company_id, at); }
+        let pending = 0;
+        if (inc.company_id) { server.links.push({ id: 'link-' + (++seq), incident_id: inc.id, link_kind: 'former', company_id: inc.company_id, platoon_id: inc.platoon_id, to_company_id: p.p_company_id, started_at: at, read_only_since: at, reason: p.p_reason }); pending = startRelief(inc.id, inc.company_id, at); }
         const back = openLink(p.p_company_id); if (back) back.ended_at = at;
-        setCompanyReadOnly(inc.id, p.p_company_id, null);
+        restore(inc.id, p.p_company_id);
         inc.company_id = p.p_company_id; inc.platoon_id = null;
-        return { data: { incident_id: inc.id, read_only_since: at, memberships_read_only: ro }, error: null };
+        return { data: { incident_id: inc.id, changed_at: at, relief_pending: pending }, error: null };
       }
       if (req.name === 'reinforce_incident_unit') {
         if (inc.company_id === p.p_company_id) return { data: null, error: { code: '22023', message: 'own company' } };
         const prev = openLink(p.p_company_id); if (prev) prev.ended_at = at;
-        setCompanyReadOnly(inc.id, p.p_company_id, null);
+        restore(inc.id, p.p_company_id);
         const link = { id: 'link-' + (++seq), incident_id: inc.id, link_kind: 'reinforcing', company_id: p.p_company_id, started_at: at, read_only_since: null, reason: p.p_reason };
         server.links.push(link);
         const pcs = Object.values(USERS).filter((x) => x.role === 'pc' && companyOf(x.id) === p.p_company_id);
-        pcs.forEach((x) => { const ex = server.members.find((m) => m.incident_id === inc.id && m.profile_id === x.id); if (ex) { ex.read_only_since = null; ex.access_ended_at = null; } else server.members.push({ incident_id: inc.id, profile_id: x.id, role_at_incident: 'pc', assigned_by: u.id, created_at: at }); });
+        pcs.forEach((x) => { const ex = server.members.find((m) => m.incident_id === inc.id && m.profile_id === x.id); if (ex) { ex.read_only_since = null; ex.access_ended_at = null; ex.relief_pending_since = null; } else server.members.push({ incident_id: inc.id, profile_id: x.id, role_at_incident: 'pc', assigned_by: u.id, created_at: at }); });
         return { data: { incident_id: inc.id, link_id: link.id, pcs_added: pcs.length }, error: null };
       }
       if (req.name === 'release_incident_unit') {
         const l = server.links.find((x) => x.incident_id === inc.id && x.company_id === p.p_company_id && x.link_kind === 'reinforcing' && !x.ended_at && !x.read_only_since);
         if (!l) return { data: null, error: { code: '22023', message: 'not reinforcing' } };
         l.read_only_since = at;
-        return { data: { memberships_read_only: setCompanyReadOnly(inc.id, p.p_company_id, at) }, error: null };
+        return { data: { changed_at: at, relief_pending: startRelief(inc.id, p.p_company_id, at) }, error: null };
       }
       const l = server.links.find((x) => x.incident_id === inc.id && x.company_id === p.p_company_id && !x.ended_at && x.read_only_since);
       if (!l) return { data: null, error: { code: '22023', message: 'no read-only access' } };
       l.ended_at = at;
       let n = 0;
-      server.members.filter((m) => m.incident_id === inc.id && m.read_only_since && !m.access_ended_at && companyOf(m.profile_id) === p.p_company_id).forEach((m) => { m.access_ended_at = at; n++; });
+      server.members.filter((m) => m.incident_id === inc.id && (m.read_only_since || m.relief_pending_since) && !m.access_ended_at && companyOf(m.profile_id) === p.p_company_id)
+        .forEach((m) => { m.read_only_since = m.read_only_since || at; m.access_ended_at = at; n++; });
       return { data: { members_ended: n }, error: null };
+    }
+    if (req.name === 'confirm_incident_relief') {
+      server.unitCalls.push({ name: req.name, by: u.id, params: clone(p) });
+      const target = p.p_profile_id || u.id;
+      if (!(target === u.id || UNIT_CHANGERS.includes(u.role) || (u.role === 'pc' && companyOf(target) === myCompany))) return denied('only the person, his PC or the CC');
+      const m = server.members.find((x) => x.incident_id === p.p_incident_id && x.profile_id === target && x.relief_pending_since && !x.read_only_since);
+      if (!m) return { data: null, error: { code: '22023', message: 'no relief is waiting' } };
+      m.read_only_since = new Date().toISOString(); m.relieved_by = u.id;
+      return { data: { profile_id: target, read_only_since: m.read_only_since }, error: null };
     }
     if (req.name === 'get_incident_unit_links') {
       const inc = server.incidents.find((i) => i.id === p.p_incident_id);
@@ -187,7 +208,11 @@ function handle(server, req) {
       const mine = server.members.find((m) => m.incident_id === inc.id && m.profile_id === u.id && m.read_only_since);
       const myLink = server.links.find((l) => l.incident_id === inc.id && !l.ended_at && l.read_only_since && l.company_id === myCompany);
       return { data: { incident_id: inc.id, company_id: inc.company_id, company_name: server.companies.find((c) => c.id === inc.company_id)?.name || null,
-        my_access: full(inc) ? 'full' : 'read_only', my_read_only_since: full(inc) ? null : (mine?.read_only_since || myLink?.read_only_since || null),
+        my_access: !full(inc) ? 'read_only' : (server.members.some((m) => m.incident_id === inc.id && m.profile_id === u.id && m.relief_pending_since && !m.read_only_since) ? 'relief_pending' : 'full'),
+        relief_pending: clone(server.members.filter((m) => m.incident_id === inc.id && m.relief_pending_since && !m.read_only_since
+          && (UNIT_CHANGERS.includes(u.role) || (u.role === 'pc' && companyOf(m.profile_id) === myCompany) || m.profile_id === u.id))
+          .map((m) => ({ profile_id: m.profile_id, display_name: USERS[Object.keys(USERS).find((k) => USERS[k].id === m.profile_id)]?.display_name || m.profile_id, role: m.role_at_incident, since: m.relief_pending_since }))),
+        my_read_only_since: full(inc) ? null : (mine?.read_only_since || myLink?.read_only_since || null),
         links: clone(server.links.filter((l) => l.incident_id === inc.id).map((l) => ({ id: l.id, kind: l.link_kind, company_id: l.company_id, company_name: server.companies.find((c) => c.id === l.company_id)?.name, started_at: l.started_at, read_only_since: l.read_only_since, ended_at: l.ended_at || null }))) }, error: null };
     }
     if (req.name === 'list_incident_unit_notices') {
@@ -440,11 +465,21 @@ async function checkFile(browser, file) {
   await cc.page.waitForTimeout(300);
   const inc2 = SERVER.incidents.find((i) => i.id === INC2);
   assert(inc2.company_id === CA && inc2.platoon_id === null, `${rel}: the handover must give the site to company A with no platoon (got ${JSON.stringify(inc2)})`);
-  assert(SERVER.members.find((m) => m.incident_id === INC2 && m.profile_id === PC2).read_only_since, `${rel}: PC2's membership must become read-only`);
-  assert(cc.toasts.some((t) => t.includes('האתר הועבר לפלוגה א')), `${rel}: the CC must be told the site moved (got ${JSON.stringify(cc.toasts)})`);
-  // The old PC: read-only banner on the strip, "צפייה בלבד" in the picker, no join attempt.
+  const pc2m = SERVER.members.find((m) => m.incident_id === INC2 && m.profile_id === PC2);
+  assert(pc2m.relief_pending_since && !pc2m.read_only_since, `${rel}: PC2 must keep recording until relieved (got ${JSON.stringify(pc2m)})`);
+  assert(cc.toasts.some((t) => t.includes('האתר הועבר לפלוגה א') && t.includes('ממתינים להחלפה')), `${rel}: the CC must be told the site moved and who waits (got ${JSON.stringify(cc.toasts)})`);
+  // The leaving PC: told to keep recording, then "הוחלפתי - מסרתי" makes him read-only.
   await pc2.page.evaluate(() => refreshIncidentContext());
-  await pc2.page.waitForTimeout(200);
+  await pc2.page.waitForSelector('#incident-readonly-banner [data-relief-self]', { timeout: 5000 });
+  assert(pc2.toasts.some((t) => t.includes('המשך לתעד')), `${rel}: PC2 must be told to keep recording until relieved (got ${JSON.stringify(pc2.toasts)})`);
+  await pc2.page.evaluate(() => openIncidentPicker());
+  await pc2.page.waitForTimeout(300);
+  assert(await pc2.page.locator('[data-readonly-badge]').count() === 0, `${rel}: no read-only badge before the relief`);
+  await pc2.page.evaluate((id) => enterIncidentFromPicker(id), INC2);
+  await pc2.page.waitForTimeout(300);
+  await pc2.page.click('#incident-readonly-banner [data-relief-self]');
+  await pc2.page.waitForTimeout(300);
+  assert(pc2m.read_only_since && pc2m.relieved_by === PC2, `${rel}: "הוחלפתי - מסרתי" must relieve PC2 himself`);
   const roBanner = await pc2.page.locator('#incident-readonly-banner').innerText();
   assert(roBanner.includes('צפייה בלבד') && roBanner.includes('פלוגה א'), `${rel}: PC2 must see a read-only banner naming the new company (got "${roBanner}")`);
   assert(pc2.toasts.some((t) => t.includes('צפייה בלבד')), `${rel}: PC2 must be told once that it is read-only`);
@@ -476,7 +511,13 @@ async function checkFile(browser, file) {
   await cc.page.waitForSelector(`[data-unit-panel="${INC1}"] button:has-text("שחרור תגבור")`, { timeout: 5000 });
   await cc.page.click(`[data-unit-panel="${INC1}"] button:has-text("שחרור תגבור")`);
   await cc.page.waitForTimeout(300);
-  assert(SERVER.members.find((m) => m.incident_id === INC1 && m.profile_id === PC2).read_only_since, `${rel}: release must make company B's PC read-only`);
+  const pc2r = SERVER.members.find((m) => m.incident_id === INC1 && m.profile_id === PC2);
+  assert(pc2r.relief_pending_since && !pc2r.read_only_since, `${rel}: after release company B's PC must keep recording until relieved`);
+  // The CC marks him relieved (his phone is gone) from the panel's waiting list.
+  await cc.page.waitForSelector(`[data-unit-panel="${INC1}"] [data-relief-row="${PC2}"] button`, { timeout: 5000 });
+  await cc.page.click(`[data-unit-panel="${INC1}"] [data-relief-row="${PC2}"] button`);
+  await cc.page.waitForTimeout(300);
+  assert(pc2r.read_only_since && pc2r.relieved_by === CC, `${rel}: the CC's "סמן כהוחלף" must relieve PC2`);
   await pc2.page.evaluate(() => pollIncidentOpenAlerts());
   assert(!(await pc2.page.locator('#incident-unit-notice-banner').isVisible()), `${rel}: a released reinforcement's notice must go`);
   // End company B's read-only access to INC2: the old PC is told its access ended.
