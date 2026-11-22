@@ -590,7 +590,7 @@ Verified: `scripts/rls_test_094_pc_review.sql` on a local PostgreSQL 16 with eve
 - A after a handover, and B after release: read-only until the CC ends it.
 - Who: cc, chamal, admin.
 - A record from a read-only phone that was offline over the change: accepted if its phone time is before the change, refused after it (a sync rejection on the phone).
-- Assumed (not answered): site-level actions in reinforce stay with A's PC. Today a reinforcing PC is a member and can do whatever a member PC can (for example close the site); `set_incident_platoon` stays with A's company.
+- Owner 2026-11-22: every PC on a site has the same rights; a reinforcing PC is not limited to patients (it can do what any member PC can, for example close the site). Only `set_incident_platoon` stays with the site's own company, as before.
 
 **Built (V2.99.91, `database/095` + `096`, this PR).** See `docs/ARCHITECTURE.md` and `docs/API_SURFACE_v1.2.md`. `app.can_access_incident()` now means full access (a read-only membership does not count), so every write path closes to read-only people without editing each RPC; reads go through the new `app.can_view_incident()`. `incident_unit_links` records former and reinforcing companies. The CC panel is in the incident picker; the CC roster's "מי עובד במוקד" no longer moves a site to another company directly. `PATIENT_REASSIGNED_BETWEEN_PLATOONS` moved to `local_only` (signed in, the CC quick action opens the panel). `PATIENT_REASSIGNED_WITHIN_PLATOON` (one patient to another medic) is not WP-27 and stays in `known_gaps`.
 
@@ -598,7 +598,7 @@ Verified: `scripts/rls_test_094_pc_review.sql` on a local PostgreSQL 16 with eve
 
 **Open.**
 - Buttons on a read-only phone are not disabled; the server refuses the record and the phone shows a sync rejection.
-- `merge_incident()` (`067`) does not move `incident_unit_links` from the source; a merged duplicate's read-only companies lose access with the source.
+- `merge_incident()` (`067`) does not move `incident_unit_links` from the source; a merged duplicate's read-only companies lose access with the source. Owner 2026-11-22: leave it.
 - Live two-phone check (WP-21).
 
 ---
