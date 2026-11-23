@@ -42,7 +42,8 @@ per-table mapping notes below):
     patient_evacuation (destination, MDA class, trap status), event_origins
     (merged events), medical_resource_requests, supply_requests,
     incident_pre_evacuations, incident_site_authority, external_reports,
-    external_patient_links and aar_reports (the report stored on each close).
+    external_patient_links, aar_reports (the report stored on each close) and
+    device_heartbeats (database/095: every heartbeat the server received).
     Display names are not copied; actor ids join to profiles.
   - Several tables have columns with no live equivalent (documented inline
     per table below) - those are left as their SQLite column's own default
@@ -67,14 +68,16 @@ SUPABASE_URL = "https://btvvjmuwdzirjyauyijx.supabase.co"
 PAGE_SIZE = 1000
 
 
-def fetch_table(table: str, service_key: str, incident_id: str | None, incident_column: str = "incident_id", op: str = "eq") -> list[dict[str, Any]]:
+def fetch_table(table: str, service_key: str, incident_id: str | None, incident_column: str = "incident_id", op: str = "eq", order: str | None = None) -> list[dict[str, Any]]:
     """Fetch all rows of `table` via PostgREST, paginating with the Range header.
 
     `op` is the PostgREST operator for the filter: "eq" by default, "in" with a value like
-    "(id1,id2)" for a table with no incident_id of its own (external_patient_links)."""
+    "(id1,id2)" for a table with no incident_id of its own (external_patient_links). `order` (a
+    PostgREST order like "id") keeps the pages stable for a table long enough to span several
+    (device_heartbeats); without it PostgREST may page in any order."""
     rows: list[dict[str, Any]] = []
     offset = 0
-    query = f"select=*" + (f"&{incident_column}={op}.{incident_id}" if incident_id else "")
+    query = f"select=*" + (f"&{incident_column}={op}.{incident_id}" if incident_id else "") + (f"&order={order}" if order else "")
     while True:
         url = f"{SUPABASE_URL}/rest/v1/{table}?{query}"
         req = urllib.request.Request(url, headers={
@@ -213,7 +216,7 @@ def export_incident(incident_id: str, out_path: Path, service_key: str) -> None:
         print(f"  {table}: {count}")
 
 
-NEWER_TABLES = ["incident_details", "patient_evacuation", "event_origins", "medical_resource_requests", "supply_requests", "incident_pre_evacuations", "incident_site_authority", "external_reports", "external_patient_links", "aar_reports"]
+NEWER_TABLES = ["incident_details", "patient_evacuation", "event_origins", "medical_resource_requests", "supply_requests", "incident_pre_evacuations", "incident_site_authority", "external_reports", "external_patient_links", "aar_reports", "device_heartbeats"]
 
 
 def export_newer_tables(conn: sqlite3.Connection, incident_id: str, service_key: str, incidents: list[dict[str, Any]], patients: list[dict[str, Any]], events: list[dict[str, Any]]) -> None:
@@ -270,6 +273,22 @@ def export_newer_tables(conn: sqlite3.Connection, incident_id: str, service_key:
         insert_rows(conn, "external_patient_links", ["id", "external_report_id", "patient_id", "match_score", "linked_by", "linked_at"], [
             (r["id"], r["external_report_id"], r["patient_id"], float(r["match_score"]) if r.get("match_score") is not None else None, r["linked_by"], r["linked_at"]) for r in links
         ])
+
+    # device_heartbeats (database/095): every heartbeat the server received for this incident, in
+    # order. received_at is the server's time, device_time the phone's. A phone heartbeats every
+    # incident it has open, so this incident's rows already show whether each of its phones was
+    # reachable; a merged duplicate's rows stay under the duplicate. A server without 095 has no
+    # table: the export goes on without it.
+    try:
+        beats = fetch_table("device_heartbeats", service_key, incident_id, order="id")
+    except RuntimeError as e:
+        if "HTTP 404" not in str(e) and "PGRST205" not in str(e) and "42P01" not in str(e):
+            raise
+        print("  device_heartbeats: not on this server (database/095 not applied), skipped")
+        beats = []
+    insert_rows(conn, "device_heartbeats", ["id", "incident_id", "actor_id", "device_id", "received_at", "device_time", "sync_status"], [
+        (r["id"], r["incident_id"], r["actor_id"], r["device_id"], r["received_at"], r["device_time"], r["sync_status"]) for r in beats
+    ])
 
     # aar_reports: one locked, statistics-only version per close (database/068).
     stored = fetch_table("aar_reports", service_key, incident_id)
