@@ -616,6 +616,8 @@ The original plan follows.
 
 ### WP-29: Dead Man's Switch on the server (P2)
 
+**Parked, 2026-11-23 (owner).** Built in draft PR #156, not merged: the owner fears too many false alarms, because a locked screen stops the 45-second heartbeat, so a medic working with the phone in a pocket looks like a medic who is down. Decide from drills (WP-21) instead: every incident and patient is a drill until the owner says otherwise, treated as real. Step 1 is `database/095_device_heartbeat_history.sql` (owner 2026-11-23, its own PR): `device_presence` keeps only the newest heartbeat, so the gaps along a drill were lost; `device_heartbeats` now keeps every heartbeat the server received (server time and phone time), written by a trigger on `device_presence` (no client change), read by admin only, exported by `analytics/.../export_live_incident.py`. Step 2, after a drill: from the export, for each medic with open patients, every stretch of 10+ minutes with no heartbeat and no event stored by the server (the rule in #156), set against what was really happening (screen locked while working, real loss of contact, phone off). That rate decides #156. #156 needs a rebase on main and a new version and migration number before it can be reopened.
+
 **Why.** If a medic's phone goes silent, only phones that are open notice (`isDeviceSilent`, 10 min, `src/domain/rules.js` ~204). Heartbeats are already on the server (`device_presence`, 17 rows live), so the minute job can raise it (WP-12 "not built").
 
 **Depends on.** WP-20: `081` replaces `app.run_clinical_watchdog()` again; start from 081's body, not 072's or 079's.
@@ -831,7 +833,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-26 PC deterioration review | P2 | Done (V2.99.87, `094` applied live 2026-11-21, live test passed) | #148 | owner 2026-11-19/21: option A (052 table, own `request_kind`), PC + CC alert, tap + outcome, "אחר כך". Removed from `known_gaps`. Two-phone check still with WP-21 |
 | WP-27 CC moves a site to another platoon | P2 | Not started, 1 design question | | owner 2026-10-23 (WP-7 remainder); RLS |
 | WP-28 27 never-sent event types | P2 | Done (V2.99.90), no SQL; `sync-log` v22 to deploy | this PR | owner 2026-11-21: 12 removed, 15 in `server_accepts_unused`, 7 in `server_writes`; `MEDIC_SITE_CLOSE_REQUESTED` is WP-42 |
-| WP-29 Dead Man's Switch on the server | P2 | Not started | | builds on 081's watchdog (live) |
+| WP-29 Dead Man's Switch on the server | P2 | Parked (owner 2026-11-23): draft #156; heartbeat history (`095`) first, then measure in WP-21 drills | #156 (draft) | false alarms from locked screens to be measured before deciding |
 | WP-30 Telegram alerts (B1) | P2 | Waiting on owner's 19 answers | | |
 | WP-31 MARCH completion + hands-on PC | P2 | Waiting on clinical criteria | | B2 |
 | WP-32 Evacuation point leftovers | P2 | Step 1 done by `085` (RCC panel, #141): the rescue board tells moving from arrived (`evac_point_arrived_at`). Open: waiting time in the stored report | #141 | WP-18 remainder |

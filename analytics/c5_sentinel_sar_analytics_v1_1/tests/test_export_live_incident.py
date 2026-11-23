@@ -55,14 +55,17 @@ def live_rows():
             "external_reports": [{"id": "rep-1", "incident_id": incident_id, "source": "mda", "external_reference": "MDA-77", "reported_red": 1, "reported_yellow": 0, "reported_green": 2, "reported_black": 0, "evacuation_destination": "Hospital A", "notes": None, "created_by": actor_id, "created_at": now, "updated_at": now, "version": 1, "source_event_id": None}],
             "external_patient_links": [{"id": _uid(), "external_report_id": "rep-1", "patient_id": patient_id, "match_score": "1.00", "match_reason": {}, "linked_by": actor_id, "linked_at": now}],
             "aar_reports": [{"id": _uid(), "incident_id": incident_id, "generated_by": actor_id, "generated_at": now, "report_json": {"version": 1, "patients": {"total": 1}}, "locked": True}],
+            "device_heartbeats": [{"id": 7, "incident_id": incident_id, "actor_id": actor_id, "device_id": "dev-1", "received_at": now, "device_time": "2026-01-01T00:00:00+00:00", "sync_status": "online"}],
         },
     }
 
 
 @pytest.fixture()
 def exported_db_path(tmp_path, monkeypatch, live_rows):
-    def fake_fetch_table(table, service_key, incident_id, incident_column="incident_id", op="eq"):
+    def fake_fetch_table(table, service_key, incident_id, incident_column="incident_id", op="eq", order=None):
         assert service_key == "fake-key"
+        # database/095: long enough to span pages, so fetched in a stable order
+        assert table != "device_heartbeats" or order == "id"
         # Archived by database/070 (WP-15): not reachable through the API, so never fetched.
         assert table != "device_sync_state"
         live_rows.setdefault("fetches", []).append((table, incident_id, incident_column, op))
@@ -120,7 +123,7 @@ class TestExportIncident:
         # reports, evacuation / MDA class and merge origin all reach the analytics file.
         db = DB(exported_db_path)
         count = lambda t: int(db.query(f"select count(*) as n from {t}").iloc[0]["n"])
-        for table in ["incident_details", "patient_evacuation", "event_origins", "medical_resource_requests", "supply_requests", "incident_pre_evacuations", "incident_site_authority", "external_reports", "external_patient_links", "aar_reports"]:
+        for table in ["incident_details", "patient_evacuation", "event_origins", "medical_resource_requests", "supply_requests", "incident_pre_evacuations", "incident_site_authority", "external_reports", "external_patient_links", "aar_reports", "device_heartbeats"]:
             assert count(table) == 1, table
         evac = db.query("select * from patient_evacuation").iloc[0]
         assert evac["evacuation_destination"] == "Hospital A" and evac["mda_classification"] == "urgent" and evac["trap_status"] == "not_trapped"
@@ -156,3 +159,30 @@ class TestExportIncident:
         monkeypatch.setattr(export_mod, "fetch_table", lambda table, *a, **k: calls.append(table) or live_rows["rows"].get(table, []))
         export_mod.export_incident(live_rows["incident_id"], tmp_path / "x.db", "fake-key")
         assert "external_patient_links" not in calls
+
+
+class TestHeartbeatHistory:
+    def test_heartbeats_exported_with_server_and_phone_time(self, exported_db_path, live_rows):
+        db = DB(exported_db_path)
+        beat = db.query("select * from device_heartbeats").iloc[0]
+        assert beat["device_id"] == "dev-1" and beat["device_time"] == "2026-01-01T00:00:00+00:00" and beat["received_at"]
+        assert ("device_heartbeats", live_rows["incident_id"], "incident_id", "eq") in live_rows["fetches"]
+
+    def test_server_without_095_is_skipped(self, tmp_path, monkeypatch, live_rows):
+        def fake_fetch_table(table, service_key, incident_id, incident_column="incident_id", op="eq", order=None):
+            if table == "device_heartbeats":
+                raise RuntimeError('fetching device_heartbeats failed: HTTP 404 {"code":"PGRST205"}')
+            return live_rows["rows"].get(table, [])
+        monkeypatch.setattr(export_mod, "fetch_table", fake_fetch_table)
+        out = tmp_path / "no_095.db"
+        export_mod.export_incident(live_rows["incident_id"], out, "fake-key")
+        assert int(DB(out).query("select count(*) as n from device_heartbeats").iloc[0]["n"]) == 0
+
+    def test_other_fetch_errors_still_fail(self, tmp_path, monkeypatch, live_rows):
+        def fake_fetch_table(table, service_key, incident_id, incident_column="incident_id", op="eq", order=None):
+            if table == "device_heartbeats":
+                raise RuntimeError("fetching device_heartbeats failed: HTTP 500 boom")
+            return live_rows["rows"].get(table, [])
+        monkeypatch.setattr(export_mod, "fetch_table", fake_fetch_table)
+        with pytest.raises(RuntimeError):
+            export_mod.export_incident(live_rows["incident_id"], tmp_path / "x.db", "fake-key")

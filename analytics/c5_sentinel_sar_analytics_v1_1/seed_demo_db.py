@@ -187,6 +187,7 @@ create table incident_site_authority(incident_id text primary key, official_t0 t
 create table external_reports(id text primary key, incident_id text not null, source text, external_reference text, reported_red integer, reported_yellow integer, reported_green integer, reported_black integer, evacuation_destination text, notes text, created_by text, created_at text, updated_at text);
 create table external_patient_links(id text primary key, external_report_id text not null, patient_id text not null, match_score real, linked_by text, linked_at text);
 create table aar_reports(id text primary key, incident_id text not null, generated_by text, generated_at text not null, locked integer, report_json text not null default '{}');
+create table device_heartbeats(id integer primary key, incident_id text, actor_id text not null, device_id text not null, received_at text not null, device_time text, sync_status text);
 """
 
 if __name__ == "__main__":
