@@ -748,7 +748,8 @@ textarea{resize:vertical;min-height:70px;}
 .incident-readonly-banner{display:none;background:rgba(245,197,24,0.16);border-bottom:2px solid #f5c518;padding:8px 16px;font-size:13px;font-weight:700;color:var(--text);}
 .incident-unit-panel .unit-link-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--border);font-size:12px;}
 .incident-unit-panel .unit-mode{display:flex;gap:8px;margin-bottom:8px;}
-.incident-readonly-banner button{margin-inline-start:8px;}
+.incident-readonly-banner button{display:block;width:100%;min-height:48px;margin-top:8px;border-radius:10px;border:2px solid #f5c518;background:#f5c518;color:#111;font-size:16px;font-weight:800;cursor:pointer;}
+.incident-readonly-banner .relief-waiting button{display:inline-block;width:auto;min-height:36px;margin:4px 0 0;padding:0 12px;font-size:13px;background:transparent;color:var(--text);}
 .relief-waiting{margin-top:6px;font-size:12px;font-weight:400;}
 .incident-unit-panel .unit-mode button{flex:1;}
 .open-alert-banner{display:none;flex-direction:column;gap:8px;background:rgba(255,107,53,0.16);border-bottom:2px solid var(--orange);padding:10px 16px;font-size:13px;color:var(--text);}
@@ -16943,7 +16944,7 @@ function renderIncidentPicker(){
       const st=_incidentOverviewState[inc.id];
       const counts=st ? ` · אדומים פעילים ${st.active_red_patients??0} · חסרי מדדים ${st.patients_missing_full_vitals??0} · התראות ${st.active_watchdog_alerts??0}` : '';
       const isCurrent=activeIncident?.id===inc.id;
-      const enterLabel=isCurrent?'המשך באירוע':inc.read_only?'צפייה':(inc.is_member||hasBlanketIncidentAccess())?'כניסה':'הצטרף לאירוע';
+      const enterLabel=inc.read_only?'צפייה':isCurrent?'המשך באירוע':(inc.is_member||hasBlanketIncidentAccess())?'כניסה':'הצטרף לאירוע';
       return `<div class="incident-card ${inc.status==='draft'?'draft':''}">
         <div class="incident-card-head"><strong>${escAttr(inc.visual_id||'')} · ${escAttr(inc.location_name||'')}</strong><span class="incident-status-badge ${escAttr(inc.status)}">${escAttr(SERVER_INCIDENT_STATUS_LABELS[inc.status]||inc.status)}</span>${inc.read_only?'<span class="incident-status-badge closed" data-readonly-badge>צפייה בלבד</span>':''}</div>
         <div class="incident-card-meta">${inc.address?escAttr(inc.address)+' · ':''}${incidentTypesRowLabel(inc)?`<span data-incident-card-types>${escAttr(incidentTypesRowLabel(inc))}</span> · `:''}נפתח ${inc.opened_at?new Date(inc.opened_at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):''}${inc.opened_by_name?' ע״י '+escAttr(inc.opened_by_name):''} · ${inc.patient_count||0} פצועים${counts}</div>
@@ -17195,7 +17196,7 @@ function incidentUnitPanelHtml(inc){
   const waiting=incidentReliefWaitingHtml(inc.id, links);
   const rows=[
     ...reinforcing.map(l=>`<div class="unit-link-row" data-unit-link="${escAttr(l.id)}"><span>🤝 ${escAttr(unitCompanyName(l.company_id,l.company_name))} מתגברת מ־${time(l.started_at)}</span><button onclick="releaseIncidentUnit('${id}','${escAttr(l.company_id)}')">שחרור תגבור</button></div>`),
-    ...readOnly.map(l=>`<div class="unit-link-row" data-unit-link="${escAttr(l.id)}"><span>👁 ${escAttr(unitCompanyName(l.company_id,l.company_name))} · צפייה בלבד מ־${time(l.read_only_since)}${l.kind==='former'?' (העבירה את האתר)':' (תגבור שוחרר)'}</span><button onclick="endIncidentUnitAccess('${id}','${escAttr(l.company_id)}')">סיום גישה</button></div>`)
+    ...readOnly.map(l=>`<div class="unit-link-row" data-unit-link="${escAttr(l.id)}"><span>👁 ${escAttr(unitCompanyName(l.company_id,l.company_name))} · ${l.kind==='former'?'העבירה את האתר ב־':'שוחררה מתגבור ב־'}${time(l.read_only_since)} · צפייה אחרי החלפה</span><button onclick="endIncidentUnitAccess('${id}','${escAttr(l.company_id)}')">סיום גישה</button></div>`)
   ].join('');
   const explain=_unitPanelMode==='handover'
     ? `העברת האתר: הפלוגה שתבחר/י מקבלת את האתר (החוג״ד, מ״פ החילוץ, והמחלקה תיבחר מחדש). הצוות הרפואי של ${escAttr(siteCompany)} ממשיך לתעד עד שכל אחד מאשר "הוחלפתי - מסרתי", ואז צפייה בלבד עד שתסיים/י את הגישה. מ״פ ומ״מ החילוץ שלה בצפייה בלבד מיד.`
@@ -17208,7 +17209,7 @@ function incidentUnitPanelHtml(inc){
     <div class="demo-strip-sub" style="margin-bottom:6px">${explain}</div>
     ${links?.error ? '<div class="login-error">טעינת שיוך הפלוגות נכשלה, בדוק/י חיבור</div>' : ''}
     ${companies.length ? `<select id="unit-company-${id}"><option value="">${_unitPanelMode==='handover'?'לאיזו פלוגה להעביר?':'איזו פלוגה מתגברת?'}</option>${companies.map(c=>`<option value="${escAttr(c.id)}">${escAttr(c.name)}</option>`).join('')}</select>` : '<div class="demo-strip-sub">אין פלוגה אחרת לבחירה.</div>'}
-    <input type="text" id="unit-reason-${id}" placeholder="${_unitPanelMode==='handover'?'סיבה (חובה), לדוגמה: מחלקה א יוצאת למנוחה':'סיבה (חובה), לדוגמה: עומס פצועים'}">
+    <input type="text" id="unit-reason-${id}" oninput="const e=document.getElementById('unit-error-${id}'); if(e) e.textContent='';" placeholder="${_unitPanelMode==='handover'?'סיבה (חובה), לדוגמה: מחלקה א יוצאת למנוחה':'סיבה (חובה), לדוגמה: עומס פצועים'}">
     <div class="login-error" id="unit-error-${id}"></div>
     <button onclick="submitIncidentUnitChange('${id}')">${_unitPanelMode==='handover'?'העבר את האתר':'הוסף תגבור'}</button>
   </div>`;
@@ -17287,7 +17288,7 @@ function isActiveIncidentReadOnly(){ return !!activeIncident && ['read_only','en
 function incidentReliefWaitingHtml(incidentId, links, othersOnly){
   const rows=(links?.relief_pending||[]).filter(x=>!(othersOnly && x.profile_id===currentUser?.id));
   if(!rows.length || !(['pc'].includes(currentUser?.role) || canChangeIncidentUnit())) return '';
-  return `<div class="relief-waiting" data-relief-waiting="${escAttr(incidentId)}">ממתינים להחלפה: ${rows.map(x=>`<span class="unit-link-row" data-relief-row="${escAttr(x.profile_id)}"><span>${escAttr(x.display_name||'')} (${escAttr(ROLE_LABELS[SERVER_ROLE_TO_CLIENT_ROLE?.[x.role]||x.role]||x.role)})</span>${x.profile_id===currentUser?.id?'':`<button onclick="confirmIncidentRelief('${escAttr(x.profile_id)}','${escAttr(incidentId)}')">סמן כהוחלף</button>`}</span>`).join('')}</div>`;
+  return `<div class="relief-waiting" data-relief-waiting="${escAttr(incidentId)}">ממתינים להחלפה: ${rows.map(x=>`<span class="unit-link-row" data-relief-row="${escAttr(x.profile_id)}"><span>${escAttr(x.display_name||'')} (${escAttr(({pc:'חוג״ד',medic:'חובש',paramedic:'פראמדיק'})[x.role]||x.role)})</span>${x.profile_id===currentUser?.id?'':`<button onclick="confirmIncidentRelief('${escAttr(x.profile_id)}','${escAttr(incidentId)}')">סמן כהוחלף</button>`}</span>`).join('')}</div>`;
 }
 async function confirmIncidentRelief(profileId, incidentId){
   const incId=incidentId||activeIncident?.id;
@@ -17315,7 +17316,7 @@ function renderIncidentReadOnlyBanner(){
   el.style.display='block';
   const text=activeIncident.access_mode==='ended'
     ? '⛔ הגישה שלך לאתר הסתיימה. רישומים שלא נשלחו יישלחו; רישומים אחרי ההחלפה יידחו.'
-    : `👁 צפייה בלבד${since?' מ־'+since:''}${activeIncident.site_company_name?' · האתר אצל '+activeIncident.site_company_name:''}. רישומים חדשים לא יתקבלו בשרת · פנה/י לחוג״ד או למ״פ רפואה`;
+    : `👁 צפייה בלבד${since?' מ־'+since:''}${activeIncident.site_company_name?' · האתר אצל '+activeIncident.site_company_name:''}. רישומים חדשים לא יתקבלו בשרת · ${currentUser.role==='pc'?'פנה/י למ״פ רפואה':'פנה/י לחוג״ד או למ״פ רפואה'}`;
   // A relieved PC can still mark his medics whose phones are gone.
   el.innerHTML=escAttr(text)+(activeIncident.access_mode==='ended'?'':incidentReliefWaitingHtml(activeIncident.id, _unitLinksByIncident[activeIncident.id], true));
 }
