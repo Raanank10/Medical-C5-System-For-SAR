@@ -880,6 +880,40 @@ begin
 end;
 $function$;
 
+-- Everyone still waiting for relief on open sites the caller commands: all for cc / chamal / admin,
+-- the sites of his company for a pc (the PC who leads the site: B after a handover, A after a
+-- release). The phone alerts once someone has waited 30 minutes (reliefOverdueMinutes in
+-- src/domain/rules.js, owner 2026-11-23); the rows come back until he is relieved or his access ends.
+create or replace function public.list_pending_reliefs()
+returns table(incident_id uuid, visual_id text, location_name text, profile_id uuid, display_name text,
+              role_at_incident user_role, company_name text, pending_since timestamptz)
+language plpgsql
+stable
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_role text := app.current_user_role()::text;
+  v_company uuid := app.my_company_id();
+begin
+  if v_role is null or v_role not in ('cc','chamal','admin','pc') or (v_role = 'pc' and v_company is null) then
+    return;
+  end if;
+  return query
+  select i.id, i.visual_id, i.location_name, im.profile_id, p.display_name, im.role_at_incident,
+         (select c.name from companies c where c.id = coalesce(p.company_id, pl.company_id)),
+         im.relief_pending_since
+  from incident_memberships im
+  join incidents i on i.id = im.incident_id
+  join profiles p on p.id = im.profile_id
+  left join platoons pl on pl.id = p.platoon_id
+  where im.relief_pending_since is not null and im.read_only_since is null
+    and i.status in ('active','staging')
+    and (v_role in ('cc','chamal','admin') or i.company_id = v_company)
+  order by im.relief_pending_since, i.visual_id, p.display_name;
+end;
+$function$;
+
 create or replace function public.acknowledge_incident_unit_notice(p_link_id uuid)
 returns jsonb
 language plpgsql
@@ -909,6 +943,8 @@ revoke execute on function public.release_incident_unit(uuid, uuid, text, text, 
 revoke execute on function public.end_incident_unit_access(uuid, uuid, text, text) from public, anon;
 revoke execute on function public.get_incident_unit_links(uuid) from public, anon;
 revoke execute on function public.list_incident_unit_notices() from public, anon;
+revoke execute on function public.list_pending_reliefs() from public, anon;
+grant execute on function public.list_pending_reliefs() to authenticated;
 revoke execute on function public.acknowledge_incident_unit_notice(uuid) from public, anon;
 grant execute on function public.handover_incident_unit(uuid, uuid, text, text, text) to authenticated;
 grant execute on function public.reinforce_incident_unit(uuid, uuid, text, text, text) to authenticated;

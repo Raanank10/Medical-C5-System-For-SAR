@@ -226,6 +226,15 @@ function handle(server, req) {
         site_company_name: server.companies.find((c) => c.id === inc.company_id)?.name, at: l.started_at, reason: l.reason }; });
       return { data: rows, error: null };
     }
+    if (req.name === 'list_pending_reliefs') {
+      if (!['cc', 'chamal', 'admin', 'pc'].includes(u.role)) return { data: [], error: null };
+      const rows = server.members.filter((m) => m.relief_pending_since && !m.read_only_since).filter((m) => {
+        const inc = server.incidents.find((i) => i.id === m.incident_id);
+        return inc && inc.status === 'active' && (UNIT_CHANGERS.includes(u.role) || inc.company_id === myCompany);
+      }).map((m) => { const inc = server.incidents.find((i) => i.id === m.incident_id); return { incident_id: inc.id, visual_id: inc.visual_id, location_name: inc.location_name, profile_id: m.profile_id,
+        display_name: USERS[Object.keys(USERS).find((k) => USERS[k].id === m.profile_id)]?.display_name || m.profile_id, role_at_incident: m.role_at_incident, pending_since: m.relief_pending_since }; });
+      return { data: clone(rows), error: null };
+    }
     if (req.name === 'acknowledge_incident_unit_notice') { server.noticeAcks.push({ link_id: p.p_link_id, profile_id: u.id }); return { data: { acknowledged: true }, error: null }; }
     if (req.name === 'get_incident_command_state') { const inc = server.incidents.find((i) => i.id === p.p_incident_id); return { data: inc ? { incident_id: inc.id, status: inc.status, state_json: {} } : null, error: null }; }
     return { data: null, error: null };
@@ -468,6 +477,18 @@ async function checkFile(browser, file) {
   const pc2m = SERVER.members.find((m) => m.incident_id === INC2 && m.profile_id === PC2);
   assert(pc2m.relief_pending_since && !pc2m.read_only_since, `${rel}: PC2 must keep recording until relieved (got ${JSON.stringify(pc2m)})`);
   assert(cc.toasts.some((t) => t.includes('האתר הועבר לפלוגה א') && t.includes('ממתינים להחלפה')), `${rel}: the CC must be told the site moved and who waits (got ${JSON.stringify(cc.toasts)})`);
+  // Not yet 30 minutes: no alert. At 31 minutes the site's PC (now PC1) and the CC are alerted.
+  await pc1.page.evaluate(() => pollIncidentOpenAlerts());
+  assert(!(await pc1.page.locator('#incident-relief-overdue-banner').isVisible()), `${rel}: no relief alert before 30 minutes`);
+  pc2m.relief_pending_since = new Date(Date.now() - 31 * 60000).toISOString();
+  await pc1.page.evaluate(() => pollIncidentOpenAlerts());
+  await pc1.page.waitForSelector(`#incident-relief-overdue-banner [data-relief-overdue="${INC2}"]`, { timeout: 5000 });
+  const overduePc = await pc1.page.locator('#incident-relief-overdue-banner').innerText();
+  assert(overduePc.includes('לא אישרו החלפה') && overduePc.includes('31 דק'), `${rel}: the site's PC must see who has not confirmed relief for 30+ minutes (got "${overduePc}")`);
+  await cc.page.evaluate(() => pollIncidentOpenAlerts());
+  await cc.page.waitForSelector(`#incident-relief-overdue-banner [data-relief-overdue="${INC2}"] button`, { timeout: 5000 });
+  await rpc1.page.evaluate(() => pollIncidentOpenAlerts());
+  assert(!(await rpc1.page.locator('#incident-relief-overdue-banner').isVisible()), `${rel}: the rescue chain gets no relief alert`);
   // The leaving PC: told to keep recording, then "הוחלפתי - מסרתי" makes him read-only.
   await pc2.page.evaluate(() => refreshIncidentContext());
   await pc2.page.waitForSelector('#incident-readonly-banner [data-relief-self]', { timeout: 5000 });
@@ -480,6 +501,12 @@ async function checkFile(browser, file) {
   await pc2.page.click('#incident-readonly-banner [data-relief-self]');
   await pc2.page.waitForTimeout(300);
   assert(pc2m.read_only_since && pc2m.relieved_by === PC2, `${rel}: "הוחלפתי - מסרתי" must relieve PC2 himself`);
+  await pc1.page.evaluate(() => pollIncidentOpenAlerts());
+  assert(!(await pc1.page.locator('#incident-relief-overdue-banner').isVisible()), `${rel}: the relief alert must go once he is relieved`);
+  // Signed in, the demo title above the dashboard is hidden (the sync pill stays).
+  await pc2.page.evaluate(() => startRoleDashboard('pc'));
+  assert(await pc2.page.locator('#role-context-line').evaluate((el) => el.closest('.demo-strip').classList.contains('signed-in-compact') && getComputedStyle(el.parentElement).display === 'none'),
+    `${rel}: the demo title must be hidden on the signed-in dashboard`);
   const roBanner = await pc2.page.locator('#incident-readonly-banner').innerText();
   assert(roBanner.includes('צפייה בלבד') && roBanner.includes('פלוגה א'), `${rel}: PC2 must see a read-only banner naming the new company (got "${roBanner}")`);
   assert(pc2.toasts.some((t) => t.includes('צפייה בלבד')), `${rel}: PC2 must be told once that it is read-only`);

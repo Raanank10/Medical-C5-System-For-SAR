@@ -688,6 +688,8 @@ input[type=range]{width:100%;accent-color:var(--orange);}
 .demo-icon{width:42px;height:42px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
 .demo-strip{margin:0 16px 12px;background:rgba(67,97,238,0.08);border:1px solid rgba(67,97,238,0.45);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px;justify-content:space-between;}
 .demo-strip-title{font-weight:700;font-size:13px;color:var(--accent);}
+.demo-strip.signed-in-compact{background:none;border:none;padding:0;margin:0 16px 6px;justify-content:flex-end;}
+.demo-strip.signed-in-compact>div:first-child{display:none;}
 .demo-strip-sub{font-size:11px;color:var(--muted);margin-top:2px;}
 .sync-pill{font-family:var(--mono);font-size:10px;border:1px solid var(--green);color:var(--green);border-radius:999px;padding:4px 8px;white-space:nowrap;}
 .sync-pill.stale{border-color:var(--orange);color:var(--orange);}
@@ -883,6 +885,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="incident-readonly-banner" class="incident-readonly-banner" role="status" aria-live="polite"></div>
 <div id="incident-open-alert-banner" class="open-alert-banner"></div>
 <div id="incident-unit-notice-banner" class="open-alert-banner" role="alert"></div>
+<div id="incident-relief-overdue-banner" class="open-alert-banner" role="alert"></div>
 <div id="rcc-evac-banner" class="rcc-evac-banner" role="status" aria-live="polite"></div>
 <div id="medic-extraction-banner" class="rcc-evac-banner medic-extraction-banner" role="alert" aria-live="assertive"></div>
 
@@ -3388,6 +3391,18 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     return { level: ms >= EVAC_POINT_WAIT_CRITICAL_MS ? "critical" : "warning", minutes: Math.floor(ms / 60000) };
   }
 
+  // Relief not confirmed (WP-27, owner 2026-11-22/23): after a handover or a release, the leaving
+  // company's medical staff keep recording until each confirms "הוחלפתי - מסרתי". Still waiting
+  // 30 minutes later: the site's PC and the CC are alerted, so nobody keeps writing on a site he
+  // has left without anyone noticing. Counted from when that person started waiting.
+  const RELIEF_OVERDUE_MS = 30 * 60 * 1000;
+  function reliefOverdueMinutes(pendingSinceMs, nowMs = Date.now()) {
+    const since = Number(pendingSinceMs);
+    if (!Number.isFinite(since) || since <= 0) return null;
+    const ms = nowMs - since;
+    return ms >= RELIEF_OVERDUE_MS ? Math.floor(ms / 60000) : null;
+  }
+
   function rescueEvacPriority(triage, tourniquetActive) {
     if (triage === "red" || tourniquetActive === true) return "urgent";
     if (triage === "yellow" || triage === "green" || triage === "black") return "not_urgent";
@@ -3437,6 +3452,8 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     EVAC_POINT_WAIT_CRITICAL_MS,
     EVAC_POINT_WAIT_WARN_MS,
     evacPointWaitAlert,
+    reliefOverdueMinutes,
+    RELIEF_OVERDUE_MS,
     isCriticalAlert,
     isDeviceSilent,
     isFinalPatientStatus,
@@ -8955,6 +8972,8 @@ function renderRoleDashboard(role=activeRoleDashboard){
   if(sub) sub.textContent=cfg.actor;
   const ctx=document.getElementById('role-context-line');
   if(ctx) ctx.textContent='כל השמות בדמו פיקטיביים. זהו V2.995: כל פצוע הוא כרטיס פיקודי צבעוני עם מקור סיווג, חוב הערכה ופעולה הבאה.';
+  // Signed in, the demo title and text are noise above the fold in an operation; only the sync pill stays.
+  ctx?.closest('.demo-strip')?.classList.toggle('signed-in-compact', !!currentUser);
   const metrics=[
     roleMetric(pts.length, role==='medic'?'הפצועים שלי':role==='pc'?'פצועי המחלקה':role==='rpc'?'פצועי המחלקה (טקטי)':role==='rcc'?'פצועי הפלוגה (טקטי)':'פצועים גלויים'),
     roleMetric(alerts.length, 'התראות לפעולה'),
@@ -16771,6 +16790,8 @@ async function pollIncidentOpenAlerts(){
   renderIncidentOpenAlertBanner();
   await refreshIncidentUnitNotices();
   renderIncidentUnitNoticeBanner();
+  await refreshPendingReliefs();
+  renderReliefOverdueBanner();
 }
 setInterval(()=>{ if(currentUser && INCIDENT_OPEN_ALERT_ROLES.has(currentUser.role)) pollIncidentOpenAlerts(); }, 20000);
 function renderIncidentOpenAlertBanner(){
@@ -17351,6 +17372,45 @@ function renderIncidentUnitNoticeBanner(){
       <div class="actions"><button onclick="acknowledgeIncidentUnitNotice('${escAttr(n.link_id)}')">ראיתי</button>${activeIncident?.id===n.incident_id?'':`<button onclick="enterIncidentFromUnitNotice('${escAttr(n.incident_id)}')">כניסה</button>`}</div></div>`;
   }).join('');
 }
+// Relief still not confirmed 30 minutes later (owner 2026-11-23): the site's PC and the CC are
+// alerted until the person is relieved or his access ends. The CC opens the site's panel to mark
+// him or end the access; the PC is told whom to ask (only that person's own PC or the CC may mark).
+const RELIEF_ALERT_ROLES=new Set(['pc','cc','chamal','admin']);
+let _pendingReliefs=[];
+let _alertedOverdueReliefs=new Set();
+async function refreshPendingReliefs(){
+  if(!currentUser || !RELIEF_ALERT_ROLES.has(currentUser.role)){ _pendingReliefs=[]; return; }
+  const client=getSupabaseClient();
+  if(!client) return;
+  let r;
+  try{ r=await client.rpc('list_pending_reliefs'); }catch(e){ return; }
+  if(r.error || !Array.isArray(r.data)) return;
+  _pendingReliefs=r.data;
+}
+function overduePendingReliefs(nowMs=Date.now()){
+  return _pendingReliefs.map(x=>({...x, minutes:C5Rules.reliefOverdueMinutes(Date.parse(x.pending_since), nowMs)}))
+    .filter(x=>x.minutes!=null && x.profile_id!==currentUser?.id);
+}
+function renderReliefOverdueBanner(){
+  const el=document.getElementById('incident-relief-overdue-banner');
+  if(!el) return;
+  const rows=currentUser ? overduePendingReliefs() : [];
+  if(!rows.length){ el.style.display='none'; el.innerHTML=''; el.classList.remove('pulse'); return; }
+  const fresh=rows.filter(x=>!_alertedOverdueReliefs.has(x.incident_id+':'+x.profile_id));
+  fresh.forEach(x=>_alertedOverdueReliefs.add(x.incident_id+':'+x.profile_id));
+  if(fresh.length){ try{ navigator.vibrate?.([300,100,300]); }catch(e){} }
+  const bySite={};
+  rows.forEach(x=>{ (bySite[x.incident_id]=bySite[x.incident_id]||[]).push(x); });
+  el.style.display='flex';
+  el.classList.add('pulse');
+  el.innerHTML=Object.values(bySite).map(list=>{
+    const x=list[0];
+    const who=list.map(y=>`${escAttr(y.display_name||'')} (${escAttr(({pc:'חוג״ד',medic:'חובש',paramedic:'פראמדיק'})[y.role_at_incident]||y.role_at_incident)}, ${y.minutes} דק׳)`).join(' · ');
+    const action=canChangeIncidentUnit() ? `<button onclick="openIncidentUnitPanel('${escAttr(x.incident_id)}')">פתח</button>` : '';
+    return `<div class="open-alert-row" data-relief-overdue="${escAttr(x.incident_id)}"><div><strong>⏰ לא אישרו החלפה:</strong> ${escAttr(x.visual_id||'')} · ${escAttr(x.location_name||'')} · ${who}${canChangeIncidentUnit()?'':' · עדיין יכולים לתעד באתר; פנה/י לחוג״ד שלהם או למ״פ רפואה'}</div>
+      <div class="actions">${action}</div></div>`;
+  }).join('');
+}
 async function acknowledgeIncidentUnitNotice(linkId){
   const r=await incidentUnitRpc('acknowledge_incident_unit_notice', {p_link_id:linkId});
   if(r.error){ toast('האישור נכשל, בדוק/י חיבור'); return; }
@@ -17645,11 +17705,14 @@ async function refreshIncidentContext(){
   if(!currentUser) return;
   await refreshOpenIncidents();
   await refreshActiveIncidentStatus();
-  await refreshActiveIncidentAccess();
   await refreshIncidentOpenAlerts();
-  await refreshIncidentUnitNotices();
   renderIncidentContext();
   await pullIncidentAssignmentState();
+  // WP-27: own access, unit notices, relief alerts.
+  await refreshActiveIncidentAccess();
+  await refreshIncidentUnitNotices();
+  await refreshPendingReliefs();
+  renderIncidentContext();
 }
 setInterval(()=>{ if(currentUser) refreshIncidentContext(); }, 45000);
 function renderIncidentContext(){
@@ -17687,6 +17750,7 @@ function renderIncidentContext(){
   renderIncidentReadOnlyBanner();
   renderIncidentOpenAlertBanner();
   renderIncidentUnitNoticeBanner();
+  renderReliefOverdueBanner();
 }
 
 // ── Sync push: outbox → deployed /sync/log Edge Function ──

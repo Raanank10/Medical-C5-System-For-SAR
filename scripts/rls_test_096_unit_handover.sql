@@ -104,6 +104,23 @@ begin
   insert into _c values ('A medic access label before relief', j->>'my_access', 'relief_pending');
   execute 'reset role';
 
+  -- Who is told someone still waits: the site's PC (now B) and the CC, not A's medic.
+  perform set_config('request.jwt.claims', json_build_object('sub', PCB, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  select count(*) into n from public.list_pending_reliefs() where incident_id = X;
+  insert into _c values ('B PC (site PC) sees who waits for relief', n::text, '2');
+  execute 'reset role';
+  perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  select count(*) into n from public.list_pending_reliefs() where incident_id = X;
+  insert into _c values ('CC sees who waits for relief', n::text, '2');
+  execute 'reset role';
+  perform set_config('request.jwt.claims', json_build_object('sub', MA, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  select count(*) into n from public.list_pending_reliefs();
+  insert into _c values ('a medic gets no relief list', n::text, '0');
+  execute 'reset role';
+
   -- Only he, his PC or the CC confirm his relief.
   perform set_config('request.jwt.claims', json_build_object('sub', PCB, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';

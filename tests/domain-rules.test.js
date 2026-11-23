@@ -528,6 +528,18 @@ assert.equal(rules.rescueEvacPriority(undefined, false), "pending");
 assert.equal(rules.rescueEvacPriority("pending", true), "urgent");
 assert.deepEqual(rules.RESCUE_PRIORITIES, ["urgent", "pending", "not_urgent"]);
 
+// WP-27 (owner 2026-11-23): a relief still unconfirmed 30 minutes after it started alerts the site's PC and the CC.
+{
+  const now = Date.parse("2026-11-23T12:00:00Z");
+  assert.equal(rules.reliefOverdueMinutes(now - 29 * 60000, now), null);
+  assert.equal(rules.reliefOverdueMinutes(now - 30 * 60000, now), 30);
+  assert.equal(rules.reliefOverdueMinutes(now - 95 * 60000 - 30000, now), 95);
+  assert.equal(rules.reliefOverdueMinutes(null, now), null);
+  assert.equal(rules.reliefOverdueMinutes(NaN, now), null);
+  assert.equal(rules.reliefOverdueMinutes(now + 60000, now), null); // a clock ahead is not overdue
+  assert.equal(rules.RELIEF_OVERDUE_MS, 30 * 60000);
+}
+
 // WP-40 (owner 2026-11-19): waiting for a vehicle after leaving for the נאפ״ל, from when the patient was sent.
 {
   const now = Date.parse("2026-11-19T12:00:00Z");
