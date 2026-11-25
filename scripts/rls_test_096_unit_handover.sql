@@ -337,6 +337,15 @@ begin
   insert into _c values ('B PC not relieved yet: full', app.can_access_incident(Y)::text, 'true');
   execute 'reset role';
 
+  -- ---- Closed site: a relieved member does not read his own records back (068 hides patient data)
+  update incidents set status = 'closed', closed_at = now() where id = Y;
+  perform set_config('request.jwt.claims', json_build_object('sub', MB, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  select count(*) into n from events where incident_id = Y;
+  insert into _c values ('closed site: relieved member reads no records back', n::text, '0');
+  execute 'reset role';
+  update incidents set status = 'active', closed_at = null where id = Y;
+
   -- ---- Hand Y to B: B comes back full, A read-only
   perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
@@ -373,8 +382,17 @@ begin
     perform public.merge_incident(X, Z, 'duplicate', 'dev-cc', 't96-merge');
     perform public.merge_incident(Y, Z, 'duplicate', 'dev-cc', 't96-merge2');
     execute 'reset role';
-    select count(*) into n from incident_memberships where incident_id = Z and profile_id = MA;
-    insert into _c values ('merge: ended / read-only member not copied', n::text, '0');
+    select count(*) into n from incident_memberships where incident_id = Z and profile_id = MA and access_ended_at is not null and read_only_since is not null;
+    insert into _c values ('merge: ended member copied for late records only', n::text, '1');
+    perform set_config('request.jwt.claims', json_build_object('sub', MA, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    insert into _c values ('merge: ended member does not see the target', app.can_view_incident(Z)::text, 'false');
+    begin
+      insert into events (incident_id, actor_id, actor_role, type, device_id, local_event_id, local_timestamp)
+      values (Z, MA, 'medic', 'NOTE_ADDED', 'dev-ma', 't96-merge-late', t_ho - interval '4 minutes') returning id into j_id;
+      insert into _c values ('merge: record from before relief accepted at the target', 'accepted', 'accepted');
+    exception when others then insert into _c values ('merge: record from before relief accepted at the target', 'refused: ' || sqlerrm, 'accepted'); end;
+    execute 'reset role';
     select count(*) into n from incident_memberships where incident_id = Z and profile_id = PCA and relief_pending_since is not null and read_only_since is null;
     insert into _c values ('merge: wait for relief moves with the person', n::text, '1');
   end if;

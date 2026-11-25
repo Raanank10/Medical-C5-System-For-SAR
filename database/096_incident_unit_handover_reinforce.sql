@@ -2,7 +2,7 @@
 -- docs/GAP_CLOSURE_PLAN.md). Needs database/095 (event types) applied first.
 -- Apply with the Supabase connector (apply_migration, named 096_incident_unit_handover_reinforce)
 -- after the owner's OK, never pasted into the SQL editor (.claude/skills/c5-db-change). It has no
--- drop statements; it can be run twice.
+-- statements that remove objects; it can be run twice.
 --
 -- Owner decisions, 2026-11-21:
 -- - Two CC actions on a site. Handover: company A goes out, company B takes the site (B's PC,
@@ -95,7 +95,7 @@ create table if not exists incident_unit_notice_acknowledgments (
   primary key (link_id, profile_id)
 );
 
--- unit_audit's action check is not widened (that needs a drop): the RPCs below write the existing
+-- unit_audit's action check is not widened (that would mean removing the constraint first): the RPCs below write the existing
 -- 'incident_unit_changed' action with detail.kind = handed_over / reinforced / released / access_ended.
 
 -- ---------------------------------------------------------------------------------------------
@@ -303,7 +303,10 @@ alter policy events_read_authenticated on events using (
             'PLATOON_STOCK_REFILLED','DIRECT_LOGO_TO_MEDIC_REFILL']::event_type[])))
     )
   )
-  or (actor_id = (select auth.uid()) and app.can_write_incident_late(incident_id, local_timestamp))
+  or (actor_id = (select auth.uid()) and app.can_write_incident_late(incident_id, local_timestamp)
+      -- not in a closed incident: there 068 hides patient data from everyone but admin, and
+      -- sync-log's closed path inserts without reading back (re-review 2026-11-25)
+      and not exists (select 1 from incidents i where i.id = events.incident_id and i.status = 'closed'))
 );
 
 alter policy events_insert_by_role on events with check (
@@ -332,10 +335,10 @@ alter table incident_unit_links enable row level security;
 alter table incident_unit_notice_acknowledgments enable row level security;
 do $$
 begin
-  if not exists (select 1 from pg_policies where tablename = 'incident_unit_links' and policyname = 'incident_unit_links_read') then
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'incident_unit_links' and policyname = 'incident_unit_links_read') then
     create policy incident_unit_links_read on incident_unit_links for select to authenticated using (app.can_view_incident(incident_id));
   end if;
-  if not exists (select 1 from pg_policies where tablename = 'incident_unit_notice_acknowledgments' and policyname = 'incident_unit_notice_ack_read') then
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'incident_unit_notice_acknowledgments' and policyname = 'incident_unit_notice_ack_read') then
     create policy incident_unit_notice_ack_read on incident_unit_notice_acknowledgments for select to authenticated
       using (profile_id = (select auth.uid()));
   end if;
@@ -402,12 +405,12 @@ end;
 $function$;
 
 -- Two new columns (read_only, company_id) change the return type, so the old function is kept under
--- another name (archive, not drop; nothing live depends on it, checked 2026-11-25) and a new one is
+-- another name (archived, not removed; nothing live depends on it, checked 2026-11-25) and a new one is
 -- created. is_member now means a full member. Re-running: the rename is skipped once done.
 do $$
 begin
   if exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-             where n.nspname = 'public' and p.proname = 'list_open_incidents'
+             where n.nspname = 'public' and p.proname = 'list_open_incidents' and p.pronargs = 0
                and pg_get_function_result(p.oid) not like '%read_only%') then
     alter function public.list_open_incidents() rename to list_open_incidents_pre096;
     revoke all on function public.list_open_incidents_pre096() from public, anon, authenticated;
@@ -1222,8 +1225,10 @@ begin
   update watchdog_alerts set incident_id = p_target_id where incident_id = p_source_id;
   get diagnostics v_count = row_count; v_moved := v_moved || jsonb_build_object('watchdog_alerts', v_count);
 
-  -- 096: only full memberships move, and a wait for relief moves with them. A read-only or ended
-  -- member of the duplicate must not get full access to the target (review 2026-11-25); the
+  -- 096: only full memberships move as full, and a wait for relief moves with them. A read-only or
+  -- ended member of the duplicate must not get access to the target (review 2026-11-25): he is
+  -- copied with his access ended, so he does not see the target but his records from before his
+  -- relief, redirected here by sync-log (067), are still accepted (re-review 2026-11-25). The
   -- duplicate's read-only companies lose their view with it (owner 2026-11-22: links left as is).
   insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by, relief_pending_since)
   select p_target_id, m.profile_id, m.role_at_incident, coalesce(m.assigned_by, auth.uid()), m.relief_pending_since
@@ -1231,6 +1236,13 @@ begin
     and m.read_only_since is null and m.access_ended_at is null
   on conflict (incident_id, profile_id) do nothing;
   get diagnostics v_count = row_count; v_moved := v_moved || jsonb_build_object('memberships_added', v_count);
+  insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by, read_only_since, access_ended_at, relieved_by)
+  select p_target_id, m.profile_id, m.role_at_incident, coalesce(m.assigned_by, auth.uid()), m.read_only_since,
+         coalesce(m.access_ended_at, now()), m.relieved_by
+  from incident_memberships m where m.incident_id = p_source_id
+    and m.read_only_since is not null
+  on conflict (incident_id, profile_id) do nothing;
+  get diagnostics v_count = row_count; v_moved := v_moved || jsonb_build_object('memberships_late_records_only', v_count);
   update device_presence s set incident_id = p_target_id
   where s.incident_id = p_source_id
     and not exists (select 1 from device_presence t where t.incident_id = p_target_id and t.actor_id = s.actor_id and t.device_id = s.device_id);
