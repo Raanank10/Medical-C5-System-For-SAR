@@ -53,6 +53,18 @@ Owner decisions, 2026-11-19. The RCC no longer shares the generic role dashboard
 
 **"בקש חובש לבדיקה"** (owner, 2026-11-19): on every casualty the rescue chain may not extract, a button sends a medical request "חובש לחילוץ לכוד" linked to the casualty (unsorted: urgent; long entrapment: immediate). The PC / CC see it in their alerts and requests and handle it as any reinforcement request; the incident's medics get it as a banner with vibration until they open the casualty or tap "ראיתי". database/087 lets rpc / rcc create only this request type and lets medics read it; sync-log lets rpc / rcc send the request events. **The call closes itself when its casualty is extracted** (owner, 2026-11-20, option A): when the patient's access turns free (the medic's "⛏ חולץ", or the rescue chain's "חולץ" after a medic's check), 087 resolves every open call linked to them (reason "extracted"); a call answered by a check alone stays open for the PC / CC. "אין גישה" counts as trapped for the 60-minute rule too (owner, same day): nobody knows whether a limb is pinned.
 
+## חמ״ל panel (V2.99.92)
+
+The חמ״ל no longer lands on the generic role page (job description first, then every alert at one weight). Its screen follows the [V2.6 role description](ROLE_COMMAND_MODEL_v2.6.md) (picture quality: sync, duplicates, external report conflicts, pending requests) on one page, nothing behind a tab:
+- the PC / CC status strip on top (server contact, longest tourniquet, blocked events, triage counts);
+- one card per site: incident type, status, T0 and minutes since it ("T0 טרם נקבע" in orange when unset), triage and trapped counts, the four evacuation stages with the longest wait at the נאפ״ל, a golden-hour line (casualties not yet evacuated past 45 / 60 minutes from injury, the full screen's watchdog thresholds), the external report against the field count, and a button that opens the full command screen on that site;
+- clinical alerts beside picture-quality alerts (duplicates, external report gaps, unsynced backlog) and the devices list, silent devices first; every alert line shows its age, orange from 10 minutes;
+- open requests, then "פתח מסך עבודה מלא" and "סיכום אירוע חי". The responsibilities list sits behind an "ⓘ האחריות שלי" chip; the company roster panel stays for signed-in company command.
+
+On a laptop the site cards and the two alert columns sit side by side. It is client only: it reads the state the full command screen reads and adds no RPC, table or event. Admin keeps the generic page.
+
+Fixed with it: a suspected duplicate needs the same site and the same known sector (an unknown building and floor no longer count as one sector) plus an overlapping injury or both casualties trapped (two "not trapped" casualties no longer match), and its title uses the visual id; the external-report gap alert fires only when a report exists (with none, every field casualty counted as a gap); the full command screen shows missing-data keys by their Hebrew labels.
+
 ## Clinical data stays with the medical roles (V2.99.63)
 
 Decided with the repo owner on 2026-10-23, after a live check of what each role could read. Enforced by the database (`database/074`), not only on the screen.

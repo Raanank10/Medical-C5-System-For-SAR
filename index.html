@@ -655,6 +655,21 @@ input[type=range]{width:100%;accent-color:var(--orange);}
 .role-metric{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 8px;text-align:center;}
 .role-metric-num{font-family:var(--mono);font-size:22px;font-weight:900;}
 .role-metric-label{font-size:10px;color:var(--muted);margin-top:3px;line-height:1.25;}
+.chamal-sites{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:10px;margin-bottom:10px;}
+.chamal-site{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;}
+.chamal-site-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+.chamal-site-name{font-weight:900;font-size:16px;}
+.chamal-site-line{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4;}
+.chamal-site-total{font-family:var(--mono);font-size:24px;font-weight:900;text-align:center;line-height:1;}
+.chamal-site-total span{display:block;font-family:inherit;font-size:11px;font-weight:600;color:var(--muted);margin-top:2px;}
+.chamal-site-open{width:100%;margin-top:10px;min-height:48px;}
+.chamal-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:0 10px;}
+.chamal-grid>div,.chamal-sites>div{min-width:0;}
+.chamal-grid .role-list{grid-template-columns:minmax(0,1fr);min-width:0;}
+.chamal-grid .cmd-strip-alert{min-width:0;}
+.chamal-alert-age{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap;align-self:center;}
+.chamal-alert-age.late{color:var(--orange);font-weight:800;}
+@media (min-width:1024px){ .chamal-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);} }
 .role-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;}
 .role-section-title{font-size:13px;font-weight:900;margin-bottom:8px;color:var(--text);}
 .role-list{display:grid;gap:7px;}
@@ -1033,7 +1048,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9990</div>
+      <div class="demo-kicker">Demo V2.9992</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1130,7 +1145,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9990</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9992</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1140,7 +1155,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9990</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9992</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3537,7 +3552,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.90';
+const APP_VERSION = '2.99.92';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -8343,7 +8358,7 @@ function commandAlertGroups(alerts){
     return g;
   }).sort((x,y)=>x.rank-y.rank || x.oldest-y.oldest);
 }
-function commandAlertLineHtml(group){
+function commandAlertLineHtml(group, withAge=false){
   const p=group.patientId ? patients.find(x=>x.id===group.patientId) : null;
   const prefix=p ? `${p.visualId||p.id} — ` : '';
   const short=a=>String(a.title||'').startsWith(prefix) ? String(a.title).slice(prefix.length) : String(a.title||'');
@@ -8352,9 +8367,11 @@ function commandAlertLineHtml(group){
   const cls=group.rank===0?'crit':group.rank===1?'high':'med';
   const open=p?` onclick="openPatientFromAlert('${p.id}')"`:'';
   const ack=p?`<button class="ack-btn" onclick="event.stopPropagation();acknowledgeAlert('${p.id}')">בטיפול</button>`:'';
+  const ageMin=withAge&&Number.isFinite(group.oldest)?Math.max(0,Math.floor((Date.now()-group.oldest)/60000)):null;
+  const age=ageMin===null?'':`<span class="chamal-alert-age${ageMin>=10?' late':''}" data-alert-age>${ageMin} דק׳</span>`;
   return `<div class="cmd-strip-alert ${cls}" data-alert-group="${escAttr(group.key)}"${open}>
     <span class="cmd-strip-alert-id">${p?escAttr(p.visualId||p.id):'מוקד'}</span>
-    <div style="flex:1;min-width:0"><div class="cmd-strip-alert-title">${p?`${escAttr(TRIAGE_LABELS[p.triage]||'')} · `:''}${escAttr(short(first))}</div><div class="cmd-strip-alert-sub">${escAttr(rest||first.detail||'')}</div></div>${ack}
+    <div style="flex:1;min-width:0"><div class="cmd-strip-alert-title">${p?`${escAttr(TRIAGE_LABELS[p.triage]||'')} · `:''}${escAttr(short(first))}</div><div class="cmd-strip-alert-sub">${escAttr(rest||first.detail||'')}</div></div>${age}${ack}
   </div>`;
 }
 function commandLongestTourniquet(pts){
@@ -8402,7 +8419,7 @@ function renderCommandStatusStrip(role, pts, alerts){
     </div>
     <div class="cmd-strip-counts">${cell(c.red,'אדום','var(--red)')}${cell(c.yellow,'צהוב','var(--yellow)')}${cell(c.green,'ירוק','var(--green)')}${cell(c.black,'שחור','var(--muted)')}${cell(c.trapped,'לכודים','var(--orange)')}</div>
     ${reviewLines?`<div class="cmd-strip-reviews">${reviewLines}</div>`:''}
-    <div class="cmd-strip-alerts${commandStripExpanded?' expanded':''}">${shown.map(commandAlertLineHtml).join('')}</div>
+    <div class="cmd-strip-alerts${commandStripExpanded?' expanded':''}">${shown.map(g=>commandAlertLineHtml(g)).join('')}</div>
   </div>`;
 }
 function renderCommandTabBar(alerts){
@@ -8433,6 +8450,74 @@ function positionCommandSticky(){
   sticky.style.top=`${headerTop+header.offsetHeight}px`;
 }
 window.addEventListener('resize', positionCommandSticky);
+// ── חמ״ל panel (V2.99.92) ──
+// The control room's own screen instead of the generic role page (docs/ROLE_COMMAND_MODEL_v2.6.md
+// "Chamal / Operator / Observer": picture quality - sync, duplicates, external report conflicts,
+// pending requests). One page, nothing behind a tab: the shared status strip (server contact,
+// longest tourniquet, blocked events, triage counts), one card per site, then clinical alerts
+// beside picture-quality alerts and devices, then open requests. Client only: it reads the same
+// state the full command screen reads and writes nothing new.
+let chamalResponsibilitiesOpen=false;
+function toggleChamalResponsibilities(){ chamalResponsibilitiesOpen=!chamalResponsibilitiesOpen; renderRoleDashboard('chamal'); }
+function isPictureQualityAlert(a){ return a.category==='integrity' || a.scope==='system'; }
+function openChamalSite(siteId){ cmdActiveSite=siteId; openLegacyForRole('chamal'); }
+function chamalSiteCardHtml(site){
+  const pts=getSitePatients(site.id);
+  const st=ensureSiteStatusFields(site.id);
+  const t0Min=st.t0?Math.max(0,Math.floor((Date.now()-Date.parse(st.t0))/60000)):null;
+  const t0=st.t0
+    ? `T0 ${new Date(st.t0).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})} · לפני ${t0Min} דק׳`
+    : `<span style="color:var(--orange)">T0 טרם נקבע</span>`;
+  const status=st.siteClear?.cleared?'אתר נקי':(INCIDENT_STATUS_LABELS[st.incidentStatus]||st.incidentStatus);
+  // Golden hour (same 45 / 60 minute watchdog as the full screen): casualties not yet evacuated,
+  // counted from the injury time, "משוערת" when the field did not enter one.
+  const open=pts.filter(p=>evacuationStage(p)!=='evacuated');
+  const gh={amber:0,red:0};
+  open.forEach(p=>{ const st2=watchdogState(Math.floor((Date.now()-patientInjuryTime(p).ms)/60000),45,60); if(st2==='red') gh.red++; else if(st2==='amber') gh.amber++; });
+  const ghLine=gh.red||gh.amber
+    ? `<div class="chamal-site-line" data-chamal-golden style="color:${gh.red?'var(--red)':'var(--orange)'};font-weight:800">⏱ שעת זהב: ${gh.red} עברו 60 דק׳ · ${gh.amber} מעל 45 דק׳ (לא פונו)</div>`
+    : `<div class="chamal-site-line" data-chamal-golden>⏱ שעת זהב: אין פצוע שלא פונה מעל 45 דק׳</div>`;
+  const stage=k=>pts.filter(p=>evacuationStage(p)===k).length;
+  const wait=longestEvacPointWait(pts.filter(p=>evacuationStage(p)==='evac_point'));
+  const reports=siteExternalReports(site.id);
+  const gaps=externalConflictCount(pts, reports);
+  const ext=reports.length
+    ? `<div class="chamal-site-line" data-chamal-external style="${gaps?'color:var(--orange);font-weight:800':''}">דיווח חיצוני: ${reports.length} דיווחים · ${gaps?`${gaps} פערים מול ספירת השדה`:'תואם לספירת השדה'}</div>`
+    : `<div class="chamal-site-line" data-chamal-external>דיווח חיצוני: אין</div>`;
+  return `<div class="chamal-site" data-chamal-site="${escAttr(site.id)}">
+    <div class="chamal-site-head"><div><div class="chamal-site-name">${escAttr(site.name)}</div><div class="chamal-site-line">${escAttr(incidentTypeLabel(site.id))} · ${escAttr(status)} · ${t0}</div></div><div class="chamal-site-total">${pts.length}<span>פצועים</span></div></div>
+    ${siteTriageGridHtml(pts)}
+    <div class="chamal-site-line" data-chamal-evac>בזירה ${stage('on_scene')} · בדרך לנאפ״ל ${stage('to_evac_point')} · בנאפ״ל ${stage('evac_point')}${wait!==null?` (עד ${wait} דק׳)`:''} · פונו ${stage('evacuated')}</div>
+    ${ghLine}
+    ${ext}
+    <button class="demo-mini-btn chamal-site-open" onclick="openChamalSite('${escAttr(site.id)}')">פתח מוקד במסך המלא</button>
+  </div>`;
+}
+function chamalDevicesHtml(pts){
+  const rows=commandDeviceRows(pts).map(d=>({...d, silent:C5Rules.isDeviceSilent(d.last)}))
+    .sort((a,b)=>(b.silent-a.silent) || (b.unsynced-a.unsynced) || (a.last-b.last));
+  const silent=rows.filter(d=>d.silent).length;
+  const list=rows.map(d=>`<div class="device-row ${d.silent?'offline':''}" data-chamal-device="${escAttr(d.id)}"><div><div class="device-name">${escAttr(d.id)}</div><div class="device-meta">${d.patients} פצועים · ${d.unsynced} ממתינים לשליחה</div></div><div class="sync-pill ${d.silent?'offline':''}">${d.silent?'שקט':(d.last?timeAgoLabel(d.last):'אין נתון')}</div></div>`).join('');
+  return roleSection(`מכשירים · ${silent} שקטים מתוך ${rows.length}`, list);
+}
+function renderChamalPanel(ctx){
+  const sites=allSites.filter(s=>s.id!=='ALL');
+  const clinical=commandAlertGroups(ctx.alerts.filter(a=>!isPictureQualityAlert(a)));
+  const quality=commandAlertGroups(ctx.alerts.filter(isPictureQualityAlert));
+  const lines=(groups,empty)=>groups.length?groups.map(g=>commandAlertLineHtml(g,true)).join(''):`<div class="role-row-sub" style="padding:6px 2px">${empty}</div>`;
+  const chip=`<button class="cmd-strip-chip" data-chamal-responsibilities onclick="toggleChamalResponsibilities()">${chamalResponsibilitiesOpen?'סגור אחריות ✕':'ⓘ האחריות שלי'}</button>`;
+  return `<div id="command-sticky" class="cmd-sticky">${renderCommandStatusStrip('chamal', ctx.pts, [])}</div>
+    ${dashboardFocusBanner()}
+    <div style="display:flex;justify-content:flex-start;margin:0 0 10px">${chip}</div>
+    ${chamalResponsibilitiesOpen?roleSection('האחריות שלי', ctx.responsibilities):''}
+    <div class="chamal-sites" data-chamal-sites>${sites.map(chamalSiteCardHtml).join('')||roleRow('אין מוקדים פתוחים','')}</div>
+    <div class="chamal-grid">
+      <div data-chamal-clinical>${roleSection(`התראות קליניות · ${clinical.length}`, lines(clinical,'אין התראות קליניות פתוחות'))}</div>
+      <div data-chamal-quality>${roleSection(`אמינות תמונת מצב · ${quality.length}`, lines(quality,'אין כפילויות, פערי דיווח או תור לא מסונכרן'))}${chamalDevicesHtml(ctx.pts)}</div>
+    </div>
+    ${roleSection('בקשות / הקצאות פתוחות', ctx.reqHtml)}
+    <div class="demo-actions" style="margin:0;grid-template-columns:1fr 1fr">${ctx.actions}<button class="demo-mini-btn" onclick="goTo('aar')">סיכום אירוע חי</button></div>`;
+}
 function renderCommandPanel(role, ctx){
   if(commandPanelRole!==role){ commandPanelRole=role; resetCommandPanel(); }
   if(role==='cc' && isCcOverviewMode()) return renderCcOverviewPanel();
@@ -9038,6 +9123,10 @@ function renderRoleDashboard(role=activeRoleDashboard){
     positionCommandSticky();
   }else if(isCommandPanelRole(role)){
     body.innerHTML=renderCommandPanel(role,{pts,alerts,responsibilities,objects,reqHtml,actions});
+    positionCommandSticky();
+  }else if(role==='chamal'){
+    body.innerHTML=renderChamalPanel({pts,alerts,responsibilities,reqHtml,actions})
+      +(canManagePlatoonRoster()?roleSection('פלוגות ומחלקות — שיבוץ', '<div id="platoon-roster-panel" style="font-size:13px;color:var(--muted)">טוען…</div>'):'');
     positionCommandSticky();
   }else{
     body.innerHTML=`
@@ -10953,7 +11042,7 @@ function buildAlertObjects(pts=patients){
   serverWatchdogAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
   tourniquetSnoozeAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
   pcReviewAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
-  duplicateCandidates(pts).forEach(([a,b],idx)=>pushAlert(alerts,{id:`dup-${a.id}-${b.id}`,type:'DUPLICATE_SUSPECTED',severity:'medium',owner:'pc',audience:['pc','chamal'],escalatesTo:null,actionRequired:'merge_duplicate',scope:'site',category:'integrity',siteId:a.siteId||b.siteId||'SITE_A',patientId:a.id,title:`חשד לכפילות ${a.id} ↔ ${b.id}`,detail:'בדיקה ידנית בלבד; אין מיזוג הרסני של אירועים'}));
+  duplicateCandidates(pts).forEach(([a,b],idx)=>pushAlert(alerts,{id:`dup-${a.id}-${b.id}`,type:'DUPLICATE_SUSPECTED',severity:'medium',owner:'pc',audience:['pc','chamal'],escalatesTo:null,actionRequired:'merge_duplicate',scope:'site',category:'integrity',siteId:a.siteId||b.siteId||'SITE_A',patientId:a.id,title:`חשד לכפילות ${a.visualId||a.id} ↔ ${b.visualId||b.id}`,detail:'בדיקה ידנית בלבד; אין מיזוג הרסני של אירועים'}));
   const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id)):siteExternalReports(cmdActiveSite);
   if(currentUser){
     openIncidentTypeReports().forEach(x=>pushAlert(alerts,{id:`incident-type-report-${x.id}`,type:'INCIDENT_TYPE_MISMATCH',severity:'medium',owner:'pc',audience:['pc','cc'],escalatesTo:null,actionRequired:'acknowledge',scope:'site',category:'integrity',siteId:'SITE_A',
@@ -10966,7 +11055,9 @@ function buildAlertObjects(pts=patients){
     if(auth.incidentType && auth.incidentType!==typeReport.type) pushAlert(alerts,{id:`incident-type-mismatch-${typeReport.siteId}`,type:'INCIDENT_TYPE_MISMATCH',severity:'medium',owner:'pc',audience:['pc','cc'],escalatesTo:null,actionRequired:'acknowledge',scope:'site',category:'integrity',siteId:typeReport.siteId,title:'פער בסוג אירוע: חובש מול חילוץ',detail:`חילוץ: ${INCIDENT_TYPE_LABELS[auth.incidentType]} · חובש: ${INCIDENT_TYPE_LABELS[typeReport.type]} · סוג החילוץ נשאר בתוקף`});
   }
   const conflicts=externalConflictCount(pts,reports);
-  if(conflicts>0) pushAlert(alerts,{id:`external-conflict-${cmdActiveSite}`,type:'EXTERNAL_REPORT_CONFLICT',severity:conflicts>2?'high':'medium',owner:'chamal',audience:['pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'verify_report',scope:'site',category:'integrity',siteId:cmdActiveSite,title:'פער דיווח חיצוני מול שדה',detail:`${conflicts} פערים בין דיווח חיצוני לספירה מאושרת`});
+  // Only against a report that exists (V2.99.92): with none, every field casualty counted as a
+  // "gap" and command always saw a high external-report alert in an incident nobody reported on.
+  if(reports.length && conflicts>0) pushAlert(alerts,{id:`external-conflict-${cmdActiveSite}`,type:'EXTERNAL_REPORT_CONFLICT',severity:conflicts>2?'high':'medium',owner:'chamal',audience:['pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'verify_report',scope:'site',category:'integrity',siteId:cmdActiveSite,title:'פער דיווח חיצוני מול שדה',detail:`${conflicts} פערים בין דיווח חיצוני לספירה מאושרת`});
   const unsynced=pts.reduce((sum,p)=>sum+(p.unsyncedEvents||0),0)+localOutboxCount();
   if(unsynced>0) pushAlert(alerts,{id:`sync-backlog-${cmdActiveSite}`,type:'UNSYNCED_EVENT_BACKLOG',severity:unsynced>5?'high':'low',owner:'chamal',audience:unsynced>5?['pc','cc','chamal']:['medic','pc'],escalatesTo:unsynced>5?'cc':null,escalateAfterMin:unsynced>5?5:null,actionRequired:'review_sync',scope:'system',category:'integrity',siteId:cmdActiveSite,title:'אירועים מקומיים לא מסונכרנים',detail:`${unsynced} אירועים ממתינים בתור המקומי`});
   requestAlertObjects(reinforcementRequests.filter(isRequestOpen)).forEach(a=>alerts.push(a));
@@ -14447,14 +14538,22 @@ function externalConflictCount(pts, reports){
   const reported=(reports||[]).reduce((a,r)=>({red:a.red+(r.red||0),yellow:a.yellow+(r.yellow||0),green:a.green+(r.green||0)}),{red:0,yellow:0,green:0});
   return Math.abs(field.red-reported.red)+Math.abs(field.yellow-reported.yellow)+Math.abs(field.green-reported.green);
 }
+// Two casualties are a suspected duplicate only on the same site, in the same known sector, with an
+// overlapping injury or both trapped (V2.99.92). Before, an unknown building and floor counted as one
+// sector, sites were not compared and two casualties who were both "not trapped" matched, so in a
+// drill almost every pair on every site was flagged.
+function sectorIsKnown(sector){ return sector.building!=='לא ידוע' || sector.floor!=='קרקע/לא ידוע'; }
 function duplicateCandidates(pts){
   const pairs=[];
   for(let i=0;i<pts.length;i++){
     for(let j=i+1;j<pts.length;j++){
       const a=pts[i], b=pts[j];
-      const sameSector=sectorFromLocation(a.location).building===sectorFromLocation(b.location).building && sectorFromLocation(a.location).floor===sectorFromLocation(b.location).floor;
+      if((a.siteId||'SITE_A')!==(b.siteId||'SITE_A')) continue;
+      const sa=sectorFromLocation(a.location), sb=sectorFromLocation(b.location);
+      const sameSector=sectorIsKnown(sa) && sa.building===sb.building && sa.floor===sb.floor;
       const injuryOverlap=(a.injury||'').split(/[ +,]/).some(token=>token.length>2 && (b.injury||'').includes(token));
-      if(sameSector && (injuryOverlap || normalizeTrapStatus(a)===normalizeTrapStatus(b))) pairs.push([a,b]);
+      const bothTrapped=normalizeTrapStatus(a)==='trapped' && normalizeTrapStatus(b)==='trapped';
+      if(sameSector && (injuryOverlap || bothTrapped)) pairs.push([a,b]);
     }
   }
   return pairs.slice(0,4);
@@ -15573,25 +15672,7 @@ function renderCommandOperationalPanels(pts, site){
   // Real device_presence rows when logged in and available; local-demo mode (no login, so
   // _remoteDevicePresence never populates) falls back to inferring devices from locally-known
   // patients' lastTouchedBy — the previous behavior, unchanged for the offline demo story.
-  const deviceMap=new Map();
-  if(currentUser && _remoteDevicePresence.length){
-    _remoteDevicePresence.forEach(d=>{
-      if(!deviceMap.has(d.device_id)) deviceMap.set(d.device_id,{id:d.device_id,last:Date.parse(d.last_heartbeat_at)||0,patients:0,unsynced:0,syncStatus:d.sync_status});
-    });
-    pts.forEach(p=>{
-      const id=p.lastTouchedBy||p.medic;
-      if(id && deviceMap.has(id)) deviceMap.get(id).patients++;
-    });
-    if(!deviceMap.has(getDeviceId())) deviceMap.set(getDeviceId(),{id:getDeviceId(),last:Date.now(),patients:0,unsynced:localOutboxCount()});
-    else deviceMap.get(getDeviceId()).unsynced=localOutboxCount();
-  } else {
-    pts.forEach(p=>{
-      const id=p.lastTouchedBy||p.medic||'UNKNOWN';
-      if(!deviceMap.has(id)) deviceMap.set(id,{id,last:0,patients:0,unsynced:0});
-      const d=deviceMap.get(id); d.patients++; d.unsynced+=(p.unsyncedEvents||0); d.last=Math.max(d.last,p.lastVitalsAt||0,Date.parse(p.lastModifiedAt||'')||0);
-    });
-    if(!deviceMap.has(getDeviceId())) deviceMap.set(getDeviceId(),{id:getDeviceId(),last:Date.now(),patients:0,unsynced:localOutboxCount()});
-  }
+  const deviceMap=new Map(commandDeviceRows(pts).map(d=>[d.id,d]));
   document.getElementById('cmd-device-panel').innerHTML=[...deviceMap.values()].map(d=>{
     const silent=C5Rules.isDeviceSilent(d.last);
     return `<div class="device-row ${silent?'offline':''}"><div><div class="device-name">${d.id}</div><div class="device-meta">${d.patients} פצועים · ${d.unsynced} unsynced</div></div><div class="sync-pill ${silent?'offline':''}">${silent?'SILENT':timeAgoLabel(d.last)}</div></div>`;
@@ -15656,12 +15737,36 @@ function renderCommandOperationalPanels(pts, site){
 
   const dupes=duplicateCandidates(pts);
   document.getElementById('cmd-duplicates').innerHTML=dupes.length?dupes.map(([a,b])=>`<div class="cmd-matrix-row critical">
-    <div><div class="cmd-matrix-title">${a.id} ↔ ${b.id}</div><div class="cmd-matrix-sub">${sectorFromLocation(a.location).building} קומה ${sectorFromLocation(a.location).floor} · מיזוג לא הורס אירועים</div></div>
+    <div><div class="cmd-matrix-title">${escAttr(a.visualId||a.id)} ↔ ${escAttr(b.visualId||b.id)}</div><div class="cmd-matrix-sub">${sectorFromLocation(a.location).building} קומה ${sectorFromLocation(a.location).floor} · מיזוג לא הורס אירועים</div></div>
     <div class="cmd-matrix-counts"><span style="color:var(--orange)">חשד לכפילות</span></div>
   </div>`).join(''):`<div class="cmd-matrix-row"><div class="cmd-matrix-sub">${conflicts?`${conflicts} פערי דיווח חיצוני מול שדה`:'אין כפילויות חשודות כרגע'}</div></div>`;
   setCmdPanelMeta('duplicates', `${dupes.length} חשודים`);
   const roleAudience=commandRole==='cc'?'cc':commandRole==='chamal'?'chamal':'pc';
   setCmdPanelMeta('alerts', `${buildAlertObjects(pts).filter(a=>a.audience.includes(roleAudience)).length} מנותבות`);
+}
+// One row per field device: real device_presence signed in, inferred from patients in the local demo.
+// Shared by the full command screen's device panel and the חמ״ל panel (V2.99.92).
+function commandDeviceRows(pts){
+  const deviceMap=new Map();
+  if(currentUser && _remoteDevicePresence.length){
+    _remoteDevicePresence.forEach(d=>{
+      if(!deviceMap.has(d.device_id)) deviceMap.set(d.device_id,{id:d.device_id,last:Date.parse(d.last_heartbeat_at)||0,patients:0,unsynced:0,syncStatus:d.sync_status});
+    });
+    pts.forEach(p=>{
+      const id=p.lastTouchedBy||p.medic;
+      if(id && deviceMap.has(id)) deviceMap.get(id).patients++;
+    });
+    if(!deviceMap.has(getDeviceId())) deviceMap.set(getDeviceId(),{id:getDeviceId(),last:Date.now(),patients:0,unsynced:localOutboxCount()});
+    else deviceMap.get(getDeviceId()).unsynced=localOutboxCount();
+  } else {
+    pts.forEach(p=>{
+      const id=p.lastTouchedBy||p.medic||'UNKNOWN';
+      if(!deviceMap.has(id)) deviceMap.set(id,{id,last:0,patients:0,unsynced:0});
+      const d=deviceMap.get(id); d.patients++; d.unsynced+=(p.unsyncedEvents||0); d.last=Math.max(d.last,p.lastVitalsAt||0,Date.parse(p.lastModifiedAt||'')||0);
+    });
+    if(!deviceMap.has(getDeviceId())) deviceMap.set(getDeviceId(),{id:getDeviceId(),last:Date.now(),patients:0,unsynced:localOutboxCount()});
+  }
+  return [...deviceMap.values()];
 }
 function renderCmdContent(){
   ensureSiteReadiness();
@@ -16068,7 +16173,7 @@ function renderCmdPatients(){
         <div style="margin-top:3px">${triageBand(p.triage,p)}</div>
         <div style="font-size:12px;color:var(--muted)">${injuryLabel(p)} · ${patientStatusLabel(p)}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">נגע אחרון: ${p.lastTouchedBy||p.medic||'—'} · ${p.confirmedClinical===false?'מדווח':'מאושר שדה'}</div>
-        ${assessmentDebtForPatient(p).length?`<div style="font-size:11px;color:var(--orange);font-weight:700;margin-top:2px">יש לקחת מדדים: ${assessmentDebtForPatient(p).join(', ')}</div>`:''}
+        ${assessmentDebtForPatient(p).length?`<div style="font-size:11px;color:var(--orange);font-weight:700;margin-top:2px">יש לקחת מדדים: ${assessmentDebtForPatient(p).map(debtLabel).join(' · ')}</div>`:''}
         ${tourniquetTimerLabel(p)?`<div style="margin-top:4px"><span class="tq-timer ${tourniquetTimerLabel(p).cls}">${tourniquetTimerLabel(p).label}</span></div>`:''}
         ${p.deterioration&&p.deterioration.length?`<div style="font-size:11px;color:var(--red);font-weight:700;margin-top:2px">⚠ ${p.deterioration.join(' · ')}</div>`:''}
         ${!(p.deterioration&&p.deterioration.length)&&isVitalsOverdue(p)?`<div style="font-size:11px;color:var(--orange);margin-top:2px">⏱ מדדים נדרשים</div><button class="demo-mini-btn" onclick="event.stopPropagation();remindMedicVitals('${p.id}')" style="margin-top:6px">תזכר לחובש</button>`:''}
