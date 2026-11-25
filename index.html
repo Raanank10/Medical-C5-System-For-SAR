@@ -667,8 +667,6 @@ input[type=range]{width:100%;accent-color:var(--orange);}
 .chamal-grid>div,.chamal-sites>div{min-width:0;}
 .chamal-grid .role-list{grid-template-columns:minmax(0,1fr);min-width:0;}
 .chamal-grid .cmd-strip-alert{min-width:0;}
-.chamal-alert-age{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap;align-self:center;}
-.chamal-alert-age.late{color:var(--orange);font-weight:800;}
 @media (min-width:1024px){ .chamal-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);} }
 .role-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;}
 .role-section-title{font-size:13px;font-weight:900;margin-bottom:8px;color:var(--text);}
@@ -8358,7 +8356,7 @@ function commandAlertGroups(alerts){
     return g;
   }).sort((x,y)=>x.rank-y.rank || x.oldest-y.oldest);
 }
-function commandAlertLineHtml(group, withAge=false){
+function commandAlertLineHtml(group){
   const p=group.patientId ? patients.find(x=>x.id===group.patientId) : null;
   const prefix=p ? `${p.visualId||p.id} — ` : '';
   const short=a=>String(a.title||'').startsWith(prefix) ? String(a.title).slice(prefix.length) : String(a.title||'');
@@ -8367,11 +8365,9 @@ function commandAlertLineHtml(group, withAge=false){
   const cls=group.rank===0?'crit':group.rank===1?'high':'med';
   const open=p?` onclick="openPatientFromAlert('${p.id}')"`:'';
   const ack=p?`<button class="ack-btn" onclick="event.stopPropagation();acknowledgeAlert('${p.id}')">בטיפול</button>`:'';
-  const ageMin=withAge&&Number.isFinite(group.oldest)?Math.max(0,Math.floor((Date.now()-group.oldest)/60000)):null;
-  const age=ageMin===null?'':`<span class="chamal-alert-age${ageMin>=10?' late':''}" data-alert-age>${ageMin} דק׳</span>`;
   return `<div class="cmd-strip-alert ${cls}" data-alert-group="${escAttr(group.key)}"${open}>
     <span class="cmd-strip-alert-id">${p?escAttr(p.visualId||p.id):'מוקד'}</span>
-    <div style="flex:1;min-width:0"><div class="cmd-strip-alert-title">${p?`${escAttr(TRIAGE_LABELS[p.triage]||'')} · `:''}${escAttr(short(first))}</div><div class="cmd-strip-alert-sub">${escAttr(rest||first.detail||'')}</div></div>${age}${ack}
+    <div style="flex:1;min-width:0"><div class="cmd-strip-alert-title">${p?`${escAttr(TRIAGE_LABELS[p.triage]||'')} · `:''}${escAttr(short(first))}</div><div class="cmd-strip-alert-sub">${escAttr(rest||first.detail||'')}</div></div>${ack}
   </div>`;
 }
 function commandLongestTourniquet(pts){
@@ -8464,19 +8460,26 @@ function openChamalSite(siteId){ cmdActiveSite=siteId; openLegacyForRole('chamal
 function chamalSiteCardHtml(site){
   const pts=getSitePatients(site.id);
   const st=ensureSiteStatusFields(site.id);
-  const t0Min=st.t0?Math.max(0,Math.floor((Date.now()-Date.parse(st.t0))/60000)):null;
-  const t0=st.t0
-    ? `T0 ${new Date(st.t0).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})} · לפני ${t0Min} דק׳`
-    : `<span style="color:var(--orange)">T0 טרם נקבע</span>`;
+  const t0Ms=st.t0?Date.parse(st.t0):NaN;
+  const t0=Number.isFinite(t0Ms)
+    ? `T0 ${new Date(t0Ms).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})} · ${t0Ms>Date.now()?'<span style="color:var(--orange)">בעתיד, בדוק שעון</span>':`לפני ${Math.floor((Date.now()-t0Ms)/60000)} דק׳`}`
+    : `<span style="color:var(--orange)">${st.t0?'T0 לא קריא':'T0 טרם נקבע'}</span>`;
   const status=st.siteClear?.cleared?'אתר נקי':(INCIDENT_STATUS_LABELS[st.incidentStatus]||st.incidentStatus);
-  // Golden hour (same 45 / 60 minute watchdog as the full screen): casualties not yet evacuated,
-  // counted from the injury time, "משוערת" when the field did not enter one.
-  const open=pts.filter(p=>evacuationStage(p)!=='evacuated');
-  const gh={amber:0,red:0};
-  open.forEach(p=>{ const st2=watchdogState(Math.floor((Date.now()-patientInjuryTime(p).ms)/60000),45,60); if(st2==='red') gh.red++; else if(st2==='amber') gh.amber++; });
-  const ghLine=gh.red||gh.amber
-    ? `<div class="chamal-site-line" data-chamal-golden style="color:${gh.red?'var(--red)':'var(--orange)'};font-weight:800">⏱ שעת זהב: ${gh.red} עברו 60 דק׳ · ${gh.amber} מעל 45 דק׳ (לא פונו)</div>`
-    : `<div class="chamal-site-line" data-chamal-golden>⏱ שעת זהב: אין פצוע שלא פונה מעל 45 דק׳</div>`;
+  // Golden hour (the full screen's 45 / 60 minute watchdog thresholds), for casualties still on the
+  // way out: not evacuated, and not black / deceased. Counted from the injury time; how many of those
+  // times are estimates (no time entered in the field) and how many cannot be read is always shown.
+  const open=pts.filter(p=>evacuationStage(p)!=='evacuated' && !isDeceasedForEvac(p));
+  const gh={amber:0,red:0,estimated:0,unknown:0};
+  open.forEach(p=>{
+    const inj=patientInjuryTime(p);
+    if(!Number.isFinite(inj.ms)){ gh.unknown++; return; }
+    if(inj.estimated) gh.estimated++;
+    const level=watchdogState(Math.floor((Date.now()-inj.ms)/60000),45,60);
+    if(level==='red') gh.red++; else if(level==='amber') gh.amber++;
+  });
+  const ghNotes=[gh.estimated?`${gh.estimated} לפי שעה משוערת`:'', gh.unknown?`${gh.unknown} ללא שעת פציעה`:''].filter(Boolean).join(' · ');
+  const ghMain=gh.red||gh.amber ? `${gh.red} עברו 60 דק׳ · ${gh.amber} מעל 45 דק׳` : 'אף פצוע לא מעל 45 דק׳';
+  const ghLine=`<div class="chamal-site-line" data-chamal-golden style="${gh.red?'color:var(--red);font-weight:800':gh.amber?'color:var(--orange);font-weight:800':''}">⏱ שעת זהב (לא פונו, ללא שחורים): ${ghMain}${ghNotes?` · <span style="color:var(--orange)">${ghNotes}</span>`:''}</div>`;
   const stage=k=>pts.filter(p=>evacuationStage(p)===k).length;
   const wait=longestEvacPointWait(pts.filter(p=>evacuationStage(p)==='evac_point'));
   const reports=siteExternalReports(site.id);
@@ -8487,6 +8490,7 @@ function chamalSiteCardHtml(site){
   return `<div class="chamal-site" data-chamal-site="${escAttr(site.id)}">
     <div class="chamal-site-head"><div><div class="chamal-site-name">${escAttr(site.name)}</div><div class="chamal-site-line">${escAttr(incidentTypeLabel(site.id))} · ${escAttr(status)} · ${t0}</div></div><div class="chamal-site-total">${pts.length}<span>פצועים</span></div></div>
     ${siteTriageGridHtml(pts)}
+    ${(()=>{ const pending=pts.filter(p=>!['red','yellow','green','black'].includes(p.triage)).length; return pending?`<div class="chamal-site-line" data-chamal-pending style="color:var(--orange);font-weight:800">ממתינים למיון: ${pending}</div>`:''; })()}
     <div class="chamal-site-line" data-chamal-evac>בזירה ${stage('on_scene')} · בדרך לנאפ״ל ${stage('to_evac_point')} · בנאפ״ל ${stage('evac_point')}${wait!==null?` (עד ${wait} דק׳)`:''} · פונו ${stage('evacuated')}</div>
     ${ghLine}
     ${ext}
@@ -8504,7 +8508,7 @@ function renderChamalPanel(ctx){
   const sites=allSites.filter(s=>s.id!=='ALL');
   const clinical=commandAlertGroups(ctx.alerts.filter(a=>!isPictureQualityAlert(a)));
   const quality=commandAlertGroups(ctx.alerts.filter(isPictureQualityAlert));
-  const lines=(groups,empty)=>groups.length?groups.map(g=>commandAlertLineHtml(g,true)).join(''):`<div class="role-row-sub" style="padding:6px 2px">${empty}</div>`;
+  const lines=(groups,empty)=>groups.length?groups.map(g=>commandAlertLineHtml(g)).join(''):`<div class="role-row-sub" style="padding:6px 2px">${empty}</div>`;
   const chip=`<button class="cmd-strip-chip" data-chamal-responsibilities onclick="toggleChamalResponsibilities()">${chamalResponsibilitiesOpen?'סגור אחריות ✕':'ⓘ האחריות שלי'}</button>`;
   return `<div id="command-sticky" class="cmd-sticky">${renderCommandStatusStrip('chamal', ctx.pts, [])}</div>
     ${dashboardFocusBanner()}
@@ -8512,8 +8516,8 @@ function renderChamalPanel(ctx){
     ${chamalResponsibilitiesOpen?roleSection('האחריות שלי', ctx.responsibilities):''}
     <div class="chamal-sites" data-chamal-sites>${sites.map(chamalSiteCardHtml).join('')||roleRow('אין מוקדים פתוחים','')}</div>
     <div class="chamal-grid">
-      <div data-chamal-clinical>${roleSection(`התראות קליניות · ${clinical.length}`, lines(clinical,'אין התראות קליניות פתוחות'))}</div>
-      <div data-chamal-quality>${roleSection(`אמינות תמונת מצב · ${quality.length}`, lines(quality,'אין כפילויות, פערי דיווח או תור לא מסונכרן'))}${chamalDevicesHtml(ctx.pts)}</div>
+      <div data-chamal-clinical>${roleSection(`התראות לטיפול · ${clinical.length}`, lines(clinical,'אין התראות קליניות פתוחות'))}</div>
+      <div data-chamal-quality>${roleSection(`אמינות תמונת מצב · ${quality.length}`, lines(quality,'אין חשד לכפילות ואין פער דיווח חיצוני'))}${chamalDevicesHtml(ctx.pts)}</div>
     </div>
     ${roleSection('בקשות / הקצאות פתוחות', ctx.reqHtml)}
     <div class="demo-actions" style="margin:0;grid-template-columns:1fr 1fr">${ctx.actions}<button class="demo-mini-btn" onclick="goTo('aar')">סיכום אירוע חי</button></div>`;
@@ -11055,9 +11059,15 @@ function buildAlertObjects(pts=patients){
     if(auth.incidentType && auth.incidentType!==typeReport.type) pushAlert(alerts,{id:`incident-type-mismatch-${typeReport.siteId}`,type:'INCIDENT_TYPE_MISMATCH',severity:'medium',owner:'pc',audience:['pc','cc'],escalatesTo:null,actionRequired:'acknowledge',scope:'site',category:'integrity',siteId:typeReport.siteId,title:'פער בסוג אירוע: חובש מול חילוץ',detail:`חילוץ: ${INCIDENT_TYPE_LABELS[auth.incidentType]} · חובש: ${INCIDENT_TYPE_LABELS[typeReport.type]} · סוג החילוץ נשאר בתוקף`});
   }
   const conflicts=externalConflictCount(pts,reports);
-  // Only against a report that exists (V2.99.92): with none, every field casualty counted as a
-  // "gap" and command always saw a high external-report alert in an incident nobody reported on.
-  if(reports.length && conflicts>0) pushAlert(alerts,{id:`external-conflict-${cmdActiveSite}`,type:'EXTERNAL_REPORT_CONFLICT',severity:conflicts>2?'high':'medium',owner:'chamal',audience:['pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'verify_report',scope:'site',category:'integrity',siteId:cmdActiveSite,title:'פער דיווח חיצוני מול שדה',detail:`${conflicts} פערים בין דיווח חיצוני לספירה מאושרת`});
+  // Per site, and only against a report that exists (V2.99.92). Before, the field count of every
+  // patient passed in (all sites, for CC and chamal) was compared with the reports of cmdActiveSite
+  // alone, and with no report every field casualty counted as a "gap".
+  [...new Set(pts.map(p=>p.siteId||'SITE_A'))].forEach(siteId=>{
+    const siteReports=siteExternalReports(siteId);
+    if(!siteReports.length) return;
+    const gaps=externalConflictCount(pts.filter(p=>(p.siteId||'SITE_A')===siteId), siteReports);
+    if(gaps>0) pushAlert(alerts,{id:`external-conflict-${siteId}`,type:'EXTERNAL_REPORT_CONFLICT',severity:gaps>2?'high':'medium',owner:'chamal',audience:['pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'verify_report',scope:'site',category:'integrity',siteId,title:`פער דיווח חיצוני מול שדה · ${siteNameById(siteId)}`,detail:`${gaps} פערים בין דיווח חיצוני לספירה מאושרת`});
+  });
   const unsynced=pts.reduce((sum,p)=>sum+(p.unsyncedEvents||0),0)+localOutboxCount();
   if(unsynced>0) pushAlert(alerts,{id:`sync-backlog-${cmdActiveSite}`,type:'UNSYNCED_EVENT_BACKLOG',severity:unsynced>5?'high':'low',owner:'chamal',audience:unsynced>5?['pc','cc','chamal']:['medic','pc'],escalatesTo:unsynced>5?'cc':null,escalateAfterMin:unsynced>5?5:null,actionRequired:'review_sync',scope:'system',category:'integrity',siteId:cmdActiveSite,title:'אירועים מקומיים לא מסונכרנים',detail:`${unsynced} אירועים ממתינים בתור המקומי`});
   requestAlertObjects(reinforcementRequests.filter(isRequestOpen)).forEach(a=>alerts.push(a));
@@ -14538,21 +14548,25 @@ function externalConflictCount(pts, reports){
   const reported=(reports||[]).reduce((a,r)=>({red:a.red+(r.red||0),yellow:a.yellow+(r.yellow||0),green:a.green+(r.green||0)}),{red:0,yellow:0,green:0});
   return Math.abs(field.red-reported.red)+Math.abs(field.yellow-reported.yellow)+Math.abs(field.green-reported.green);
 }
-// Two casualties are a suspected duplicate only on the same site, in the same known sector, with an
-// overlapping injury or both trapped (V2.99.92). Before, an unknown building and floor counted as one
-// sector, sites were not compared and two casualties who were both "not trapped" matched, so in a
-// drill almost every pair on every site was flagged.
-function sectorIsKnown(sector){ return sector.building!=='לא ידוע' || sector.floor!=='קרקע/לא ידוע'; }
+// Two casualties are a suspected duplicate only on the same site, in the same recorded zone, with an
+// overlapping injury or both trapped / without access (V2.99.92). The field flows keep the site
+// address in location and the zone in locDetail (zoneLabel(), sometimes followed by " · " and a
+// description), so the zone is read from there; location was the site address and never told two
+// places apart. Before, sites were not compared, an unparsed location counted as one sector and two
+// casualties who were both "not trapped" matched, so almost every pair on every site was flagged.
+const DUPLICATE_UNKNOWN_ZONES=new Set(['','לא צוין','אזור לא צוין']);
+function duplicateZoneOf(p){ return String(p.zone||String(p.locDetail||'').split(' · ')[0]||'').trim(); }
+function isTrappedForDuplicate(p){ return ['trapped','access_blocked'].includes(normalizeTrapStatus(p)); }
 function duplicateCandidates(pts){
   const pairs=[];
   for(let i=0;i<pts.length;i++){
     for(let j=i+1;j<pts.length;j++){
       const a=pts[i], b=pts[j];
       if((a.siteId||'SITE_A')!==(b.siteId||'SITE_A')) continue;
-      const sa=sectorFromLocation(a.location), sb=sectorFromLocation(b.location);
-      const sameSector=sectorIsKnown(sa) && sa.building===sb.building && sa.floor===sb.floor;
+      const za=duplicateZoneOf(a), zb=duplicateZoneOf(b);
+      const sameSector=!DUPLICATE_UNKNOWN_ZONES.has(za) && za===zb;
       const injuryOverlap=(a.injury||'').split(/[ +,]/).some(token=>token.length>2 && (b.injury||'').includes(token));
-      const bothTrapped=normalizeTrapStatus(a)==='trapped' && normalizeTrapStatus(b)==='trapped';
+      const bothTrapped=isTrappedForDuplicate(a) && isTrappedForDuplicate(b);
       if(sameSector && (injuryOverlap || bothTrapped)) pairs.push([a,b]);
     }
   }
@@ -15737,7 +15751,7 @@ function renderCommandOperationalPanels(pts, site){
 
   const dupes=duplicateCandidates(pts);
   document.getElementById('cmd-duplicates').innerHTML=dupes.length?dupes.map(([a,b])=>`<div class="cmd-matrix-row critical">
-    <div><div class="cmd-matrix-title">${escAttr(a.visualId||a.id)} ↔ ${escAttr(b.visualId||b.id)}</div><div class="cmd-matrix-sub">${sectorFromLocation(a.location).building} קומה ${sectorFromLocation(a.location).floor} · מיזוג לא הורס אירועים</div></div>
+    <div><div class="cmd-matrix-title">${escAttr(a.visualId||a.id)} ↔ ${escAttr(b.visualId||b.id)}</div><div class="cmd-matrix-sub">${escAttr(duplicateZoneOf(a))} · מיזוג לא הורס אירועים</div></div>
     <div class="cmd-matrix-counts"><span style="color:var(--orange)">חשד לכפילות</span></div>
   </div>`).join(''):`<div class="cmd-matrix-row"><div class="cmd-matrix-sub">${conflicts?`${conflicts} פערי דיווח חיצוני מול שדה`:'אין כפילויות חשודות כרגע'}</div></div>`;
   setCmdPanelMeta('duplicates', `${dupes.length} חשודים`);

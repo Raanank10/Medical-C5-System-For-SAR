@@ -1,10 +1,12 @@
 // Real-browser test of the חמ״ל panel (V2.99.92) and the three picture-quality fixes that came with it:
 // - chamal gets its own panel (one card per site, clinical alerts apart from picture-quality alerts,
 //   devices, open requests) instead of the generic role page; responsibilities sit behind a chip
-// - suspected duplicates: never across sites, never from an unknown sector, never from "both not
-//   trapped"; same site + same known sector + both trapped still flags; titles use the visual id
+// - suspected duplicates: by the recorded zone (locDetail, as the field flows write it; location is the
+//   site address), never across sites, never from an unknown zone, never from "both not trapped";
+//   same site + same zone + both trapped / no access still flags; titles use the visual id
 // - the full command screen never shows a raw missing-data key (missing_vitals, ...)
-// - the external-report gap alert needs a report to compare against
+// - the external-report gap alert is per site and needs that site's report
+// - golden-hour line leaves out black casualties and says how many injury times are estimates; pending triage shown
 // Checked at 412x915 (phone) and 1440x900 (laptop: sites and alert columns side by side).
 // Local demo mode, synthetic data only. Run: npm install && node scripts/browser_chamal_panel_test.js
 const path = require('path');
@@ -33,14 +35,16 @@ async function open(browser, viewport) {
     const ago = (m) => new Date(Date.now() - m * 60000).toISOString();
     const base = { vitals: { pulse: 110, spo2: 94, rr: 24, avpu: 'V' }, events: [], patientStatus: 'identified', createdAt: ago(20) };
     // Unknown sector, different sites, same injury and both not trapped: the old check flagged all of these.
-    patients.push({ ...base, id: 'cp-a1', visualId: 'A-01', triage: 'red', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', location: 'לובי', injury: 'פגיעת מעיכה', trapStatus: 'not_trapped' });
-    patients.push({ ...base, id: 'cp-a2', visualId: 'A-02', triage: 'yellow', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', location: 'חניה', injury: 'פגיעת מעיכה', trapStatus: 'not_trapped' });
-    patients.push({ ...base, id: 'cp-b1', visualId: 'B-01', triage: 'red', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', location: 'מרתף', injury: 'פגיעת מעיכה', trapStatus: 'not_trapped' });
-    // Same site, same known sector, both trapped: still a suspected duplicate.
-    patients.push({ ...base, id: 'cp-a3', visualId: 'A-03', triage: 'yellow', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', location: 'בניין 3, קומה 2', injury: 'שבר', trapStatus: 'trapped' });
-    patients.push({ ...base, id: 'cp-a4', visualId: 'A-04', triage: 'green', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', location: 'בניין 3, קומה 2', injury: 'חתך', trapStatus: 'trapped' });
-    // Same known sector and both trapped, but on the other site: never a duplicate.
-    patients.push({ ...base, id: 'cp-b2', visualId: 'B-02', triage: 'yellow', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', location: 'בניין 3, קומה 2', injury: 'שבר', trapStatus: 'trapped' });
+    patients.push({ ...base, id: 'cp-a1', visualId: 'A-01', triage: 'red', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', location: 'הרצל 12', locDetail: 'לובי', injury: 'פגיעת מעיכה', trapStatus: 'not_trapped' });
+    patients.push({ ...base, id: 'cp-a2', visualId: 'A-02', triage: 'yellow', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', location: 'הרצל 12', locDetail: 'חניה', injury: 'פגיעת מעיכה', trapStatus: 'not_trapped' });
+    patients.push({ ...base, id: 'cp-b1', visualId: 'B-01', triage: 'red', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', location: 'ב.ג. 45', locDetail: 'מרתף', injury: 'פגיעת מעיכה', trapStatus: 'not_trapped' });
+    // Same site, same zone (a description after " · " is not part of it), trapped + no access: a suspected duplicate.
+    patients.push({ ...base, id: 'cp-a3', visualId: 'A-03', triage: 'yellow', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', location: 'הרצל 12', locDetail: 'קומה 2 / דירה 5', injury: 'שבר', trapStatus: 'trapped' });
+    patients.push({ ...base, id: 'cp-a4', visualId: 'A-04', triage: 'green', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', location: 'הרצל 12', locDetail: 'קומה 2 / דירה 5 · חולצה כחולה', injury: 'חתך', trapStatus: 'access_blocked' });
+    // Same zone and trapped, but on the other site: never a duplicate. A black casualty and one waiting for triage.
+    patients.push({ ...base, id: 'cp-b3', visualId: 'B-03', triage: 'black', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', location: 'ב.ג. 45', locDetail: 'קומה 3', injury: 'מעיכה', createdAt: ago(90), tInjury: Date.now() - 90 * 60000, tInjurySource: 'entered' });
+    patients.push({ ...base, id: 'cp-b4', visualId: 'B-04', triage: 'pending', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', location: 'ב.ג. 45', locDetail: 'חצר', injury: 'לא ידוע' });
+    patients.push({ ...base, id: 'cp-b2', visualId: 'B-02', triage: 'yellow', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', location: 'ב.ג. 45', locDetail: 'קומה 2 / דירה 5', injury: 'שבר', trapStatus: 'trapped' });
     createMedicalResourceRequest({ resourceType: 'doctor_treatment', siteId: 'SITE_A', targetLocation: 'לובי' });
     startRoleDashboard('chamal');
   });
@@ -68,7 +72,8 @@ async function checkPanel(browser, viewport) {
       clinicalRect: clinical.getBoundingClientRect().toJSON(),
       qualityRect: quality.getBoundingClientRect().toJSON(),
       devices: body.querySelectorAll('[data-chamal-device]').length,
-      ages: body.querySelectorAll('[data-alert-age]').length,
+      golden: body.querySelector('[data-chamal-site="SITE_B"] [data-chamal-golden]')?.textContent || '',
+      pendingB: body.querySelector('[data-chamal-site="SITE_B"] [data-chamal-pending]')?.textContent || '',
       responsibilitiesShown: text.includes('אמינות נתונים ו-Sync'),
       hasChip: !!body.querySelector('[data-chamal-responsibilities]'),
       hasGenericMetrics: !!body.querySelector('.role-top-grid'),
@@ -87,7 +92,8 @@ async function checkPanel(browser, viewport) {
   assert(info.externalLine.includes('אין'), `${tag}: site A has no external report, line says: ${info.externalLine}`);
   assert(!info.responsibilitiesShown && info.hasChip, `${tag}: responsibilities must sit behind the chip, not at the top`);
   assert(info.devices >= 1, `${tag}: no device rows`);
-  assert(info.ages >= 1, `${tag}: alerts show no age`);
+  assert(info.pendingB.includes('ממתינים למיון: 1'), `${tag}: site B has one casualty waiting for triage, card says: ${info.pendingB}`);
+  assert(info.golden.includes('אף פצוע לא מעל 45') && info.golden.includes('משוערת'), `${tag}: golden-hour line must leave out the 90-min black casualty and name the estimated times: ${info.golden}`);
   assert(!info.rawKey, `${tag}: a raw missing-data key is on screen`);
   assert(!info.overflowX, `${tag}: the page scrolls sideways: ${info.overflowX}`);
 
@@ -115,6 +121,17 @@ async function checkPanel(browser, viewport) {
   await page.waitForTimeout(150);
 
   // An external report that disagrees with the field raises the gap alert and the site line says so.
+  // Site B reports exactly its field count; site A has no report: no gap alert at all (before, all
+  // sites' casualties were compared with one site's report).
+  const quiet = await page.evaluate(() => {
+    const b = allSites.find((x) => x.id === 'SITE_B');
+    const pb = getSitePatients('SITE_B');
+    const n = (t) => pb.filter((p) => p.triage === t).length;
+    b.externalReports = [{ id: 'ext-test-b', source: 'mda', red: n('red'), yellow: n('yellow'), green: n('green'), at: new Date().toISOString() }];
+    renderRoleDashboard('chamal');
+    return [...document.querySelectorAll('[data-chamal-quality] .cmd-strip-alert-title')].some((t) => t.textContent.includes('פער דיווח חיצוני'));
+  });
+  assert(!quiet, `${tag}: site B's matching report must not raise a gap alert for site A's casualties`);
   await page.evaluate(() => {
     siteData.externalReports = [{ id: 'ext-test-1', source: 'mda', red: 0, yellow: 0, green: 0, at: new Date().toISOString() }];
     renderRoleDashboard('chamal');
