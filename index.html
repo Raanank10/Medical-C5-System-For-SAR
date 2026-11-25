@@ -15675,7 +15675,7 @@ function renderCommandOperationalPanels(pts, site){
   const deviceMap=new Map(commandDeviceRows(pts).map(d=>[d.id,d]));
   document.getElementById('cmd-device-panel').innerHTML=[...deviceMap.values()].map(d=>{
     const silent=C5Rules.isDeviceSilent(d.last);
-    return `<div class="device-row ${silent?'offline':''}"><div><div class="device-name">${d.id}</div><div class="device-meta">${d.patients} פצועים · ${d.unsynced} unsynced</div></div><div class="sync-pill ${silent?'offline':''}">${silent?'SILENT':timeAgoLabel(d.last)}</div></div>`;
+    return `<div class="device-row ${silent?'offline':''}"><div><div class="device-name">${escAttr(d.id)}</div><div class="device-meta">${d.patients} פצועים · ${d.unsynced} unsynced</div></div><div class="sync-pill ${silent?'offline':''}">${silent?'SILENT':timeAgoLabel(d.last)}</div></div>`;
   }).join('');
   setCmdPanelMeta('devices', `${[...deviceMap.values()].filter(d=>C5Rules.isDeviceSilent(d.last)).length} שקטים מתוך ${deviceMap.size} מכשירים`);
 

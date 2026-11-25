@@ -142,6 +142,36 @@ async function checkPanel(browser, viewport) {
   assert(fullText.includes('יש לקחת מדדים:'), `${tag}: expected the missing-data line on the full screen`);
   assert(!/missing_vitals|stale_vitals|pending_handover|missing_trap_status|missing_evac/.test(fullText), `${tag}: raw missing-data key on the full command screen`);
 
+  // The full screen's device panel and the חמ״ל panel read one list (commandDeviceRows): same devices
+  // in both, demo path first, then the signed-in path with server presence rows (one silent).
+  const sameDevices = async (label) => {
+    const r = await page.evaluate(() => {
+      goTo('commander'); renderCommander();
+      const full = [...document.querySelectorAll('#cmd-device-panel .device-name')].map((e) => e.textContent).sort();
+      startRoleDashboard('chamal');
+      const panel = [...document.querySelectorAll('[data-chamal-device]')].map((e) => e.dataset.chamalDevice).sort();
+      const silent = [...document.querySelectorAll('[data-chamal-device].offline')].map((e) => e.dataset.chamalDevice);
+      return { full, panel, silent };
+    });
+    assert(r.full.length >= 1 && JSON.stringify(r.full) === JSON.stringify(r.panel), `${tag} ${label}: device lists differ: full ${r.full} / panel ${r.panel}`);
+    return r;
+  };
+  await sameDevices('demo');
+  const signed = await page.evaluate(() => {
+    currentUser = { id: 'USR-CHAMAL-TEST', role: 'chamal', email: 'chamal@example.test' };
+    const inc = SITE_TO_INCIDENT_ID.SITE_A || 'INC-TEST';
+    _remoteDevicePresence = [
+      { device_id: 'PHONE-LIVE-1', incident_id: inc, last_heartbeat_at: new Date(Date.now() - 60000).toISOString(), sync_status: 'ok' },
+      { device_id: 'PHONE-QUIET-2', incident_id: inc, last_heartbeat_at: new Date(Date.now() - 25 * 60000).toISOString(), sync_status: 'ok' },
+    ];
+    return true;
+  });
+  assert(signed, `${tag}: could not set the signed-in device state`);
+  const live = await sameDevices('signed in');
+  assert(live.panel.includes('PHONE-LIVE-1') && live.panel.includes('PHONE-QUIET-2'), `${tag}: server presence rows missing: ${live.panel}`);
+  assert(live.silent[0] === 'PHONE-QUIET-2', `${tag}: the silent device must be listed first and marked: ${live.silent}`);
+  await page.evaluate(() => { currentUser = null; _remoteDevicePresence = []; });
+
   assert(errors.length === 0, `${tag}: page errors: ${errors.join(' | ')}`);
   await context.close();
   console.log(`  ${tag}: ok`);
