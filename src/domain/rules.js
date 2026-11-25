@@ -594,6 +594,52 @@
     return null;
   }
 
+  // MARCH completion (WP-31, owner 2026-11-23). Each MARCH letter is documented as "treated" (a
+  // treatment in that letter), "effective" (treated, then a reassessment tap confirmed it worked)
+  // or "clear" (checked, nothing needed). Treated alone is not complete: a tourniquet on is not
+  // bleeding controlled until someone looks again. Clear is complete with no vitals needed (R and
+  // C included: the medic's check stands). H (hypothermia / head injury) also needs an AVPU on
+  // record, so the head-injury half is covered. PAWS letters are not judged here: they stay
+  // documented / not documented. Documentation only: nothing here blocks a save or a handover.
+  const MARCH_LETTERS = ["m", "a", "r", "c", "h"];
+  const MARCH_REVIEW_VALUES = ["treated", "effective", "clear"];
+  function marchLetterStatus(letter, value, avpu) {
+    if (!MARCH_REVIEW_VALUES.includes(value)) return "not_documented";
+    if (value === "treated") return "needs_reassessment";
+    if (letter === "h" && !["A", "V", "P", "U"].includes(avpu)) return "needs_avpu";
+    return "complete";
+  }
+  function marchStatus(review, avpu) {
+    const letters = {};
+    MARCH_LETTERS.forEach((id) => {
+      letters[id] = marchLetterStatus(id, review && typeof review === "object" ? review[id] : null, avpu);
+    });
+    const missing = MARCH_LETTERS.filter((id) => letters[id] !== "complete");
+    return { letters, complete: missing.length === 0, missing };
+  }
+  // A casualty's review is built from every MARCH-PAWS save on every phone (the New Patient form's
+  // march_review, then each later "טיפולים MARCH-PAWS" save, which carries only the letters touched
+  // then). Per letter, the newest documented value wins, so a later treatment reopens a letter that
+  // was effective, and a reassessment closes one that was treated. Entries: {at: ms, review}.
+  function mergeMarchReviews(entries) {
+    const out = {};
+    const at = {};
+    (Array.isArray(entries) ? entries : []).forEach((entry) => {
+      const t = Number(entry && entry.at);
+      const review = entry && entry.review;
+      if (!Number.isFinite(t) || !review || typeof review !== "object") return;
+      Object.keys(review).forEach((id) => {
+        const value = review[id];
+        if (!MARCH_REVIEW_VALUES.includes(value)) return;
+        if (at[id] === undefined || t >= at[id]) {
+          out[id] = value;
+          at[id] = t;
+        }
+      });
+    });
+    return out;
+  }
+
   return {
     AVPU_RANK,
     DEVICE_SILENCE_MS,
@@ -650,6 +696,9 @@
     RESCUE_PRIORITIES,
     rescueEvacPriority,
     LONG_ENTRAPMENT_MINUTES,
+    MARCH_LETTERS,
+    marchStatus,
+    mergeMarchReviews,
     rescueExtractionRequirement,
     suggestedSweepColor,
     suggestMstartTriage,

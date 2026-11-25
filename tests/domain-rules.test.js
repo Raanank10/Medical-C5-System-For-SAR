@@ -546,4 +546,55 @@ assert.deepEqual(rules.RESCUE_PRIORITIES, ["urgent", "pending", "not_urgent"]);
   assert.equal(rules.EVAC_POINT_WAIT_CRITICAL_MS, 60 * 60000);
 }
 
+// WP-31 (owner 2026-11-23): MARCH completion. Treated needs a reassessment; clear is complete with
+// no vitals (R and C too); H also needs an AVPU; PAWS is not judged.
+{
+  const all = (v) => ({ m: v, a: v, r: v, c: v, h: v });
+  assert.deepEqual(rules.MARCH_LETTERS, ["m", "a", "r", "c", "h"]);
+  // Nothing documented
+  let s = rules.marchStatus({}, null);
+  assert.equal(s.complete, false);
+  assert.deepEqual(s.missing, ["m", "a", "r", "c", "h"]);
+  assert.equal(s.letters.m, "not_documented");
+  assert.equal(rules.marchStatus(null, "A").letters.a, "not_documented");
+  // Treated is not complete until reassessed
+  s = rules.marchStatus(all("treated"), "A");
+  assert.deepEqual(Object.values(s.letters), Array(5).fill("needs_reassessment"));
+  assert.equal(s.complete, false);
+  // Effective and clear are complete with an AVPU
+  assert.equal(rules.marchStatus(all("effective"), "A").complete, true);
+  assert.equal(rules.marchStatus(all("clear"), "U").complete, true);
+  // R and C clear need no vitals; only H looks at AVPU
+  s = rules.marchStatus(all("clear"), null);
+  assert.equal(s.letters.r, "complete");
+  assert.equal(s.letters.c, "complete");
+  assert.equal(s.letters.h, "needs_avpu");
+  assert.deepEqual(s.missing, ["h"]);
+  assert.equal(rules.marchStatus({ ...all("clear"), h: "effective" }, "").letters.h, "needs_avpu");
+  assert.equal(rules.marchStatus({ ...all("clear"), h: "clear" }, "x").letters.h, "needs_avpu"); // not an AVPU value
+  // H treated without AVPU: reassessment is what is asked first
+  assert.equal(rules.marchStatus({ h: "treated" }, null).letters.h, "needs_reassessment");
+  // Unknown values and PAWS keys are ignored
+  assert.equal(rules.marchStatus({ m: "done" }, "A").letters.m, "not_documented");
+  assert.equal(rules.marchStatus({ ...all("clear"), p: null, ab: "treated" }, "A").complete, true);
+  assert.equal(Object.keys(rules.marchStatus(all("clear"), "A").letters).length, 5);
+
+  // Merge: newest documented value per letter wins; nulls never erase
+  const t0 = Date.parse("2026-11-23T10:00:00Z");
+  const merged = rules.mergeMarchReviews([
+    { at: t0, review: { m: "treated", a: "clear", r: null, c: "clear", h: "clear", p: "treated" } },
+    { at: t0 + 60000, review: { m: "effective", a: null } }, // reassessment closes M; A untouched
+    { at: t0 + 120000, review: { c: "treated" } }, // a later treatment reopens C
+  ]);
+  assert.deepEqual(merged, { m: "effective", a: "clear", c: "treated", h: "clear", p: "treated" });
+  // Order of entries does not matter, only their time
+  assert.deepEqual(
+    rules.mergeMarchReviews([{ at: t0 + 5, review: { m: "treated" } }, { at: t0, review: { m: "effective" } }]),
+    { m: "treated" }
+  );
+  // Bad entries are skipped
+  assert.deepEqual(rules.mergeMarchReviews([null, { at: "x", review: { m: "clear" } }, { at: t0, review: "m" }, { at: t0, review: { m: "bogus" } }]), {});
+  assert.deepEqual(rules.mergeMarchReviews(undefined), {});
+}
+
 console.log("Domain rule tests passed.");

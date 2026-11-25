@@ -12,6 +12,12 @@
 // - nothing chosen and no letter marked: refused, nothing sent; back: nothing clinical sent;
 // - a draft restored on reload stays on its casualty;
 // - the medic panel and the zone bar offer "פצוע חדש - טופס מלא", which opens the full form.
+// - WP-31 (owner 2026-11-23): reopening shows the letters earlier saves documented; a letter
+//   treated earlier offers "בדיקה חוזרת: הטיפול יעיל" and refuses "no treatment needed"; the save
+//   sends only what changed and the casualty's review merges newest-per-letter, with reviews from
+//   other phones (PATIENT_CREATED / NOTE_ADDED march_review); the card shows what MARCH still
+//   lacks; the PC's "חוב הערכה" lists red / yellow casualties with MARCH incomplete; a PC going
+//   hands-on records it the same way.
 //
 // Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_march_update_test.js
@@ -163,6 +169,63 @@ async function main() {
       return r;
     });
     assert(full.screen === 'screen-step1' && full.mode === 'extended', `"פצוע חדש - טופס מלא" opens the full form, got ${JSON.stringify(full)}`);
+
+    // 8. WP-31: reassessment of an earlier treatment, merge, other phones, card, PC debt row.
+    const pcDebt = () => page.evaluate(() => {
+      const holder = document.createElement('div');
+      holder.innerHTML = renderPcAssessmentDebtBoard();
+      const row = [...holder.querySelectorAll('.role-row')].find((el) => el.textContent.includes('MARCH לא הושלם'));
+      return row ? row.textContent.replace(/\s+/g, ' ') : null;
+    });
+    const reopened = await page.evaluate((id) => {
+      activeRoleDashboard = 'medic';
+      openMarchForPatient(id);
+      const tiles = Object.fromEntries([...document.querySelectorAll('#march-strip .march-tile')].map((el) => [el.id.replace('march-tile-', ''), el.querySelector('small').textContent]));
+      const btn = getComputedStyle(document.getElementById('march-reassess-m')).display !== 'none';
+      openMarchLetter('m');
+      toggleMarchClear(document.getElementById('march-clear-m'), 'm');
+      return { tiles, btn, clearM: state.marchClear.has('m'), review: marchReviewFromState() };
+    }, CHILD);
+    assert(reopened.tiles.m === 'בדיקה חוזרת' && reopened.tiles.r === 'בדיקה חוזרת' && reopened.tiles.h === 'חסר AVPU' && reopened.tiles.a === 'לא תועד',
+      `reopening shows the earlier letters, got ${JSON.stringify(reopened.tiles)}`);
+    assert(reopened.btn && !reopened.clearM, `M treated earlier offers the reassessment and refuses "no treatment needed", got ${JSON.stringify(reopened)}`);
+    assert(Object.values(reopened.review).every((v) => v === null), `nothing new before a tap, got ${JSON.stringify(reopened.review)}`);
+    await page.click('#march-reassess-m');
+    const before8 = await page.evaluate(() => getOutbox().length);
+    await page.click('#btn-step7');
+    const merged = await page.evaluate(({ id, n }) => {
+      const p = patients.find((x) => x.id === id);
+      const note = getOutbox().slice(n).find((e) => e.type === 'NOTE_ADDED');
+      return { sent: note?.payload_json?.march_review, review: p.marchReview, status: patientMarchStatus(p), card: document.querySelector('[data-march-status]')?.textContent };
+    }, { id: CHILD, n: before8 });
+    assert(merged.sent.m === 'effective' && ['a', 'r', 'c', 'h', 'p', 'ab', 'w', 's'].every((k) => merged.sent[k] === null), `only the reassessment is sent, got ${JSON.stringify(merged.sent)}`);
+    assert(merged.review.m === 'effective' && merged.review.r === 'treated' && merged.review.h === 'clear', `the casualty keeps earlier letters, got ${JSON.stringify(merged.review)}`);
+    assert(merged.status.missing.join() === 'a,r,c,h' && merged.card === 'MARCHחסר: A (לא תועד) · R (בדיקה חוזרת) · C (לא תועד) · H (AVPU)', `card shows what is missing, got ${merged.card}`);
+    await page.evaluate(() => { activeRoleDashboard = 'pc'; });
+    let debt = await pcDebt();
+    assert(debt && debt.includes('1 פצועים') && debt.includes('P009-TS'), `the PC's debt board lists the yellow casualty, got ${debt}`);
+
+    // Another phone documented A, R (reassessed) and C; this phone's own rows and other notes are ignored.
+    const remote = await page.evaluate((id) => {
+      const later = new Date(Date.now() + 60000).toISOString();
+      applyRemoteMarchReviews([
+        { id: 'e1', patient_id: id, device_id: 'other-phone', type: 'NOTE_ADDED', kind: 'march_review', local_timestamp: later, march_review: { a: 'clear', r: 'effective', c: 'clear', h: 'bogus' } },
+        { id: 'e2', patient_id: id, device_id: 'other-phone', type: 'NOTE_ADDED', kind: 'free_text', local_timestamp: later, march_review: { m: 'treated' } },
+        { id: 'e3', patient_id: id, device_id: getDeviceId(), type: 'NOTE_ADDED', kind: 'march_review', local_timestamp: later, march_review: { m: 'treated' } },
+      ]);
+      const p = patients.find((x) => x.id === id);
+      return { review: patientMarchReview(p), missing: patientMarchStatus(p).missing.join() };
+    }, CHILD);
+    assert(remote.review.m === 'effective' && remote.review.r === 'effective' && remote.review.a === 'clear' && remote.review.h === 'clear' && remote.missing === 'h',
+      `other phones' reviews merge in, got ${JSON.stringify(remote)}`);
+    await page.evaluate((id) => { const p = patients.find((x) => x.id === id); p.vitals = { ...p.vitals, avpu: 'A' }; openPatient(id); }, CHILD);
+    const done = await page.evaluate(() => document.querySelector('[data-march-status]')?.getAttribute('data-march-status'));
+    debt = await pcDebt();
+    assert(done === 'complete' && debt && debt.includes('0 פצועים'), `with AVPU MARCH is complete and leaves the debt board, got ${done} / ${debt}`);
+
+    // A PC going hands-on records MARCH the same way (TREATMENT_RECORDING_ROLES has pc).
+    const pcHands = await page.evaluate((id) => { openMarchForPatient(id); const s = document.querySelector('.screen.active')?.id; cancelMarchUpdate(); activeRoleDashboard = 'medic'; return s; }, CHILD);
+    assert(pcHands === 'screen-step7', `a PC opens MARCH-PAWS for a casualty, got ${pcHands}`);
 
     assert(pageErrors.length === 0, `uncaught page error(s): ${pageErrors.join(' | ')}`);
     await page.close();

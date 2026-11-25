@@ -213,7 +213,8 @@ Since V2.99.62 the PC (חוג"ד) and CC (מ״פ רפואה) panels are a sticky
 - No alert may be visible only inside a tab. Every alert routed to the role (the alert pipeline, including server watchdog alerts) is in the strip, one line per patient, coloured by its most severe alert, most severe first. Collapsed, the strip shows the top line and "+N התראות"; tapping opens the rest inside the strip.
 - Tab badges count patients (a site-level alert counts once), from the same alert list; the UI only maps alert types to tabs and adds no rule logic.
 - The full command screen (חפ״ק) is reached from the "מסך בקרה מלא (חפ״ק)" button at the bottom of כוחות.
-- MARCH is not on the command panels: it belongs to the medic's and, when going hands-on, the PC's patient flow (backlog B2 in `GAP_CLOSURE_PLAN.md`).
+- MARCH is not on the command panels: it belongs to the medic's and, when going hands-on, the PC's patient flow (backlog B2 in `GAP_CLOSURE_PLAN.md`). The one command-side trace is the PC's "חוב הערכה" row "MARCH לא הושלם" (WP-31): a count and ids, never the letters.
+- A treated MARCH letter is never shown as complete until it is reassessed ("טופל - חסרה בדיקה חוזרת", orange); H without an AVPU says so. Never hide an undocumented or unreassessed letter to make the strip look finished (WP-31, owner 2026-11-23).
 
 ## Production Watch Items
 

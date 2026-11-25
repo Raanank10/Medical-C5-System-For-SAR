@@ -364,7 +364,7 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 3. WP-22 after WP-19, so the rejected stock movements can be resent instead of closed.
 4. WP-23 to WP-27, one at a time (they all touch `index.html`; owner decisions from 2026-10-23).
 5. WP-29 builds on 081's `run_clinical_watchdog()` (live since WP-20).
-6. WP-30 and WP-31 wait for an owner answer; ask it first in the session. (WP-28 answered and done 2026-11-21; WP-33 done.)
+6. WP-30 waits for an owner answer; ask it first in the session. (WP-28 answered and done 2026-11-21; WP-33 done; WP-31 answered 2026-11-23.)
 7. WP-32 and WP-34 to WP-37 any time.
 8. WP-38 after WP-19 (owner 2026-11-18); WP-24 touches the same flow.
 9. WP-43 to WP-45 (onboarding, added 2026-11-24): WP-43 first (the PC / CC tour is broken today), WP-44 on its engine, WP-45 any time after WP-43. They touch `index.html` only; no SQL.
@@ -383,7 +383,7 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 | WP-28 | The 27 never-sent event types | P2 | - (answered 2026-11-21) |
 | WP-29 | Dead Man's Switch on the server | P2 | recipients |
 | WP-30 | Telegram critical alerts (B1) | P2 | the 19 alert answers, a bot |
-| WP-31 | MARCH completion rule and hands-on PC | P2 | clinical criteria |
+| WP-31 | MARCH completion rule and hands-on PC | P2 | - (answered 2026-11-23) |
 | WP-32 | Evacuation point leftovers (WP-18) | P2 | - |
 | WP-33 | CC all-incidents: what counts as an alert | P3 | - (answered 2026-11-18) |
 | WP-34 | Test gaps: AAR screen, analytics pytest in CI | P3 | - |
@@ -646,7 +646,13 @@ The original plan follows.
 
 **Why.** The MARCH-PAWS step shipped (V2.99.62, V2.99.69), but `marchStatus()` in `src/domain/rules.js` does not exist, so nothing says when a letter is complete, and a PC who goes hands-on has no MARCH flow.
 
-**Steps.** Get the owner's completion criteria per letter first (clinical sign-off; do not invent them). Then `marchStatus(patient)` in `rules.js` with tests in `tests/domain-rules.test.js`, inlined in `index.html` (the drift check enforces it), the letter strip reads it, then the PC hands-on entry. Never auto-merged.
+**Owner, 2026-11-23 (clinical sign-off).** (1) A treated MARCH letter is not complete until a reassessment tap confirms the treatment worked (TCCC: reassess after each intervention); a tourniquet on is not bleeding controlled. (2) "Checked, nothing needed" completes a letter; R and C need no measured vitals for it (the medic's check stands). (3) H needs warming done or checked **and** an AVPU on record, so the head-injury half is covered. (4) An incomplete MARCH shows on the letter strip and as a row in the PC's "חוב הערכה" board for red and yellow casualties; it never blocks a save or a handover. PAWS stays documented / not documented.
+
+**Done (V2.99.92).** `marchStatus(review, avpu)` and `mergeMarchReviews(entries)` in `src/domain/rules.js` (tests in `tests/domain-rules.test.js`, inlined in `index.html`). Review values: `treated`, `effective` (new: treated + reassessed), `clear`. Step 7: "בדיקה חוזרת: הטיפול יעיל" per MARCH letter while it is treated (a new treatment in the letter clears it); treated reads "טופל - חסרה בדיקה חוזרת"; H shows whether an AVPU is on record; the progress line counts completed MARCH letters. Reopening "טיפולים MARCH-PAWS" for a casualty shows the letters earlier saves documented (this phone and others), offers the reassessment for a letter treated earlier and refuses "nothing needed" on it; a save sends only what changed. The casualty's review is every save merged newest-per-letter (`p.marchReviews` here, `p.remoteMarchReviews` from other phones' `PATIENT_CREATED` / `NOTE_ADDED` `march_review`, read with only those two JSON fields selected). The patient card shows "MARCH: הושלם" or what is missing; the PC's debt board has "MARCH לא הושלם" (red / yellow, not evacuated, handed over or dead). Hands-on PC: already had `TREATMENT_RECORDING_ROLES` and the patient-card button (V2.99.85); now tested. No server or database change.
+
+**Known consequence.** A red or yellow casualty from the MSTART sweep has no MARCH review until someone opens "טיפולים MARCH-PAWS", so it is in the PC's new row from the start. That is the intended reading (nothing documented is not complete), but expect the row to be long during a sweep.
+
+**Verify.** `node tests/domain-rules.test.js`; `scripts/browser_march_paws_test.js` step 10 and `scripts/browser_march_update_test.js` step 8. Live: the two-phone run (WP-21) should include one casualty treated on one phone and reassessed on the other. Never auto-merged.
 
 ---
 
@@ -878,7 +884,7 @@ These need a decision, people or money rather than a code change in this repo. L
 ### Backlog
 
 - B1 (owner, 2026-10-21): Telegram notifications for critical alerts. Telegram first (free bot API, a server-side function sends the message when an alert is raised); WhatsApp later only if needed (needs Meta's Business API, approved templates, per-message cost). An extra channel only: the phone's own offline alert (D1) stays primary, since Telegram also needs a network. No patient details in the message (only "critical alert, incident X, open the app"), per `OPERATIONS_SAFETY.md` and the privacy review. Open questions for the owner before it starts: which alerts (proposal: 120-minute tourniquet, deterioration to red, death-certification request), and who receives them (role per incident).
-- B2 (owner, 2026-10-23): MARCH for the medic and, when they go hands-on, the PC (never the CC panel). Today the medic's MSTART sweep card labels only its first block "M — דימום מסכן חיים"; there are no A/R/C/H steps, and the treatment list has no chest seal, needle decompression or warming entry. Add those treatments first, then a tested `marchStatus()` in `src/domain/rules.js` (completion criteria need the owner's clinical sign-off), then an accordion on the medic's patient flow with M before A. **Update (V2.99.69, owner 2026-10-26):** the MARCH-PAWS step shipped in V2.99.62 as nine open cards; it is now a letter strip with one letter on screen at a time (chosen over an accordion and over a modal per letter, which would add a tap per letter and cover the tourniquet reminder). The `marchStatus()` completion criteria in `rules.js` are still open.
+- B2 (owner, 2026-10-23): MARCH for the medic and, when they go hands-on, the PC (never the CC panel). Today the medic's MSTART sweep card labels only its first block "M — דימום מסכן חיים"; there are no A/R/C/H steps, and the treatment list has no chest seal, needle decompression or warming entry. Add those treatments first, then a tested `marchStatus()` in `src/domain/rules.js` (completion criteria need the owner's clinical sign-off), then an accordion on the medic's patient flow with M before A. **Update (V2.99.69, owner 2026-10-26):** the MARCH-PAWS step shipped in V2.99.62 as nine open cards; it is now a letter strip with one letter on screen at a time (chosen over an accordion and over a modal per letter, which would add a tap per letter and cover the tourniquet reminder). The `marchStatus()` completion criteria were signed off by the owner on 2026-11-23 and built in WP-31 (V2.99.92).
 
 ## Status
 
@@ -918,7 +924,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-28 27 never-sent event types | P2 | Done (V2.99.90), no SQL; `sync-log` v22 deployed 2026-11-22 | #155 | owner 2026-11-21: 12 removed, 15 in `server_accepts_unused`, 7 in `server_writes`; `MEDIC_SITE_CLOSE_REQUESTED` is WP-42 |
 | WP-29 Dead Man's Switch on the server | P2 | Not started | | builds on 081's watchdog (live) |
 | WP-30 Telegram alerts (B1) | P2 | Waiting on owner's 19 answers | | |
-| WP-31 MARCH completion + hands-on PC | P2 | Waiting on clinical criteria | | B2 |
+| WP-31 MARCH completion + hands-on PC | P2 | Done V2.99.92 (owner criteria 2026-11-23), awaiting merge | | B2 |
 | WP-32 Evacuation point leftovers | P2 | Step 1 done by `085` (RCC panel, #141): the rescue board tells moving from arrived (`evac_point_arrived_at`). Open: waiting time in the stored report | #141 | WP-18 remainder |
 | WP-33 CC all-incidents alert rule | P3 | Done (V2.99.76), no SQL | this PR | owner 2026-11-18: one line per incident; a red patient counts until a vehicle takes them; "פצוע אדום" no longer fires after a vehicle took the patient |
 | WP-34 Test gaps | P3 | Not started | | AAR screen test, analytics pytest in CI |
