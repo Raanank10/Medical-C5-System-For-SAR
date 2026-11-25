@@ -1,6 +1,7 @@
 -- Rolled-back test for database/096 (CC moves a site to another company / reinforces it, WP-27;
 -- relief before read-only, owner 2026-11-22).
--- Run in the Supabase SQL editor after 095 and 096 are applied. It ends with an error on purpose so
+-- Run after 095 and 096 are applied, through the Supabase connector's execute_sql (not pasted into
+-- the SQL editor from a phone: a long paste was cut off once, database/090). It ends with an error on purpose so
 -- nothing persists; the error text is the result: every line should read "ok", and the last line
 -- counts the failures (want 0).
 -- Uses the synthetic test accounts of the live project, looked up by role. The live project has one
@@ -16,13 +17,15 @@ declare
   MB  uuid := (select id from profiles where role = 'medic' and is_active order by created_at offset 2 limit 1);
   RCCA uuid := (select id from profiles where role = 'rcc' and is_active order by created_at limit 1);
   RPCA uuid := (select id from profiles where role = 'rpc' and is_active order by created_at limit 1);
+  LG uuid := (select id from profiles where role = 'logistics_officer' and is_active order by created_at limit 1);
+  Z uuid := gen_random_uuid();   -- target of a merge
   CA uuid; CB uuid; PA1 uuid;
   X uuid := gen_random_uuid();   -- site handed over from A to B
   Y uuid := gen_random_uuid();   -- site A keeps, B reinforces
   P1 uuid := gen_random_uuid();
   t0 timestamptz := now() - interval '20 minutes';
   t_ho timestamptz;
-  r text := ''; fails int := 0; n bigint; s text; ok boolean; j jsonb;
+  r text := ''; fails int := 0; n bigint; s text; ok boolean; j jsonb; j_id uuid;
 begin
   -- Each check: (label, got, want). now() is fixed for the whole transaction, so records meant to be
   -- "after the change" use clock_timestamp().
@@ -39,6 +42,7 @@ begin
   insert into incidents (id, visual_id, t_zero, t_injury_default, location_name, status, opened_at, company_id, platoon_id) values
     (X, 'TEST96-X', t0, t0, 'TEST96 X', 'active', t0, CA, PA1),
     (Y, 'TEST96-Y', t0, t0, 'TEST96 Y', 'active', t0, CA, null);
+  update incidents set opened_by = MA where id = X;
   insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by) values
     (X, PCA, 'pc', PCA), (X, MA, 'medic', PCA), (Y, PCA, 'pc', PCA), (Y, MA, 'medic', PCA);
   insert into patients (id, incident_id, visual_id, t_injury, created_by) values (P1, X, 'T96-P1', t0, MA);
@@ -172,6 +176,15 @@ begin
   exception when insufficient_privilege then insert into _c values ('A medic new patient refused', 'refused', 'refused'); end;
   j := public.get_incident_unit_links(X);
   insert into _c values ('A medic access label after relief', j->>'my_access', 'read_only');
+  begin
+    perform public.update_patient_identity(P1, 'x', 'x');
+    insert into _c values ('A medic after relief changes patient identity', 'allowed', 'refused');
+  exception when insufficient_privilege then insert into _c values ('A medic after relief changes patient identity', 'refused', 'refused'); end;
+  begin
+    perform public.cancel_incident_false_alarm(X, 'x');
+    insert into _c values ('A medic (opener) cancels the handed-over site', 'allowed', 'refused');
+  exception when insufficient_privilege then
+    insert into _c values ('A medic (opener) cancels the handed-over site', case when sqlerrm like 'no write access%' then 'refused' else 'refused for another reason: ' || sqlerrm end, 'refused'); end;
   select count(*) into n from public.list_open_incidents() where id = X and read_only;
   insert into _c values ('A medic list shows X read-only', n::text, '1');
   execute 'reset role';
@@ -192,6 +205,13 @@ begin
   exception when insufficient_privilege then insert into _c values ('A PC assigns another medic while waiting', 'refused', 'refused'); end;
   select count(*) into n from public.list_incident_unit_notices();
   insert into _c values ('A PC gets no notice', n::text, '0');
+  execute 'reset role';
+
+  -- ---- A logistics officer who is not a member is not shown a site as read-only (he joins as before)
+  perform set_config('request.jwt.claims', json_build_object('sub', LG, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  select count(*) into n from public.list_open_incidents() where id = Y and read_only;
+  insert into _c values ('logistics: site not marked read-only', n::text, '0');
   execute 'reset role';
 
   -- ---- A's rescue chain: read-only at once
@@ -249,8 +269,17 @@ begin
   execute 'set local role authenticated';
   begin
     insert into events (incident_id, actor_id, actor_role, type, device_id, local_event_id, local_timestamp)
-    values (X, MA, 'medic', 'NOTE_ADDED', 'dev-ma', 't96-6', t_ho - interval '3 minutes');
+    values (X, MA, 'medic', 'NOTE_ADDED', 'dev-ma', 't96-6', t_ho - interval '3 minutes') returning id into j_id; -- read back, as sync-log does
     insert into _c values ('after end: record from before still accepted', 'accepted', 'accepted');
+    -- sync-log's dependency check: the author still finds his own earlier record.
+    select count(*) into n from events where device_id = 'dev-ma' and local_event_id = 't96-3';
+    insert into _c values ('after end: author finds his own earlier record (dependency check)', n::text, '1');
+    select count(*) into n from events where incident_id = X and actor_id is distinct from MA;
+    insert into _c values ('after end: nobody else''s records readable', n::text, '0');
+  begin
+    perform public.get_incident_aar_reports(X);
+    insert into _c values ('after end: stored reports refused', 'allowed', 'refused');
+  exception when insufficient_privilege then insert into _c values ('after end: stored reports refused', 'refused', 'refused'); end;
   exception when others then insert into _c values ('after end: record from before still accepted', 'refused: ' || sqlerrm, 'accepted'); end;
   execute 'reset role';
 
@@ -323,7 +352,7 @@ begin
   insert into _c values ('A PC on Y after handover: waits for relief', (public.get_incident_unit_links(Y))->>'my_access', 'relief_pending');
   execute 'reset role';
 
-  -- ---- Physician (unit manager, not cc) may not hand over
+  -- ---- Physician (unit manager, not cc) may not move or reinforce a site (reinforce tried here)
   update profiles set role = 'physician' where id = PCB;
   perform set_config('request.jwt.claims', json_build_object('sub', PCB, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
@@ -332,6 +361,23 @@ begin
     insert into _c values ('physician refused', 'allowed', 'refused');
   exception when insufficient_privilege then insert into _c values ('physician refused', 'refused', 'refused'); end;
   execute 'reset role';
+
+  -- ---- Merge: a read-only or ended member of the duplicate gets no access to the target, a wait for
+  -- relief moves with the person. Needs the full live schema, so it runs only where merge can run.
+  if to_regclass('public.tourniquets') is not null then
+    insert into incidents (id, visual_id, t_zero, t_injury_default, location_name, status, opened_at, company_id)
+    values (Z, 'TEST96-Z', t0, t0, 'TEST96 Z', 'active', t0, CB);
+    update incident_memberships set relief_pending_since = now() where incident_id = Y and profile_id = PCA and read_only_since is null;
+    perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    perform public.merge_incident(X, Z, 'duplicate', 'dev-cc', 't96-merge');
+    perform public.merge_incident(Y, Z, 'duplicate', 'dev-cc', 't96-merge2');
+    execute 'reset role';
+    select count(*) into n from incident_memberships where incident_id = Z and profile_id = MA;
+    insert into _c values ('merge: ended / read-only member not copied', n::text, '0');
+    select count(*) into n from incident_memberships where incident_id = Z and profile_id = PCA and relief_pending_since is not null and read_only_since is null;
+    insert into _c values ('merge: wait for relief moves with the person', n::text, '1');
+  end if;
 
   select string_agg(case when got = want then 'ok   ' else 'FAIL ' end || label || ': got ' || got || ', want ' || want, E'\n'),
          count(*) filter (where got is distinct from want)

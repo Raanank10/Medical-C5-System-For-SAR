@@ -232,7 +232,7 @@ function handle(server, req) {
         const inc = server.incidents.find((i) => i.id === m.incident_id);
         return inc && inc.status === 'active' && (UNIT_CHANGERS.includes(u.role) || inc.company_id === myCompany);
       }).map((m) => { const inc = server.incidents.find((i) => i.id === m.incident_id); return { incident_id: inc.id, visual_id: inc.visual_id, location_name: inc.location_name, profile_id: m.profile_id,
-        display_name: USERS[Object.keys(USERS).find((k) => USERS[k].id === m.profile_id)]?.display_name || m.profile_id, role_at_incident: m.role_at_incident, pending_since: m.relief_pending_since }; });
+        display_name: USERS[Object.keys(USERS).find((k) => USERS[k].id === m.profile_id)]?.display_name || m.profile_id, role_at_incident: m.role_at_incident, pending_since: m.relief_pending_since, server_now: new Date().toISOString() }; });
       return { data: clone(rows), error: null };
     }
     if (req.name === 'acknowledge_incident_unit_notice') { server.noticeAcks.push({ link_id: p.p_link_id, profile_id: u.id }); return { data: { acknowledged: true }, error: null }; }
@@ -311,7 +311,8 @@ async function openPhone(context, file) {
   const errors = [];
   const toasts = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  page.on('dialog', (d) => d.accept());
+  const dialogs = [];
+  page.on('dialog', (d) => { dialogs.push(d.message()); d.accept(); });
   await page.route('**/supabase-js@*/**', (r) => r.fulfill({ contentType: 'application/javascript', body: FAKE_SUPABASE }));
   await page.route('**/functions/v1/sync-log**', (r) => r.request().method() === 'POST'
     ? r.fulfill({ contentType: 'application/json', body: JSON.stringify({ accepted: [], duplicates: [], rejected: [] }) })
@@ -325,7 +326,7 @@ async function openPhone(context, file) {
   } else {
     await page.fill('#pin-gate-unlock-input', PIN); await page.click('#pin-gate-unlock-btn');
   }
-  return { page, errors, toasts };
+  return { page, errors, toasts, dialogs };
 }
 async function login(page, email) {
   await page.waitForSelector('#screen-login.active', { timeout: 5000 });
@@ -498,11 +499,33 @@ async function checkFile(browser, file) {
   assert(await pc2.page.locator('[data-readonly-badge]').count() === 0, `${rel}: no read-only badge before the relief`);
   await pc2.page.evaluate((id) => enterIncidentFromPicker(id), INC2);
   await pc2.page.waitForTimeout(300);
+  // An unsent record on PC2's phone: the relief tries to send it first and warns while it is not sent.
+  await pc2.page.evaluate((id) => {
+    const ob = getOutbox();
+    ob.push({ type: 'NOTE_ADDED', incident_id: id, synced: false, local_event_id: 'relief-unsent-1', device_id: getDeviceId(), local_timestamp: new Date().toISOString(), payload_json: {} });
+    persistOutbox(ob);
+    window.__origSyncPush = syncPush; syncPush = async () => {}; // offline: nothing goes out
+  }, INC2);
+  pc2.dialogs.length = 0;
   await pc2.page.click('#incident-readonly-banner [data-relief-self]');
   await pc2.page.waitForTimeout(300);
+  assert(pc2.dialogs.some((d) => d.includes('רישומים שעוד לא נשלחו')), `${rel}: relieving himself with unsent records must warn first (got ${JSON.stringify(pc2.dialogs)})`);
+  assert(pc2.toasts.some((t) => t.includes('שולח 1 רישומים לפני ההחלפה')), `${rel}: the phone must try to send its records before the relief`);
+  await pc2.page.evaluate(() => { syncPush = window.__origSyncPush; const ob = getOutbox(); const i = ob.findIndex((e) => e.local_event_id === 'relief-unsent-1'); if (i >= 0) ob.splice(i, 1); persistOutbox(); });
   assert(pc2m.read_only_since && pc2m.relieved_by === PC2, `${rel}: "הוחלפתי - מסרתי" must relieve PC2 himself`);
   await pc1.page.evaluate(() => pollIncidentOpenAlerts());
   assert(!(await pc1.page.locator('#incident-relief-overdue-banner').isVisible()), `${rel}: the relief alert must go once he is relieved`);
+  // A record refused after the relief says why and offers no retry that cannot work.
+  await pc2.page.evaluate(() => refreshIncidentContext());
+  await pc2.page.waitForTimeout(200);
+  const relRej = await pc2.page.evaluate(() => {
+    const ob = getOutbox();
+    ob.push({ type: 'VITALS_RECORDED', patient_id: 'p-relief-x', syncRejected: true, syncRejectReason: 'FORBIDDEN_ACTOR_ROLE', syncRejectMessage: 'new row violates row-level security policy' });
+    const html = patientSyncRejectionBanner({ id: 'p-relief-x' });
+    ob.pop();
+    return { readOnly: isActiveIncidentReadOnly(), explains: html.includes('data-relief-rejection'), retry: html.includes('retryPatientSync') };
+  });
+  assert(relRej.readOnly && relRej.explains && !relRej.retry, `${rel}: after relief a refused record must say why, with no retry (got ${JSON.stringify(relRej)})`);
   // Signed in, the demo title above the dashboard is hidden (the sync pill stays).
   await pc2.page.evaluate(() => startRoleDashboard('pc'));
   assert(await pc2.page.locator('#role-context-line').evaluate((el) => el.closest('.demo-strip').classList.contains('signed-in-compact') && getComputedStyle(el.parentElement).display === 'none'),

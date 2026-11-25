@@ -532,6 +532,7 @@ assert.deepEqual(rules.RESCUE_PRIORITIES, ["urgent", "pending", "not_urgent"]);
 {
   const now = Date.parse("2026-11-23T12:00:00Z");
   assert.equal(rules.reliefOverdueMinutes(now - 29 * 60000, now), null);
+  assert.equal(rules.reliefOverdueMinutes(now - 30 * 60000 + 1, now), null); // 1 ms short of 30 minutes
   assert.equal(rules.reliefOverdueMinutes(now - 30 * 60000, now), 30);
   assert.equal(rules.reliefOverdueMinutes(now - 95 * 60000 - 30000, now), 95);
   assert.equal(rules.reliefOverdueMinutes(null, now), null);

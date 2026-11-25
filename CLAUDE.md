@@ -51,7 +51,7 @@ CI (`.github/workflows/validate.yml`) runs two jobs on every PR and push to `mai
 
 `scripts/check_repo.py` enforces (stdlib only, no deps):
 - a fixed list of required paths exist (`REQUIRED_PATHS` in the script — update it when adding/renaming core docs, schema files, or archive folders)
-- `index.html` has a doctype and closing `</html>`, and its three visible version labels ("Demo V2.9990", "ROLE // V2.9990", "Role-Based Medical Command System V2.9990") match `APP_VERSION`
+- `index.html` has a doctype and closing `</html>`, and its three visible version labels ("Demo V2.9991", "ROLE // V2.9991", "Role-Based Medical Command System V2.9991") match `APP_VERSION`
 - every relative markdown link across the repo resolves to a real file (no broken/external-repo links)
 - the domain-rules module inlined in `index.html` hasn't drifted from `src/domain/rules.js`
 - `database/*.sql` structural sanity: balanced parens/`$$` dollar-quoted blocks, and every `references table(...)` target resolves to a real `create table` — see docs/DEVELOPMENT.md's "Validating SQL Drafts" for what this does and doesn't catch (it's not a real SQL parser; a Postgres instance is still the only full validation)

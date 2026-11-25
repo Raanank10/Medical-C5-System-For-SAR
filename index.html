@@ -14456,7 +14456,9 @@ function patientSyncRejectionBanner(p){
     <div style="font-weight:900;font-size:14px;color:var(--red)">⛔ ${title}</div>
     <div style="font-size:12px;margin-top:4px">${detail}</div>
     ${r.code?`<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px">${escAttr(r.code)}${r.message?' · '+escAttr(r.message):''}</div>`:''}
-    <button class="btn-secondary" style="margin-top:8px" onclick="retryPatientSync('${p.id}')">שלח שוב לשרת</button>
+    ${typeof isActiveIncidentReadOnly==='function' && isActiveIncidentReadOnly() && r.code==='FORBIDDEN_ACTOR_ROLE'
+      ? `<div data-relief-rejection style="font-size:12px;font-weight:700;margin-top:6px">נרשם אחרי שהוחלפת: השרת לא יקבל אותו. מסור/י את הפרטים בעל פה לחוג״ד של האתר או לחובש המחליף, ודווח/י למ״פ רפואה. שליחה חוזרת לא תעזור.</div>`
+      : `<button class="btn-secondary" style="margin-top:8px" onclick="retryPatientSync('${p.id}')">שלח שוב לשרת</button>`}
   </div>`;
 }
 // Re-queue this patient's rejected events (create first, in original outbox order) for the next
@@ -17316,6 +17318,17 @@ async function confirmIncidentRelief(profileId, incidentId){
   if(!incId) return;
   const self=!profileId || profileId===currentUser?.id;
   const name=self?'':((_unitLinksByIncident[incId]?.relief_pending||[]).find(x=>x.profile_id===profileId)?.display_name||'');
+  // Review 2026-11-25: send this phone's records first. Until they reach the server the new team
+  // does not see them, and a record dated after the relief (a phone clock running fast) is refused.
+  if(self){
+    let unsent=unsentRecordsForIncident(incId);
+    if(unsent>0){
+      toast(`שולח ${unsent} רישומים לפני ההחלפה...`);
+      try{ await syncPush(); }catch(e){}
+      unsent=unsentRecordsForIncident(incId);
+    }
+    if(unsent>0 && !confirm(`⚠️ יש ${unsent} רישומים שעוד לא נשלחו לשרת. הצוות המחליף לא רואה אותם עד שיישלחו. מומלץ לחכות לקליטה ולשלוח שוב. לאשר החלפה בכל זאת?`)) return;
+  }
   if(!confirm(self ? 'מסרת את הפצועים לצוות המחליף? אחרי האישור תוכל/י רק לצפות באתר.' : `לסמן ש${name} הוחלף/ה? מעכשיו צפייה בלבד עבורו/ה.`)) return;
   const r=await incidentUnitRpc('confirm_incident_relief', {p_incident_id:incId, p_profile_id:self?null:profileId, p_device_id:getDeviceId(), p_local_event_id:`incident-relief-${newUuid()}`});
   if(r.error){ toast('האישור נכשל'+(navigator.onLine===false?': אין חיבור לשרת, נסה/י שוב כשיחזור':': '+(r.error.message||''))); return; }
@@ -17377,6 +17390,7 @@ function renderIncidentUnitNoticeBanner(){
 // him or end the access; the PC is told whom to ask (only that person's own PC or the CC may mark).
 const RELIEF_ALERT_ROLES=new Set(['pc','cc','chamal','admin']);
 let _pendingReliefs=[];
+let _pendingReliefsClockSkewMs=0; // server now minus phone now at the last fetch (review 2026-11-25)
 let _alertedOverdueReliefs=new Set();
 async function refreshPendingReliefs(){
   if(!currentUser || !RELIEF_ALERT_ROLES.has(currentUser.role)){ _pendingReliefs=[]; return; }
@@ -17386,8 +17400,12 @@ async function refreshPendingReliefs(){
   try{ r=await client.rpc('list_pending_reliefs'); }catch(e){ return; }
   if(r.error || !Array.isArray(r.data)) return;
   _pendingReliefs=r.data;
+  const serverNow=Date.parse(r.data[0]?.server_now||'');
+  if(Number.isFinite(serverNow)) _pendingReliefsClockSkewMs=serverNow-Date.now();
 }
-function overduePendingReliefs(nowMs=Date.now()){
+// Waiting time counted on the server's clock: pending_since is server time, so a phone clock that
+// is behind would otherwise delay or skip the alert.
+function overduePendingReliefs(nowMs=Date.now()+_pendingReliefsClockSkewMs){
   return _pendingReliefs.map(x=>({...x, minutes:C5Rules.reliefOverdueMinutes(Date.parse(x.pending_since), nowMs)}))
     .filter(x=>x.minutes!=null && x.profile_id!==currentUser?.id);
 }
