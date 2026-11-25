@@ -104,7 +104,7 @@ See `CLAUDE.md` for the full command reference, including what CI actually runs.
 |   |-- FIELD_USABILITY_TEST_PLAN.md
 |   |-- FAILURE_MODE_REVIEW.md
 |   |-- PHASE_4_PLAN.md                # plan for splitting into apps/packages/services
-|   |-- MULTI_AGENT_DEV_PLAN.md        # how work on this repo is actually planned
+|   |-- MULTI_AGENT_DEV_PLAN.md        # how work is planned and reviewed (review agents in .claude/agents/)
 |   |-- METRICS_DICTIONARY.md
 |   `-- ROADMAP.md
 |-- database/
@@ -129,6 +129,7 @@ See `CLAUDE.md` for the full command reference, including what CI actually runs.
 |   |-- browser_smoke_test.js         # Playwright real-browser smoke test
 |   `-- smoke_v2_*.js                 # string-assertion smoke checks, one per milestone
 `-- archive/
+    |-- docs/                         # superseded docs (MULTI_AGENT_DEV_PLAN_v1.md)
     |-- v0.6/
     `-- v0.7/
 ```

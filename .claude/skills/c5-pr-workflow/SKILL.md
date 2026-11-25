@@ -57,4 +57,6 @@ Update whatever the change makes wrong: `docs/ARCHITECTURE.md` "Backend Deployme
 
 Fill `.github/pull_request_template.md`: Summary, Operational Workflow Affected, Validation (tick only what you actually ran), Safety Review. Also state: the version taken, the tests run and their result, anything verified live versus only in stubbed tests, and any owner decision still open.
 
+Before asking for merge, run the review agents that match the diff (CLAUDE.md "Review agents": `clinical-rules-reviewer`, `rls-sync-reviewer`, `docs-drift-checker`) once on the finished diff, handle what they find, and put each verdict in the PR.
+
 Stop there. Clinical, sync-conflict and RLS changes are never auto-merged; the owner verifies them live and merges.
