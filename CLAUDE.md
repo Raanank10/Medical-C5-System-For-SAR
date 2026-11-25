@@ -34,53 +34,8 @@ for f in scripts/smoke_*.js; do node "$f" || echo "FAILED: $f"; done
 # checks it actually renders, not just that the HTML text contains expected strings. All of them run in CI (WP-13); locally `npm test` runs every browser, other and smoke test after `npm install` once.
 npm install
 npm run test:browser-smoke            # or: node scripts/browser_smoke_test.js
-node scripts/browser_incident_lifecycle_test.js   # logged-in incident picker/open flow (no drafts since D10) + close guard, stubbed Supabase client
-node scripts/browser_collapse_brief_test.js       # Movement screen: building collapse with any incident type
-node scripts/browser_medic_assignment_test.js     # cross-device PC -> medic assignment: PC, medic and rescue tabs sharing one stubbed backend
-node scripts/browser_evacuation_tracking_test.js  # cross-device evacuation destination/MDA classification, location board, UH report: PC, CC and medic tabs
-node scripts/browser_command_scope_test.js        # command hierarchy: CC (company) sees every site, PC (platoon) only its own
-node scripts/browser_platoon_security_test.js     # database/045+053 client side: real companies/platoons, no self-join, unit roster, PC/RCC see their company, RPC its platoon; WP-27 (database/096): CC hands a site to another company or reinforces it from the picker (reason required), the leaving PC keeps recording until "הוחלפתי - מסרתי" (or the CC's "סמן כהוחלף"), then sees "צפייה בלבד" until the CC ends its access, the new PC gets a one-time notice, a relief unconfirmed for 30 min alerts the site's PC and the CC, the demo title is hidden when signed in, the roster no longer moves a site silently
-node scripts/browser_admin_users_test.js          # admin user management + invite-link handling, stubbed Supabase client
-node scripts/browser_sync_rejection_test.js       # a server-rejected patient is loud on the phone (tile badge, card banner, red sync pill, resend)
-node scripts/browser_remote_patient_and_resupply_test.js  # remote patients show no placeholder vitals; medic resupply requests are queued for push
-node scripts/browser_tourniquet_sync_test.js      # tourniquets pushed per patient/limb from every entry path, read back on other devices
-node scripts/browser_pre_evacuation_test.js       # pre-evacuated casualties: first medic to sync owns the report, then only PC/CC change it; 2 medics, PC, CC as separate devices
-node scripts/browser_intake_clinical_sync_test.js # treatments, medications, high-risk overrides and injury zones sent patient-scoped after the create event (WP-3)
-node scripts/browser_reinforcement_sync_test.js   # reinforcement / death-certification requests across medic, PC, physician devices; status by server id, D3 visibility (WP-5)
-node scripts/browser_pc_review_sync_test.js       # WP-26 (database/094): "בקש חוג"ד" from the worse / red-worsening card or "עוד" reaches PC and CC; one line per casualty, "אחר כך" (red 1x3 min, others 2x5), unanswered after 5 min, outcome closes every review of the casualty, medic sees the decision; improvement card has no PC review; yellow trend card after 2 flagged re-checks in a row (V2.99.88), also from a climbing breathing rate (V2.99.89)
-node scripts/browser_alert_ack_sync_test.js       # "בטיפול" acknowledgment shared across medic and PC devices; re-escalation brings the alert back everywhere (WP-4)
-node scripts/browser_remote_treatments_test.js    # treatments, medications and airway from another device listed on the patient card, not mixed into this device's own history (WP-3 step 6)
-node scripts/browser_tourniquet_followups_test.js # later limb, effectiveness check, vitals-screen tourniquet sent; remote effectiveness shown (WP-2b)
-node scripts/browser_tourniquet_offline_alert_test.js # D1: network off, fake clock; 60/100/120-minute and hourly (3 h ... 6 h) tourniquet alerts vibrate + banner, once per level
-node scripts/browser_tourniquet_snooze_test.js    # V2.99.70: "remind me later" on tourniquet banners: stays on the current screen, chip, comes back vibrating, per-level limits, last delay escalates; PC strip line + one vibration
-node scripts/browser_tourniquet_conversion_test.js # V2.99.70: "המרה ללחץ ישיר" on the patient screen: medic 120 min, paramedic 4 h, physician and admin 6 h, CC none; TOURNIQUET_RELEASED reason converted_direct_pressure
-node scripts/browser_tourniquet_time_entry_test.js # V2.99.72: tourniquet time from the body: sweep "הונח עכשיו / היה על הפצוע", enter / correct with history, later-than-phone asks (type again / yesterday / no time), >12 h asks, passed levels silent here and on other phones, no time = no conversion
-node scripts/browser_resupply_decision_sync_test.js # PC approves / escalates / delivers a medic's resupply request from another device; CC, logistics and the medic see it (WP-6); a delivery waits for the medic's receipt (WP-38); command cancels with a reason, CC board on the shared queue, no "fulfilled by company" (WP-24)
-node scripts/browser_rescue_site_authority_test.js # RPC/RCC T0, building status and site clear reach PC, medic and other rescue phones; a PC's attempt changes nothing (WP-8); WP-25: several incident types per incident (two medics add shooting + explosion), anyone adds, removing by the ladder rescue > PC/CC > medics against the adder, another medic's tap is a "not right" report, PC/CC never remove rescue's (server refuses too), a stale board never drops a type it had not seen, a medic whose type is removed is told
-node scripts/browser_offline_cold_start_test.js  # WP-10: serves the repo on localhost, sw.js caches the shell, network off + reload: PIN gate, local data, signed-in session and incident come back
-node scripts/browser_inventory_sync_test.js       # WP-9: two medics' consumption reaches logistics (incident-wide burn rate, each bag's stock), PC truck issue, no double count; WP-19: stock events carry a uuid patient or none (New Patient form sent after the create, abandoned form with no patient), the bag is kept over new patients and reloads, "התיק חודש"; WP-38: a delivered resupply raises the bag only on the medic's "קיבלתי", by what arrived, once
-node scripts/browser_sweep_sync_test.js           # WP-11: manual sweep override sent as MSTART_OVERRIDE (after the patient's create); a finished sweep reaches the PC's board on another phone and stays
-node scripts/browser_incident_open_alerts_test.js  # D10: no drafts; "join this instead?" before a medic opens, PC/RCC/CC and every company RPC (until the platoon is chosen) get a banner until each acknowledges, false-alarm cancel while empty
-node scripts/browser_incident_merge_test.js          # D8: CC merges a duplicate incident from the picker (reason required, PC cannot); late pushes for the duplicate land in the target (redirected_to); phones in the duplicate switch
-node scripts/browser_incident_close_report_test.js   # D9: close ends patient access; a medic offline over the close keeps data until its records are sent, then removes it; stored report screen; admin keeps access
-node scripts/browser_external_report_link_test.js   # WP-16 PR B: PC and CC link / unlink an external report to a patient from the report card across phones (pending until sent), MDA beside triage, medic not offered
-node scripts/browser_remote_vitals_test.js         # N6: another phone's newest vitals values shown on the patient card with source and age, range-checked, never older than this phone's own
-node scripts/browser_sync_rejection_close_test.js  # N7: command closes a sync rejection from the panel (reason, note for "not recoverable", overnight-deletion warning); a resent and accepted record closes its rejection by itself
-node scripts/browser_server_watchdog_test.js      # WP-12: open server watchdog alerts (tourniquet 45/60/100/120 min, red/yellow vitals overdue) listed for command and the medic, marked "(שרת)", only when the phone does not raise the same alert itself
-node scripts/browser_patient_number_test.js        # patient numbers: sweep markers count up, ids carry the registrant's initials (P004-DK, Latin only), a clash on the server is renamed instead of losing the patient, the phone shows the new id
-node scripts/browser_sweep_vitals_debt_test.js     # one "no vitals" key (missing_vitals: MSTART answers do not clear it, a vitals save does), chip tiers/labels, one add button on the sweep, tourniquet limb fix from the patient screen, roster on cc/chamal/admin
-node scripts/browser_vitals_not_counted_test.js    # no invented vitals (MSTART breathing, quick flow, untouched counters = "לא נספר"), empty vitals saves refused, stricter full set, honest MIST/patient screen, white "!" critical chips, short patient bar that never covers content
-node scripts/browser_march_paws_test.js           # V2.99.62: full-flow treatment step ordered by MARCH-PAWS, per-letter "treated / checked / not documented", treatments sent with march_section, march_review on the create event; cric / needle decompression for paramedic and physician only; documentation only; V2.99.69 letter strip: one letter at a time, auto-advance after "no treatment needed"
-node scripts/browser_march_update_test.js         # V2.99.85: "טיפולים MARCH-PAWS" on the patient card (treatment roles only): same screen for that casualty, saves treatments / medication / tourniquet with its uuid + review as NOTE_ADDED, empty save refused, back discards, restored draft stays on it; "פצוע חדש - טופס מלא" for medics
-node scripts/browser_supply_banner_test.js         # V2.99.71: "supply used" banner instead of a blocking sheet: limb taps go through, nothing needed next covered, closes after 6 s unless stock is low/empty, "הפצוע בתיעוד" never a draft id, cancel / quantity change with no double return
-node scripts/browser_role_clinical_scope_test.js # database/074: a medic's own patients marked and listed first; RPC sees urgent / not urgent and the evacuation order, never a colour or tourniquet
-node scripts/browser_rcc_panel_test.js           # V2.99.80: RCC / RPC panel (RPC: own platoon's incidents only), "חולץ" (not for unsorted or 60+ min trapped: medic check / medic present, "בקש חובש לבדיקה" call, medic banner and medic extraction), access sync (trapped / no access sent, never wiped by the server's unknown): table of every incident (row opens its patients in evacuation order), type / building / site clear / close in the incident, banner + feed when a patient reaches the נאפ״ל or is evacuated; signed in from the rescue board (database/085), never the patients table
-node scripts/browser_mobile_layout_test.js        # phone layout at 375x812 / 412x915: no overlaps, nothing past the viewport or clipped by a card, nothing left under the FAB/bottom bar, header <= 64px, no raw keys
-node scripts/browser_evac_point_arrival_test.js   # WP-18: moving to the evacuation point vs arrived; earliest phone time wins (late offline push), waiting minutes on PC/CC boards, medic/PC mark it, CC does not; WP-41: medical roles get a 15-second banner when another phone sends a patient to / records arrival at the נאפ״ל, not the sender, not the PC
-node scripts/browser_injury_time_test.js        # WP-23: injury time starts as the alert time "(משוערת)", entered with the tourniquet body-time control, newest phone time wins (late offline push), CC cannot edit; Golden Hour watchdog, MIST and the stored report count from it
-node scripts/browser_command_panel_test.js        # V2.99.62: PC/CC panel: sticky strip + 4 tap-only tabs, every alert in the strip, per-patient badges, entry on תמונת מצב, server-contact label, three evacuation stages, CC tables of every open incident by triage (at the site / evacuated), row opens the incident, CC starts on all incidents with none open, the strip there shows one alert line per open incident from server data (WP-33), a red patient counts until a vehicle takes them; WP-40: waiting 30 / 60 min after leaving for the נאפ״ל alerts PC and CC
-node scripts/test_outbox_eviction.js              # F1: persistOutbox() never evicts an unsynced event, even past the 500 cap (docs/FAILURE_MODE_REVIEW.md)
-node scripts/test_inject_scenario.js              # scenario injector run against a local mock of the Supabase endpoints; checks the wire traffic, no network or real accounts
+# One line per feature test (what each covers): .claude/skills/c5-pr-workflow/browser-tests.md
+# `npm test` runs all of them; CI runs `npm test` on every PR.
 
 # Analytics package
 cd analytics/c5_sentinel_sar_analytics_v1_1
@@ -100,6 +55,7 @@ CI (`.github/workflows/validate.yml`) runs two jobs on every PR and push to `mai
 - every relative markdown link across the repo resolves to a real file (no broken/external-repo links)
 - the domain-rules module inlined in `index.html` hasn't drifted from `src/domain/rules.js`
 - `database/*.sql` structural sanity: balanced parens/`$$` dollar-quoted blocks, and every `references table(...)` target resolves to a real `create table` — see docs/DEVELOPMENT.md's "Validating SQL Drafts" for what this does and doesn't catch (it's not a real SQL parser; a Postgres instance is still the only full validation)
+- every `database/*.sql` name starts with a three-digit number no other file uses (only the v1.1/v1.2 pairs of `001`/`002` are exempt). Take the next free number from `main` when the PR is ready, not when the branch starts; PR CI runs on the merge with `main`, so a clash fails there - see `docs/MULTI_AGENT_DEV_PLAN.md` section 3
 - every `*.py` file parses without a syntax error
 - every event type `index.html` writes is classified in `src/domain/event-contract.json` (`synced` must equal `SYNC_ELIGIBLE_EVENT_TYPES` and be allowed by `sync-log`; otherwise `local_only`, `not_events` or `known_gaps` with its work package) - see docs/DEVELOPMENT.md "Event Contract"
 - every synced type `index.html` never writes is listed in the contract's `server_writes` (a server RPC writes it) or `server_accepts_unused` (allowed, not built yet; do not assume the feature exists) - WP-28
@@ -108,7 +64,7 @@ CI (`.github/workflows/validate.yml`) runs two jobs on every PR and push to `mai
 
 ### The prototype is one HTML file
 
-`index.html` is the whole prototype, and the file GitHub Pages serves as the live demo. It used to have a byte-identical copy, `demo/rescue-app.html`; that copy was removed (decision D5 in `docs/GAP_CLOSURE_PLAN.md`), so there is only one file to edit. It is ~16,800 lines of self-contained HTML/CSS/JS, with no bundler and no framework. Its one external script is the pinned supabase-js build from jsDelivr (real auth and sync; bump the pinned version deliberately, never float `@2`). Next to it, `sw.js` + `manifest.webmanifest` + `icon.svg` (WP-10) keep the page and that exact supabase-js build cached for an offline cold start; `check_repo.py` fails if the pinned URL in `sw.js` differs from `index.html`'s. The `src/domain/rules.js` logic is inlined directly into the HTML (the standalone `src/domain/rules.js` module is a separately extracted, testable copy of that logic, see below).
+`index.html` is the whole prototype, and the file GitHub Pages serves as the live demo. It used to have a byte-identical copy, `demo/rescue-app.html`; that copy was removed (decision D5 in `docs/GAP_CLOSURE_PLAN.md`), so there is only one file to edit. It is ~20,000 lines of self-contained HTML/CSS/JS, with no bundler and no framework. Its one external script is the pinned supabase-js build from jsDelivr (real auth and sync; bump the pinned version deliberately, never float `@2`). Next to it, `sw.js` + `manifest.webmanifest` + `icon.svg` (WP-10) keep the page and that exact supabase-js build cached for an offline cold start; `check_repo.py` fails if the pinned URL in `sw.js` differs from `index.html`'s. The `src/domain/rules.js` logic is inlined directly into the HTML (the standalone `src/domain/rules.js` module is a separately extracted, testable copy of that logic, see below).
 
 Inside the HTML, look for:
 - `const APP_VERSION = '2.99.91';` — bump this and the three visible label strings ("Demo V2.9991", "ROLE // V2.9991", "Role-Based Medical Command System V2.9991") together when shipping a version; `scripts/check_repo.py` fails CI if they disagree.
@@ -168,6 +124,30 @@ This repo's actual product/API/data contracts live in `docs/`, not in code comme
 - Never remove audit history or hide stale-data/sync-failure/missing-vitals states to make a workflow look cleaner.
 - Clinically-relevant `localStorage` is now encrypted at rest: a device PIN (never persisted) derives an AES-256-GCM key via PBKDF2, gated by `screen-pin-gate` ahead of login on every fresh load. The Supabase session token itself is a deliberately deferred follow-up — see `docs/THREAT_MODEL.md` T2.
 - `docs/OPERATIONS_SAFETY.md`'s Phase 5 security/privacy checklist is now mostly checked off against real docs (threat model, auth/role model, RLS audit, encrypted local storage, audit/retention policy, privacy/data-minimization review) — only a backup/incident-response plan and full clinical/legal governance sign-off remain open. Read the relevant doc before assuming a gap still exists.
+
+## Owner rules (every session, every change)
+
+Set by the repo owner. They apply even when no skill is loaded.
+
+- **Find before delete.** Before deleting or removing anything (a file, a function, a line of logic, a doc section, a table, column, policy or row, a branch), show the evidence that nothing still depends on it: the `grep -rn` output across the repo, or the read-only SQL query and its result for live objects. Then wait for the owner's OK. A "probably unused" without evidence is not enough. The `LEGACY_FULL_ASSESSMENT_DO_NOT_DELETE_WITHOUT_TESTS` flow is the standing example.
+- **No RPC or schema change without approval.** Any change to a Postgres function or RPC, a table, column, enum, trigger or RLS policy, or the `sync-log` Edge Function's accepted events: present the change and the SQL first, and apply nothing live until the owner approves it in the conversation. Read-only checks need no approval.
+- **Drill data is treated as real.** Every incident and patient in the live project is a drill, not a real event, until the owner says otherwise, but it is handled as if it were real: never clean up, delete, reset or "fix" drill records to make the data look better, and analyse them as real operational data. This does not change the synthetic-only rule for anything committed to this repo.
+- **Verify by running, not by reading.** A change is verified when the matching browser test (or a new one) has executed against the DOM and passed. Reading the code or a syntax check is not verification.
+
+## Project skills (`.claude/skills/`)
+
+- `c5-pr-workflow`: shipping any change as a PR (branch, version bump, which tests, docs, PR body).
+- `c5-db-change`: any database, RPC, RLS, enum or `sync-log` change, from read-only inspection to an approved, applied migration.
+- `c5-wp-status`: what is done and what is open in `docs/GAP_CLOSURE_PLAN.md`, separating "the plan says done" from "verified live".
+
+## Review agents (`.claude/agents/`) - run before asking for merge
+
+Three read-only reviewer subagents exist (`docs/MULTI_AGENT_DEV_PLAN.md` section 2). They report findings and never edit; they do not replace the owner's clinical sign-off or real-account RLS verification. Before asking the owner to merge a PR, run every one that matches the diff, once, on the finished diff, fix or answer what it finds, and put each agent's verdict (findings and how each was handled) in the PR description:
+- `clinical-rules-reviewer` - the diff touches `src/domain/rules.js`, its inlined copy, `tests/domain-rules.test.js`, or triage / vitals / tourniquet / pediatric-dose / deterioration / evacuation-wait / patient-status logic
+- `rls-sync-reviewer` - the diff touches `database/*.sql`, `supabase/functions/*`, `src/domain/event-contract.json`, sync push/pull, or role / incident access scope
+- `docs-drift-checker` - every feature or fix PR
+
+This standing instruction is the owner's request to use these subagents; it covers only these three, at this point in the workflow. Skip them for a docs-only typo fix, and say so in the PR.
 
 ## Conventions
 

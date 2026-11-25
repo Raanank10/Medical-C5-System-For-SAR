@@ -1,102 +1,50 @@
-# Multi-Agent Development Plan (RESCUE / C5 Sentinel-SAR)
+# Multi-Agent Development Plan (C5 Sentinel-SAR)
 
-This is a real execution plan for how a solo developer drives this build using Claude Code's actual agent/task/memory mechanics — not a description of autonomous AI agents shipping code unsupervised. See "Grounding" below for why that distinction matters.
+How work on this repo is planned, built and reviewed with Claude Code. Rewritten 2026-11-25: the first version (now [archive/docs/MULTI_AGENT_DEV_PLAN_v1.md](../archive/docs/MULTI_AGENT_DEV_PLAN_v1.md)) planned four builder agents and four missions for a backend that did not exist yet. The backend has been live for weeks, the missions are done or folded into [GAP_CLOSURE_PLAN.md](GAP_CLOSURE_PLAN.md), and no agent was ever defined. This version records what is actually used.
 
-## 0. Grounding
+## 1. Who does what
 
-Two corrections to the brief this plan was requested from, made explicit so they don't get silently re-litigated:
+- **The owner** sets scope and priority, makes every clinical decision, verifies RLS against real accounts, applies SQL live, and approves every merge. None of this is delegated.
+- **One Claude Code session per work package** builds the whole vertical slice: `index.html`, `src/domain/rules.js`, `database/*.sql`, `sync-log`, tests and docs together. The pattern is research, present findings, ask before ambiguous or architecturally significant decisions, implement, verify, small PR, wait for merge approval.
+- **Review agents** (section 2) are read-only. The session runs them on its own diff before asking the owner to merge. They find problems; they decide nothing.
 
-1. **No agent here is autonomous.** Claude Code can run subagents (via the `Agent` tool, optionally backed by reusable definitions in `.claude/agents/*.md`) for a single bounded task at a time. Every subagent's output is a diff or artifact that a human reviews before it counts as done. There is no standing team of AI workers building this app unattended. The "agents" below are scoped roles a developer invokes deliberately, not independent actors.
-2. **CHAMAL is not a networking protocol.** In this repo's own docs (`docs/ARCHITECTURE.md`), CHAMAL refers to the command dashboard. The documented architecture is cloud sync (`/sync/log` → Postgres event log → projector → command snapshot), decided over local-first mesh because real-world experience is that cellular networks hold up during actual operations. Peer-to-peer mesh is deferred, not built now — see Mission 2.
+### Why there are no builder agents
 
-**A concrete finding that sets Mission 1's priority:** `src/domain/rules.js` (the tested, canonical domain module) and the domain-rules code inlined directly into `index.html` (lines ~1933–2044) have drifted. `src/domain/rules.js`'s `suggestMstartTriage` includes an airway safety check:
+The first plan split building by area (front-end, medical logic, sync, logistics). That does not fit this repo: almost every feature touches the 20,000-line `index.html`, a migration, `sync-log`, a browser test and several docs at once. Splitting one slice across agents means conflicting edits to one file and lost context between them. Revisit this after the Phase 4 split ([PHASE_4_PLAN.md](PHASE_4_PLAN.md)) gives the code real module boundaries.
 
-```js
-if (sabcde.B === "abnormal" && sabcde.A !== "managed") {
-  return { triage: "black", reason: "ללא נשימה לאחר פתיחת נתיב אוויר", reasons: [] };
-}
-```
+## 2. Review agents (`.claude/agents/`)
 
-The copy actually shipped inside `index.html` does not have this check — it has a comment in its place: `// SABCDE airway path removed — use breathing field in MSTART sweep (step1) for non-breathing → black.` That means `tests/domain-rules.test.js` is validating airway-triage behavior that the running app does not exhibit. This needs an explicit decision (which behavior is correct) before any other mission builds on top of it. It is exactly the failure mode "single source of truth for domain rules" is meant to prevent, and it already happened once.
+| Agent | Run it when the diff touches | What it checks |
+|---|---|---|
+| `clinical-rules-reviewer` | `src/domain/rules.js`, its inlined copy in `index.html`, triage, vitals, tourniquet, pediatric/dose, deterioration, evacuation-wait alerts, patient status | Rules and tests change together, boundaries and units, missing data stays visible, pending never green, alert levels, role authority, docs updated. Clinical judgment calls are marked "needs owner clinical decision", never approved by the agent. |
+| `rls-sync-reviewer` | `database/*.sql`, `supabase/functions/*`, `src/domain/event-contract.json`, sync push/pull, role or incident scope | The `app.*` access convention from [RLS_AUDIT_v1.md](RLS_AUDIT_v1.md), `SECURITY DEFINER` hygiene, spoofed roles, idempotency, poison-event quarantine, late offline pushes, audit history, migration hygiene. With the Supabase connector it compares the repo with the live project through read-only tools; it has no SQL tool and writes the SQL for the owner to run. |
+| `docs-drift-checker` | Any feature or fix, before merge | The docs that govern the change were updated; CLAUDE.md facts (version, line count, migration range, test list) and status markers in ROADMAP and GAP_CLOSURE_PLAN match the repo. Live claims are listed for the owner to confirm. |
 
-## 1. Multi-Agent System Hierarchy
+All three are read-only (they report; the session fixes), and none replaces the owner's gates: clinical sign-off for medical logic, real-account verification for RLS.
 
-**Principal Orchestrator: you, not an AI.** You own scope, priority, and — non-negotiably for a triage app — clinical sign-off. Continuity across sessions comes from the memory system already in place plus `TaskList`, not from an agent remembering things on its own.
+### How they get used
 
-**Claude Code (per session): the one who actually invokes subagents and is accountable for what merges.** Not a separate entity from your perspective — a tool you direct.
+- **By rule:** CLAUDE.md tells every session to run the matching agent before asking for merge, and to put each agent's verdict in the PR description. This is the reliable path; do not rely on the session choosing to delegate on its own.
+- **By asking:** in any Claude Code session, "run the clinical-rules-reviewer on this branch" (or `@clinical-rules-reviewer` in the CLI). `/agents` in the CLI lists and edits them.
+- **Cost:** each run starts a fresh context and reads the docs again. Run them once per PR when the diff is ready, not after every edit.
+- **Supabase tools:** `rls-sync-reviewer` lists the connector's tools as `mcp__Supabase__*`, the name in the owner's cloud sessions. In a session where that connector has another name or is not connected, the agent reviews from the repo only and says so.
 
-**Sub-agents:** none exist yet as `.claude/agents/*.md` definitions in this repo; creating them is the first concrete step. Each is invoked for one bounded task and reviewed before merge.
+## 3. Parallel branches: migration numbers and versions
 
-| Agent | Scope | Primary tools | Review gate |
-|---|---|---|---|
-| **Front-End & UI/UX** | Mobile-first tactical layout in `index.html`, Field Mode performance, rapid-tap telemetry | `Explore` first (find existing patterns before adding new ones), then implementation | Manual browser QA (`/verify`). If the change touches the MSTART sweep flow specifically, it also needs the Medical Logic gate below — that boundary is exactly where the drift above happened. |
-| **Medical Logic & Triage Engine** | `src/domain/rules.js` **exclusively** as source of truth: MSTART/JumpSTART state machine, pediatric dosing guardrails, vitals/tourniquet timers, priority calc | Direct edits + `tests/domain-rules.test.js` in the same diff | **Never auto-merged.** You manually review every change against MSTART/JumpSTART references before it's "done." `index.html` must load this module's logic, not inline a second copy — this is the fix for Mission 1. |
-| **Real-Time Sync & Networking** | Deploy `database/001_postgresql_schema_v1.2.sql`, implement `/sync/log` per `docs/API_SURFACE_v1.2.md`, wire Supabase Auth to the `user_role` enum, enforce the 24 drafted RLS policies, local-first outbox for brief connectivity gaps | `general-purpose` agent for implementation | RLS is **verified by you** with real logged-in test accounts attempting cross-role access — not agent-asserted. Given this is casualty/personnel data, this is the one gate that can't be delegated even in spirit. Mesh/P2P transport is explicitly out of scope now; recorded as a future addition (see Mission 2). |
-| **Logistics & Resource** | Supply metrics, low-stock triggers, reinforcement matching, burn rates — real existing surface (`evaluateSupplyBurn`, `renderPcResupplyBoard`, `logisticsCompanies`, `renderLogisticsTaskBoard`), not greenfield | `Explore` to map current logic, then implementation | Manual QA against a scripted supply-depletion scenario |
+Most merge pain in the history came from two branches picking the same next migration number or `APP_VERSION` (the files now numbered 043-046, 049-050, 054, 074, 076-077, 088 and 094 were all renumbered at merge; see the notes in [RLS_AUDIT_v1.md](RLS_AUDIT_v1.md), [ARCHITECTURE.md](ARCHITECTURE.md) and [GAP_CLOSURE_PLAN.md](GAP_CLOSURE_PLAN.md)). Rules:
 
-**Communication protocol.** There is no message bus between agents because there's no standing team. The actual shared state is:
-- `memory/` + `MEMORY.md` — durable facts and decisions (already set up)
-- `TaskList` — the live work queue, standing in for "what is any agent working on"
-- git commits — the integration/merge gate
-- the test suite (domain-rules tests, soon Playwright, soon pytest) — the regression gate
+- `python scripts/check_repo.py` fails when two `database/*.sql` files share a number (only the v1.1/v1.2 pairs of `001`/`002` are exempt). Pull-request CI runs on the merge with `main`, so a clash shows up on the PR before it merges.
+- Take the migration number and the version from `main` as late as possible, when the PR is ready, and merge `main` again right before asking for merge.
+- A migration already applied live keeps its live name; record the repo number and live name in the docs as the existing notes do. Never rename a live migration.
 
-Anything more elaborate (agent-to-agent negotiation, a shared blackboard) would be process overhead with no team to justify it.
+## 4. Shared state
 
-## 2. Phased Development Roadmap (Missions)
+There is no message bus and no standing team. The shared state is git (commits and PRs are the integration gate), CI (`repo-check` and `browser-and-smoke-tests`), the docs (especially [GAP_CLOSURE_PLAN.md](GAP_CLOSURE_PLAN.md) for work packages and owner decisions, dated "owner, YYYY-MM-DD"), and the owner's notes. Medical-logic and RLS changes are never auto-merged.
 
-### Mission 1 — Foundation Lock-In (domain rules as single source of truth, real tests)
+## 5. History
 
-**Objective & Scope:** Resolve the `rules.js` / `index.html` drift found above. Make `src/domain/rules.js` the only place triage and dosing logic lives — `index.html` must reference it, not inline a copy. Retire the seven `scripts/smoke_v2_9x_*.js` string-matching scripts (they assert substrings exist in the HTML, not that behavior is correct) and replace with real Playwright browser tests.
+Things the first version recorded that are still true and still referenced:
 
-**Assigned agents:** Medical Logic Agent (drift resolution, decided in consultation with you — this is a clinical call, not an engineering one), Front-End Agent (wire `index.html` to load the module instead of duplicating it).
-
-**Feature focus:** MSTART fast-scan classification, pediatric dosing guardrails, vitals/tourniquet timers.
-
-**Adaptability buffer:** `rules.js` is pure functions with no UI dependency. A future protocol change (new drug, new triage branch, JumpSTART-specific logic) is an additive function with its own test — it cannot silently touch rendering code, because nothing in `index.html` should contain triage logic anymore.
-
-**Definition of Done:** zero inline duplicate of triage/dosing logic in `index.html`; the SABCDE airway-check divergence is explicitly resolved (kept or dropped) with both the module and its tests reflecting the same decision; Playwright covers en route intake → MSTART fast scan → full vitals entry → tourniquet timer → pediatric dose block; CI runs the Playwright suite alongside the existing domain-rule tests.
-
-### Mission 2 — Cloud Backbone (schema, auth, RLS, sync API)
-
-**Objective & Scope:** Deploy the already-drafted Postgres schema, wire real Supabase Auth mapped to `user_role`, enforce the 24 drafted RLS policies against real accounts, implement `/sync/log` push/pull per `docs/API_SURFACE_v1.2.md`.
-
-**Assigned agents:** Sync & Networking Agent (schema deploy, API implementation), you (RLS verification — non-delegable).
-
-**Feature focus:** en route intake events flowing device → event log → projector → command snapshot; local-first outbox as resilience for brief gaps only.
-
-**Adaptability buffer:** the event-sourced schema means new event types — including a future mesh transport — are additive rows/enum values, not migrations that touch existing data. This is where mesh/P2P sync is explicitly parked: recorded as a deferred future addition riding on the same event log, not re-architected from scratch later. Add one line to `ARCHITECTURE.md`'s "Planned Production Split" section marking this so a future "let's add mesh" proposal has to argue against a recorded decision instead of silently reopening it.
-
-**Definition of Done:** real login works end to end; a live cross-role access attempt is blocked by RLS; one synthetic incident's full event lifecycle round-trips correctly through sync → event log → projector; a duplicate event submission is proven idempotent.
-
-### Mission 3 — Command Surface + Logistics (commander matrix, resource tracking)
-
-**Objective & Scope:** Commander overview matrix and logistics/supply tracking running against real synced data instead of local demo-seed data.
-
-**Assigned agents:** Front-End Agent (matrix UI, stale/last-seen indicators), Logistics & Resource Agent (burn-rate, low-stock triggers on top of existing logic), Sync Agent (projector views like `vw_command_incident_throughput_funnel`).
-
-**Feature focus:** commander overview matrix, data-freshness indicators (already specified under "Data Freshness" in `ARCHITECTURE.md`).
-
-**Adaptability buffer:** command UI reads only projector/snapshot views, never raw events — new KPIs or matrix columns are additive SQL views, not schema changes.
-
-**Definition of Done:** dashboard reflects real multi-device incident state within a defined sync-latency bound; a disconnected test device correctly shows as stale; a scripted supply-depletion scenario correctly fires a low-stock trigger.
-
-### Mission 4 — Real Drill + AAR + Job-Search Package
-
-**Objective & Scope:** Run one real or realistic drill, process its actual event log through the AAR/analytics pipeline, and produce the job-search deliverables.
-
-**Assigned agents:** Logistics & Analytics Agent (KPI engine, pytest suite for `analytics/`), you (drill execution — not delegable), general-purpose agent (draft prose for the case study/RICE writeup for you to edit, not publish verbatim).
-
-**Feature focus:** post-action AAR diagnostics, full vitals history review, sync-gap reporting.
-
-**Adaptability buffer:** analytics reads only from the event log/projector layer, so future event types or KPIs don't require reworking the AAR generator — just new queries.
-
-**Definition of Done:** one real drill fully processed through the AAR pipeline; SQL portfolio queries run against that real data (not seed data); a RICE-style prioritization writeup published; a dashboard built from the real drill data.
-
-## 3. Change-Management Protocol
-
-- Every scope change — addition or removal — is written to `memory/` and `TaskList` **before** any agent starts on it. That written state, not a runtime negotiation between agents, is what "orchestrator routing" actually means here.
-- **Additions:** create a task tagged to the mission it belongs to. If it doesn't fit an existing mission's boundary, that's a signal the mission boundaries need redrawing, not that the feature should be forced in.
-- **Removals:** mark the task cancelled with a one-line reason in memory rather than deleting it silently. This avoids re-litigating the same idea later and doubles as material for the job-search case study ("here's what we cut and why").
-- **Medical logic changes are always human-reviewed against tests and never auto-merged**, regardless of schedule pressure. This is a hard constraint on the workflow itself, not an agent policy that can be waived.
-- **Architecture decisions** (cloud-vs-mesh being the live example) get one line recorded in the relevant doc (`ARCHITECTURE.md`) so a future proposal has to explicitly argue against a recorded decision instead of silently reopening it.
-- **The actual merge gate is git + the test suite** (domain-rule tests now, Playwright and pytest as they land in Missions 1 and 4). There is no separate agent-approval workflow beyond that — for a one-person team, anything more would be process for its own sake.
+- **The `rules.js` / inlined-copy drift** (the SABCDE airway check present in one copy and not the other) was the reason for "single source of truth for domain rules". `scripts/check_repo.py` now fails if the two copies differ.
+- **Cloud sync over mesh networking** was decided because cellular networks hold up in real operations. Peer-to-peer mesh stays deferred, and this section is where the decision is recorded, so a proposal to add it has to argue against it. (The first version planned a line in ARCHITECTURE.md as well; it was never added.)
+- **"CHAMAL" is the command system role and dashboard**, not a network protocol.

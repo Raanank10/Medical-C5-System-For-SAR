@@ -367,6 +367,7 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 6. WP-30 and WP-31 wait for an owner answer; ask it first in the session. (WP-28 answered and done 2026-11-21; WP-33 done.)
 7. WP-32 and WP-34 to WP-37 any time.
 8. WP-38 after WP-19 (owner 2026-11-18); WP-24 touches the same flow.
+9. WP-43 to WP-45 (onboarding, added 2026-11-24): WP-43 first (the PC / CC tour is broken today), WP-44 on its engine, WP-45 any time after WP-43. They touch `index.html` only; no SQL.
 
 | Round 2 WP | Title | Priority | Needs from the owner first |
 | --- | --- | --- | --- |
@@ -394,6 +395,9 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 | WP-40 | 30 minutes waiting at the נאפ"ל alerts PC and CC | P2 | - (decided 2026-11-19) |
 | WP-41 | Medical staff see a patient sent to / arriving at the נאפ"ל | P2 | - (decided 2026-11-19) |
 | WP-42 | Medic asks to close their site (`MEDIC_SITE_CLOSE_REQUESTED`) | P2 | who approves, what "closed" changes |
+| WP-43 | The PC / CC guided tour points at hidden panels | P2 | tour in the sandbox? reachable when signed in? |
+| WP-44 | Guided tour for RPC and RCC | P3 | Hebrew text review |
+| WP-45 | One short intro per role (what / why / don't skip) | P3 | `enroute` strip, the 10 intros |
 
 ---
 
@@ -608,14 +612,14 @@ Verified: `scripts/rls_test_094_pc_review.sql` on a local PostgreSQL 16 with eve
 
 ### WP-28: The 27 never-sent event types (P2, owner answered 2026-11-21)
 
-**Done (V2.99.90, no SQL, `sync-log` v22 to deploy).** Recomputed on `main` @ `4f8d082` (V2.99.86), rechecked by `check_repo.py` on `f41e1de` (V2.99.89), and checked live (read-only count of `events` per type, 2026-11-21): 33 synced types were never written by the phone; 7 are incident lifecycle types the server's RPCs write; the other 26 had 0 rows live. `NOTE_ADDED` dropped off the 10-23 list (built for the MARCH-PAWS review); `INCIDENT_TYPE_MISMATCH_REPORTED` joined it (WP-25 stopped writing it). Owner decisions:
+**Done (V2.99.90, no SQL, `sync-log` v22 deployed 2026-11-22).** Recomputed on `main` @ `4f8d082` (V2.99.86), rechecked by `check_repo.py` on `f41e1de` (V2.99.89), and checked live (read-only count of `events` per type, 2026-11-21): 33 synced types were never written by the phone; 7 are incident lifecycle types the server's RPCs write; the other 26 had 0 rows live. `NOTE_ADDED` dropped off the 10-23 list (built for the MARCH-PAWS review); `INCIDENT_TYPE_MISMATCH_REPORTED` joined it (WP-25 stopped writing it). Owner decisions:
 - **Removed (12)** from `SYNC_ELIGIBLE_EVENT_TYPES`, the contract's `synced` and `sync-log`: the 8 pre-WP-19 inventory types (`SUPPLY_REQUEST_CREATED`, `INVENTORY_LEDGER_ENTRY`, `INVENTORY_INITIALIZED`, `INVENTORY_TRANSFER_OUT`, `INVENTORY_TRANSFER_IN`, `PLATOON_STOCK_INITIALIZED`, `PLATOON_STOCK_REFILLED`, `DIRECT_LOGO_TO_MEDIC_REFILL`), `SYNC_CONFLICT`, `CONFLICT_LOG_ENTRY`, `DEAD_MAN_SWITCH_ESCALATED` (server list only) and `PATIENT_IDENTIFIED`. `PATIENT_IDENTIFIED` is removed, not built: identity is a direct write (`update_patient_identity()`) so `finalize_incident_aar()` can delete it; as an event the name would sit in the immutable log (docs/PATIENT_IDENTITY_LIFECYCLE.md). Enum values, projection triggers and `events_insert_by_role` (`074`) are unchanged; `admin` can still send any type.
 - **Kept, listed in the contract's new `server_accepts_unused` (15):** `MEDIC_SITE_CLOSE_REQUESTED` (WP-42), `INCIDENT_TYPE_MISMATCH_REPORTED` (an outbox from before V2.99.82 may still hold one), and 13 owed with no WP: `PATIENT_INJURY_UPDATED`, `MINIMAL_TRIAGE_RECORDED`, `SABCDE_RECORDED`, `MSTART_SUGGESTED`, `JUMPSTART_SUGGESTED`, `JUMPSTART_OVERRIDE`, `TOURNIQUET_CONTEXT_UPDATED`, `TREATMENT_SAFETY_WARNING`, `HIGH_RISK_CLINICAL_VIOLATION`, `WATCHDOG_RESOLVED`, `VOICE_MEMO_ADDED`, `COMMAND_CONTEXT_NOTE_ADDED`, `AAR_CONTEXT_NOTE_ADDED`.
 - **New contract section `server_writes`** for the 7 incident lifecycle types.
 - `check_repo.py` now fails when a synced type is never written by `index.html` and is in neither section, or when a listed type starts being written, so the gap cannot reopen silently.
 - Follow-up noticed, not done: since D10 (`064`) no drafts are created, so `INCIDENT_DRAFT_CREATED` / `_MERGED` / `_REJECTED` may be dead on the server too; check before a later cleanup.
 
-**Still to do (owner).** Deploy `sync-log` v22 from `main`'s file after merge. Until it is deployed the server still accepts the removed types (harmless: nothing sends them).
+**Deployed.** `sync-log` v22 from `main` @ `431f817` on 2026-11-22 (live v21 was checked first to equal the pre-WP-28 file). Not yet checked with a real account: a medic push of a normal event should be accepted and of e.g. `SUPPLY_REQUEST_CREATED` rejected `FORBIDDEN_ACTOR_ROLE`.
 
 The original plan follows.
 
@@ -794,6 +798,87 @@ No rows were written to the migration list to make it look complete: a row there
 
 ---
 
+### WP-43: The PC / CC guided tour points at hidden panels (P2, found 2026-11-24)
+
+**Why.** The tour (`GUIDED_TOUR_STEPS`, `startGuidedTour()`) was written before the V2.99.62 command panel (sticky strip + 4 tabs: תמונת מצב / פעולה / כוחות / ציוד). It never switches `commandPanelTab`, so most of its targets sit inside a `[hidden]` `cmd-tab-panel`. `findTourTarget()` still finds them, so the card shows its normal text, highlights an element nobody can see and does not scroll. A commander shown "⏱ חסמי עורקים" over an empty screen learns the screen has no such section. The only check, `scripts/smoke_v2_9925_sandboxed_briefing_and_tour.js`, asserts that the strings `startGuidedTour()` and `GUIDED_TOUR_STEPS` exist, so it has kept passing since V2.99.62 while the tour was broken.
+
+**Reproduced 2026-11-24** on `main` @ `431f817` (V2.99.90), real Chrome through Playwright, 412x915, local demo, no data:
+
+| Step | Role | Title | Result |
+| --- | --- | --- | --- |
+| 1 | pc | חוג״ד · תמונת מצב מהירה | not found (`.role-top-grid`), card says "האזור לא מוצג" |
+| 2 | pc | סטטוס אתר מהחילוץ | visible |
+| 3 | pc | משימות עכשיו | in a hidden tab, card shows normal text |
+| 4 | pc | עומס חובשים | in a hidden tab, card shows normal text |
+| 5 | pc | ספירת מיון | not found (`.stat-grid`), card says "האזור לא מוצג" |
+| 6 | pc | חסמי עורקים | in a hidden tab, card shows normal text |
+| 7 | pc | לוח פצועים | visible |
+| 8 | pc | חוב הערכה | in a hidden tab, card shows normal text |
+| 9 | pc | בקשות ציוד | in a hidden tab, card shows normal text |
+| 10 | cc | מ״פ רפואה · תמונת פלוגה | visible |
+| 11 | cc | משאבים פלוגתיים | in a hidden tab, card shows normal text |
+| 12 | cc | עומס מחלקות | in a hidden tab, card shows normal text |
+| 13 | cc | תעדוף פינוי | visible |
+| 14 | cc | בקשות משאב | in a hidden tab, card shows normal text |
+| 15 | cc | תור רופא | in a hidden tab, card shows normal text |
+
+4 of 15 steps work. Two more facts: the tour starts only from `screen-demo` (the local demo, or a signed-in admin), so signed-in PC and CC users cannot reach it; and on a clean phone most sections show empty states, so even a working tour shows empty boxes.
+
+**Before starting, ask the owner.** (1) Run the tour inside the sandboxed briefing (`startBriefingDemo()`, isolated state, restored on exit) so every section has data, instead of on the live dashboard? Today the tour refuses to start inside the sandbox (`if(_demoSandbox)`). (2) Reachable for signed-in PC / CC from the role screen (see WP-45's "ⓘ" chip)? The tour is read-only and writes nothing.
+
+**Steps.**
+1. Write the failing test first: `scripts/browser_guided_tour_test.js`. For every step of every role: the target exists, is not inside `[hidden]`, has a non-zero size, is inside the viewport after the scroll, and carries `.tour-highlight`; after `endGuidedTour()` the screen, role, tab and data are what they were before. It must fail on today's `main` with the table above.
+2. Steps get a `tab` key (`overview` / `action` / `forces` / `supply`); `showGuidedTourStep()` sets `commandPanelTab` and re-renders before it looks for the target.
+3. A step whose target is missing or not visible is skipped and counted, never shown as if it worked. The test fails on any skip, so a later screen change breaks the build instead of the tour.
+4. Cut the tour to at most 7 PC steps and 6 CC steps, one or two per tab, with the "why" in each text (who acts on that panel), not only "what it shows". Owner reviews the Hebrew text.
+5. Replace the string-only tour assertions in `smoke_v2_9925` with a pointer to the new test (keep the sandbox assertion).
+
+**Verify.** The new test, `browser_command_panel_test.js` and `browser_mobile_layout_test.js` pass (the tour card must not cover the sticky strip or the bottom bar at 375x812 and 412x915).
+
+**Done when.** Every step highlights a visible panel with data, on both phone sizes, and the test fails if a panel moves.
+
+---
+
+### WP-44: Guided tour for RPC and RCC (P3, after WP-43)
+
+**Why.** Rescue officers are not medics, open the app rarely, and their panel hides clinical data on purpose (database/074: urgent / not urgent, never a colour, tourniquet or vitals). "Why can't I see the colour?" is the question they will ask in the field. They have no tour today; the RCC / RPC panel (V2.99.80) is small, so a short one covers it.
+
+**Steps.** On WP-43's tab-aware engine (one tour system, not two), at most 5 steps each, real selectors from `renderRccPanel()` and the RPC panel (file:line in the PR):
+1. The incident table (`[data-rcc-incidents-table]`): a row opens its patients in evacuation order. RPC: own platoon only.
+2. Urgent / not urgent / not yet sorted, and why there is no triage colour.
+3. "חולץ" and "בקש חובש לבדיקה" (when "חולץ" is not offered: unsorted, or trapped 60+ minutes).
+4. The banner and feed when a patient reaches the נאפ״ל or is evacuated.
+5. Site authority: T0, building status and site clear are final, with no medical approval; RCC closes the incident after every patient is handed over.
+
+Runs with data in the sandbox if the owner chose that in WP-43. Hebrew text reviewed by the owner.
+
+**Verify.** `browser_guided_tour_test.js` extended to `rpc` and `rcc`; `browser_rcc_panel_test.js` and `browser_role_clinical_scope_test.js` still pass (the tour must not reveal a colour or a tourniquet to a rescue role).
+
+---
+
+### WP-45: One short intro per role, "what / why / don't skip" (P3, owner 2026-11-23)
+
+**Why.** Role text exists in three places that disagree, and the most numerous role gets none of it:
+- `ROLE_DEFS[].desc` (10 roles): permission lists, shown only on the "תפקידים והרשאות" screen.
+- `roleConfig()[].responsibilities`: "what I do" lists of 5 to 11 lines, placed differently per role: behind the "ⓘ האחריות שלי" chip (RCC / RPC), inside a `<details>` (CC), at the top of the screen (the generic dashboards: physician, chamal, logistics).
+- `GUIDED_TOUR_STEPS`: PC / CC only (WP-43).
+- Medic and paramedic land on `enroute` (`startRoleDashboard()`) and get none of these. `enroute` has its own `demo-strip` explanation instead.
+- None of them says why: who acts on what this role records. That is the line that makes people log.
+- Contradictions found 2026-11-24: the RPC demo card in `screen-demo` says "תג, מיון ואזור למחלקה שלי" (RPC never sees a triage colour, database/074); `roleConfig().physician.title` is "רופא / פראמדיק" though the paramedic has the medic's scope; `roleConfig().logistics.actor` is a hardcoded person's name.
+
+**Before starting, ask the owner.** (1) On `enroute`, does the intro replace the existing `demo-strip` text or take it in? Not both. (2) The 3 lines for each role (the PR drafts all 10 for review).
+
+**Steps.**
+1. One source: `ROLE_DEFS[].intro = {what, why, critical}`, at most 3 short Hebrew lines; the roles screen and the intro render from it. Fix the three contradictions above.
+2. Numbers in the text come from `C5DomainRules` constants (vitals 10 / 20 / 30 min, tourniquet levels), not typed into the copy, so a rule change cannot leave the intro wrong.
+3. Shown once per user + role + `ROLE_INTRO_VERSION` (raised when a role's workflow changes), stored in `localStorage` as `c5_seen_role_intro` (the `c5_seen_pc_reviews` pattern). Nothing sent to the server, no new event type (UI state is not clinical history; `event-contract.json` unchanged).
+4. A strip at the top of the role's landing screen, never a modal: one tap closes it ("הבנתי", at least 48 px), the screen under it stays usable, and it waits while a tourniquet banner or a critical alert is up.
+5. One "ⓘ התפקיד שלי" chip on every role screen (the `toggleRccResponsibilities()` pattern): it reopens the intro and the full "האחריות שלי" list; that list leaves the top of the generic dashboards. For PC / CC (and RPC / RCC after WP-44) the chip also starts the tour.
+
+**Verify.** New `scripts/browser_role_intro_test.js`: shown once per role, shown again after a version bump, reopened from the chip, not shown over an active tourniquet banner, never covers the FAB or bottom bar; `browser_mobile_layout_test.js` passes at both sizes; no raw key on screen. Real check in the field usability sessions (T1): does a first-time medic finish the first patient without asking how?
+
+---
+
 ## Tracks outside this plan's PRs
 
 These need a decision, people or money rather than a code change in this repo. Listed so nothing is lost:
@@ -846,7 +931,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-25 Medic incident type + mismatch | P2 | Done (V2.99.82): `089`, `090` live, `sync-log` v21 deployed, role check with real profiles passed 2026-11-20; `091` hardening applied live 2026-11-21 | #134, this PR | owner 2026-11-18: several types per incident; anyone adds, removing by the ladder rescue > PC/CC > medics against the adder (`090`). Medic's "not right" reports; PC/CC type section, never over rescue; one change at a time from boards. Removed from `known_gaps`. Every type in the picker, RCC table, stored report and analytics export: `092` (V2.99.83), applied live 2026-11-21 |
 | WP-26 PC deterioration review | P2 | Done (V2.99.87, `094` applied live 2026-11-21, live test passed) | #148 | owner 2026-11-19/21: option A (052 table, own `request_kind`), PC + CC alert, tap + outcome, "אחר כך". Removed from `known_gaps`. Two-phone check still with WP-21 |
 | WP-27 CC moves a site to another platoon | P2 | Done in this PR (V2.99.91, `database/095` + `096`); not applied live: owner applies 095, then 096, then runs `scripts/rls_test_096_unit_handover.sql` | this PR | owner 2026-11-21: handover (whole company, A read-only) and reinforce (B's PC joins, A leads, CC releases); cc/chamal/admin; records from before the change accepted; RLS |
-| WP-28 27 never-sent event types | P2 | Done (V2.99.90), no SQL; `sync-log` v22 to deploy | this PR | owner 2026-11-21: 12 removed, 15 in `server_accepts_unused`, 7 in `server_writes`; `MEDIC_SITE_CLOSE_REQUESTED` is WP-42 |
+| WP-28 27 never-sent event types | P2 | Done (V2.99.90), no SQL; `sync-log` v22 deployed 2026-11-22 | #155 | owner 2026-11-21: 12 removed, 15 in `server_accepts_unused`, 7 in `server_writes`; `MEDIC_SITE_CLOSE_REQUESTED` is WP-42 |
 | WP-29 Dead Man's Switch on the server | P2 | Not started | | builds on 081's watchdog (live) |
 | WP-30 Telegram alerts (B1) | P2 | Waiting on owner's 19 answers | | |
 | WP-31 MARCH completion + hands-on PC | P2 | Waiting on clinical criteria | | B2 |
@@ -861,6 +946,9 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-41 Banner: patient to / at the נאפ"ל | P2 | Done (V2.99.79), no SQL | this PR | owner 2026-11-18/19; send + arrival, medic / paramedic / physician, open or close, 15 s |
 | WP-42 Medic asks to close their site | P2 | Not started, design questions | | from WP-28; spec v1.2 Medic Site Close Rule |
 | WP-38 Resupply raises the medic's bag | P2 | Done (V2.99.74): `database/082` applied live by the owner, `sync-log` v18 deployed 2026-11-18; live two-phone check pending | #132 | owner 2026-11-18: the medic confirms, by what arrived; the PC's / logistics' "delivered" = handed over, waiting for the medic |
+| WP-43 Guided tour hidden panels | P2 | Not started, 2 owner questions | | found 2026-11-24: 4 of 15 steps visible on V2.99.90; tab-aware steps + real browser test |
+| WP-44 RPC / RCC tour | P3 | Not started, after WP-43 | | max 5 steps each, same engine |
+| WP-45 Role intro | P3 | Not started, 2 owner questions | | owner 2026-11-23; one source in `ROLE_DEFS`, medic first, no server change |
 
 ## Revisions after #73 (2026-10-19)
 

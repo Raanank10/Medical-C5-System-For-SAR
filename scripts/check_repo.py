@@ -44,6 +44,10 @@ REQUIRED_PATHS = [
     "analytics/c5_sentinel_sar_analytics_v1_1/requirements.txt",
     "archive/v0.6",
     "archive/v0.7",
+    "docs/MULTI_AGENT_DEV_PLAN.md",
+    ".claude/agents/clinical-rules-reviewer.md",
+    ".claude/agents/rls-sync-reviewer.md",
+    ".claude/agents/docs-drift-checker.md",
 ]
 
 MARKDOWN_LINK_RE = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
@@ -275,6 +279,45 @@ def check_sql_structure(errors: list[str]) -> None:
                 )
 
 
+# Numbers shared before this check existed: the superseded v1.1 drafts kept beside the deployed
+# v1.2 files. Kept for history (CLAUDE.md: never edit them), so they are the only exception.
+LEGACY_SHARED_MIGRATION_NUMBERS = {
+    "001": {"001_postgresql_schema_v1.1.sql", "001_postgresql_schema_v1.2.sql"},
+    "002": {"002_seed_demo_data_v1.1.sql", "002_seed_demo_data_v1.2.sql"},
+}
+
+
+def check_migration_numbers(errors: list[str]) -> None:
+    """Every database/*.sql file starts with a three-digit number that no other file uses.
+
+    Two branches written in parallel kept picking the same next number (085, 093, 042-046 ...),
+    and each one passed CI alone. GitHub runs pull_request CI on the merge with main, so a
+    branch whose number main already took now fails here instead of after it merges.
+    """
+    sql_dir = ROOT / "database"
+    if not sql_dir.exists():
+        return
+    by_number: dict[str, list[str]] = {}
+    for path in sorted(sql_dir.glob("*.sql")):
+        m = re.match(r"(\d{3})_[a-z0-9_.]+\.sql$", path.name)
+        if not m:
+            fail(
+                f"database/{path.name}: name must be a three-digit number, '_', then lowercase "
+                "words (for example 095_short_description.sql)",
+                errors,
+            )
+            continue
+        by_number.setdefault(m.group(1), []).append(path.name)
+    for number, names in sorted(by_number.items()):
+        if len(names) < 2 or set(names) == LEGACY_SHARED_MIGRATION_NUMBERS.get(number):
+            continue
+        fail(
+            f"database/: number {number} is used by {', '.join(names)}. Renumber the newer file to "
+            f"the next free number ({int(max(by_number)) + 1:03d}) and update the docs that name it.",
+            errors,
+        )
+
+
 def check_python_syntax(errors: list[str]) -> None:
     for path in ROOT.rglob("*.py"):
         if any(part in {".git", ".venv", "venv", "__pycache__", "node_modules"} for part in path.parts):
@@ -424,6 +467,7 @@ def main() -> int:
     check_offline_shell(errors)
     check_event_contract(errors)
     check_sql_structure(errors)
+    check_migration_numbers(errors)
     check_python_syntax(errors)
 
     if errors:

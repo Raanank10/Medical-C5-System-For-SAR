@@ -100,6 +100,7 @@ python -c "from db import DB; from kpis import KPIEngine; from report import Rep
 6. Run `npm run test:browser-smoke` when UI initialization, `src/domain/rules.js`, or the app's startup/login flow changes.
 7. Update docs when behavior, terminology, roles, or metrics change.
 8. Keep all demo data synthetic.
+9. Before asking for merge, run the matching read-only review agents in `.claude/agents/` and put their verdicts in the PR description (`CLAUDE.md` "Review agents", [MULTI_AGENT_DEV_PLAN.md](MULTI_AGENT_DEV_PLAN.md)). Take the next `database/` number from `main` when the PR is ready; `check_repo.py` fails on a duplicate.
 
 ## Branch Naming
 
