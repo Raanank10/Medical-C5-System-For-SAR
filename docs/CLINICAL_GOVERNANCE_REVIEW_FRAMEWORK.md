@@ -60,14 +60,14 @@ Current rules (exact, from `src/domain/rules.js`):
 
 ## 7. MARCH Completion (WP-31)
 
-`marchStatus(review, avpu)`, `mergeMarchReviews(entries)` and `marchSeenFrom(entries)` in `src/domain/rules.js` (V2.99.92). Criteria set by the owner, a medic platoon commander, on 2026-11-23, with two follow-ups on 2026-11-25 after review. That is owner product direction, not a doctrine citation:
+`marchStatus(review, avpu)`, `mergeMarchReviews(entries)` and `marchSeenFrom(entries)` in `src/domain/rules.js` (V2.99.92). Criteria set by the owner, a medic platoon commander, on 2026-11-23, with follow-ups on 2026-11-25 and 2026-11-26 after review. That is owner product direction, not a doctrine citation:
 
 | Rule | Current behaviour |
 |---|---|
 | Treated letter (M, A, R, C, H) | Not complete until a reassessment tap ("בדיקה חוזרת: הטיפול יעיל", value `effective`) confirms the treatment worked. A new treatment in the letter needs a new reassessment. |
 | "Checked, nothing needed" | Completes a letter with no vitals, R and C included. It never closes or hides a treatment. |
 | H | Also needs an AVPU on record (the newest one measured). |
-| M from outside the MARCH screen | Every active tourniquet counts as an M treatment, and so does recorded continued bleeding (an ineffective tourniquet, "bleeding continues", active bleeding). Each needs a reassessment (owner 2026-11-25). |
+| M from outside the MARCH screen | Every active tourniquet counts as an M treatment, and so does recorded continued bleeding (an ineffective tourniquet, "bleeding continues", active bleeding). Each needs a reassessment (owner 2026-11-25). The tourniquet's own "דימום נשלט" check counts as the reassessment for that tourniquet, and correcting its time or limb does not reopen M (owner 2026-11-26). |
 | Several phones | A treatment is closed only by a reassessment from the same phone stamped after it, or by one whose `march_seen` says it saw that treatment. Phone clocks are never compared across phones to decide open or closed (owner 2026-11-25, "treated wins across phones"). |
 | PAWS | Not judged: documented or not documented. |
 | Effect | Shown on the letter strip, the patient card and the PC's "MARCH לא הושלם" debt row (red and yellow at the site). It never blocks a save, a handover or a triage. |

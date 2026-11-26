@@ -325,6 +325,24 @@ async function main() {
     });
     assert(effSaved.sent === 'effective' && effSaved.complete && effSaved.reviews === 1, `the create sends "effective" and the casualty is complete, got ${JSON.stringify(effSaved)}`);
 
+    // 11. A step-3 tourniquet reassessed in the form stays closed after save; the create says what it saw.
+    const formTq = await page.evaluate(() => {
+      startNewPatient('extended'); state.triage = 'red'; quickTqData.applied = true; flowVitals.avpu = 'A';
+      goTo('step7');
+      toggleMarchReassess('m');
+      const before = getOutbox().length;
+      savePatient();
+      const p = patients[patients.length - 1];
+      const added = getOutbox().slice(before);
+      const create = added.find((e) => /PATIENT_CREATED$/.test(e.type));
+      const tqEv = added.find((e) => e.type === 'TOURNIQUET_APPLIED');
+      const seenKeys = Object.keys(create?.payload_json?.march_seen?.m || {});
+      return { sent: create?.payload_json?.march_review?.m, m: patientMarchReview(p).m, tqs: (p.tourniquets || []).length,
+        keyMatch: !!tqEv && seenKeys.includes(`tq:${getDeviceId()}:${tqEv.local_event_id}`), stampEq: Date.parse(create.local_timestamp) === p.marchReviews[0].at };
+    });
+    assert(formTq.sent === 'effective' && formTq.m === 'effective' && formTq.tqs >= 1 && formTq.keyMatch && formTq.stampEq,
+      `a reassessed step-3 tourniquet stays closed after save, got ${JSON.stringify(formTq)}`);
+
     assert(pageErrors.length === 0, `uncaught page error(s): ${pageErrors.join(' | ')}`);
     await page.close();
     console.log('index.html: MARCH-PAWS treatment step browser test passed');

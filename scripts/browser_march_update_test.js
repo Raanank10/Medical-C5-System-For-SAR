@@ -272,6 +272,70 @@ async function main() {
     });
     assert(sweep.m === 'needs_reassessment' && sweep.debt, `an active tourniquet counts as an M treatment, got ${JSON.stringify(sweep)}`);
 
+    // Review round 2 (owner 2026-11-26): what a save saw is what the screen showed when it opened.
+    const snap = await page.evaluate((id) => {
+      const p = patients.find((x) => x.id === id);
+      p.tourniquets.forEach((t) => { t.effectiveness = 'effective'; t.status = 'active'; }); // "דימום נשלט" closes each
+      p.activeBleeding = false; if (p.hemorrhageControl) p.hemorrhageControl.status = 'controlled';
+      const closedByCheck = patientMarchReview(p).m;
+      // Another phone's new M treatment arrives while this screen is open.
+      p.marchReviews.push({ at: Date.now(), review: { m: 'treated' }, source: getDeviceId() });
+      openMarchForPatient(id);
+      p.remoteMarchReviews = [...(p.remoteMarchReviews || []), { at: Date.now(), source: 'phone-b', review: { m: 'treated' }, seen: {}, id: 'b1' }];
+      openMarchLetter('m');
+      toggleMarchReassess('m');
+      document.getElementById('btn-step7').click();
+      const note = getOutbox().filter((e) => e.type === 'NOTE_ADDED').pop();
+      const last = p.marchReviews[p.marchReviews.length - 1];
+      return { closedByCheck, m: patientMarchReview(p).m, sawB: !!note.payload_json.march_seen?.m?.['phone-b'], stampEq: Date.parse(note.local_timestamp) === last.at };
+    }, CHILD);
+    assert(snap.closedByCheck !== 'treated' || false, `"דימום נשלט" on every tourniquet closes their M treatments, got ${snap.closedByCheck}`);
+    assert(!snap.sawB && snap.m === 'treated', `a treatment that arrived after the screen opened stays open, got ${JSON.stringify(snap)}`);
+    assert(snap.stampEq, 'the local review is stamped with its NOTE_ADDED local_timestamp');
+
+    // Tourniquet key: its TOURNIQUET_APPLIED event, the same on another phone, unchanged by corrections.
+    const tqKey = await page.evaluate(() => {
+      const p = { id: 'tq-key-1', triage: 'red', patientStatus: 'observing', tourniquets: [] };
+      patients.push(p);
+      const tq = { id: 'TQ-001', limb: 'right_leg', appliedAt: Date.now() - 300000, status: 'active' };
+      p.tourniquets.push(tq);
+      queueTourniquetAppliedEvent(p, tq, { source: 'test' });
+      const ev = getOutbox().filter((e) => e.type === 'TOURNIQUET_APPLIED').pop();
+      const local = marchTqKey(tq);
+      MARCH_TQ_EVENT_KEYS.set('evt-uuid-1', `${ev.device_id || getDeviceId()}:${ev.local_event_id}`);
+      const remote = marchTqKey({ source: 'server', appliedEventId: 'evt-uuid-1', limb: 'left_arm', appliedAt: 1 });
+      // Reassess M, then correct the time and the limb: M stays closed.
+      p.marchReviews = [{ at: Date.now(), review: { m: 'effective' }, source: getDeviceId(), seen: C5Rules.marchSeenFrom(patientMarchEntries(p)) }];
+      const before = patientMarchReview(p).m;
+      tq.appliedAt -= 3600000; tq.limb = 'left_leg';
+      const after = patientMarchReview(p).m;
+      // A second tourniquet is a new treatment: M reopens.
+      const tq2 = { id: 'TQ-002', limb: 'left_arm', appliedAt: Date.now(), status: 'active' };
+      p.tourniquets.push(tq2); queueTourniquetAppliedEvent(p, tq2, { source: 'test' });
+      const second = patientMarchReview(p).m;
+      patients.splice(patients.indexOf(p), 1);
+      return { sameEvent: local === `tq:${getDeviceId()}:${ev.local_event_id}`, local, remote, before, after, second };
+    });
+    assert(tqKey.sameEvent && tqKey.local === tqKey.remote, `a tourniquet has one key on every phone, got ${JSON.stringify(tqKey)}`);
+    assert(tqKey.before === 'effective' && tqKey.after === 'effective' && tqKey.second === 'treated', `a correction keeps M closed, a new tourniquet reopens it, got ${JSON.stringify(tqKey)}`);
+
+    // march_seen from other phones: letters only, no prototype keys, at most 50 sources per letter.
+    const san = await page.evaluate(() => {
+      const many = {}; for (let i = 0; i < 80; i++) many['s' + i] = i;
+      const s = sanitizeMarchSeen(JSON.parse('{"__proto__":{"x":1},"constructor":{"y":2},"m":{"__proto__":5,"a":"7","b":"x"},"r":' + JSON.stringify(many) + '}'));
+      return { keys: Object.keys(s).sort().join(), m: s.m, r: Object.keys(s.r).length, proto: Object.getPrototypeOf(s) === Object.prototype };
+    });
+    assert(san.keys === 'm,r' && JSON.stringify(san.m) === '{"a":7}' && san.r === 50 && san.proto, `march_seen sanitised, got ${JSON.stringify(san)}`);
+
+    // Paging: keeps reading full pages, stops at a short one; a cut-off read is marked incomplete.
+    const paging = await page.evaluate(async () => {
+      const mk = (total) => { let calls = 0; return { calls: () => calls, build: () => ({ range: async (a, b) => { calls++; const n = Math.max(0, Math.min(b + 1, total) - a); return { data: Array.from({ length: n }, (_, i) => ({ i: a + i })) }; } }) }; };
+      const a = mk(2500); const ra = await pullEventPages(a.build);
+      const b = mk(99999); const rb = await pullEventPages(b.build);
+      return { aRows: ra.rows.length, aDone: ra.complete, aCalls: a.calls(), bDone: rb.complete, bCalls: b.calls() };
+    });
+    assert(paging.aRows === 2500 && paging.aDone && paging.aCalls === 3 && !paging.bDone && paging.bCalls === 10, `paging, got ${JSON.stringify(paging)}`);
+
     // A PC going hands-on records MARCH the same way (TREATMENT_RECORDING_ROLES has pc).
     const pcHands = await page.evaluate((id) => { openMarchForPatient(id); const s = document.querySelector('.screen.active')?.id; cancelMarchUpdate(); activeRoleDashboard = 'medic'; return s; }, CHILD);
     assert(pcHands === 'screen-step7', `a PC opens MARCH-PAWS for a casualty, got ${pcHands}`);
