@@ -115,9 +115,9 @@ The 60-second PC/CC briefing ("הצג תדריך מ״פ / חוג״ד ב־60 שנ
 
 - Local demo (and admin): from the launcher, all 13 steps.
 - Signed-in PC: from the incident picker, PC steps only. Signed-in CC: from the all-incidents view, CC steps only.
-- Never inside an open incident (owner, 2026-11-26): in the sandbox the phone's alarms read the sample patients and nothing arrives from other phones, so real tourniquet and review alarms would be held back until the tour ends. Inside an incident the tour is refused with a message.
+- Signed in, only when the server has said within the last 2 minutes that no incident is open at all (owner 2026-11-26: with no incident there is no team on site whose first minutes a held-back update could cost; a failed pull keeps the old list, so an empty list alone is not enough). In the sandbox the phone's alarms read the sample patients and nothing arrives from other phones, so the most it can delay is the news that a new incident opened, by at most 3 minutes.
 - Also refused while the phone holds an active tourniquet (any mode), and for a signed-in CC while the all-incidents strip shows an alert line (owner, 2026-11-26).
-- It ends by itself after 3 minutes (owner, 2026-11-26), and cannot be left for another screen: "ראשי" and other navigation are refused while it is open; signing out ends it first and then really signs out.
+- It ends by itself after 3 minutes and as soon as the screen locks or the app goes to the background (owner, 2026-11-26), and cannot be left for another screen: "ראשי" and other navigation are refused while it is open; signing out ends it first and then really signs out.
 - On exit the phone re-checks its own alarms at once (a tourniquet level crossed during the tour is raised once), and a signed-in phone pushes and polls open-incident alerts at once.
 
 ## Cross-device PC → medic assignment on real incidents (V2.99.30)

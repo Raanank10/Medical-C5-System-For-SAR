@@ -142,7 +142,7 @@ async function walkTour(page, label) {
         await seedRealPatient(page);
         await page.evaluate(() => {
           currentUser = { id: 'stub-pc', email: 'pc@test', role: 'pc' };
-          activeIncident = null;
+          activeIncident = null; _openIncidents = []; _openIncidentsAt = Date.now();
           window.__calls = { push: 0, alerts: 0, client: 0 };
           const origClient = getSupabaseClient;
           window.getSupabaseClient = () => { if (!inDemoSandbox()) window.__calls.client++; else window.__calls.sandboxClient = (window.__calls.sandboxClient || 0) + 1; return origClient(); };
@@ -210,11 +210,49 @@ async function walkTour(page, label) {
         await context.close();
       }
 
+      // 3a. The rule is "the server said within 2 minutes that no incident is open" (owner 2026-11-26):
+      //     a list the phone never got from the server, or any open incident, refuses the tour.
+      for (const [name, setup] of [
+        ['stale list', () => { _openIncidents = []; _openIncidentsAt = 0; }],
+        ['list 3 minutes old', () => { _openIncidents = []; _openIncidentsAt = Date.now() - 3 * 60000; }],
+        ['an open incident elsewhere', () => { _openIncidents = [{ id: '00000000-0000-4000-8000-000000000009', visual_id: 'INC-9', status: 'official' }]; _openIncidentsAt = Date.now(); }],
+      ]) {
+        const { page, errors, context } = await newPage(browser, viewport);
+        await page.evaluate((src) => {
+          currentUser = { id: 'stub-pc', email: 'pc@test', role: 'pc' }; activeIncident = null;
+          (new Function(src))();
+          renderIncidentPicker(); goTo('incident-picker');
+        }, `(${setup.toString()})()`);
+        const btn = await page.$('#screen-incident-picker [data-guided-tour-start]');
+        check(!btn || !(await btn.isVisible()), `${vp} ${name}: the picker must not offer the tour`);
+        const r = await page.evaluate(() => { startGuidedTour(); return { tour: !!_guidedTour, sandbox: inDemoSandbox() }; });
+        check(!r.tour && !r.sandbox, `${vp} ${name}: startGuidedTour() must be refused (got ${JSON.stringify(r)})`);
+        check(!errors.length, `${vp} ${name}: page errors ${errors.join(' | ')}`);
+        await context.close();
+      }
+
+      // 3e. The screen locks or the app goes to the background: the tour ends at once.
+      {
+        const { page, errors, context } = await newPage(browser, viewport);
+        await page.evaluate(() => { currentUser = { id: 'stub-pc', email: 'pc@test', role: 'pc' }; activeIncident = null; _openIncidents = []; _openIncidentsAt = Date.now(); openIncidentPicker(); startGuidedTour(); });
+        await page.waitForTimeout(400);
+        const open = await page.evaluate(() => !!_guidedTour);
+        await page.evaluate(() => {
+          Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+          document.dispatchEvent(new Event('visibilitychange'));
+        });
+        await page.waitForTimeout(300);
+        const after = await page.evaluate(() => ({ tour: !!_guidedTour, sandbox: inDemoSandbox(), user: currentUser && currentUser.id, screen: activeScreenId() }));
+        check(open && !after.tour && !after.sandbox && after.user === 'stub-pc' && after.screen === 'incident-picker', `${vp} screen locked: the tour must end, signed in, back on the picker (got ${JSON.stringify(after)})`);
+        check(!errors.length, `${vp} screen locked: page errors ${errors.join(' | ')}`);
+        await context.close();
+      }
+
       // 3b. Signing out mid-tour (by hand, or the automatic sign-out of a deactivated account) ends
       //     the tour and really signs out: the user does not come back when the card is gone.
       {
         const { page, errors, context } = await newPage(browser, viewport);
-        await page.evaluate(() => { currentUser = { id: 'stub-pc', email: 'pc@test', role: 'pc' }; activeIncident = null; openIncidentPicker(); startGuidedTour(); });
+        await page.evaluate(() => { currentUser = { id: 'stub-pc', email: 'pc@test', role: 'pc' }; activeIncident = null; _openIncidents = []; _openIncidentsAt = Date.now(); openIncidentPicker(); startGuidedTour(); });
         await page.waitForTimeout(500);
         await page.evaluate(() => signOut());
         await page.waitForTimeout(500);
@@ -243,7 +281,7 @@ async function walkTour(page, label) {
         const { page, errors, context } = await newPage(browser, viewport);
         await page.clock.install();
         await page.evaluate(() => {
-          currentUser = { id: 'stub-pc', email: 'pc@test', role: 'pc' }; activeIncident = null;
+          currentUser = { id: 'stub-pc', email: 'pc@test', role: 'pc' }; activeIncident = null; _openIncidents = []; _openIncidentsAt = Date.now();
           window.__push = 0; const origPush = syncPush; window.syncPush = (...a) => { window.__push++; return origPush(...a); };
           openIncidentPicker(); startGuidedTour();
         });
@@ -263,7 +301,7 @@ async function walkTour(page, label) {
         const { page, errors, context } = await newPage(browser, viewport);
         await page.evaluate(() => {
           currentUser = { id: 'stub-cc', email: 'cc@test', role: 'cc' };
-          activeIncident = null; _openIncidents = []; _allIncidentTriage = {};
+          activeIncident = null; _openIncidents = []; _openIncidentsAt = Date.now(); _openIncidents = []; _allIncidentTriage = {};
           window.ccOverviewIncidentAlerts = () => [{ inc: { id: 'inc-x', visual_id: 'INC-9' }, groups: [{ rank: 0, alerts: [{ title: 'פצוע אדום' }] }] }];
           enterCcAllIncidentsView();
         });
@@ -281,7 +319,7 @@ async function walkTour(page, label) {
         const { page, errors, context } = await newPage(browser, viewport);
         await page.evaluate(() => {
           currentUser = { id: 'stub-cc', email: 'cc@test', role: 'cc' };
-          activeIncident = null; _openIncidents = []; _allIncidentTriage = {};
+          activeIncident = null; _openIncidents = []; _openIncidentsAt = Date.now(); _openIncidents = []; _allIncidentTriage = {};
           enterCcAllIncidentsView();
         });
         await page.waitForTimeout(300);
@@ -306,5 +344,5 @@ async function walkTour(page, label) {
     console.error(`browser_guided_tour_test: ${failures.length} failure(s)\n- ` + failures.join('\n- '));
     process.exit(1);
   }
-  console.log('browser_guided_tour_test: the PC / CC guided tour passed (local demo, signed-in PC picker, refusal inside an incident / with an active tourniquet / for a CC with open alerts, sign-out mid-tour, 3-minute limit, signed-in CC all-incidents view; 375x812 and 412x915)');
+  console.log('browser_guided_tour_test: the PC / CC guided tour passed (local demo, signed-in PC picker, refusal inside an incident / with an open incident elsewhere / with a stale incident list / with an active tourniquet / for a CC with open alerts, ends on screen lock, sign-out mid-tour, 3-minute limit, signed-in CC all-incidents view; 375x812 and 412x915)');
 })();

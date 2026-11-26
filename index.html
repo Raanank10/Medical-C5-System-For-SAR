@@ -956,7 +956,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-panel" style="margin:16px;display:none" id="incident-picker-tour">
     <div class="demo-strip-title">סיור מודרך</div>
-    <div class="demo-strip-sub" style="margin-bottom:10px">מסכי הפיקוד עם נתוני הדגמה, כשתי דקות. זמין כאן, מחוץ לאירוע: במהלכו הטלפון לא מקבל עדכונים מהשרת.</div>
+    <div class="demo-strip-sub" style="margin-bottom:10px">מסכי הפיקוד עם נתוני הדגמה, כשתי דקות. זמין רק כשאין אף אירוע פתוח: במהלכו הטלפון לא מקבל עדכונים מהשרת. נסגר מעצמו אחרי 3 דקות או כשהמסך ננעל.</div>
     <button class="demo-mini-btn" style="width:100%;min-height:48px" data-guided-tour-start onclick="startGuidedTour()">התחל סיור במסך הפיקוד</button>
   </div>
   <div class="demo-panel" style="margin:16px" id="incident-open-panel">
@@ -2158,7 +2158,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     <div id="guided-tour-count" style="font-family:var(--mono);font-size:12px;color:var(--muted)"></div>
   </div>
   <div id="guided-tour-text" style="font-size:13px;line-height:1.5;margin:6px 0 4px"></div>
-  <div id="guided-tour-sample" style="font-size:11px;color:var(--muted);margin:0 0 10px">נתוני הדגמה · הנתונים שלך לא מוצגים, לא משתנים ולא נשלחים · נסגר מעצמו אחרי 3 דקות</div>
+  <div id="guided-tour-sample" style="font-size:11px;color:var(--muted);margin:0 0 10px">נתוני הדגמה · הנתונים שלך לא מוצגים, לא משתנים ולא נשלחים · נסגר מעצמו אחרי 3 דקות או כשהמסך ננעל</div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
     <button class="demo-mini-btn" id="guided-tour-prev" onclick="guidedTourPrev()">הקודם</button>
     <button class="demo-mini-btn" id="guided-tour-next" style="background:var(--accent);border-color:var(--accent);color:#fff" onclick="guidedTourNext()">הבא</button>
@@ -6542,6 +6542,9 @@ function flushLocalStateForUnload(){
 }
 window.addEventListener('beforeunload', flushLocalStateForUnload);
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushLocalStateForUnload(); });
+// A guided tour nobody is looking at only keeps the phone deaf: end it when the screen locks or the
+// app goes to the background (owner 2026-11-26), so the phone syncs and alarms again at once.
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden' && _guidedTour) endGuidedTour(); });
 // ── Sandboxed briefing demo ("תדריך מ״פ / חוג״ד ב־60 שניות") ──
 // The scripted briefing needs fake patients, but this app shares one live database across every
 // test phone, so the demo runs in an isolated sandbox: the current local state is snapshotted,
@@ -6687,6 +6690,9 @@ let _guidedTour=null; // {steps, index, origin:{screen, role, tab, signedInRole}
 // Hard cap (owner 2026-11-26): while the tour runs the phone gets no server updates, so it ends by
 // itself after 3 minutes, syncs and says why. A full tour takes about 1.5-2 minutes.
 const GUIDED_TOUR_MAX_MS=3*60*1000;
+// Signed in, the tour needs the server to have said "no open incident" this recently (owner
+// 2026-11-26): with no incident there is no team on site whose first minutes it could delay.
+const GUIDED_TOUR_LIST_FRESH_MS=2*60*1000;
 function findTourTarget(step){
   const body=document.getElementById('role-dashboard-body');
   if(!body || !step) return null;
@@ -6765,6 +6771,9 @@ function guidedTourRefusal(){
   if(activeIncident) return 'הסיור זמין מחוץ לאירוע בלבד: במהלכו הטלפון לא מקבל עדכונים והתראות מהאירוע. צא למסך בחירת האירוע והפעל משם.';
   const role=mapServerRole(currentUser.role);
   if(!['pc','cc','admin'].includes(role)) return 'הסיור מיועד לחוג״ד ולמ״פ רפואה';
+  if(!_openIncidentsAt || Date.now()-_openIncidentsAt>GUIDED_TOUR_LIST_FRESH_MS)
+    return 'הסיור זמין רק כשהשרת אישר שאין אירוע פתוח: אין עדכון טרי מהשרת. נסה שוב כשיש חיבור.';
+  if((_openIncidents||[]).length) return 'יש אירוע פתוח: הסיור זמין רק כשאין אף אירוע פתוח.';
   // The all-incidents view is the CC's alert screen across every open incident: no tour while it
   // shows an alert line (owner 2026-11-26), since nothing new arrives while the tour runs.
   if(role==='cc' && ccOverviewIncidentAlerts().length) return 'יש התראות פתוחות באירועים: הסיור לא זמין עד שיטופלו.';
@@ -16739,6 +16748,9 @@ let _platoonsByCompany={}; // company id -> [{id,name}], for the banner's platoo
 let _openDupesShownFor=null; // location the duplicate warning was shown for; a second press opens anyway
 let _workingIncidentId=null; // which incident patients[] currently holds (in memory only)
 let _openIncidents=[];
+// When the server last answered list_open_incidents (ms). A failed pull keeps the old list, so an empty
+// list alone does not prove there is no open incident (guided tour rule, owner 2026-11-26).
+let _openIncidentsAt=0;
 let _incidentListError='';
 let _incidentOverviewState={}; // incidentId -> get_incident_command_state row, picker overview only
 let _legacySiteB=null;
@@ -16790,6 +16802,7 @@ async function refreshOpenIncidents(){
   if(result.error){ _incidentListError='טעינת האירועים נכשלה: '+(result.error.message||''); return false; }
   _incidentListError='';
   _openIncidents=Array.isArray(result.data)?result.data:[];
+  _openIncidentsAt=Date.now();
   if(currentUser.role==='rcc' || currentUser.role==='rpc'){
     // RCC / RPC: no patients table, no command state (database/074). The rescue board per incident and
     // the site authority rows instead (RCC panel).
