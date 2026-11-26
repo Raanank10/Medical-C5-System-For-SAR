@@ -146,6 +146,8 @@ begin
     perform public.confirm_incident_relief(X, MA);
     insert into _c values ('relief confirmed twice', 'allowed', 'refused');
   exception when others then insert into _c values ('relief confirmed twice', 'refused', 'refused'); end;
+  -- The flag of confirm_incident_relief is cleared after its write (same transaction).
+  insert into _c values ('flag cleared after confirm_incident_relief', coalesce(current_setting('app.membership_relief_via_rpc', true), ''), '');
   execute 'reset role';
   select count(*) into n from events where incident_id = X and type = 'INCIDENT_UNIT_RELIEF_CONFIRMED';
   insert into _c values ('relief event written', n::text, '1');
@@ -256,10 +258,11 @@ begin
   exception when others then insert into _c values ('B medic writes', 'no: ' || sqlerrm, 'yes'); end;
   execute 'reset role';
 
-  -- ---- CC ends A's access
-  perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
+  -- ---- Admin ends A's access (admin runs every 096 function; owner 2026-11-26)
+  perform set_config('request.jwt.claims', json_build_object('sub', ADM, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
-  j := public.end_incident_unit_access(X, CA, 'dev-cc', 't96-end');
+  j := public.end_incident_unit_access(X, CA, 'dev-adm', 't96-end');
+  insert into _c values ('flag cleared after end_incident_unit_access', coalesce(current_setting('app.membership_relief_via_rpc', true), ''), '');
   insert into _c values ('A members ended (PC still waiting is relieved too)', j->>'members_ended', '2');
   execute 'reset role';
   foreach s in array array[MA::text, PCA::text, RCCA::text, RPCA::text] loop
@@ -291,6 +294,7 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   j := public.reinforce_incident_unit(Y, CB, 'more hands', 'dev-cc', 't96-rf');
+  insert into _c values ('flag cleared after reinforce_incident_unit', coalesce(current_setting('app.membership_relief_via_rpc', true), ''), '');
   insert into _c values ('reinforce adds B PC', j->>'pcs_added', '1');
   begin
     perform public.reinforce_incident_unit(Y, CB, 'again');
@@ -324,10 +328,11 @@ begin
   exception when others then insert into _c values ('B medic writes on Y', 'no: ' || sqlerrm, 'yes'); end;
   execute 'reset role';
 
-  -- ---- Release B: read-only
-  perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
+  -- ---- Admin releases B: read-only
+  perform set_config('request.jwt.claims', json_build_object('sub', ADM, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   j := public.release_incident_unit(Y, CB, 'done', 'dev-cc', 't96-rl');
+  insert into _c values ('flag cleared after release_incident_unit', coalesce(current_setting('app.membership_relief_via_rpc', true), ''), '');
   insert into _c values ('release: B PC and medic wait for relief', j->>'relief_pending', '2');
   execute 'reset role';
   perform set_config('request.jwt.claims', json_build_object('sub', MB, 'role', 'authenticated')::text, true);
@@ -353,10 +358,11 @@ begin
   -- ---- A relabelled membership does not escape relief (review 2026-11-26): MA's Y row says logistics.
   update incident_memberships set role_at_incident = 'logistics_officer' where incident_id = Y and profile_id = MA;
 
-  -- ---- Hand Y to B: B comes back full, A read-only
-  perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
+  -- ---- Admin hands Y to B: B comes back full, A read-only
+  perform set_config('request.jwt.claims', json_build_object('sub', ADM, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   j := public.handover_incident_unit(Y, CB, 'B takes it', 'dev-cc', 't96-ho2');
+  insert into _c values ('flag cleared after handover_incident_unit', coalesce(current_setting('app.membership_relief_via_rpc', true), ''), '');
   insert into _c values ('Y handover restores B memberships', j->>'memberships_restored', '2');
   execute 'reset role';
   perform set_config('request.jwt.claims', json_build_object('sub', MB, 'role', 'authenticated')::text, true);
@@ -369,11 +375,8 @@ begin
   execute 'reset role';
   select (relief_pending_since is not null)::text into s from incident_memberships where incident_id = Y and profile_id = MA;
   insert into _c values ('relabelled medic still waits for relief', s, 'true');
-  perform set_config('request.jwt.claims', json_build_object('sub', PCA, 'role', 'authenticated')::text, true);
-  execute 'set local role authenticated';
-  execute 'reset role';
 
-  -- ---- Relief fields (owner 2026-11-26): only the CC or chamal edit them directly; a PC who
+  -- ---- Relief fields (owner 2026-11-26): only the CC, chamal or admin edit them directly; a PC who
   -- re-assigns his own medic gives him full access back.
   update incident_memberships set read_only_since = now() - interval '5 minutes', access_ended_at = now()
   where incident_id = Y and profile_id = MB;                        -- MB ended on Y (as postgres)
@@ -400,35 +403,54 @@ begin
     insert into _c values ('A PC restores his medic on the handed-over site', 'allowed', 'refused');
   exception when insufficient_privilege then insert into _c values ('A PC restores his medic on the handed-over site', 'refused', 'refused'); end;
   execute 'reset role';
-  -- Admin is not CC / chamal: refused directly (owner 2026-11-26).
+  -- Admin has every right the CC has (owner 2026-11-26, "admin should have all permissions").
   update incident_memberships set read_only_since = now() - interval '5 minutes' where incident_id = Y and profile_id = MB;
   perform set_config('request.jwt.claims', json_build_object('sub', ADM, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   begin
-    update incident_memberships set read_only_since = null where incident_id = Y and profile_id = MB;
-    insert into _c values ('admin edits a relief field directly', 'allowed', 'refused');
-  exception when insufficient_privilege then insert into _c values ('admin edits a relief field directly', case when sqlerrm like '%relief fields%' then 'refused' else 'refused elsewhere: ' || sqlerrm end, 'refused'); end;
+    update incident_memberships set access_ended_at = now() where incident_id = Y and profile_id = MB;
+    insert into _c values ('admin edits a relief field directly', 'allowed', 'allowed');
+  exception when others then insert into _c values ('admin edits a relief field directly', 'refused: ' || sqlerrm, 'allowed'); end;
+  execute 'reset role';
+  select count(*) into n from unit_audit where target_incident_id = Y and target_profile_id = MB and detail->>'kind' = 'relief_fields_edited'
+    and detail->>'by_role' = 'admin' and detail->'before'->>'access_ended_at' is null and detail->'after'->>'access_ended_at' is not null;
+  insert into _c values ('admin direct edit audited with before and after', n::text, '1');
+  perform set_config('request.jwt.claims', json_build_object('sub', ADM, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
   begin
     update incident_memberships set assigned_by = ADM, created_at = clock_timestamp() where incident_id = Y and profile_id = MB;
-    insert into _c values ('admin re-assigns a relieved medic', 'allowed (silently locked?)', 'refused');
-  exception when insufficient_privilege then insert into _c values ('admin re-assigns a relieved medic', case when sqlerrm like '%access back%' then 'refused' else 'refused elsewhere: ' || sqlerrm end, 'refused'); end;
-  begin
-    delete from incident_memberships where incident_id = Y and profile_id = MB;
-    insert into _c values ('admin removes a relieved membership', 'allowed', 'refused');
-  exception when insufficient_privilege then insert into _c values ('admin removes a relieved membership', case when sqlerrm like '%relief fields%' then 'refused' else 'refused elsewhere: ' || sqlerrm end, 'refused'); end;
+    insert into _c values ('admin re-assigns a relieved medic', 'allowed', 'allowed');
+  exception when others then insert into _c values ('admin re-assigns a relieved medic', 'refused: ' || sqlerrm, 'allowed'); end;
   begin
     insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by, read_only_since) values (Y, MA2, 'medic', ADM, now());
-    insert into _c values ('admin inserts a membership with relief fields', 'allowed', 'refused');
-  exception when insufficient_privilege then insert into _c values ('admin inserts a membership with relief fields', case when sqlerrm like '%relief fields%' then 'refused' else 'refused elsewhere: ' || sqlerrm end, 'refused');
-  end;
+    insert into _c values ('admin inserts a membership with relief fields', 'allowed', 'allowed');
+  exception when others then insert into _c values ('admin inserts a membership with relief fields', 'refused: ' || sqlerrm, 'allowed'); end;
   execute 'reset role';
-  update incident_memberships set read_only_since = null where incident_id = Y and profile_id = MB;
+  select (read_only_since is null and access_ended_at is null)::text into s from incident_memberships where incident_id = Y and profile_id = MB;
+  insert into _c values ('admin re-assign: access back', s, 'true');
+  select count(*) into n from unit_audit where target_incident_id = Y and target_profile_id = MA2 and detail->>'kind' = 'relief_fields_set'
+    and detail->'before' = 'null'::jsonb and detail->'after'->>'read_only_since' is not null;
+  insert into _c values ('admin insert with relief fields audited with after', n::text, '1');
+  -- Chamal removes the row admin just inserted (a role swap stands in for a chamal account).
+  update profiles set role = 'chamal' where id = RCCA;
+  perform set_config('request.jwt.claims', json_build_object('sub', RCCA, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    delete from incident_memberships where incident_id = Y and profile_id = MA2;
+    get diagnostics n = row_count;
+    insert into _c values ('chamal removes a membership with relief fields', n::text, '1');
+  exception when others then insert into _c values ('chamal removes a membership with relief fields', 'refused: ' || sqlerrm, '1'); end;
+  execute 'reset role';
+  update profiles set role = 'rcc' where id = RCCA;
+  select count(*) into n from unit_audit where target_incident_id = Y and target_profile_id = MA2 and detail->>'kind' = 'membership_with_relief_removed'
+    and detail->>'by_role' = 'chamal' and detail->'before'->>'read_only_since' is not null;
+  insert into _c values ('chamal removal audited with before', n::text, '1');
   perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   update incident_memberships set relieved_by = CC where incident_id = Y and profile_id = MB;
   get diagnostics n = row_count;
   insert into _c values ('CC edits a relief field directly', n::text, '1');
-  select count(*) into n from unit_audit where target_incident_id = Y and target_profile_id = MB and detail->>'kind' = 'relief_fields_edited';
+  select count(*) into n from unit_audit where target_incident_id = Y and target_profile_id = MB and detail->>'kind' = 'relief_fields_edited' and detail->>'by_role' = 'cc';
   insert into _c values ('CC direct edit written to unit_audit', n::text, '1');
   execute 'reset role';
   update incident_memberships set relieved_by = null where incident_id = Y and profile_id = MB;
@@ -446,6 +468,25 @@ begin
     insert into _c values ('physician edits a relief field directly', 'allowed', 'refused');
   exception when insufficient_privilege then insert into _c values ('physician edits a relief field directly', case when sqlerrm like '%relief fields%' then 'refused' else 'refused elsewhere: ' || sqlerrm end, 'refused'); end;
   execute 'reset role';
+  -- A key change is a delete plus an insert (review 2026-11-26): moving a relieved row away and adding
+  -- the medic back without relief fields must not work.
+  update incident_memberships set read_only_since = now() - interval '5 minutes' where incident_id = Y and profile_id = MB;
+  perform set_config('request.jwt.claims', json_build_object('sub', PCB, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    update incident_memberships set profile_id = MA2 where incident_id = Y and profile_id = MB;
+    insert into _c values ('physician moves a relieved row to another person', 'allowed', 'refused');
+  exception when insufficient_privilege then insert into _c values ('physician moves a relieved row to another person', case when sqlerrm like '%move a membership%' then 'refused' else 'refused elsewhere: ' || sqlerrm end, 'refused'); end;
+  begin
+    update incident_memberships set incident_id = X where incident_id = Y and profile_id = MB;
+    insert into _c values ('physician moves a relieved row to another site', 'allowed', 'refused');
+  exception when insufficient_privilege then insert into _c values ('physician moves a relieved row to another site', case when sqlerrm like '%move a membership%' then 'refused' else 'refused elsewhere: ' || sqlerrm end, 'refused'); end;
+  begin
+    delete from incident_memberships where incident_id = Y and profile_id = MB;
+    insert into _c values ('physician removes a relieved membership', 'allowed', 'refused');
+  exception when insufficient_privilege then insert into _c values ('physician removes a relieved membership', case when sqlerrm like '%relief fields%' then 'refused' else 'refused elsewhere: ' || sqlerrm end, 'refused'); end;
+  execute 'reset role';
+  update incident_memberships set read_only_since = null where incident_id = Y and profile_id = MB;
 
   -- ---- Merge: a read-only or ended member of the duplicate gets no access to the target, a wait for
   -- relief moves with the person. Needs the full live schema, so it runs only where merge can run.
@@ -453,10 +494,11 @@ begin
     insert into incidents (id, visual_id, t_zero, t_injury_default, location_name, status, opened_at, company_id)
     values (Z, 'TEST96-Z', t0, t0, 'TEST96 Z', 'active', t0, CB);
     update incident_memberships set relief_pending_since = now() where incident_id = Y and profile_id = PCA and read_only_since is null;
-    perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
+    perform set_config('request.jwt.claims', json_build_object('sub', ADM, 'role', 'authenticated')::text, true);
     execute 'set local role authenticated';
-    perform public.merge_incident(X, Z, 'duplicate', 'dev-cc', 't96-merge');
+    perform public.merge_incident(X, Z, 'duplicate', 'dev-adm', 't96-merge');
     perform public.merge_incident(Y, Z, 'duplicate', 'dev-cc', 't96-merge2');
+    insert into _c values ('flag cleared after merge_incident', coalesce(current_setting('app.membership_relief_via_rpc', true), ''), '');
     execute 'reset role';
     select count(*) into n from incident_memberships where incident_id = Z and profile_id = MA and access_ended_at is not null and read_only_since is not null;
     insert into _c values ('merge: ended member copied for late records only', n::text, '1');

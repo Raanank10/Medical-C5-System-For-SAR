@@ -1331,15 +1331,19 @@ $function$
 -- 8. Who may change the relief fields directly (owner 2026-11-26; review 2026-11-26)
 -- ---------------------------------------------------------------------------------------------
 -- The 045 policies let cc, chamal, admin and physician (and a PC for his own medics) insert, update
--- and delete incident_memberships through the API. Owner 2026-11-26: only the CC or chamal edit the
--- relief fields (read_only_since, access_ended_at, relief_pending_since, relieved_by) directly;
--- everyone else changes them only through the 096 functions, which mark their writes with
--- app.membership_relief_via_rpc (transaction-local, the same pattern as 053's
--- app.incident_unit_via_rpc; the API cannot set it). Re-assigning a medic (the client's upsert,
--- which never sends the relief fields) gives him full access back when the PC of his company, the
--- CC or chamal does it; for anyone else it is refused instead of silently changing nothing. Deleting
--- a membership that carries relief fields is CC / chamal only: it would undo a relief, and the row
--- is what lets his records from before the relief in. Every such change is written to unit_audit.
+-- and delete incident_memberships through the API. Owner 2026-11-26: only the CC, chamal or admin
+-- edit the relief fields (read_only_since, access_ended_at, relief_pending_since, relieved_by)
+-- directly ("admin should have all permissions"); everyone else changes them only through the 096
+-- functions, which mark their writes with app.membership_relief_via_rpc (transaction-local, the same
+-- pattern as 053's app.incident_unit_via_rpc; the API cannot set it). Re-assigning a medic (the
+-- client's upsert, which never sends the relief fields) gives him full access back when the PC of
+-- his company, the CC, chamal or admin does it; for anyone else it is refused instead of silently
+-- changing nothing. Deleting a membership that carries relief fields, or moving it to another
+-- incident or person (a key change is a delete plus an insert), is CC / chamal / admin only: it would
+-- undo a relief, and the row is what lets his records from before the relief in. Every such change
+-- is written to unit_audit with the relief fields before and after.
+-- Fail closed: every session role is checked except the known trusted ones (migrations, the owner,
+-- service_role and the Supabase internal roles), so a future custom JWT role is checked too.
 create or replace function app.guard_membership_relief_fields()
 returns trigger
 language plpgsql
@@ -1350,13 +1354,13 @@ declare
   v_role text := app.current_user_role()::text;
   v_row incident_memberships;
   v_locked boolean := false;
+  v_new_relief boolean := false;
   v_kind text;
   v_before jsonb;
+  v_after jsonb;
 begin
-  -- Only API writes are checked: the session role is `authenticated` for every PostgREST call, also
-  -- inside a SECURITY DEFINER function, while migrations, the owner and service_role are not. The
-  -- 096 functions mark their own writes.
-  if coalesce(current_setting('role', true), '') not in ('authenticated', 'anon')
+  if coalesce(current_setting('role', true), 'none') in
+       ('none', 'postgres', 'service_role', 'supabase_admin', 'supabase_auth_admin', 'supabase_storage_admin')
      or coalesce(current_setting('app.membership_relief_via_rpc', true), '') = 'on' then
     if tg_op = 'DELETE' then return old; end if;
     return new;
@@ -1372,35 +1376,44 @@ begin
     v_before := jsonb_build_object('read_only_since', old.read_only_since, 'access_ended_at', old.access_ended_at,
                                    'relief_pending_since', old.relief_pending_since, 'relieved_by', old.relieved_by);
   end if;
+  if tg_op <> 'DELETE' then
+    v_new_relief := new.read_only_since is not null or new.access_ended_at is not null
+                    or new.relief_pending_since is not null or new.relieved_by is not null;
+  end if;
   if tg_op = 'DELETE' then
     if v_locked then
-      if coalesce(v_role, '') not in ('cc', 'chamal') then
-        raise exception 'only the CC or chamal may remove a membership that carries relief fields' using errcode = '42501';
+      if coalesce(v_role, '') not in ('cc', 'chamal', 'admin') then
+        raise exception 'only the CC, chamal or admin may remove a membership that carries relief fields' using errcode = '42501';
       end if;
       v_kind := 'membership_with_relief_removed';
     end if;
   elsif tg_op = 'INSERT' then
-    if new.read_only_since is not null or new.access_ended_at is not null
-       or new.relief_pending_since is not null or new.relieved_by is not null then
-      if coalesce(v_role, '') not in ('cc', 'chamal') then
-        raise exception 'only the CC or chamal may set relief fields on a site membership' using errcode = '42501';
+    if v_new_relief then
+      if coalesce(v_role, '') not in ('cc', 'chamal', 'admin') then
+        raise exception 'only the CC, chamal or admin may set relief fields on a site membership' using errcode = '42501';
       end if;
       v_kind := 'relief_fields_set';
     end if;
+  elsif (new.incident_id is distinct from old.incident_id or new.profile_id is distinct from old.profile_id)
+        and (v_locked or v_new_relief) then
+    if coalesce(v_role, '') not in ('cc', 'chamal', 'admin') then
+      raise exception 'only the CC, chamal or admin may move a membership that carries relief fields' using errcode = '42501';
+    end if;
+    v_kind := 'membership_with_relief_moved';
   elsif new.read_only_since is distinct from old.read_only_since
      or new.access_ended_at is distinct from old.access_ended_at
      or new.relief_pending_since is distinct from old.relief_pending_since
      or new.relieved_by is distinct from old.relieved_by then
-    if coalesce(v_role, '') not in ('cc', 'chamal') then
-      raise exception 'only the CC or chamal may change relief fields on a site membership' using errcode = '42501';
+    if coalesce(v_role, '') not in ('cc', 'chamal', 'admin') then
+      raise exception 'only the CC, chamal or admin may change relief fields on a site membership' using errcode = '42501';
     end if;
     v_kind := 'relief_fields_edited';
   elsif v_locked and (new.assigned_by is distinct from old.assigned_by or new.created_at is distinct from old.created_at
                       or new.role_at_incident is distinct from old.role_at_incident) then
     -- A re-assignment (or a role change) of someone relieved: the PC of his company (the policy
-    -- already limits a PC to that), the CC or chamal give him full access back.
-    if coalesce(v_role, '') not in ('pc', 'cc', 'chamal') then
-      raise exception 'only the CC, chamal or his own PC can give a relieved member access back' using errcode = '42501';
+    -- already limits a PC to that), the CC, chamal or admin give him full access back.
+    if coalesce(v_role, '') not in ('pc', 'cc', 'chamal', 'admin') then
+      raise exception 'only the CC, chamal, admin or his own PC can give a relieved member access back' using errcode = '42501';
     end if;
     new.read_only_since := null;
     new.access_ended_at := null;
@@ -1409,11 +1422,18 @@ begin
     v_kind := 'access_restored_by_assignment';
   end if;
   if v_kind is not null then
+    if tg_op <> 'DELETE' then
+      v_after := jsonb_build_object('incident_id', new.incident_id, 'profile_id', new.profile_id,
+                                    'read_only_since', new.read_only_since, 'access_ended_at', new.access_ended_at,
+                                    'relief_pending_since', new.relief_pending_since, 'relieved_by', new.relieved_by);
+    end if;
+    -- On a key move the audit row is for the old row; `after` names where it went.
+    if tg_op <> 'INSERT' then v_row := old; end if;
     perform app.write_unit_audit('incident_unit_changed',
       (select coalesce(p.company_id, pl.company_id) from profiles p left join platoons pl on pl.id = p.platoon_id where p.id = v_row.profile_id),
       null, v_row.profile_id, v_row.incident_id, null, null, null, null,
       jsonb_build_object('kind', v_kind, 'role_at_incident', v_row.role_at_incident,
-        'by_role', v_role, 'before', v_before));
+        'by_role', v_role, 'before', v_before, 'after', v_after));
   end if;
   if tg_op = 'DELETE' then return old; end if;
   return new;
