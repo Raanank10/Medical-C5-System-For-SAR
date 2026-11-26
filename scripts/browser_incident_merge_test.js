@@ -231,7 +231,7 @@ async function checkFile(browser, file) {
   assert((await cc.page.textContent(`#merge-error-${INC_B}`)).includes('סיבה'), `${rel}: a merge without a reason must be refused in the UI`);
   assert(!SERVER.rpcLog.some((r) => r.name === 'merge_incident'), `${rel}: no merge call without a reason`);
   await cc.page.fill(`#merge-reason-${INC_B}`, 'same building, two medics');
-  SERVER.keptEnded = [{ profile_id: 'kept-1', display_name: 'חובש סינתטי' }];
+  SERVER.keptEnded = [{ profile_id: 'kept-1', display_name: 'חובש סינתטי', read_only_since: '2026-01-01T10:00:00Z', access_ended_at: '2026-01-01T10:05:00Z' }, { profile_id: 'kept-2', display_name: 'חוג"ד סינתטי', read_only_since: '2026-01-01T10:00:00Z', access_ended_at: null }];
   await cc.page.click(`[data-merge-panel="${INC_B}"] button:has-text("מזג לאירוע הנבחר")`);
   await cc.page.waitForTimeout(400);
   const call = SERVER.rpcLog.find((r) => r.name === 'merge_incident');
@@ -239,7 +239,7 @@ async function checkFile(browser, file) {
   assert(cc.toasts.some((t) => t.includes('P001→P001-BBBB')), `${rel}: the CC must be told which patient ids were renamed (got ${JSON.stringify(cc.toasts)})`);
   assert(SERVER.incidents.find((i) => i.id === INC_B).status === 'closed', `${rel}: B must be closed as merged`);
   // database/098: someone the target itself ended stays ended, and the CC is told by name.
-  assert(cc.page.__dialogs.some((m) => m.includes('חובש סינתטי') && m.includes('ללא גישה') && m.includes('לשייך מחדש')), `${rel}: the CC must be told who stayed without access after the merge (got ${JSON.stringify(cc.page.__dialogs)})`);
+  assert(cc.page.__dialogs.some((m) => m.includes('חובש סינתטי (ללא גישה)') && m.includes('חוג"ד סינתטי (צפייה בלבד)') && m.includes('לשייך מחדש')), `${rel}: the CC must be told who stayed without access or read-only after the merge (got ${JSON.stringify(cc.page.__dialogs)})`);
 
   // Events recorded in B before the merge now belong to A, stamped with their origin.
   assert(early.every((lid) => SERVER.events.some((e) => e.local_event_id === lid && e.incident_id === INC_A && e.origin_incident_id === INC_B)), `${rel}: B's events must be re-tagged to A with their origin`);

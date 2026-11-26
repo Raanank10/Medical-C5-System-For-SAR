@@ -17151,14 +17151,15 @@ async function submitIncidentMerge(sourceId){
   _mergePanelFor=null;
   const renames=Array.isArray(r.data.renamed_patients)?r.data.renamed_patients:[];
   const moved=r.data.moved||{};
-  toast(`אוחד לתוך ${r.data.target_visual_id||tgt?.visual_id||''} · ${moved.patients??0} פצועים הועברו`+(renames.length?` · ${renames.length} מזהים שונו: `+renames.slice(0,3).map(x=>`${x.from}→${x.to}`).join(', '):'')
+  if(r.data.changed===false) toast(`האירוע כבר אוחד לתוך ${r.data.target_visual_id||tgt?.visual_id||''} קודם לכן`);
+  else toast(`אוחד לתוך ${r.data.target_visual_id||tgt?.visual_id||''} · ${moved.patients??0} פצועים הועברו`+(renames.length?` · ${renames.length} מזהים שונו: `+renames.slice(0,3).map(x=>`${x.from}→${x.to}`).join(', '):'')
     +(r.data.pre_evacuation_kept_on_source?' · דיווח פינוי מוקדם נשאר באירוע המקורי, יש לבדוק':''));
   // database/098: someone the target site itself ended stays ended; the CC must know who, because
   // the merge did not give him access back (owner 2026-11-26). Blocking, like the confirm above.
   const keptEnded=Array.isArray(r.data.memberships_kept_ended)?r.data.memberships_kept_ended:[];
   if(keptEnded.length){
-    const names=keptEnded.map(x=>x.display_name||'ללא שם').join(', ');
-    alert(`שים/י לב: ${names} ${keptEnded.length>1?'נשארו':'נשאר/ה'} ללא גישה ל-${r.data.target_visual_id||tgt?.visual_id||''}. הגישה הופסקה באתר הזה לפני המיזוג, והמיזוג לא החזיר אותה. אם צריך לעבוד שם, יש לשייך מחדש (החוג"ד של האדם, מ״פ רפואה, חמ"ל או מנהל מערכת).`);
+    const label=x=>`${x.display_name||'ללא שם'} (${x.access_ended_at?'ללא גישה':'צפייה בלבד'})`;
+    alert(`שים/י לב: ${keptEnded.map(label).join(', ')} - ב-${r.data.target_visual_id||tgt?.visual_id||''} הגישה שלהם הוגבלה עוד לפני המיזוג, והמיזוג לא החזיר אותה. אם צריך לעבוד שם, יש לשייך מחדש (החוג"ד של האדם, מ״פ רפואה, חמ"ל או מנהל מערכת).`);
   }
   if(activeIncident?.id===sourceId){ await switchToMergedIncident(targetId, r.data.target_visual_id||null); return; }
   await refreshIncidentContext();

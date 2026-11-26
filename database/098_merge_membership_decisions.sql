@@ -1,20 +1,128 @@
--- merge_incident: decisions made on the target site stand, and every membership change a merge
--- makes is audited (WP-27 follow-up to 097, rls-sync-reviewer 2026-11-26; owner 2026-11-26: a person
--- the CC ended on the target stays ended, and the CC is told). Needs database/096 and 097.
--- Changes against 097, membership section only:
---  1. Someone ended or read-only on the target because of the target's own handover, release or end
---     of access (his company has a read-only incident_unit_links row on the target) stays as he is,
---     even when he is still full on the duplicate. Listed in memberships_kept_ended so the CC can
---     re-assign him (the 096 guard lets his own PC, the CC, chamal or admin give access back).
---     Only a read-only or ended copy that an earlier merge brought onto the target is made full again
---     (memberships_restored).
---  2. One unit_audit row per person already on the target whose membership the merge changes or
---     keeps ended, with the values before (new copies are counted in memberships_added, not audited) (kinds access_restored_by_merge, merge_kept_target_decision,
---     relief_wait_set_by_merge, relief_wait_cleared_by_merge). memberships_added counts new rows only.
---  3. Someone full on both sites waits for relief exactly when his company left either site, so the
---     result no longer depends on the order the duplicates are merged in.
+-- merge_incident: decisions made on the target site stand, and the merge audits every person
+-- already on the target that it changes or leaves ended (WP-27 follow-up to 097; rls-sync-reviewer
+-- 2026-11-26, twice; owner 2026-11-26: a person the CC ended on the target stays ended, and the CC
+-- is told). Needs database/096 and 097. Live had no merge, relief row or unit link when written
+-- (checked 2026-11-26), so no existing row needs the new marker.
+--  1. incident_memberships.merged_copy_from: set only by merge_incident on the read-only / ended copy
+--     it makes for a duplicate's relieved member. A read-only or ended row on the target is made full
+--     again only when it carries this mark; any other such row is the target's own decision and stays
+--     (listed in memberships_kept_ended, with names and state, so the CC can re-assign).
+--  2. The 096 guard treats merged_copy_from as a relief field: only the CC, chamal or admin change it
+--     directly, and a re-assignment that gives access back clears it.
+--  3. One unit_audit row (before and after) per person already on the target whose membership the
+--     merge changes or keeps ended; memberships_added counts new rows only; the event payload carries
+--     profile ids only.
+--  4. Someone full on both sites (or restored) waits for relief exactly when his company has an
+--     unended read-only link on either site, whatever the merge order.
+--  5. A repeated merge returns the same memberships_kept_ended.
 -- Apply with the Supabase connector (apply_migration, named 098_merge_membership_decisions) after
--- the owner's OK. Every other line of the body is 097's.
+-- the owner's OK.
+
+alter table incident_memberships add column if not exists merged_copy_from uuid references incidents(id) on delete set null;
+comment on column incident_memberships.merged_copy_from is
+  'Set by merge_incident() on the read-only / ended copy it makes for a member of the merged duplicate (database/098); a later merge may make only such a row full again.';
+
+create or replace function app.guard_membership_relief_fields()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_role text := app.current_user_role()::text;
+  v_row incident_memberships;
+  v_locked boolean := false;
+  v_new_relief boolean := false;
+  v_kind text;
+  v_before jsonb;
+  v_after jsonb;
+begin
+  if coalesce(current_setting('role', true), 'none') in
+       ('none', 'postgres', 'service_role', 'supabase_admin', 'supabase_auth_admin', 'supabase_storage_admin')
+     or coalesce(current_setting('app.membership_relief_via_rpc', true), '') = 'on' then
+    if tg_op = 'DELETE' then return old; end if;
+    return new;
+  end if;
+  if tg_op = 'DELETE' then
+    v_row := old;
+  else
+    v_row := new;
+  end if;
+  if tg_op <> 'INSERT' then
+    v_locked := old.read_only_since is not null or old.access_ended_at is not null
+                or old.relief_pending_since is not null or old.relieved_by is not null
+                or old.merged_copy_from is not null;
+    v_before := jsonb_build_object('read_only_since', old.read_only_since, 'access_ended_at', old.access_ended_at,
+                                   'relief_pending_since', old.relief_pending_since, 'relieved_by', old.relieved_by,
+                                   'merged_copy_from', old.merged_copy_from);
+  end if;
+  if tg_op <> 'DELETE' then
+    v_new_relief := new.read_only_since is not null or new.access_ended_at is not null
+                    or new.relief_pending_since is not null or new.relieved_by is not null
+                    or new.merged_copy_from is not null;
+  end if;
+  if tg_op = 'DELETE' then
+    if v_locked then
+      if coalesce(v_role, '') not in ('cc', 'chamal', 'admin') then
+        raise exception 'only the CC, chamal or admin may remove a membership that carries relief fields' using errcode = '42501';
+      end if;
+      v_kind := 'membership_with_relief_removed';
+    end if;
+  elsif tg_op = 'INSERT' then
+    if v_new_relief then
+      if coalesce(v_role, '') not in ('cc', 'chamal', 'admin') then
+        raise exception 'only the CC, chamal or admin may set relief fields on a site membership' using errcode = '42501';
+      end if;
+      v_kind := 'relief_fields_set';
+    end if;
+  elsif (new.incident_id is distinct from old.incident_id or new.profile_id is distinct from old.profile_id)
+        and (v_locked or v_new_relief) then
+    if coalesce(v_role, '') not in ('cc', 'chamal', 'admin') then
+      raise exception 'only the CC, chamal or admin may move a membership that carries relief fields' using errcode = '42501';
+    end if;
+    v_kind := 'membership_with_relief_moved';
+  elsif new.read_only_since is distinct from old.read_only_since
+     or new.access_ended_at is distinct from old.access_ended_at
+     or new.relief_pending_since is distinct from old.relief_pending_since
+     or new.relieved_by is distinct from old.relieved_by
+     or new.merged_copy_from is distinct from old.merged_copy_from then
+    if coalesce(v_role, '') not in ('cc', 'chamal', 'admin') then
+      raise exception 'only the CC, chamal or admin may change relief fields on a site membership' using errcode = '42501';
+    end if;
+    v_kind := 'relief_fields_edited';
+  elsif v_locked and (new.assigned_by is distinct from old.assigned_by or new.created_at is distinct from old.created_at
+                      or new.role_at_incident is distinct from old.role_at_incident) then
+    -- A re-assignment (or a role change) of someone relieved: the PC of his company (the policy
+    -- already limits a PC to that), the CC, chamal or admin give him full access back.
+    if coalesce(v_role, '') not in ('pc', 'cc', 'chamal', 'admin') then
+      raise exception 'only the CC, chamal, admin or his own PC can give a relieved member access back' using errcode = '42501';
+    end if;
+    new.read_only_since := null;
+    new.access_ended_at := null;
+    new.relief_pending_since := null;
+    new.relieved_by := null;
+    new.merged_copy_from := null;
+    v_kind := 'access_restored_by_assignment';
+  end if;
+  if v_kind is not null then
+    if tg_op <> 'DELETE' then
+      v_after := jsonb_build_object('incident_id', new.incident_id, 'profile_id', new.profile_id,
+                                    'read_only_since', new.read_only_since, 'access_ended_at', new.access_ended_at,
+                                    'relief_pending_since', new.relief_pending_since, 'relieved_by', new.relieved_by,
+                                    'merged_copy_from', new.merged_copy_from);
+    end if;
+    -- On a key move the audit row is for the old row; `after` names where it went.
+    if tg_op <> 'INSERT' then v_row := old; end if;
+    perform app.write_unit_audit('incident_unit_changed',
+      (select coalesce(p.company_id, pl.company_id) from profiles p left join platoons pl on pl.id = p.platoon_id where p.id = v_row.profile_id),
+      null, v_row.profile_id, v_row.incident_id, null, null, null, null,
+      jsonb_build_object('kind', v_kind, 'role_at_incident', v_row.role_at_incident,
+        'by_role', v_role, 'before', v_before, 'after', v_after));
+  end if;
+  if tg_op = 'DELETE' then return old; end if;
+  return new;
+end;
+$function$;
 
 CREATE OR REPLACE FUNCTION public.merge_incident(p_source_id uuid, p_target_id uuid, p_reason text, p_device_id text DEFAULT NULL::text, p_local_event_id text DEFAULT NULL::text)
  RETURNS jsonb
@@ -61,7 +169,18 @@ begin
     raise exception 'incident % not found', p_target_id using errcode = 'P0002';
   end if;
   if v_src.status = 'closed' and v_src.metadata->'merged_into'->>'target_id' = p_target_id::text then
-    return jsonb_build_object('source_id', p_source_id, 'target_id', p_target_id, 'changed', false);
+    -- 098: a repeat (say the first answer was lost) still tells the CC who stayed out.
+    return jsonb_build_object('source_id', p_source_id, 'target_id', p_target_id, 'target_visual_id', v_tgt.visual_id,
+      'changed', false, 'memberships_restored', '[]'::jsonb,
+      'memberships_kept_ended', coalesce((
+        select jsonb_agg(jsonb_build_object('profile_id', im.profile_id, 'display_name', p.display_name,
+                 'read_only_since', im.read_only_since, 'access_ended_at', im.access_ended_at) order by p.display_name)
+        from events e
+        cross join lateral jsonb_array_elements_text(coalesce(e.payload_json->'moved'->'memberships_kept_ended', '[]'::jsonb)) k(pid)
+        join incident_memberships im on im.incident_id = p_target_id and im.profile_id = k.pid::uuid
+          and (im.read_only_since is not null or im.access_ended_at is not null)
+        join profiles p on p.id = im.profile_id
+        where e.incident_id = p_target_id and e.type = 'INCIDENT_MERGED' and e.payload_json->>'source_id' = p_source_id::text), '[]'::jsonb));
   end if;
   if v_src.status not in ('active', 'staging') then
     raise exception 'incident % is %: only an open incident can be merged', v_src.visual_id, v_src.status using errcode = '42501';
@@ -134,26 +253,28 @@ begin
   get diagnostics v_count = row_count; v_moved := v_moved || jsonb_build_object('watchdog_alerts', v_count);
 
   -- Memberships (096, 097, 098; owner 2026-11-26). A decision made on the target site itself
-  -- stands: the merge never quietly undoes it, and every change it makes to a person is audited.
+  -- stands: the merge never quietly undoes it, and it audits every person already on the target
+  -- whom it changes or leaves ended.
   --  * New people: a full membership on the duplicate is copied as full (with its wait for relief);
-  --    a read-only or ended one is copied with its access ended, so his records from before his
-  --    relief, redirected here by sync-log (067), are still accepted.
-  --  * Someone read-only or ended on the target but still full on the duplicate: when his company has
-  --    a read-only link on the target (the target's own handover, release or end of access), he stays
-  --    as he is and the CC is told (memberships_kept_ended); otherwise his row is a copy from an
-  --    earlier merge and he gets full access back (memberships_restored).
-  --  * Someone full on both: he waits for relief when his company left either site (a read-only link
-  --    on the target or the duplicate), otherwise not, whatever order the duplicates are merged in.
-  --    Waiting never takes access away; it only asks him (or his PC / the CC) to confirm the relief.
+  --    a read-only or ended one is copied with its access ended and marked merged_copy_from, so his
+  --    records from before his relief, redirected here by sync-log (067), are still accepted.
+  --  * Someone read-only or ended on the target but full on the duplicate: if his target row is a
+  --    merge copy (merged_copy_from set) he gets full access back (memberships_restored); otherwise
+  --    it is the target's own decision (a handover, release, relief, end of access or a direct CC
+  --    edit) and he stays as he is; the CC is told (memberships_kept_ended) and can re-assign him.
+  --  * Someone full on both, or restored: he waits for relief exactly when his company has a link
+  --    in force (not ended) that left it read-only on either site, whatever the merge order. Waiting
+  --    never takes access away; it only asks him (or his PC / the CC) to confirm the relief.
+  --  * Someone full on the target and read-only on the duplicate keeps his target row (the merged
+  --    site is the target).
   perform set_config('app.membership_relief_via_rpc', 'on', true);
   for r in
     select t.profile_id, t.role_at_incident, t.read_only_since, t.access_ended_at, t.relieved_by,
-           t.relief_pending_since, m.relief_pending_since as src_pending, p.display_name,
+           t.relief_pending_since, t.merged_copy_from, m.relief_pending_since as src_pending, p.display_name,
            coalesce(p.company_id, pl.company_id) as company_id,
-           exists (select 1 from incident_unit_links l where l.incident_id = p_target_id and l.read_only_since is not null
-                   and l.company_id = coalesce(p.company_id, pl.company_id)) as target_left,
-           exists (select 1 from incident_unit_links l where l.incident_id = p_source_id and l.read_only_since is not null
-                   and l.company_id = coalesce(p.company_id, pl.company_id)) as source_left
+           exists (select 1 from incident_unit_links l where l.incident_id in (p_target_id, p_source_id)
+                   and l.read_only_since is not null and l.ended_at is null
+                   and l.company_id = coalesce(p.company_id, pl.company_id)) as company_left
     from incident_memberships t
     join incident_memberships m on m.incident_id = p_source_id and m.profile_id = t.profile_id
       and m.read_only_since is null and m.access_ended_at is null
@@ -161,25 +282,27 @@ begin
     left join platoons pl on pl.id = p.platoon_id
     where t.incident_id = p_target_id
     order by t.profile_id
+    for update of t
   loop
     v_kind := null;
     if r.read_only_since is not null or r.access_ended_at is not null then
-      if r.target_left then
-        v_kept_ended := v_kept_ended || jsonb_build_object('profile_id', r.profile_id, 'display_name', r.display_name);
+      if r.merged_copy_from is null then
+        v_kept_ended := v_kept_ended || jsonb_build_object('profile_id', r.profile_id, 'display_name', r.display_name,
+                          'read_only_since', r.read_only_since, 'access_ended_at', r.access_ended_at);
         v_kind := 'merge_kept_target_decision';
       else
-        update incident_memberships set read_only_since = null, access_ended_at = null, relieved_by = null,
-               relief_pending_since = case when r.source_left then coalesce(r.src_pending, now()) else null end
+        update incident_memberships set read_only_since = null, access_ended_at = null, relieved_by = null, merged_copy_from = null,
+               relief_pending_since = case when r.company_left then coalesce(r.src_pending, now()) else null end
         where incident_id = p_target_id and profile_id = r.profile_id;
         v_restored := v_restored || jsonb_build_object('profile_id', r.profile_id, 'display_name', r.display_name);
         v_kind := 'access_restored_by_merge';
       end if;
-    elsif (r.target_left or r.source_left) and r.relief_pending_since is null then
+    elsif r.company_left and r.relief_pending_since is null then
       update incident_memberships set relief_pending_since = coalesce(r.src_pending, now())
       where incident_id = p_target_id and profile_id = r.profile_id;
       v_wait_set := v_wait_set || to_jsonb(r.profile_id);
       v_kind := 'relief_wait_set_by_merge';
-    elsif not (r.target_left or r.source_left) and r.relief_pending_since is not null then
+    elsif not r.company_left and r.relief_pending_since is not null then
       update incident_memberships set relief_pending_since = null
       where incident_id = p_target_id and profile_id = r.profile_id;
       v_wait_cleared := v_wait_cleared || to_jsonb(r.profile_id);
@@ -189,7 +312,13 @@ begin
       perform app.write_unit_audit('incident_unit_changed', r.company_id, null, r.profile_id, p_target_id, null, null, null, null,
         jsonb_build_object('kind', v_kind, 'source_id', p_source_id, 'role_at_incident', r.role_at_incident, 'by_role', v_role,
           'before', jsonb_build_object('read_only_since', r.read_only_since, 'access_ended_at', r.access_ended_at,
-                                       'relief_pending_since', r.relief_pending_since, 'relieved_by', r.relieved_by)));
+                                       'relief_pending_since', r.relief_pending_since, 'relieved_by', r.relieved_by,
+                                       'merged_copy_from', r.merged_copy_from),
+          'after', (select jsonb_build_object('incident_id', x.incident_id, 'profile_id', x.profile_id,
+                      'read_only_since', x.read_only_since, 'access_ended_at', x.access_ended_at,
+                      'relief_pending_since', x.relief_pending_since, 'relieved_by', x.relieved_by,
+                      'merged_copy_from', x.merged_copy_from)
+                    from incident_memberships x where x.incident_id = p_target_id and x.profile_id = r.profile_id)));
     end if;
   end loop;
   insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by, relief_pending_since)
@@ -198,12 +327,14 @@ begin
     and m.read_only_since is null and m.access_ended_at is null
   on conflict (incident_id, profile_id) do nothing;
   get diagnostics v_count = row_count;
-  v_moved := v_moved || jsonb_build_object('memberships_added', v_count, 'memberships_restored', v_restored,
-                                           'memberships_kept_ended', v_kept_ended,
-                                           'relief_wait_set', v_wait_set, 'relief_wait_cleared', v_wait_cleared);
-  insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by, read_only_since, access_ended_at, relieved_by)
+  -- Profile ids only in the event payload (every member pulls it); names go to the caller only.
+  v_moved := v_moved || jsonb_build_object('memberships_added', v_count,
+    'memberships_restored', coalesce((select jsonb_agg(x->'profile_id') from jsonb_array_elements(v_restored) x), '[]'::jsonb),
+    'memberships_kept_ended', coalesce((select jsonb_agg(x->'profile_id') from jsonb_array_elements(v_kept_ended) x), '[]'::jsonb),
+    'relief_wait_set', v_wait_set, 'relief_wait_cleared', v_wait_cleared);
+  insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by, read_only_since, access_ended_at, relieved_by, merged_copy_from)
   select p_target_id, m.profile_id, m.role_at_incident, coalesce(m.assigned_by, auth.uid()), m.read_only_since,
-         coalesce(m.access_ended_at, now()), m.relieved_by
+         coalesce(m.access_ended_at, now()), m.relieved_by, p_source_id
   from incident_memberships m where m.incident_id = p_source_id
     and m.read_only_since is not null
   on conflict (incident_id, profile_id) do nothing;

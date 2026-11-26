@@ -21,6 +21,8 @@ declare
   ADM uuid := (select id from profiles where role = 'admin' and is_active order by created_at limit 1);
   Z uuid := gen_random_uuid();
   T2 uuid := gen_random_uuid();
+  R3 uuid := gen_random_uuid();
+  S3 uuid := gen_random_uuid();
   S2 uuid := gen_random_uuid();   -- target of a merge
   CA uuid; CB uuid; PA1 uuid;
   X uuid := gen_random_uuid();   -- site handed over from A to B
@@ -539,12 +541,13 @@ begin
     insert into incidents (id, visual_id, t_zero, t_injury_default, location_name, status, opened_at, company_id) values
       (T2, 'TEST96-T2', t0, t0, 'TEST96 T2', 'active', t0, CA), (S2, 'TEST96-S2', t0, t0, 'TEST96 S2', 'active', t0, CA);
     insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by) values
-      (T2, MA2, 'medic', PCA), (S2, MA2, 'medic', PCA), (S2, MB, 'medic', PCA);
+      (T2, MA2, 'medic', PCA), (S2, MA2, 'medic', PCA), (S2, MB, 'medic', PCA), (T2, LG, 'logistics_officer', PCA), (S2, LG, 'logistics_officer', PCA);
     perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
     execute 'set local role authenticated';
     perform public.handover_incident_unit(T2, CB, 'B takes T2', 'dev-cc', 't96-ho-t2');
     perform public.confirm_incident_relief(T2, MA2, 'dev-cc', 't96-rel-ma2');
     perform public.end_incident_unit_access(T2, CA, 'dev-cc', 't96-end-t2');
+    update incident_memberships set read_only_since = now(), access_ended_at = now() where incident_id = T2 and profile_id = LG;
     execute 'reset role';
     insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by, relief_pending_since)
       values (T2, MB, 'medic', PCB, now() - interval '10 minutes');
@@ -558,8 +561,9 @@ begin
     execute 'set local role authenticated';
     insert into _c values ('merge (098): ended on the target, no access after the merge', pg_temp.t96_view(T2)::text, 'false');
     execute 'reset role';
-    insert into _c values ('merge (098): the CC is told who stayed ended',
-      coalesce((select string_agg(e->>'profile_id', ',') from jsonb_array_elements(j->'memberships_kept_ended') e), '-'), MA2::text);
+    insert into _c values ('merge (098): the CC is told who stayed ended (MA2 and LG)',
+      coalesce((select string_agg(e->>'profile_id', ',' order by e->>'profile_id') from jsonb_array_elements(j->'memberships_kept_ended') e), '-'),
+      (select string_agg(u::text, ',' order by u::text) from unnest(array[MA2, LG]) u));
     select count(*) into n from unit_audit where target_incident_id = T2 and target_profile_id = MA2
       and detail->>'kind' = 'merge_kept_target_decision' and detail->'before'->>'access_ended_at' is not null;
     insert into _c values ('merge (098): kept-ended decision audited with before', n::text, '1');
@@ -571,6 +575,55 @@ begin
     insert into _c values ('merge (098): memberships_added counts new rows only', j->'moved'->>'memberships_added', '0');
     select count(*) into n from unit_audit where target_incident_id = Z and target_profile_id = PCA and detail->>'kind' = 'access_restored_by_merge';
     insert into _c values ('merge (098): restoring an earlier merge copy is audited', n::text, '1');
+    select (access_ended_at is not null)::text into s from incident_memberships where incident_id = T2 and profile_id = LG;
+    insert into _c values ('merge (098): no company, ended by a direct CC edit on the target: stays ended', s, 'true');
+    perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    j := public.merge_incident(S2, T2, 'duplicate', 'dev-cc', 't96-merge3');
+    execute 'reset role';
+    insert into _c values ('merge (098): a repeated merge changes nothing', j->>'changed', 'false');
+    insert into _c values ('merge (098): a repeated merge still names who stayed out',
+      (select string_agg(e->>'display_name', ',' order by e->>'profile_id') is not null and jsonb_array_length(j->'memberships_kept_ended') = 2 from jsonb_array_elements(j->'memberships_kept_ended') e)::text, 'true');
+    select count(*) into n from events where incident_id = T2 and type = 'INCIDENT_MERGED'
+      and payload_json::text like '%display_name%';
+    insert into _c values ('merge (098): no names in the event log', n::text, '0');
+
+    -- A company that left and came back (link ended 'returned') no longer counts as left; a link in
+    -- force on the duplicate does. R3: A hands it to B and B hands it back. S3: B reinforces, then is
+    -- released (B's link in force). MA2 (A) is full on both: no wait. MB (B) is full on both: waits.
+    insert into incidents (id, visual_id, t_zero, t_injury_default, location_name, status, opened_at, company_id) values
+      (R3, 'TEST96-R3', t0, t0, 'TEST96 R3', 'active', t0, CA), (S3, 'TEST96-S3', t0, t0, 'TEST96 S3', 'active', t0, CA);
+    insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by) values
+      (R3, MA2, 'medic', PCA), (S3, MA2, 'medic', PCA);
+    perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    perform public.handover_incident_unit(R3, CB, 'to B', 'dev-cc', 't96-ho-r3');
+    perform public.handover_incident_unit(R3, CA, 'back to A', 'dev-cc', 't96-ho-r3b');
+    perform public.reinforce_incident_unit(S3, CB, 'help', 'dev-cc', 't96-rf-s3');
+    execute 'reset role';
+    insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by) values (S3, MB, 'medic', PCB), (R3, MB, 'medic', PCB);
+    perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    perform public.release_incident_unit(S3, CB, 'done', 'dev-cc', 't96-rl-s3');
+    j := public.merge_incident(S3, R3, 'duplicate', 'dev-cc', 't96-merge4');
+    execute 'reset role';
+    select (relief_pending_since is null and read_only_since is null)::text into s from incident_memberships where incident_id = R3 and profile_id = MA2;
+    insert into _c values ('merge (098): company came back (returned link): full, no wait for relief', s, 'true');
+    select count(*) into n from unit_audit where target_incident_id = R3 and target_profile_id = MA2 and detail->>'kind' like '%by_merge%';
+    insert into _c values ('merge (098): no audit row for someone the merge leaves unchanged', n::text, '0');
+    select (relief_pending_since is not null and read_only_since is null)::text into s from incident_memberships where incident_id = R3 and profile_id = MB;
+    insert into _c values ('merge (098): company released from the duplicate: full, waits for relief', s, 'true');
+    select count(*) into n from unit_audit where target_incident_id = R3 and target_profile_id = MB
+      and detail->>'kind' = 'relief_wait_set_by_merge' and detail->'after'->>'relief_pending_since' is not null;
+    insert into _c values ('merge (098): wait set by the merge audited with after', n::text, '1');
+    update incident_memberships set merged_copy_from = R3 where incident_id = R3 and profile_id = MB;
+    perform set_config('request.jwt.claims', json_build_object('sub', PCB, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    begin
+      update incident_memberships set merged_copy_from = null where incident_id = R3 and profile_id = MB;
+      insert into _c values ('merge (098): a physician edits merged_copy_from directly', 'allowed', 'refused');
+    exception when insufficient_privilege then insert into _c values ('merge (098): a physician edits merged_copy_from directly', case when sqlerrm like '%relief fields%' then 'refused' else 'refused elsewhere: ' || sqlerrm end, 'refused'); end;
+    execute 'reset role';
   end if;
 
   select string_agg(case when got = want then 'ok   ' else 'FAIL ' end || label || ': got ' || got || ', want ' || want, E'\n'),
