@@ -1312,6 +1312,68 @@ end;
 $function$
 ;
 
+
+-- ---------------------------------------------------------------------------------------------
+-- 8. Who may change the relief fields directly (owner 2026-11-26)
+-- ---------------------------------------------------------------------------------------------
+-- The 045 policies let cc, chamal, admin and physician (and a PC for his own medics) write
+-- incident_memberships through the API. Owner 2026-11-26: only the CC or chamal may edit the relief
+-- fields (read_only_since, access_ended_at, relief_pending_since, relieved_by) directly; everyone
+-- else changes them only through the 096 functions. And a PC who re-assigns his own medic (the
+-- usual upsert, which never sends these fields) gives him full access back.
+-- This trigger function deliberately runs as the caller (no security definer): the 096 functions
+-- run as their owner and are not checked here, a direct API write runs as `authenticated` and is.
+-- It reads nothing the caller could not; app.current_user_role() is itself security definer.
+create or replace function app.guard_membership_relief_fields()
+returns trigger
+language plpgsql
+set search_path to 'public'
+as $function$
+declare
+  v_role text := app.current_user_role()::text;
+begin
+  if current_user not in ('authenticated', 'anon') then
+    return new;
+  end if;
+  if v_role in ('cc', 'chamal') then
+    return new;
+  end if;
+  if tg_op = 'INSERT' then
+    if new.read_only_since is not null or new.access_ended_at is not null
+       or new.relief_pending_since is not null or new.relieved_by is not null then
+      raise exception 'only the CC or chamal may set relief fields on a site membership' using errcode = '42501';
+    end if;
+    return new;
+  end if;
+  if new.read_only_since is distinct from old.read_only_since
+     or new.access_ended_at is distinct from old.access_ended_at
+     or new.relief_pending_since is distinct from old.relief_pending_since
+     or new.relieved_by is distinct from old.relieved_by then
+    raise exception 'only the CC or chamal may change relief fields on a site membership' using errcode = '42501';
+  end if;
+  -- A PC re-assigning his medic (the 045 policy already limits him to his own company's medics on a
+  -- site he fully works) restores the medic's access.
+  if v_role = 'pc' and (old.read_only_since is not null or old.access_ended_at is not null
+                        or old.relief_pending_since is not null) then
+    new.read_only_since := null;
+    new.access_ended_at := null;
+    new.relief_pending_since := null;
+    new.relieved_by := null;
+  end if;
+  return new;
+end;
+$function$;
+revoke all on function app.guard_membership_relief_fields() from public, anon, authenticated;
+do $$
+begin
+  if not exists (select 1 from pg_trigger where tgrelid = 'public.incident_memberships'::regclass
+                 and tgname = 'trg_guard_membership_relief_fields') then
+    create trigger trg_guard_membership_relief_fields
+      before insert or update on incident_memberships
+      for each row execute function app.guard_membership_relief_fields();
+  end if;
+end $$;
+
 revoke all on function app.require_unit_change_caller() from public, anon, authenticated;
 revoke all on function app.company_profile_ids(uuid) from public, anon, authenticated;
 revoke all on function app.start_company_relief(uuid, uuid, timestamptz) from public, anon, authenticated;

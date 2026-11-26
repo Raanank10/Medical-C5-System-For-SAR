@@ -479,7 +479,7 @@ Verified before applying on a local PostgreSQL 16 built from every `database/*.s
 
 ## Follow-up: read-only access after a site handover (`database/096`, WP-27, not applied live yet)
 
-Written 2026-11-25 with PR #157. Not applied live and not verified against real accounts yet; the owner applies `095`, then `096`, then runs `scripts/rls_test_096_unit_handover.sql` (rolled back; 67 checks passed on a local Postgres built from the live definitions, 71 expected live with the merge checks).
+Written 2026-11-25 with PR #157. Not applied live and not verified against real accounts yet; the owner applies `095`, then `096`, then runs `scripts/rls_test_096_unit_handover.sql` (rolled back; 73 checks passed on a local Postgres built from the live definitions, 77 expected live with the merge checks).
 
 What changes in the convention above:
 - `app.can_access_incident()` now means **full** access. A membership with `read_only_since` set (a relieved member after a handover, or a released reinforcement) no longer counts. Every write policy and write RPC that already checks `can_access_incident()` therefore closes to read-only people without being edited. The `app.current_user_role() is not null` guard from `017` is kept.
@@ -489,6 +489,8 @@ What changes in the convention above:
 - `app.pc_may_manage_membership()` is redefined: a PC waiting for relief assigns no medics.
 - `events_read_authenticated` gains one branch: the author may read back his own records that `can_write_incident_late()` accepted. `sync-log` inserts with `returning` and checks a record's parents with the caller's access, so without it a relieved medic's records from before his relief were quarantined once the CC ended his access (found by review 2026-11-25). The branch excludes closed incidents, where `068` hides patient data from everyone but admin and `sync-log` inserts without reading back. `merge_incident` copies a read-only member to the target with his access ended, so his late records are still accepted there without giving him a view of the target.
 - Four live write RPCs did not check full access (checked live 2026-11-25): `update_patient_identity` and `resolve_sync_ingestion_error` checked only `can_read_incident_patients()`, `cancel_incident_false_alarm` only the opener, `merge_incident` copied every membership as full. `096` section 7 fixes each, from the live bodies (md5 compared before the edit). A new write RPC must check `can_access_incident()` itself.
+- Relief fields (owner 2026-11-26): the `045` policies let cc, chamal, admin, physician and a PC write `incident_memberships` through the API. A trigger (`trg_guard_membership_relief_fields`, running as the caller so it can tell a direct API write from the `096` functions) lets only cc and chamal change `read_only_since`, `access_ended_at`, `relief_pending_since` and `relieved_by` directly. A PC's re-assignment of his own medic (the usual upsert) clears them, which gives the medic full access back.
+- A logistics officer's membership is never touched by relief or end access (owner 2026-11-26).
 - No `drop` in `096`: policies are changed with `alter policy`, `unit_audit`'s action check is left as is (the RPCs write `incident_unit_changed` with `detail.kind`), and the old `list_open_incidents()` is kept as `list_open_incidents_pre096()` with no execute grant.
 
 Known and left as is:

@@ -36,7 +36,7 @@ begin
   insert into companies(name) values ('TEST96-B') returning id into CB;
   insert into platoons(company_id, name) values (CA, 'TEST96-A1') returning id into PA1;
   update profiles set role = 'pc' where id = PCB;
-  update profiles set company_id = CA, platoon_id = null where id in (PCA, MA, MA2, RCCA);
+  update profiles set company_id = CA, platoon_id = null where id in (PCA, MA, MA2, RCCA, LG);
   update profiles set company_id = null, platoon_id = PA1 where id = RPCA;
   update profiles set company_id = CB, platoon_id = null where id in (PCB, MB);
   insert into incidents (id, visual_id, t_zero, t_injury_default, location_name, status, opened_at, company_id, platoon_id) values
@@ -44,7 +44,7 @@ begin
     (Y, 'TEST96-Y', t0, t0, 'TEST96 Y', 'active', t0, CA, null);
   update incidents set opened_by = MA where id = X;
   insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by) values
-    (X, PCA, 'pc', PCA), (X, MA, 'medic', PCA), (Y, PCA, 'pc', PCA), (Y, MA, 'medic', PCA);
+    (X, PCA, 'pc', PCA), (X, MA, 'medic', PCA), (Y, PCA, 'pc', PCA), (Y, MA, 'medic', PCA), (X, LG, 'logistics_officer', PCA);
   insert into patients (id, incident_id, visual_id, t_injury, created_by) values (P1, X, 'T96-P1', t0, MA);
 
   -- ---- Before any change
@@ -207,12 +207,15 @@ begin
   insert into _c values ('A PC gets no notice', n::text, '0');
   execute 'reset role';
 
-  -- ---- A logistics officer who is not a member is not shown a site as read-only (he joins as before)
+  -- ---- Logistics (owner 2026-11-26: part of the company and its sites, never relieved)
   perform set_config('request.jwt.claims', json_build_object('sub', LG, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   select count(*) into n from public.list_open_incidents() where id = Y and read_only;
-  insert into _c values ('logistics: site not marked read-only', n::text, '0');
+  insert into _c values ('logistics: a site he is not on is not marked read-only', n::text, '0');
+  insert into _c values ('logistics of A on the handed-over site: still full', app.can_access_incident(X)::text, 'true');
   execute 'reset role';
+  select (relief_pending_since is null and read_only_since is null)::text into s from incident_memberships where incident_id = X and profile_id = LG;
+  insert into _c values ('logistics of A: never waits for relief', s, 'true');
 
   -- ---- A's rescue chain: read-only at once
   foreach s in array array[RCCA::text, RPCA::text] loop
@@ -361,6 +364,29 @@ begin
   insert into _c values ('A PC on Y after handover: waits for relief', (public.get_incident_unit_links(Y))->>'my_access', 'relief_pending');
   execute 'reset role';
 
+  -- ---- Relief fields (owner 2026-11-26): only the CC or chamal edit them directly; a PC who
+  -- re-assigns his own medic gives him full access back.
+  update incident_memberships set read_only_since = now() - interval '5 minutes', access_ended_at = now()
+  where incident_id = Y and profile_id = MB;                        -- MB ended on Y (as postgres)
+  perform set_config('request.jwt.claims', json_build_object('sub', PCB, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    update incident_memberships set access_ended_at = null where incident_id = Y and profile_id = MB;
+    insert into _c values ('PC edits a relief field directly', 'allowed', 'refused');
+  exception when insufficient_privilege then insert into _c values ('PC edits a relief field directly', 'refused', 'refused'); end;
+  insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by) values (Y, MB, 'medic', PCB)
+  on conflict (incident_id, profile_id) do update set assigned_by = excluded.assigned_by, role_at_incident = excluded.role_at_incident;
+  execute 'reset role';
+  select (read_only_since is null and access_ended_at is null)::text into s from incident_memberships where incident_id = Y and profile_id = MB;
+  insert into _c values ('PC re-assigns his ended medic: access back', s, 'true');
+  perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  update incident_memberships set relieved_by = CC where incident_id = Y and profile_id = MB;
+  get diagnostics n = row_count;
+  insert into _c values ('CC edits a relief field directly', n::text, '1');
+  execute 'reset role';
+  update incident_memberships set relieved_by = null where incident_id = Y and profile_id = MB;
+
   -- ---- Physician (unit manager, not cc) may not move or reinforce a site (reinforce tried here)
   update profiles set role = 'physician' where id = PCB;
   perform set_config('request.jwt.claims', json_build_object('sub', PCB, 'role', 'authenticated')::text, true);
@@ -369,6 +395,10 @@ begin
     perform public.reinforce_incident_unit(X, CA, 'x');
     insert into _c values ('physician refused', 'allowed', 'refused');
   exception when insufficient_privilege then insert into _c values ('physician refused', 'refused', 'refused'); end;
+  begin
+    update incident_memberships set read_only_since = now() where incident_id = Y and profile_id = MB;
+    insert into _c values ('physician edits a relief field directly', 'allowed', 'refused');
+  exception when insufficient_privilege then insert into _c values ('physician edits a relief field directly', 'refused', 'refused'); end;
   execute 'reset role';
 
   -- ---- Merge: a read-only or ended member of the duplicate gets no access to the target, a wait for
