@@ -1,6 +1,6 @@
--- Rolled-back test for database/096 and 097 (CC moves a site to another company / reinforces it, WP-27;
+-- Rolled-back test for database/096, 097 and 098 (CC moves a site to another company / reinforces it, WP-27;
 -- relief before read-only, owner 2026-11-22).
--- Run after 095, 096 and 097 are applied, through the Supabase connector's execute_sql (not pasted into
+-- Run after 095, 096, 097 and 098 are applied, through the Supabase connector's execute_sql (not pasted into
 -- the SQL editor from a phone: a long paste was cut off once, database/090). It ends with an error on purpose so
 -- nothing persists; the error text is the result: every line should read "ok", and the last line
 -- counts the failures (want 0).
@@ -19,7 +19,9 @@ declare
   RPCA uuid := (select id from profiles where role = 'rpc' and is_active order by created_at limit 1);
   LG uuid := (select id from profiles where role = 'logistics_officer' and is_active order by created_at limit 1);
   ADM uuid := (select id from profiles where role = 'admin' and is_active order by created_at limit 1);
-  Z uuid := gen_random_uuid();   -- target of a merge
+  Z uuid := gen_random_uuid();
+  T2 uuid := gen_random_uuid();
+  S2 uuid := gen_random_uuid();   -- target of a merge
   CA uuid; CB uuid; PA1 uuid;
   X uuid := gen_random_uuid();   -- site handed over from A to B
   Y uuid := gen_random_uuid();   -- site A keeps, B reinforces
@@ -529,6 +531,46 @@ begin
     execute 'reset role';
     select count(*) into n from incident_memberships where incident_id = Z and profile_id = PCA and relief_pending_since is not null and read_only_since is null;
     insert into _c values ('merge: wait for relief moves with the person, also over an ended copy (097)', n::text, '1');
+
+    -- 098 (owner 2026-11-26): a decision made on the target itself stands. MA2 is relieved and ended
+    -- on T2 by T2's own handover; a duplicate S2 where he is still full is merged into T2: he stays
+    -- ended, the CC is told, and it is audited. MB is full on both and his company left neither: he
+    -- does not wait for relief, whichever row the merge met first.
+    insert into incidents (id, visual_id, t_zero, t_injury_default, location_name, status, opened_at, company_id) values
+      (T2, 'TEST96-T2', t0, t0, 'TEST96 T2', 'active', t0, CA), (S2, 'TEST96-S2', t0, t0, 'TEST96 S2', 'active', t0, CA);
+    insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by) values
+      (T2, MA2, 'medic', PCA), (S2, MA2, 'medic', PCA), (S2, MB, 'medic', PCA);
+    perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    perform public.handover_incident_unit(T2, CB, 'B takes T2', 'dev-cc', 't96-ho-t2');
+    perform public.confirm_incident_relief(T2, MA2, 'dev-cc', 't96-rel-ma2');
+    perform public.end_incident_unit_access(T2, CA, 'dev-cc', 't96-end-t2');
+    execute 'reset role';
+    insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by, relief_pending_since)
+      values (T2, MB, 'medic', PCB, now() - interval '10 minutes');
+    perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    j := public.merge_incident(S2, T2, 'duplicate', 'dev-cc', 't96-merge3');
+    execute 'reset role';
+    select (access_ended_at is not null)::text into s from incident_memberships where incident_id = T2 and profile_id = MA2;
+    insert into _c values ('merge (098): someone the target ended stays ended', s, 'true');
+    perform set_config('request.jwt.claims', json_build_object('sub', MA2, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    insert into _c values ('merge (098): ended on the target, no access after the merge', pg_temp.t96_view(T2)::text, 'false');
+    execute 'reset role';
+    insert into _c values ('merge (098): the CC is told who stayed ended',
+      coalesce((select string_agg(e->>'profile_id', ',') from jsonb_array_elements(j->'memberships_kept_ended') e), '-'), MA2::text);
+    select count(*) into n from unit_audit where target_incident_id = T2 and target_profile_id = MA2
+      and detail->>'kind' = 'merge_kept_target_decision' and detail->'before'->>'access_ended_at' is not null;
+    insert into _c values ('merge (098): kept-ended decision audited with before', n::text, '1');
+    select (relief_pending_since is null)::text into s from incident_memberships where incident_id = T2 and profile_id = MB;
+    insert into _c values ('merge (098): full on both, company left neither: no wait for relief', s, 'true');
+    select count(*) into n from unit_audit where target_incident_id = T2 and target_profile_id = MB
+      and detail->>'kind' = 'relief_wait_cleared_by_merge' and detail->'before'->>'relief_pending_since' is not null;
+    insert into _c values ('merge (098): cleared wait audited with before', n::text, '1');
+    insert into _c values ('merge (098): memberships_added counts new rows only', j->'moved'->>'memberships_added', '0');
+    select count(*) into n from unit_audit where target_incident_id = Z and target_profile_id = PCA and detail->>'kind' = 'access_restored_by_merge';
+    insert into _c values ('merge (098): restoring an earlier merge copy is audited', n::text, '1');
   end if;
 
   select string_agg(case when got = want then 'ok   ' else 'FAIL ' end || label || ': got ' || got || ', want ' || want, E'\n'),

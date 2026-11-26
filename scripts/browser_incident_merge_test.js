@@ -109,7 +109,8 @@ function handle(server, req) {
       server.members.filter((m) => m.incident_id === src.id).forEach((m) => { if (!server.members.some((x) => x.incident_id === tgt.id && x.profile_id === m.profile_id)) server.members.push({ incident_id: tgt.id, profile_id: m.profile_id }); });
       src.status = 'closed'; src.closed_at = new Date().toISOString();
       src.metadata = { ...src.metadata, merged_into: { target_id: tgt.id, target_visual_id: tgt.visual_id, reason: p.p_reason } };
-      return { data: { source_id: src.id, target_id: tgt.id, target_visual_id: tgt.visual_id, changed: true, moved: { patients: moved }, renamed_patients: renamed, pre_evacuation_kept_on_source: false }, error: null };
+      // database/098: people the target itself ended stay ended and are listed for the CC.
+      return { data: { source_id: src.id, target_id: tgt.id, target_visual_id: tgt.visual_id, changed: true, moved: { patients: moved }, renamed_patients: renamed, pre_evacuation_kept_on_source: false, memberships_restored: [], memberships_kept_ended: server.keptEnded || [] }, error: null };
     }
     if (req.name === 'get_incident_command_state') { const inc = server.incidents.find((i) => i.id === p.p_incident_id); return { data: inc ? { incident_id: inc.id, status: inc.status, state_json: {} } : null, error: null }; }
     return { data: null, error: null };
@@ -158,7 +159,8 @@ async function openPhone(context, file) {
   const errors = [];
   const toasts = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  page.on('dialog', (d) => d.accept());
+  page.__dialogs = [];
+  page.on('dialog', (d) => { page.__dialogs.push(d.message()); d.accept(); });
   await page.route('**/supabase-js@*/**', (r) => r.fulfill({ contentType: 'application/javascript', body: FAKE_SUPABASE }));
   await page.route('**/functions/v1/sync-log**', async (r) => {
     if (r.request().method() !== 'POST') return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ events: [], next_cursor: 0, has_more: false }) });
@@ -229,12 +231,15 @@ async function checkFile(browser, file) {
   assert((await cc.page.textContent(`#merge-error-${INC_B}`)).includes('סיבה'), `${rel}: a merge without a reason must be refused in the UI`);
   assert(!SERVER.rpcLog.some((r) => r.name === 'merge_incident'), `${rel}: no merge call without a reason`);
   await cc.page.fill(`#merge-reason-${INC_B}`, 'same building, two medics');
+  SERVER.keptEnded = [{ profile_id: 'kept-1', display_name: 'חובש סינתטי' }];
   await cc.page.click(`[data-merge-panel="${INC_B}"] button:has-text("מזג לאירוע הנבחר")`);
   await cc.page.waitForTimeout(400);
   const call = SERVER.rpcLog.find((r) => r.name === 'merge_incident');
   assert(call && call.params.p_source_id === INC_B && call.params.p_target_id === INC_A && call.params.p_reason === 'same building, two medics', `${rel}: merge_incident must be called with B, A and the reason (got ${JSON.stringify(call)})`);
   assert(cc.toasts.some((t) => t.includes('P001→P001-BBBB')), `${rel}: the CC must be told which patient ids were renamed (got ${JSON.stringify(cc.toasts)})`);
   assert(SERVER.incidents.find((i) => i.id === INC_B).status === 'closed', `${rel}: B must be closed as merged`);
+  // database/098: someone the target itself ended stays ended, and the CC is told by name.
+  assert(cc.page.__dialogs.some((m) => m.includes('חובש סינתטי') && m.includes('ללא גישה') && m.includes('לשייך מחדש')), `${rel}: the CC must be told who stayed without access after the merge (got ${JSON.stringify(cc.page.__dialogs)})`);
 
   // Events recorded in B before the merge now belong to A, stamped with their origin.
   assert(early.every((lid) => SERVER.events.some((e) => e.local_event_id === lid && e.incident_id === INC_A && e.origin_incident_id === INC_B)), `${rel}: B's events must be re-tagged to A with their origin`);
