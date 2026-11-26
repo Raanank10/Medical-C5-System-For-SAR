@@ -496,3 +496,7 @@ What changes in the convention above:
 Known and left as is:
 - `app.can_write_incident_event()` (`017`) still counts a read-only membership. Checked live 2026-11-25: no policy and no function references it (read-only query on `pg_policies` and `pg_get_functiondef`), so this is latent. Any new policy must use `can_access_incident()` for writes, not this function.
 - `device_presence` writes stay full-access only, so a read-only phone stops showing as working the site.
+
+### `database/098`: merge keeps the target's decisions (not applied live yet)
+
+No new table, policy or grant; `merge_incident()` is redefined (`create or replace` keeps its grants: execute for `authenticated`, revoked from `public` and `anon`). Owner 2026-11-26: someone the target site itself ended stays ended. A read-only or ended row on the target stays as it is when the person's company has an `incident_unit_links` row on the target with `read_only_since` set (its own handover, release or end of access); only a copy an earlier merge brought in is made full again. Each such person gets one `unit_audit` row through `app.write_unit_audit` with the values before; the result lists `memberships_kept_ended` so the CC can re-assign (the `096` guard lets his own PC, the CC, chamal or admin do it). Rolled-back test: 106/106 locally; the 8 new checks fail against `097`. To verify live after applying: the same test through `execute_sql`.

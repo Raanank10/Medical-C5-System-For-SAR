@@ -8,8 +8,8 @@
 --     re-assign him (the 096 guard lets his own PC, the CC, chamal or admin give access back).
 --     Only a read-only or ended copy that an earlier merge brought onto the target is made full again
 --     (memberships_restored).
---  2. One unit_audit row per person whose membership the merge changes or keeps ended, with the
---     values before (kinds access_restored_by_merge, merge_kept_target_decision,
+--  2. One unit_audit row per person already on the target whose membership the merge changes or
+--     keeps ended, with the values before (new copies are counted in memberships_added, not audited) (kinds access_restored_by_merge, merge_kept_target_decision,
 --     relief_wait_set_by_merge, relief_wait_cleared_by_merge). memberships_added counts new rows only.
 --  3. Someone full on both sites waits for relief exactly when his company left either site, so the
 --     result no longer depends on the order the duplicates are merged in.
