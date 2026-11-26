@@ -1,6 +1,6 @@
--- Rolled-back test for database/096 (CC moves a site to another company / reinforces it, WP-27;
+-- Rolled-back test for database/096 and 097 (CC moves a site to another company / reinforces it, WP-27;
 -- relief before read-only, owner 2026-11-22).
--- Run after 095 and 096 are applied, through the Supabase connector's execute_sql (not pasted into
+-- Run after 095, 096 and 097 are applied, through the Supabase connector's execute_sql (not pasted into
 -- the SQL editor from a phone: a long paste was cut off once, database/090). It ends with an error on purpose so
 -- nothing persists; the error text is the result: every line should read "ok", and the last line
 -- counts the failures (want 0).
@@ -30,14 +30,22 @@ declare
 begin
   -- Each check: (label, got, want). now() is fixed for the whole transaction, so records meant to be
   -- "after the change" use clock_timestamp().
-  create temp table if not exists _c(label text, got text, want text) on commit drop;
+  create temp table if not exists _c(label text, got text, want text);  -- rolled back with the rest
   grant all on _c to authenticated;
+  -- Live, `authenticated` cannot name the app schema (policies reach it without a name lookup), so
+  -- the checks call the helpers through these wrappers; they vanish with the rolled-back transaction.
+  create function pg_temp.t96_access(p uuid) returns boolean language sql stable security definer
+    as 'select app.can_access_incident(p)';
+  create function pg_temp.t96_view(p uuid) returns boolean language sql stable security definer
+    as 'select app.can_view_incident(p)';
 
   insert into companies(name) values ('TEST96-A') returning id into CA;
   insert into companies(name) values ('TEST96-B') returning id into CB;
   insert into platoons(company_id, name) values (CA, 'TEST96-A1') returning id into PA1;
   update profiles set role = 'pc' where id = PCB;
-  update profiles set company_id = CA, platoon_id = null where id in (PCA, MA, MA2, RCCA, LG);
+  -- A logistics officer is never placed in a company (live app.guard_profile_unit); he reaches a
+  -- site as a member only.
+  update profiles set company_id = CA, platoon_id = null where id in (PCA, MA, MA2, RCCA);
   update profiles set company_id = null, platoon_id = PA1 where id = RPCA;
   update profiles set company_id = CB, platoon_id = null where id in (PCB, MB);
   insert into incidents (id, visual_id, t_zero, t_injury_default, location_name, status, opened_at, company_id, platoon_id) values
@@ -215,7 +223,7 @@ begin
   execute 'set local role authenticated';
   select count(*) into n from public.list_open_incidents() where id = Y and read_only;
   insert into _c values ('logistics: a site he is not on is not marked read-only', n::text, '0');
-  insert into _c values ('logistics of A on the handed-over site: still full', app.can_access_incident(X)::text, 'true');
+  insert into _c values ('logistics of A on the handed-over site: still full', pg_temp.t96_access(X)::text, 'true');
   execute 'reset role';
   select (relief_pending_since is null and read_only_since is null)::text into s from incident_memberships where incident_id = X and profile_id = LG;
   insert into _c values ('logistics of A: never waits for relief', s, 'true');
@@ -225,14 +233,14 @@ begin
     perform set_config('request.jwt.claims', json_build_object('sub', s, 'role', 'authenticated')::text, true);
     execute 'set local role authenticated';
     insert into _c values ('A rescue chain view/full (' || (select role::text from profiles where id = s::uuid) || ')',
-      app.can_view_incident(X)::text || '/' || app.can_access_incident(X)::text, 'true/false');
+      pg_temp.t96_view(X)::text || '/' || pg_temp.t96_access(X)::text, 'true/false');
     execute 'reset role';
   end loop;
 
   -- ---- New PC B: full, told once, assigns his medic
   perform set_config('request.jwt.claims', json_build_object('sub', PCB, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
-  select app.can_access_incident(X)::text into s;
+  select pg_temp.t96_access(X)::text into s;
   insert into _c values ('B PC full access', s, 'true');
   select string_agg(kind, ',') into s from public.list_incident_unit_notices() where incident_id = X;
   insert into _c values ('B PC notice', coalesce(s, '-'), 'handover');
@@ -316,7 +324,7 @@ begin
   execute 'reset role';
   perform set_config('request.jwt.claims', json_build_object('sub', PCA, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
-  select app.can_access_incident(Y)::text into s;
+  select pg_temp.t96_access(Y)::text into s;
   insert into _c values ('A PC still full on Y', s, 'true');
   execute 'reset role';
   perform set_config('request.jwt.claims', json_build_object('sub', MB, 'role', 'authenticated')::text, true);
@@ -337,23 +345,28 @@ begin
   execute 'reset role';
   perform set_config('request.jwt.claims', json_build_object('sub', MB, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
-  insert into _c values ('after release, before relief: B medic full', app.can_access_incident(Y)::text, 'true');
+  insert into _c values ('after release, before relief: B medic full', pg_temp.t96_access(Y)::text, 'true');
   perform public.confirm_incident_relief(Y, null, 'dev-mb', 't96-rel-mb');
-  insert into _c values ('B medic relieved himself: view/full', app.can_view_incident(Y)::text || '/' || app.can_access_incident(Y)::text, 'true/false');
+  insert into _c values ('B medic relieved himself: view/full', pg_temp.t96_view(Y)::text || '/' || pg_temp.t96_access(Y)::text, 'true/false');
   execute 'reset role';
   perform set_config('request.jwt.claims', json_build_object('sub', PCB, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
-  insert into _c values ('B PC not relieved yet: full', app.can_access_incident(Y)::text, 'true');
+  insert into _c values ('B PC not relieved yet: full', pg_temp.t96_access(Y)::text, 'true');
   execute 'reset role';
 
   -- ---- Closed site: a relieved member does not read his own records back (068 hides patient data)
+  -- Live, incidents close only through close_incident() (app.guard_incident_close); the test uses its flag.
+  perform set_config('app.incident_close_via_rpc', 'on', true);
   update incidents set status = 'closed', closed_at = now() where id = Y;
+  perform set_config('app.incident_close_via_rpc', '', true);
   perform set_config('request.jwt.claims', json_build_object('sub', MB, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   select count(*) into n from events where incident_id = Y;
   insert into _c values ('closed site: relieved member reads no records back', n::text, '0');
   execute 'reset role';
+  perform set_config('app.incident_close_via_rpc', 'on', true);
   update incidents set status = 'active', closed_at = null where id = Y;
+  perform set_config('app.incident_close_via_rpc', '', true);
 
   -- ---- A relabelled membership does not escape relief (review 2026-11-26): MA's Y row says logistics.
   update incident_memberships set role_at_incident = 'logistics_officer' where incident_id = Y and profile_id = MA;
@@ -367,7 +380,7 @@ begin
   execute 'reset role';
   perform set_config('request.jwt.claims', json_build_object('sub', MB, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
-  insert into _c values ('B medic full on Y again', app.can_access_incident(Y)::text, 'true');
+  insert into _c values ('B medic full on Y again', pg_temp.t96_access(Y)::text, 'true');
   execute 'reset role';
   perform set_config('request.jwt.claims', json_build_object('sub', PCA, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
@@ -494,6 +507,9 @@ begin
     insert into incidents (id, visual_id, t_zero, t_injury_default, location_name, status, opened_at, company_id)
     values (Z, 'TEST96-Z', t0, t0, 'TEST96 Z', 'active', t0, CB);
     update incident_memberships set relief_pending_since = now() where incident_id = Y and profile_id = PCA and read_only_since is null;
+    -- MA is then only ended (on X); PCA is on both: ended on X, waiting for relief on Y. X is merged
+    -- first, so PCA's ended copy reaches Z first and his full Y membership must win (database/097).
+    delete from incident_memberships where incident_id = Y and profile_id = MA;
     perform set_config('request.jwt.claims', json_build_object('sub', ADM, 'role', 'authenticated')::text, true);
     execute 'set local role authenticated';
     perform public.merge_incident(X, Z, 'duplicate', 'dev-adm', 't96-merge');
@@ -504,7 +520,7 @@ begin
     insert into _c values ('merge: ended member copied for late records only', n::text, '1');
     perform set_config('request.jwt.claims', json_build_object('sub', MA, 'role', 'authenticated')::text, true);
     execute 'set local role authenticated';
-    insert into _c values ('merge: ended member does not see the target', app.can_view_incident(Z)::text, 'false');
+    insert into _c values ('merge: ended member does not see the target', pg_temp.t96_view(Z)::text, 'false');
     begin
       insert into events (incident_id, actor_id, actor_role, type, device_id, local_event_id, local_timestamp)
       values (Z, MA, 'medic', 'NOTE_ADDED', 'dev-ma', 't96-merge-late', t_ho - interval '4 minutes') returning id into j_id;
@@ -512,7 +528,7 @@ begin
     exception when others then insert into _c values ('merge: record from before relief accepted at the target', 'refused: ' || sqlerrm, 'accepted'); end;
     execute 'reset role';
     select count(*) into n from incident_memberships where incident_id = Z and profile_id = PCA and relief_pending_since is not null and read_only_since is null;
-    insert into _c values ('merge: wait for relief moves with the person', n::text, '1');
+    insert into _c values ('merge: wait for relief moves with the person, also over an ended copy (097)', n::text, '1');
   end if;
 
   select string_agg(case when got = want then 'ok   ' else 'FAIL ' end || label || ': got ' || got || ', want ' || want, E'\n'),
