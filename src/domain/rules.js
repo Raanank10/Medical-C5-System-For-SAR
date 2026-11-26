@@ -39,7 +39,7 @@
   const TOURNIQUET_CONVERSION_LIMIT_MS = {
     medic: TOURNIQUET_CRITICAL_MS,
     pc: TOURNIQUET_CRITICAL_MS,
-    paramedic: 4 * 60 * 60 * 1000,
+    paramedic: TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS, // owner 2026-11-26: 6 h, as a physician (was 4 h)
     physician: TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS,
     // The owner's test / monitoring profile (2026-11-08): every option open, with the physician's
     // limits so the blocked states can be seen too.

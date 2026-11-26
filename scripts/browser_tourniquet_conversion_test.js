@@ -76,15 +76,20 @@ async function main() {
     r = await tap(s.id);
     assert(r.active === 1 && r.status === 'active' && r.sent.length === 0 && dialogs.length === 1, `a blocked conversion must change nothing (got ${JSON.stringify(r)})`);
 
-    // 3. Paramedic: allowed at 200 minutes, blocked past 4 hours.
+    // 3. Paramedic (owner 2026-11-26: 6 h, as a physician): allowed at 200 minutes and at 5 hours,
+    //    blocked past 6 hours with no one left to convert.
     s = await setup('paramedic', 200, 3);
     assert(s.shown && !s.disabled, `paramedic at 200 min must be allowed (got ${JSON.stringify(s)})`);
     r = await tap(s.id);
     assert(r.active === 0 && r.sent.length === 1, `paramedic at 200 min converts (got ${JSON.stringify(r)})`);
-    s = await setup('paramedic', 245, 4);
-    assert(s.disabled && s.text.includes('עברו 4 שעות') && s.text.includes('רופא בלבד'), `paramedic past 4 h must be blocked (got ${JSON.stringify(s)})`);
+    s = await setup('paramedic', 300, 4);
+    assert(s.shown && !s.disabled, `paramedic at 5 h must be allowed (got ${JSON.stringify(s)})`);
     r = await tap(s.id);
-    assert(r.active === 1 && r.sent.length === 0, `paramedic past 4 h changes nothing (got ${JSON.stringify(r)})`);
+    assert(r.active === 0 && r.sent.length === 1, `paramedic at 5 h converts (got ${JSON.stringify(r)})`);
+    s = await setup('paramedic', 370, 21);
+    assert(s.disabled && s.text.includes('עברו 6 שעות') && s.text.includes('חלון ההמרה נסגר'), `paramedic past 6 h must be blocked (got ${JSON.stringify(s)})`);
+    r = await tap(s.id);
+    assert(r.active === 1 && r.sent.length === 0, `paramedic past 6 h changes nothing (got ${JSON.stringify(r)})`);
 
     // 4. Physician (owner, 2026-11-08): allowed at 5 hours, blocked past 6 hours.
     s = await setup('physician', 300, 5);
