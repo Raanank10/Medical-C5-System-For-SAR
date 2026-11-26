@@ -370,6 +370,41 @@ async function main() {
     assert(r3.bleed1 === 'treated' && r3.reassessed === 'effective' && r3.bleed2 === 'treated', `each "bleeding continues" reopens M, got ${JSON.stringify(r3)}`);
     assert(r3.srvEvent === 'ev-a' && r3.aliasKey === 'tq:phoneA:local-1' && r3.alias === 'effective', `server event key from the side query; offline reassessment still covers it, got ${JSON.stringify(r3)}`);
 
+    // Round 4: a tourniquet recorded in a MARCH save stays an M treatment after conversion, on another
+    // phone too (march_tq), and "nothing needed" is refused; a check on a server tourniquet is sent;
+    // a new check id alone refreshes the server tourniquet.
+    const r4 = await page.evaluate(() => {
+      const out = {};
+      const p = { id: 'r4-1', visualId: 'P-R4', triage: 'red', patientStatus: 'observing', tourniquets: [], marchReviews: [] };
+      patients.push(p);
+      const tq = { id: 'TQ-001', limb: 'right_leg', appliedAt: Date.now() - 600000, status: 'active' };
+      p.tourniquets.push(tq); queueTourniquetAppliedEvent(p, tq, { source: 'march_update' });
+      const key = marchTqKey(tq);
+      p.marchReviews.push({ at: Date.now(), source: getDeviceId(), review: { m: null }, seen: {}, tq: [key] });
+      tq.status = 'converted';
+      out.local = patientMarchStatus(p).letters.m;
+      // Another phone: no tourniquet row (converted rows are not pulled), only the save's march_tq.
+      const other = { id: 'r4-2', visualId: 'P-R4c', triage: 'red', patientStatus: 'observing', vitals: {}, vitalsHistory: [], events: [], tourniquets: [],
+        remoteMarchReviews: [{ at: Date.now(), source: 'phone-a', review: { m: null }, seen: {}, tq: [key], id: 'x1' }] };
+      out.remote = patientMarchStatus(other).letters.m;
+      patients.push(other);
+      openMarchForPatient('r4-2'); openMarchLetter('m');
+      toggleMarchClear(document.getElementById('march-clear-m'), 'm');
+      out.clearRefused = !state.marchClear.has('m');
+      cancelMarchUpdate();
+      patients.splice(patients.indexOf(p), 1); patients.splice(patients.indexOf(other), 1);
+      // A server tourniquet: a check from this phone is sent for its limb.
+      const [srv] = serverTourniquetRecords([{ id: 'row9', patient_id: 'r4-3', limb: 'left_arm', applied_at: new Date().toISOString(), is_active: true, tourniquet_status: 'applied' }], 'r4-3', null);
+      const n = getOutbox().length;
+      queueTourniquetReassessment({ id: 'r4-3', visualId: 'P-R4b' }, srv, 'bleeding_continues');
+      const sent = getOutbox().slice(n).find((e) => e.type === 'TOURNIQUET_REASSESSMENT');
+      out.sent = sent ? sent.payload_json.limb : null;
+      out.bleedKey = marchBleedKey(srv) === `bleed:${getDeviceId()}:${sent?.local_event_id}`;
+      return out;
+    });
+    assert(r4.local === 'needs_reassessment' && r4.remote === 'needs_reassessment' && r4.clearRefused, `a converted tourniquet stays an M treatment here and on another phone, got ${JSON.stringify(r4)}`);
+    assert(r4.sent === 'left_arm' && r4.bleedKey, `a check on another phone's tourniquet is sent and keyed by its event, got ${JSON.stringify(r4)}`);
+
     // march_seen from other phones: letters only, no prototype keys, at most 50 sources per letter.
     const san = await page.evaluate(() => {
       const many = {}; for (let i = 0; i < 80; i++) many['s' + i] = i;

@@ -642,7 +642,12 @@ assert.deepEqual(rules.RESCUE_PRIORITIES, ["urgent", "pending", "not_urgent"]);
   // its event key is known; seen records both names.
   const tqEv = { at: 0, source: "tq:dev1:local-1", aliases: ["tq:right_leg:999"], review: { m: "treated" } };
   assert.equal(rules.mergeMarchReviews([tqEv, { at: T, source: "B", review: { m: "effective" }, seen: { m: { "tq:right_leg:999": 0 } } }]).m, "effective");
-  assert.deepEqual(rules.marchSeenFrom([tqEv]), { m: { "tq:dev1:local-1": 0, "tq:right_leg:999": 0 } });
+  assert.deepEqual(rules.marchSeenFrom([tqEv]), { m: { "tq:dev1:local-1": 0 } });
+  // Two tourniquets on one limb in one minute share the alias: seeing one never covers the other.
+  const tqA = { at: 0, source: "tq:devY:local-A", aliases: ["tq:left_leg:29000000"], review: { m: "treated" } };
+  const tqB = { at: 0, source: "tq:devZ:local-B", aliases: ["tq:left_leg:29000000"], review: { m: "treated" } };
+  assert.equal(rules.mergeMarchReviews([tqA, tqB, { at: T, source: "X", review: { m: "effective" }, seen: rules.marchSeenFrom([tqA]) }]).m, "treated");
+  assert.equal(rules.mergeMarchReviews([tqA, tqB, { at: T, source: "X", review: { m: "effective" }, seen: rules.marchSeenFrom([tqA, tqB]) }]).m, "effective");
   // A seen map's inherited keys never count.
   assert.equal(rules.mergeMarchReviews([{ at: 0, source: "constructor", review: { m: "treated" } }, { at: T, source: "B", review: { m: "effective" }, seen: { m: {} } }]).m, "treated");
   // PAWS letters keep plain newest-wins.

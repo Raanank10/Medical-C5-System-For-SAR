@@ -689,9 +689,10 @@
       MARCH_LETTERS.forEach((id) => {
         if (entry.review[id] !== "treated") return;
         const bySource = seen[id] || (seen[id] = {});
-        [entry.source, ...entry.aliases].forEach((source) => {
-          if (bySource[source] === undefined || entry.at > bySource[source]) bySource[source] = entry.at;
-        });
+        // Only the name the phone knows it by: an alias (limb + minute) is shared by two tourniquets on
+        // one limb in one minute, so seeing one must not cover the other. A phone that knew only the
+        // alias has it as the source, and the alias then covers the event-keyed entry later.
+        if (bySource[entry.source] === undefined || entry.at > bySource[entry.source]) bySource[entry.source] = entry.at;
       });
     });
     return seen;
