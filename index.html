@@ -18328,9 +18328,6 @@ function serverTourniquetRecords(rows, patientId, timeMeta=null){
       appliedBy:'(מכשיר אחר)', source:'server', status:effectiveness==='bleeding_continues'?'ineffective':'active', effectiveness, reasonForAdditional:null, note:''};
     const time=metaById.get(r.id);
     if(time){ tq.appliedEventId=time.applied_event_id||null; tq.lastCheckEventId=time.last_reassessed_event_id||null; }
-    // A check on this tourniquet from this phone is sent for the server's own limb (it was dropped
-    // before: no serverLimb), so other phones see it and MARCH M follows it (WP-31).
-    if(r.limb) tq.serverLimb=String(r.limb);
     if(time && ['phone','entered','unknown'].includes(time.time_source)){
       tq.timeSource=time.time_source;
       tq.timeUnknown=time.time_source==='unknown';
