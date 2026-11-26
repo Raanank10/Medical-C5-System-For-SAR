@@ -82,7 +82,7 @@ async function checkFile(browser, file) {
   // 3. Past 120 minutes: critical, saying who may still convert (paramedic / physician 6 h, owner 2026-11-26).
   await page.clock.runFor(20 * 60000);
   const crit = await page.evaluate(() => ({ n: window.__vibrations.length, level: document.getElementById('tq-time-alert')?.dataset.level, banner: document.getElementById('tq-time-alert')?.textContent || '' }));
-  assert(crit.n === 3 && crit.level === 'critical' && crit.banner.includes('120') && crit.banner.includes('פראמדיק / רופא עד 6 שעות') && crit.banner.includes('רופא עד 6 שעות'), `${rel}: crossing 120 minutes must raise a critical alert (got ${JSON.stringify(crit)})`);
+  assert(crit.n === 3 && crit.level === 'critical' && crit.banner.includes('120') && crit.banner.includes('פראמדיק / רופא עד 6 שעות'), `${rel}: crossing 120 minutes must raise a critical alert (got ${JSON.stringify(crit)})`);
   await page.click('#tq-time-alert [data-tq-action="open"]');
   assert(await page.evaluate(() => !document.getElementById('tq-time-alert') && document.getElementById('detail-pid')?.textContent === 'P-TQ-OFF'), `${rel}: "open patient" on the banner opens the patient`);
 
@@ -120,7 +120,7 @@ async function checkFile(browser, file) {
   // answer whatever is still showing (the remote patient's levels), so only the 6-hour ping is left
   await page.evaluate(() => { while (document.querySelector('#tq-time-alert [data-tq-action="open"]')) document.querySelector('#tq-time-alert [data-tq-action="open"]').click(); });
   const h6 = await hourly(150); // just past 6 hours
-  assert(h6.level === 'hours_6' && h6.banner.includes('עברו 6 שעות') && h6.banner.includes('עבר חלון השחרור של רופא'), `${rel}: 6 hours must ping with the end of the physician window (got ${JSON.stringify(h6)})`);
+  assert(h6.level === 'hours_6' && h6.banner.includes('עברו 6 שעות') && h6.banner.includes('עבר חלון ההמרה (פראמדיק / רופא, 6 שעות)'), `${rel}: 6 hours must ping with the end of the paramedic / physician window (got ${JSON.stringify(h6)})`);
 
   assert(pageErrors.length === 0, `${rel}: uncaught page error(s): ${pageErrors.join(' | ')}`);
   await context.close();

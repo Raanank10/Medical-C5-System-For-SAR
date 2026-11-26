@@ -4,7 +4,7 @@
 //    tourniquet is no longer active, its alerts stop, and TOURNIQUET_RELEASED is queued with reason
 //    'converted_direct_pressure'.
 // 2. A medic past 120 minutes: the button is disabled and says who may; a tap does nothing.
-// 3. A paramedic: allowed at 200 minutes, blocked past 4 hours.
+// 3. A paramedic: allowed at 200 minutes and at 5 hours, blocked past 6 hours (owner 2026-11-26; was 4 h).
 // 4. A physician: allowed at 5 hours, blocked past 6 hours, and blocked when the time is unknown.
 // 5. Admin (owner, 2026-11-08): every option, with the physician's limits; a CC sees no button.
 //

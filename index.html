@@ -2828,7 +2828,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   const TOURNIQUET_NOTICE_MS = 45 * 60 * 1000;
   const TOURNIQUET_WARN_MS = 60 * 60 * 1000;
   // Repo owner, 2026-10-26 / 27: a medic may convert a tourniquet to direct pressure only up to 120
-  // minutes after it went on; a paramedic up to 4 hours, a physician up to 6 (see
+  // minutes after it went on; a paramedic or a physician up to 6 hours (paramedic 4 until 2026-11-26; see
   // TOURNIQUET_CONVERSION_LIMIT_MS). The 100-minute
   // alert gives the medic 20 minutes to decide (convert / evacuate) before that window closes.
   const TOURNIQUET_DECISION_MS = 100 * 60 * 1000;
@@ -2839,7 +2839,8 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   const TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS = 6 * 60 * 60 * 1000;
   // Converting a tourniquet to direct pressure (repo owner, 2026-10-26 / 27 / 11-08): how long after
   // application each role may do it. A medic (and a PC, the platoon's medical commander) up to 120
-  // minutes, a paramedic up to 4 hours, a physician up to 6 hours; past that the phone blocks them.
+  // minutes, a paramedic or a physician up to 6 hours (owner 2026-11-26; the paramedic's was 4);
+  // past that the phone blocks them.
   // Any other role may not convert (no admin exception, as with cric / needle decompression).
   const TOURNIQUET_CONVERSION_LIMIT_MS = {
     medic: TOURNIQUET_CRITICAL_MS,
@@ -10282,9 +10283,9 @@ function patientTourniquetFixHtml(p){
   }).join('');
   return `<div class="summary-card"><div class="summary-key" style="margin-bottom:8px">חסמים פעילים</div>${rows}</div>`;
 }
-// Converting a tourniquet to direct pressure (repo owner, 2026-10-26 / 27 / 11-08): a medic or PC
-// may do it up to 120 minutes after application, a paramedic up to 4 hours, a physician up to 6
-// hours; the phone blocks the rest (C5Rules.tourniquetConversionAllowed). Before
+// Converting a tourniquet to direct pressure (repo owner, 2026-10-26 / 27 / 11-08 / 11-26): a medic or
+// PC may do it up to 120 minutes after application, a paramedic or a physician up to 6 hours; the
+// phone blocks the rest (C5Rules.tourniquetConversionAllowed). Before
 // this the app had no way to record a release at all, only "cancel an entry recorded by mistake".
 // The conversion stops that tourniquet's alerts and is sent as TOURNIQUET_RELEASED with reason
 // 'converted_direct_pressure', which closes the server row (project_tourniquet_events) and resolves
@@ -10489,7 +10490,7 @@ function applyTourniquetEnteredTime(p, tq, value, appliedAtMs, minutesAgo){
   renderTourniquetTimeAlert();
   rerenderAfterTourniquetFix(p);
   const pastCritical=tqAlertRank(tq.timeAlertedLevel)>=tqAlertRank('critical');
-  toast(pastCritical ? `שעת הנחה נשמרה · עברו ${minutes} דק׳ · המרה: ${tourniquetConversionCheck(tq).allowed?'מותרת לך':'פראמדיק / רופא בלבד'}` : `שעת הנחה נשמרה · +${minutes} דק׳`);
+  toast(pastCritical ? `שעת הנחה נשמרה · עברו ${minutes} דק׳ · המרה: ${tourniquetConversionCheck(tq).allowed?'מותרת לך':tourniquetConversionBlockedText(tourniquetConversionCheck(tq))}` : `שעת הנחה נשמרה · +${minutes} דק׳`);
 }
 // Sweep (owner, 2026-11-08): a tourniquet recorded in the sweep is either placed now by this medic
 // (the phone's time, as before) or was already on the patient (time from the body, or unknown; no
@@ -11072,7 +11073,7 @@ function tqAlertTitle(level){
 // minutes a paramedic or a physician, up to 6 hours (C5Rules.TOURNIQUET_CONVERSION_LIMIT_MS).
 function tqAlertNote(level){
   const hours=tqAlertHours(level);
-  if(hours && hours>=C5Rules.TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS/3600000) return 'עבר חלון השחרור של רופא (6 שעות)';
+  if(hours && hours>=C5Rules.TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS/3600000) return 'עבר חלון ההמרה (פראמדיק / רופא, 6 שעות)';
   return level==='critical' || hours ? 'המרה ללחץ ישיר אחרי 120 דק׳: פראמדיק / רופא עד 6 שעות' : '';
 }
 const TQ_ALERT_HAPTICS={notice:150, warn:[250,100,250], decision:[300,100,300,100,300], critical:[400,150,400,150,400]};
