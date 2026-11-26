@@ -3438,25 +3438,74 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   }
   // A casualty's review is built from every MARCH-PAWS save on every phone (the New Patient form's
   // march_review, then each later "טיפולים MARCH-PAWS" save, which carries only the letters touched
-  // then). Per letter, the newest documented value wins, so a later treatment reopens a letter that
-  // was effective, and a reassessment closes one that was treated. Entries: {at: ms, review}.
+  // then), plus M treatments the phone knows from elsewhere (an active tourniquet, recorded continued
+  // bleeding). Per letter the newest documented value wins, so a later treatment reopens a letter
+  // that was effective and a reassessment closes one that was treated.
+  // For MARCH letters (owner 2026-11-25, "treated wins across phones"): a treatment is closed only by
+  // a reassessment from the same source stamped after it (one clock), or by one whose `seen` says it
+  // knew that treatment. Phone clocks are never compared across sources, so a phone with a fast clock or
+  // one that was offline and never saw the treatment cannot hide it.
+  // Entries: {at: ms, review, source?, seen?}. `source` names whose clock `at` is (a phone id, or a
+  // stable key for a tourniquet / bleeding record); `seen` is {letter: {source: latest treated at}}.
+  function marchEntryCovers(closer, treated, letter) {
+    if (closer.source === treated.source && closer.at >= treated.at) return true;
+    const seen = closer.seen && closer.seen[letter];
+    const t = seen && typeof seen === "object" ? Number(seen[treated.source]) : NaN;
+    return Number.isFinite(t) && t >= treated.at;
+  }
+  function normalizeMarchEntries(entries) {
+    const list = [];
+    (Array.isArray(entries) ? entries : []).forEach((entry) => {
+      const at = Number(entry && entry.at);
+      const review = entry && entry.review;
+      if (!Number.isFinite(at) || !review || typeof review !== "object") return;
+      const source = entry.source === undefined || entry.source === null ? "" : String(entry.source);
+      const seen = entry.seen && typeof entry.seen === "object" ? entry.seen : null;
+      list.push({ at, review, source, seen });
+    });
+    return list;
+  }
   function mergeMarchReviews(entries) {
+    const list = normalizeMarchEntries(entries);
     const out = {};
     const at = {};
-    (Array.isArray(entries) ? entries : []).forEach((entry) => {
-      const t = Number(entry && entry.at);
-      const review = entry && entry.review;
-      if (!Number.isFinite(t) || !review || typeof review !== "object") return;
-      Object.keys(review).forEach((id) => {
-        const value = review[id];
+    list.forEach((entry) => {
+      Object.keys(entry.review).forEach((id) => {
+        const value = entry.review[id];
         if (!MARCH_REVIEW_VALUES.includes(value)) return;
-        if (at[id] === undefined || t >= at[id]) {
+        if (at[id] === undefined || entry.at >= at[id]) {
           out[id] = value;
-          at[id] = t;
+          at[id] = entry.at;
         }
       });
     });
+    // MARCH letters: a treatment is closed only by a reassessment ("effective") that covers it; a
+    // later "nothing needed" never closes or hides one (owner 2026-11-23 criterion 1). So the letter
+    // is "treated" while any treatment is uncovered, "effective" once every one is, and otherwise
+    // "clear" if anyone checked it. Clocks are never compared across sources here.
+    MARCH_LETTERS.forEach((id) => {
+      const treated = list.filter((e) => e.review[id] === "treated");
+      const reassessed = list.filter((e) => e.review[id] === "effective");
+      if (treated.some((t) => !reassessed.some((c) => marchEntryCovers(c, t, id)))) out[id] = "treated";
+      else if (treated.length || reassessed.length) out[id] = "effective";
+      else if (list.some((e) => e.review[id] === "clear")) out[id] = "clear";
+      else delete out[id];
+    });
     return out;
+  }
+  // What a closing save records as seen: per MARCH letter, the latest treated stamp per source among
+  // the entries this phone knows now. Sent with the review (march_seen) so other phones can tell a
+  // reassessment of their treatment from one that never saw it.
+  function marchSeenFrom(entries) {
+    const seen = {};
+    normalizeMarchEntries(entries).forEach((entry) => {
+      MARCH_LETTERS.forEach((id) => {
+        if (entry.review[id] !== "treated") return;
+        const bySource = seen[id] || (seen[id] = {});
+        if (bySource[entry.source] === undefined || entry.at > bySource[entry.source]) bySource[entry.source] = entry.at;
+      });
+    });
+    return seen;
   }
 
   return {
@@ -3518,6 +3567,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     MARCH_LETTERS,
     marchStatus,
     mergeMarchReviews,
+    marchSeenFrom,
     rescueExtractionRequirement,
     suggestedSweepColor,
     suggestMstartTriage,
@@ -13290,7 +13340,7 @@ function marchShownStatus(sec){
 // AVPU the H letter reads: the casualty's when updating one, the form's vitals step otherwise.
 function marchCurrentAvpu(){
   const p=marchUpdatePatient();
-  return p ? (p.vitals?.avpu||null) : (flowVitals?.avpu||null);
+  return p ? marchAvpuOf(p) : (flowVitals?.avpu||null);
 }
 function marchShownReview(){
   return Object.fromEntries(MARCH_PAWS_SECTIONS.map(sec=>[sec.id, marchShownStatus(sec)]));
@@ -13421,10 +13471,13 @@ function renderMarchProgress(){
   renderMarchStrip();
 }
 function marchReviewSummaryHtml(review){
+  // Same reading as the strip (WP-31): treated MARCH and H without AVPU orange, complete green.
+  const march=C5Rules.marchStatus(review, marchCurrentAvpu());
   return MARCH_PAWS_SECTIONS.map(sec=>{
     const status=review?.[sec.id]||null;
-    const color=status==='treated'?'var(--accent)':status==='clear'?'var(--green)':'var(--muted)';
-    return `<span style="color:${color};white-space:nowrap">${sec.letter} ${sec.label}: ${marchStateLabel(sec, status, null)}</span>`;
+    const letter=sec.phase==='march' ? march.letters[sec.id] : null;
+    const color=!status?'var(--muted)':(letter==='needs_reassessment'||letter==='needs_avpu')?'var(--orange)':status==='treated'?'var(--accent)':'var(--green)';
+    return `<span style="color:${color};white-space:nowrap">${sec.letter} ${sec.label}: ${marchStateLabel(sec, status, letter)}</span>`;
   }).join('<br>');
 }
 // ── MARCH completion for a casualty (WP-31, owner 2026-11-23) ──
@@ -13433,16 +13486,56 @@ function marchReviewSummaryHtml(review){
 // (p.remoteMarchReviews, from their PATIENT_CREATED / NOTE_ADDED march_review). Newest per letter
 // wins (C5Rules.mergeMarchReviews).
 function localMarchReviews(p){
-  if(Array.isArray(p?.marchReviews)) return p.marchReviews.slice();
+  const me=getDeviceId();
+  if(Array.isArray(p?.marchReviews)) return p.marchReviews.map(e=>({...e, source:e.source||me}));
   // Saved before WP-31: one review, from the create (or the last update, which replaced it).
-  if(p?.marchReview && typeof p.marchReview==='object') return [{at:Date.parse(p.createdAt||'')||0, review:p.marchReview}];
+  if(p?.marchReview && typeof p.marchReview==='object') return [{at:Date.parse(p.createdAt||'')||0, review:p.marchReview, source:me}];
   return [];
 }
+// M treatments this phone knows outside any MARCH-PAWS save (owner 2026-11-25): every active
+// tourniquet, and recorded continued bleeding (an ineffective tourniquet, "bleeding continues",
+// active bleeding). Each is keyed by what other phones see the same way (limb + applied minute),
+// so a reassessment on any phone that saw it closes it, and a new one reopens M.
+function marchTqMinute(ms){ return Math.round((Number(ms)||0)/60000); }
+function marchSyntheticEntries(p){
+  const out=[];
+  activeTourniquets(p||{}).forEach(t=>{
+    const at=Number(t.appliedAt)||0;
+    out.push({at, source:`tq:${t.limb||'?'}:${marchTqMinute(at)}`, review:{m:'treated'}});
+    if(t.status==='ineffective' || t.effectiveness==='bleeding_continues'){
+      const bat=Number(t.ineffectiveAt)||at;
+      out.push({at:bat, source:`bleed:${t.limb||'?'}:${marchTqMinute(bat)}`, review:{m:'treated'}});
+    }
+  });
+  if(p && (p.hemorrhageControl?.status==='bleeding_continues' || p.activeBleeding)){
+    const at=Number(p.hemorrhageControl?.lastCheckedAt)||0;
+    out.push({at, source:`bleed:patient:${marchTqMinute(at)}`, review:{m:'treated'}});
+  }
+  return out;
+}
+function patientMarchEntries(p){
+  return [...localMarchReviews(p), ...(p?.remoteMarchReviews||[]), ...marchSyntheticEntries(p)];
+}
 function patientMarchReview(p){
-  return C5Rules.mergeMarchReviews([...localMarchReviews(p), ...(p?.remoteMarchReviews||[])]);
+  return C5Rules.mergeMarchReviews(patientMarchEntries(p));
+}
+// What a save that closes letters records as seen (march_seen), only for the letters it closes.
+function marchSeenForReview(review, entries){
+  const all=C5Rules.marchSeenFrom(entries);
+  const seen={};
+  Object.keys(all).forEach(id=>{ if(['effective','clear'].includes(review?.[id])) seen[id]=all[id]; });
+  return seen;
+}
+// AVPU "on record" for H: the newest one measured, even if a later reading (here or on another
+// phone) did not include it.
+function marchAvpuOf(p){
+  const ok=v=>['A','V','P','U'].includes(v);
+  if(ok(p?.vitals?.avpu)) return p.vitals.avpu;
+  const hit=(p?.vitalsHistory||[]).filter(h=>ok(h?.avpu)).sort((a,b)=>(b.t||0)-(a.t||0))[0];
+  return hit ? hit.avpu : null;
 }
 function patientMarchStatus(p){
-  return C5Rules.marchStatus(patientMarchReview(p), p?.vitals?.avpu||null);
+  return C5Rules.marchStatus(patientMarchReview(p), marchAvpuOf(p));
 }
 const MARCH_LETTER_BY_ID=Object.fromEntries(MARCH_PAWS_SECTIONS.filter(sec=>sec.phase==='march').map(sec=>[sec.id, sec.letter]));
 const MARCH_MISSING_SHORT={not_documented:'לא תועד', needs_reassessment:'בדיקה חוזרת', needs_avpu:'AVPU'};
@@ -13540,11 +13633,13 @@ function saveMarchUpdate(){
   queueIntakeClinicalEventsAtSave(p.id, 'march_update');
   sendFormSupply(p.id);
   const done=MARCH_PAWS_SECTIONS.filter(sec=>review[sec.id]).map(sec=>`${sec.letter} ${MARCH_REVIEW_LABELS[review[sec.id]]}`).join(' · ');
+  // Tourniquets added in this save are known now; what this save closes says which treatments it saw.
+  const seen=marchSeenForReview(review, patientMarchEntries(p));
   saveLocalEvent({type:'NOTE_ADDED', detail:`MARCH-PAWS · ${p.visualId||p.id} · ${done}`, warn:false, patient_id:p.id,
-    payload_json:{kind:'march_review', march_review:review, source:'march_update'}});
+    payload_json:{kind:'march_review', march_review:review, ...(Object.keys(seen).length?{march_seen:seen}:{}), source:'march_update'}});
   if(text){ p.txHistory=p.txHistory||[]; p.txHistory.unshift({time:nowT(), text, medic:medicName}); }
   p.marchReviews=localMarchReviews(p);
-  p.marchReviews.push({at:Date.now(), review});
+  p.marchReviews.push({at:Date.now(), review, source:getDeviceId(), seen});
   p.marchReview=patientMarchReview(p);
   p.events=p.events||[];
   p.events.unshift({type:'MARCH_PAWS_RECORDED', time:nowT(), detail:`MARCH-PAWS: ${done}${text?` · ${text}`:''}`, warn:false});
@@ -13986,6 +14081,8 @@ function savePatient(){
   const deviceId=getDeviceId();
   const tqRecord=tourniquetRecordFromState();
   const tqEntries=tourniquetEntriesFromState();
+  // WP-31: an M reassessed in this form saw this form's own tourniquets (march_seen).
+  const createMarchSeen=marchSeenForReview(marchReviewFromState(), marchSyntheticEntries({tourniquets:tqEntries.map(t=>({...t}))}));
   const t=nowT();
   const vitalsCapture=vitalsCapturePayload('flow');
   queueMedicationEventsBeforeSave();
@@ -14050,7 +14147,7 @@ function savePatient(){
     tourniquet:tqRecord,
     tourniquets:tqEntries,
     marchReview:marchReviewFromState(),
-    marchReviews:[{at:Date.now(), review:marchReviewFromState()}],
+    marchReviews:[{at:Date.now(), review:marchReviewFromState(), source:getDeviceId(), seen:createMarchSeen}],
     medic:deviceId,
     siteId:'SITE_A',
     events:[
@@ -14076,7 +14173,7 @@ function savePatient(){
       patient_age_group:state.patientAgeGroup||'adult', patient_age_band:state.patientAgeBand||'adult',
       patient_age:Number.isFinite(Number(state.patientAge)) && state.patientAge!==null && state.patientAge!=='' ? Number(state.patientAge) : null,
       // Kept in the event log for audit/AAR; the server projects no column from it (V2.99.62).
-      ...(state.flowMode!=='quick' && state.triage!=='black' ? {march_review:marchReviewFromState()} : {})}});
+      ...(state.flowMode!=='quick' && state.triage!=='black' ? {march_review:marchReviewFromState(), ...(Object.keys(createMarchSeen).length?{march_seen:createMarchSeen}:{})} : {})}});
   // Vitals taken in the full flow: the server sets last_vitals_at (and clears
   // needs_full_assessment) from this event, so other devices do not show the patient as
   // vitals overdue. Never sent for a quick capture, which must stay flagged for assessment.
@@ -18293,22 +18390,29 @@ function applyRemoteTreatments(rows){
 // other than treated / effective / clear are dropped by C5Rules.mergeMarchReviews.
 // Only the review and the note's kind leave the server (PostgREST JSON paths), not the rest of the
 // create payload or a note's text.
-const REMOTE_MARCH_COLUMNS='id,patient_id,device_id,type,local_timestamp,march_review:payload_json->march_review,kind:payload_json->>kind';
+// actor_role is bound to the writer's profile role (database/075), so only reviews written by a
+// role that records treatments count (NOTE_ADDED is also open to cc, chamal, logistics and the
+// rescue chain). march_seen says which treatments a closing save had seen (owner 2026-11-25).
+const REMOTE_MARCH_COLUMNS='id,patient_id,device_id,actor_role,type,local_timestamp,march_review:payload_json->march_review,march_seen:payload_json->march_seen,kind:payload_json->>kind';
+const REMOTE_MARCH_LIMIT=1000;
 async function pullRemoteMarchReviews(incidentId){
   if(!currentUser) return;
   const client=getSupabaseClient();
   if(!client) return;
   let r;
-  try{ r=await client.from('events').select(REMOTE_MARCH_COLUMNS).eq('incident_id', incidentId).in('type',['PATIENT_CREATED','NOTE_ADDED']).order('local_timestamp',{ascending:false}).limit(1000); }
+  try{ r=await client.from('events').select(REMOTE_MARCH_COLUMNS).eq('incident_id', incidentId).in('type',['PATIENT_CREATED','NOTE_ADDED']).not('payload_json->march_review','is',null).order('local_timestamp',{ascending:false}).limit(REMOTE_MARCH_LIMIT); }
   catch(e){ return; }
   if(r.error || !Array.isArray(r.data)) return;
-  applyRemoteMarchReviews(r.data);
+  // A full page may have cut off older reviews: add to what is known instead of replacing it.
+  applyRemoteMarchReviews(r.data, {partial:r.data.length>=REMOTE_MARCH_LIMIT});
 }
-function applyRemoteMarchReviews(rows){
-  const me=getDeviceId();
+function applyRemoteMarchReviews(rows, opts={}){
   const byPatient={};
+  // This phone's own rows are read back too: after an incident re-entry the local history is gone,
+  // and the per-letter merge gives the same answer when it sees a review twice.
   rows.forEach(row=>{
-    if(!row || !row.patient_id || row.device_id===me) return;
+    if(!row || !row.patient_id) return;
+    if(!TREATMENT_RECORDING_ROLES.has(SERVER_ROLE_TO_CLIENT_ROLE[row.actor_role]||row.actor_role)) return;
     const mr=row.march_review;
     if(!mr || typeof mr!=='object' || Array.isArray(mr)) return;
     if(row.type==='NOTE_ADDED' && row.kind!=='march_review') return;
@@ -18316,11 +18420,25 @@ function applyRemoteMarchReviews(rows){
     if(!Number.isFinite(at)) return;
     const review={};
     MARCH_PAWS_SECTIONS.forEach(sec=>{ if(['treated','effective','clear'].includes(mr[sec.id])) review[sec.id]=mr[sec.id]; });
-    (byPatient[row.patient_id]||(byPatient[row.patient_id]=[])).push({at, review, id:String(row.id||'')});
+    const seen={};
+    if(row.march_seen && typeof row.march_seen==='object' && !Array.isArray(row.march_seen)){
+      Object.keys(row.march_seen).forEach(id=>{
+        const bySource=row.march_seen[id];
+        if(!MARCH_LETTER_BY_ID[id] || !bySource || typeof bySource!=='object') return;
+        seen[id]={};
+        Object.keys(bySource).forEach(src=>{ const t=Number(bySource[src]); if(Number.isFinite(t)) seen[id][String(src).slice(0,120)]=t; });
+      });
+    }
+    (byPatient[row.patient_id]||(byPatient[row.patient_id]=[])).push({at, review, source:String(row.device_id||''), seen, id:String(row.id||'')});
   });
   let changed=false;
   patients.forEach(p=>{
-    const next=(byPatient[p.id]||[]).sort((a,b)=>a.at-b.at);
+    let next=(byPatient[p.id]||[]);
+    if(opts.partial){
+      const ids=new Set(next.map(e=>e.id));
+      next=[...(p.remoteMarchReviews||[]).filter(e=>!ids.has(e.id)), ...next];
+    }
+    next=next.sort((a,b)=>a.at-b.at);
     if(JSON.stringify(p.remoteMarchReviews||[])===JSON.stringify(next)) return;
     p.remoteMarchReviews=next;
     changed=true;

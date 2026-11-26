@@ -205,23 +205,72 @@ async function main() {
     let debt = await pcDebt();
     assert(debt && debt.includes('1 פצועים') && debt.includes('P009-TS'), `the PC's debt board lists the yellow casualty, got ${debt}`);
 
-    // Another phone documented A, R (reassessed) and C; this phone's own rows and other notes are ignored.
+    // Another phone documented A, R (reassessed, having seen this phone's R treatment) and C.
+    // Ignored: a non-clinical writer (rcc), a note of another kind, a "clear" from a phone that never
+    // saw the treatment it would hide (owner 2026-11-25). This phone's own row is read back.
     const remote = await page.evaluate((id) => {
+      const p = patients.find((x) => x.id === id);
+      const me = getDeviceId();
+      const myR = Math.max(...p.marchReviews.filter((e) => e.review.r === 'treated').map((e) => e.at));
       const later = new Date(Date.now() + 60000).toISOString();
       applyRemoteMarchReviews([
-        { id: 'e1', patient_id: id, device_id: 'other-phone', type: 'NOTE_ADDED', kind: 'march_review', local_timestamp: later, march_review: { a: 'clear', r: 'effective', c: 'clear', h: 'bogus' } },
-        { id: 'e2', patient_id: id, device_id: 'other-phone', type: 'NOTE_ADDED', kind: 'free_text', local_timestamp: later, march_review: { m: 'treated' } },
-        { id: 'e3', patient_id: id, device_id: getDeviceId(), type: 'NOTE_ADDED', kind: 'march_review', local_timestamp: later, march_review: { m: 'treated' } },
+        { id: 'e1', patient_id: id, device_id: 'other-phone', actor_role: 'medic', type: 'NOTE_ADDED', kind: 'march_review', local_timestamp: later,
+          march_review: { a: 'clear', r: 'effective', c: 'clear', h: 'bogus' }, march_seen: { r: { [me]: myR } } },
+        { id: 'e2', patient_id: id, device_id: 'other-phone', actor_role: 'medic', type: 'NOTE_ADDED', kind: 'free_text', local_timestamp: later, march_review: { m: 'treated' } },
+        { id: 'e4', patient_id: id, device_id: 'rescue-phone', actor_role: 'rcc', type: 'NOTE_ADDED', kind: 'march_review', local_timestamp: later, march_review: { m: 'treated', r: 'treated' } },
+        { id: 'e5', patient_id: id, device_id: me, actor_role: 'medic', type: 'NOTE_ADDED', kind: 'march_review', local_timestamp: new Date(p.marchReviews[p.marchReviews.length - 1].at).toISOString(),
+          march_review: p.marchReviews[p.marchReviews.length - 1].review, march_seen: p.marchReviews[p.marchReviews.length - 1].seen },
       ]);
-      const p = patients.find((x) => x.id === id);
-      return { review: patientMarchReview(p), missing: patientMarchStatus(p).missing.join() };
+      const withStale = C5Rules.mergeMarchReviews([...patientMarchEntries(p), { at: Date.now() + 99999, source: 'stale-phone', review: { m: 'clear' } }]);
+      return { review: patientMarchReview(p), missing: patientMarchStatus(p).missing.join(), rows: p.remoteMarchReviews.map((e) => e.id).sort().join(), staleM: withStale.m };
     }, CHILD);
     assert(remote.review.m === 'effective' && remote.review.r === 'effective' && remote.review.a === 'clear' && remote.review.h === 'clear' && remote.missing === 'h',
       `other phones' reviews merge in, got ${JSON.stringify(remote)}`);
-    await page.evaluate((id) => { const p = patients.find((x) => x.id === id); p.vitals = { ...p.vitals, avpu: 'A' }; openPatient(id); }, CHILD);
+    assert(remote.rows === 'e1,e5', `only clinical march_review rows are kept (own row included), got ${remote.rows}`);
+    assert(remote.staleM === 'effective', `a phone that saw nothing cannot reopen with "clear", and M stays as reassessed, got ${remote.staleM}`);
+    // A full page (possibly cut off) adds to what is known instead of replacing it.
+    const partial = await page.evaluate((id) => {
+      applyRemoteMarchReviews([], { partial: true });
+      const kept = patients.find((x) => x.id === id).remoteMarchReviews.length;
+      return kept;
+    }, CHILD);
+    assert(partial === 2, `a partial page keeps earlier rows, got ${partial}`);
+    // AVPU on record survives a later reading without it (remote vitals replace p.vitals).
+    await page.evaluate((id) => {
+      const p = patients.find((x) => x.id === id);
+      p.vitalsHistory = [...(p.vitalsHistory || []), { t: Date.now() - 1000, avpu: 'A' }, { t: Date.now(), pulse: 90, remote: true }];
+      p.vitals = { pulse: 90 };
+      openPatient(id);
+    }, CHILD);
     const done = await page.evaluate(() => document.querySelector('[data-march-status]')?.getAttribute('data-march-status'));
     debt = await pcDebt();
-    assert(done === 'complete' && debt && debt.includes('0 פצועים'), `with AVPU MARCH is complete and leaves the debt board, got ${done} / ${debt}`);
+    assert(done === 'complete' && debt && debt.includes('0 פצועים'), `with AVPU on record MARCH is complete and leaves the debt board, got ${done} / ${debt}`);
+
+    // Owner 2026-11-25: recorded continued bleeding reopens M until a new reassessment.
+    const bleed = await page.evaluate((id) => {
+      const p = patients.find((x) => x.id === id);
+      const tq = activeTourniquets(p)[0];
+      tq.status = 'ineffective'; tq.effectiveness = 'bleeding_continues'; tq.ineffectiveAt = Date.now();
+      refreshHemorrhageControl(p, tq);
+      const reopened = patientMarchReview(p).m;
+      openMarchForPatient(id);
+      openMarchLetter('m');
+      toggleMarchClear(document.getElementById('march-clear-m'), 'm');
+      const clearRefused = !state.marchClear.has('m');
+      toggleMarchReassess('m');
+      document.getElementById('btn-step7').click();
+      return { reopened, clearRefused, after: patientMarchReview(p).m, note: getOutbox().filter((e) => e.type === 'NOTE_ADDED').pop()?.payload_json };
+    }, CHILD);
+    assert(bleed.reopened === 'treated' && bleed.clearRefused, `bleeding continues reopens M and refuses "nothing needed", got ${JSON.stringify(bleed)}`);
+    assert(bleed.after === 'effective' && bleed.note.march_review.m === 'effective' && Object.keys(bleed.note.march_seen.m).some((k) => k.startsWith('bleed:')),
+      `a new reassessment closes it and says what it saw, got ${JSON.stringify(bleed)}`);
+
+    // A sweep casualty with a tourniquet and no MARCH review: M waits for reassessment, not "לא תועד".
+    const sweep = await page.evaluate(() => {
+      const p = { id: 'sweep-tq-1', visualId: 'TMP-001-DK', triage: 'red', patientStatus: 'observing', tourniquets: [{ id: 'TQ-001', limb: 'right_leg', appliedAt: Date.now() - 600000, status: 'active' }] };
+      return { m: patientMarchStatus(p).letters.m, debt: marchDebtApplies(p) };
+    });
+    assert(sweep.m === 'needs_reassessment' && sweep.debt, `an active tourniquet counts as an M treatment, got ${JSON.stringify(sweep)}`);
 
     // A PC going hands-on records MARCH the same way (TREATMENT_RECORDING_ROLES has pc).
     const pcHands = await page.evaluate((id) => { openMarchForPatient(id); const s = document.querySelector('.screen.active')?.id; cancelMarchUpdate(); activeRoleDashboard = 'medic'; return s; }, CHILD);

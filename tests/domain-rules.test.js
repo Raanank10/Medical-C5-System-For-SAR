@@ -595,6 +595,59 @@ assert.deepEqual(rules.RESCUE_PRIORITIES, ["urgent", "pending", "not_urgent"]);
   // Bad entries are skipped
   assert.deepEqual(rules.mergeMarchReviews([null, { at: "x", review: { m: "clear" } }, { at: t0, review: "m" }, { at: t0, review: { m: "bogus" } }]), {});
   assert.deepEqual(rules.mergeMarchReviews(undefined), {});
+
+  // Owner 2026-11-25: treated wins across phones. A closing save from another source closes a
+  // treatment only if its `seen` covers it; clocks are compared only within one source.
+  const T = t0;
+  // Clock skew: phone A (fast clock) marks C effective without having seen B's later treatment.
+  assert.equal(rules.mergeMarchReviews([
+    { at: T + 300000, source: "A", review: { c: "effective" }, seen: { c: {} } },
+    { at: T + 180000, source: "B", review: { c: "treated" } },
+  ]).c, "treated");
+  // "Nothing needed" never closes a treatment, even from the same phone, and once a treatment is
+  // reassessed a later "nothing needed" keeps the letter "effective" (the treatment stays visible).
+  assert.equal(rules.mergeMarchReviews([{ at: T, source: "A", review: { m: "treated" } }, { at: T + 1, source: "A", review: { m: "clear" } }]).m, "treated");
+  assert.equal(rules.mergeMarchReviews([
+    { at: T, source: "A", review: { m: "treated" } },
+    { at: T + 1, source: "A", review: { m: "effective" } },
+    { at: T + 2, source: "B", review: { m: "clear" } },
+  ]).m, "effective");
+  // Stale offline phone: B's "nothing needed" never saw A's M treatment.
+  assert.equal(rules.mergeMarchReviews([
+    { at: T, source: "A", review: { m: "treated" } },
+    { at: T + 60000, source: "B", review: { m: "clear" } },
+  ]).m, "treated");
+  // B saw A's treatment (seen stamp is A's own clock) and reassessed it: closed.
+  assert.equal(rules.mergeMarchReviews([
+    { at: T, source: "A", review: { m: "treated" } },
+    { at: T - 999999, source: "B", review: { m: "effective" }, seen: { m: { A: T } } }, // B's clock far behind
+  ]).m, "effective");
+  // ...but a newer A treatment B had not seen reopens it.
+  assert.equal(rules.mergeMarchReviews([
+    { at: T, source: "A", review: { m: "treated" } },
+    { at: T + 1, source: "B", review: { m: "effective" }, seen: { m: { A: T } } },
+    { at: T + 5, source: "A", review: { m: "treated" } },
+    { at: T + 9, source: "B", review: { m: "effective" }, seen: { m: { A: T } } },
+  ]).m, "treated");
+  // Same source: its own later save closes its treatment without `seen`.
+  assert.equal(rules.mergeMarchReviews([
+    { at: T, source: "A", review: { r: "treated" } },
+    { at: T + 1, source: "A", review: { r: "effective" } },
+  ]).r, "effective");
+  // A tourniquet known from elsewhere (its own stable key) needs a closer that saw it.
+  const tq = { at: T, source: "tq:left_leg:123", review: { m: "treated" } };
+  assert.equal(rules.mergeMarchReviews([tq, { at: T + 1, source: "A", review: { m: "clear" } }]).m, "treated");
+  assert.equal(rules.mergeMarchReviews([tq, { at: T + 1, source: "A", review: { m: "effective" }, seen: { m: { "tq:left_leg:123": T } } }]).m, "effective");
+  // PAWS letters keep plain newest-wins.
+  assert.equal(rules.mergeMarchReviews([{ at: T, source: "A", review: { s: "treated" } }, { at: T + 1, source: "B", review: { s: "clear" } }]).s, "clear");
+  // marchSeenFrom: latest treated stamp per source per MARCH letter.
+  assert.deepEqual(rules.marchSeenFrom([
+    { at: T, source: "A", review: { m: "treated", c: "clear", s: "treated" } },
+    { at: T + 7, source: "A", review: { m: "treated" } },
+    tq,
+    { at: T, source: "B", review: { c: "treated" } },
+  ]), { m: { A: T + 7, "tq:left_leg:123": T }, c: { B: T } });
+  assert.deepEqual(rules.marchSeenFrom(null), {});
 }
 
 console.log("Domain rule tests passed.");

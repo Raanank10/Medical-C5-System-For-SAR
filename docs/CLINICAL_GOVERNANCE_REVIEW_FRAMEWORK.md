@@ -58,6 +58,22 @@ Current rules (exact, from `src/domain/rules.js`):
 
 **Question for the reviewer**: is 10 minutes an operationally appropriate silence threshold for this environment, balancing "catch a real emergency quickly" against "false alarms from normal signal gaps in a collapsed structure"?
 
+## 7. MARCH Completion (WP-31)
+
+`marchStatus(review, avpu)`, `mergeMarchReviews(entries)` and `marchSeenFrom(entries)` in `src/domain/rules.js` (V2.99.92). Criteria set by the owner, a medic platoon commander, on 2026-11-23, with two follow-ups on 2026-11-25 after review. That is owner product direction, not a doctrine citation:
+
+| Rule | Current behaviour |
+|---|---|
+| Treated letter (M, A, R, C, H) | Not complete until a reassessment tap ("בדיקה חוזרת: הטיפול יעיל", value `effective`) confirms the treatment worked. A new treatment in the letter needs a new reassessment. |
+| "Checked, nothing needed" | Completes a letter with no vitals, R and C included. It never closes or hides a treatment. |
+| H | Also needs an AVPU on record (the newest one measured). |
+| M from outside the MARCH screen | Every active tourniquet counts as an M treatment, and so does recorded continued bleeding (an ineffective tourniquet, "bleeding continues", active bleeding). Each needs a reassessment (owner 2026-11-25). |
+| Several phones | A treatment is closed only by a reassessment from the same phone stamped after it, or by one whose `march_seen` says it saw that treatment. Phone clocks are never compared across phones to decide open or closed (owner 2026-11-25, "treated wins across phones"). |
+| PAWS | Not judged: documented or not documented. |
+| Effect | Shown on the letter strip, the patient card and the PC's "MARCH לא הושלם" debt row (red and yellow at the site). It never blocks a save, a handover or a triage. |
+
+**Questions for the reviewer**: Is a single "effective" tap enough as the reassessment, or should each letter name what was checked (for example distal pulse absent for a tourniquet, chest rise after a chest seal)? Should "nothing needed" for R and C require a measured rate or pulse? Should continued bleeding also raise an alert, or is reopening M on the strip and the debt row enough?
+
 ## What the System Already Does to Support Human Override
 
 Not everything above is a rigid, unoverridable rule — cataloging what already exists matters for the reviewer's assessment of overall risk:
