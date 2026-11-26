@@ -844,7 +844,7 @@ Runs with data in the sandbox if the owner chose that in WP-43. Hebrew text revi
 
 **Why.** Role text exists in three places that disagree, and the most numerous role gets none of it:
 - `ROLE_DEFS[].desc` (10 roles): permission lists, shown only on the "תפקידים והרשאות" screen.
-- `roleConfig()[].responsibilities`: "what I do" lists of 5 to 11 lines, placed differently per role: behind the "ⓘ האחריות שלי" chip (RCC / RPC), inside a `<details>` (CC), at the top of the screen (the generic dashboards: physician, logistics), behind an "ⓘ האחריות שלי" chip (chamal, since its own panel in V2.99.92).
+- `roleConfig()[].responsibilities`: "what I do" lists of 5 to 11 lines, placed differently per role: behind the "ⓘ האחריות שלי" chip (RCC / RPC), inside a `<details>` (CC), at the top of the screen (the generic dashboards: physician, logistics), behind an "ⓘ האחריות שלי" chip (chamal, since its own panel in V2.99.93).
 - `GUIDED_TOUR_STEPS`: PC / CC only (WP-43).
 - Medic and paramedic land on `enroute` (`startRoleDashboard()`) and get none of these. `enroute` has its own `demo-strip` explanation instead.
 - None of them says why: who acts on what this role records. That is the line that makes people log.

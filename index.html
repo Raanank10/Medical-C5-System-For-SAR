@@ -1046,13 +1046,13 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9992</div>
+      <div class="demo-kicker">Demo V2.9993</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
       </div>
       <div class="demo-strip-sub" style="margin-top:12px">
-        הערה לדמו: בדמו ניתן לבחור תפקיד כדי להציג את יכולות המערכת. בניסוי שטח, כל משתמש ייכנס אוטומטית לתפקיד שהוגדר לו: חובש, חוג"ד, מ״פ רפואה, רופא/פראמדיק או חמ״ל.
+        הערה לדמו: בדמו ניתן לבחור תפקיד כדי להציג את יכולות המערכת. בניסוי שטח, כל משתמש ייכנס אוטומטית לתפקיד שהוגדר לו: חובש, חוג"ד, מ״פ רפואה, רופא/פראמדיק או חמ״ל רפואי.
       </div>
       <div class="field-experiment-notice" style="background:rgba(255,107,53,0.12);border:1px solid var(--orange);padding:12px;margin-top:15px;border-radius:6px;text-align:right">
         <div style="font-weight:800;color:var(--orange);margin-bottom:4px;font-size:14px">הערה מבצעית לניסוי השטח:</div>
@@ -1098,7 +1098,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
         </button>
         <button class="demo-card" onclick="startRoleDashboard('chamal')">
           <div class="demo-icon">📡</div>
-          <div><strong>חמ״ל</strong><span>תמונת מצב, אמינות נתונים, כפילויות, Sync וסיכום אירוע חי.</span></div>
+          <div><strong>חמ״ל רפואי</strong><span>תמונת מצב, אמינות נתונים, כפילויות, Sync וסיכום אירוע חי.</span></div>
         </button>
       </div>
     </div>
@@ -1143,7 +1143,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9992</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9993</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1153,7 +1153,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9992</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9993</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2101,7 +2101,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div class="modal-overlay panic-modal hidden" id="trap-status-modal" onclick="closeTrapStatusModal(event)">
   <div class="modal-sheet panic-sheet" style="border-color:var(--yellow);box-shadow:0 22px 90px rgba(244,162,97,.2)">
     <div class="panic-title" style="color:var(--yellow)">סטטוס חילוץ אחרון</div>
-    <div class="panic-message">בחר מצב בינארי לפני סגירה: לכוד או לא לכוד. אם אין זמן, ניתן לשמור כחסר נתון והחמ״ל יראה שיש לקחת מדדים.</div>
+    <div class="panic-message">בחר מצב בינארי לפני סגירה: לכוד או לא לכוד. אם אין זמן, ניתן לשמור כחסר נתון והחמ״ל רפואי יראה שיש לקחת מדדים.</div>
     <div class="tap-grid tap-grid-2">
       <button class="tap-btn" onclick="confirmTrapStatus('trapped')"><span class="icon">⛓️</span><div style="font-weight:800">לכוד</div></button>
       <button class="tap-btn" onclick="confirmTrapStatus('not_trapped')"><span class="icon">🚶</span><div style="font-weight:800">לא לכוד</div></button>
@@ -2432,7 +2432,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-commander" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle">COMMANDER // CHAMAL</div>
+      <div class="header-subtitle">COMMANDER // MEDICAL CHAMAL</div>
       <div class="header-title" id="cmd-header-label">כל המוקדים</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -2456,7 +2456,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="alert-slicer" id="command-role-slicer" style="padding-top:10px">
     <button class="alert-slice active" onclick="switchCommandRole('pc',this)">חוג"ד / הכל</button>
-    <button class="alert-slice" onclick="switchCommandRole('chamal',this)">חמ״ל / הכל</button>
+    <button class="alert-slice" onclick="switchCommandRole('chamal',this)">חמ״ל רפואי / הכל</button>
     <button class="alert-slice other" onclick="switchCommandRole('cc',this)">מ״פ רפואה / הפלוגה שלי</button>
   </div>
   <div style="display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto" id="cmd-site-tabs"></div>
@@ -3550,7 +3550,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.92';
+const APP_VERSION = '2.99.93';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3789,7 +3789,7 @@ const DEMO_USERS = [
   {userId:'USR-DR', fullName:'ד״ר איתן שלו', role:'physician', callsign:'רופא חברה', platoonId:null, companyId:'COMP-1', active:true},
   {userId:'USR-PARA', fullName:'רס״ר מיה אדרי', role:'paramedic', callsign:'פראמדיקית', platoonId:null, companyId:'COMP-1', active:true},
   {userId:'USR-LOG', fullName:'רס״ם אמיר דגן', role:'logistics', callsign:'Log-O', platoonId:null, companyId:'COMP-1', active:true},
-  {userId:'USR-CHAMAL', fullName:'סמלת תמר גולן', role:'chamal', callsign:'חמ״ל', platoonId:null, companyId:'COMP-1', active:true}
+  {userId:'USR-CHAMAL', fullName:'סמלת תמר גולן', role:'chamal', callsign:'חמ״ל רפואי', platoonId:null, companyId:'COMP-1', active:true}
 ];
 const DEMO_PLATOONS = [
   {platoonId:'PLT-A', name:'מחלקה רפואית א', pcId:'USR-BARAK', companyId:'COMP-1'},
@@ -3993,7 +3993,7 @@ const ROLE_DEFS = [
   {key:'cc', label:'מ״פ רפואה', he:'מפקד פלוגה רפואית', desc:'סמכות פיקודית לפתיחת/אישור אירוע, סגירה, אתר נקי, דשבורד וייצוא.'},
   {key:'physician', label:'Physician', he:'רופא', desc:'סמכות פיקודית כמו מ״פ רפואה (ניהול אירוע, מכשירים, תמונת מצב, ניגודי עדכון) בתוספת סמכות רישום קליני מלאה: מדדים, טיפול, מיון. אינו פותח פצוע חדש. הדרג הגבוה ביותר בהכרעת ניגודי עדכון בין מכשירים. בעל סמכות אישור מוות קליני.'},
   {key:'paramedic', label:'Paramedic', he:'פראמדיק', desc:'אותה סמכות טיפול שדה כמו חובש: פתיחת פצוע, מדדים, תרופות, מיון, מסירת מצב — כולל אישור חריגת סיכון גבוה. ללא הסמכות הפיקודית של רופא/מ״פ רפואה וללא סמכות אישור מוות קליני.'},
-  {key:'chamal', label:'Chamal', he:'חמ״ל', desc:'תמונת מצב מלאה, התראה על אירועים שנפתחו בשטח, ניהול אירוע ברמת חטיבה וסיכום אירוע חי, ללא רישום פצועים.'},
+  {key:'chamal', label:'Medical Chamal', he:'חמ״ל רפואי', desc:'תמונת מצב מלאה, התראה על אירועים שנפתחו בשטח, ניהול אירוע ברמת חטיבה וסיכום אירוע חי, ללא רישום פצועים.'},
   {key:'rpc', label:'מ״מ', he:'מפקד מחלקת חילוץ', desc:'פאנל טקטי למחלקה שלו: תג, עדיפות פינוי (דחוף / לא דחוף), אזור, לכוד/נייד, סטטוס פינוי, חובש אחראי (כינוי קריאה). ללא צבע מיון, חסם, מדדים, טיפול או מנגנון פציעה. סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא אישור רפואי. יכול לדווח פצוע ראשוני (מיקום/לכוד/חסם בלבד).'},
   {key:'rcc', label:'מ״פ חילוץ', he:'מפקד פלוגת חילוץ', desc:'פאנל טקטי מרוכז לפי מחלקות עבור הפלוגה שלו (דחוף / לא דחוף, לכודים, פינוי), כולל בקשות אספקה פתוחות (לוגיסטיקת פלוגת חילוץ). ללא צבע מיון, חסם, מדדים, טיפול או מנגנון פציעה. סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא אישור רפואי. יכול לדווח פצוע ראשוני (מיקום/לכוד/חסם בלבד).'},
   {key:'admin', label:'Admin', he:'מנהל מערכת', desc:'גישה טכנית מלאה: כל הנתונים הגולמיים, טעינת/ניקוי תרחישים, ייצוא ניסוי, בדיקת גרסה וסנכרון. תפקיד טכני להרצת דמו/בדיקות, לא תפקיד פיקודי מבצעי.'}
@@ -4726,7 +4726,7 @@ function renderAuthStatus(){
 // picks the role for each invitation; the invitee never does. Inviting or promoting someone to
 // admin, and deactivating anyone, always asks for confirmation first.
 const ADMIN_USERS_FUNCTION_URL = SUPABASE_URL + '/functions/v1/admin-users';
-const ADMIN_ROLE_NAMES = {medic:'חובש', paramedic:'פראמדיק', physician:'רופא', pc:'חוג"ד', cc:'מ״פ רפואה', chamal:'חמ״ל', logistics_officer:'קצין לוגיסטיקה', rpc:'מ״מ חילוץ', rcc:'מ״פ חילוץ', admin:'מנהל מערכת'};
+const ADMIN_ROLE_NAMES = {medic:'חובש', paramedic:'פראמדיק', physician:'רופא', pc:'חוג"ד', cc:'מ״פ רפואה', chamal:'חמ״ל רפואי', logistics_officer:'קצין לוגיסטיקה', rpc:'מ״מ חילוץ', rcc:'מ״פ חילוץ', admin:'מנהל מערכת'};
 const ADMIN_ERROR_TEXT = {
   invalid_email:'כתובת האימייל אינה תקינה',
   invalid_role:'יש לבחור תפקיד',
@@ -6767,7 +6767,7 @@ function roleConfig(role){
     cc:{title:'מ״פ רפואה', actor:'מ״פ רפואה — משתמש מחובר', audience:'cc', legacy:'commander', responsibilities:['פיקוד ישיר על משאבים רפואיים','הקצאה בין מחלקות','אישור / דחייה / ניתוב בקשות תגבור','ניהול תורי רופא / פראמדיק / קביעת מוות','הסרת צווארי בקבוק ברמת פלוגה']},
     physician:{title:'רופא / פראמדיק — תור סקירה רפואית', actor:'רופא / פראמדיק — משתמש מחובר', audience:'physician', legacy:'commander', responsibilities:['סקירת פצועים קשים','מענה לבקשות חוג"ד / מ״פ רפואה','החלטה רפואית בכירה','קביעת מוות / אישור מוות','סגירת בקשת סקירה רפואית']},
     logistics:{title:'קצין לוגיסטיקה / Log-O', actor:'רס״ם אמיר דגן — Log-O', audience:'logistics', legacy:'logistics', responsibilities:['מלאי ציוד רפואי לפי מחלקה / מוקד','מענה לבקשות ציוד','הקצאת אספקה מחדש','מעקב burn rate','הצפת חוסר המשפיע על טיפול']},
-    chamal:{title:'חמ״ל / מפעיל', actor:'חמ״ל — משתמש מחובר', audience:'chamal', legacy:'commander', responsibilities:['תמונת מצב כללית','אמינות נתונים ו-Sync','כפילויות ודיווחים חיצוניים','תמיכה בחוג"ד / מ״פ רפואה','ייצוא סיכום אירוע חי']},
+    chamal:{title:'חמ״ל רפואי / מפעיל', actor:'חמ״ל רפואי — משתמש מחובר', audience:'chamal', legacy:'commander', responsibilities:['תמונת מצב כללית','אמינות נתונים ו-Sync','כפילויות ודיווחים חיצוניים','תמיכה בחוג"ד / מ״פ רפואה','ייצוא סיכום אירוע חי']},
     admin:{title:'מנהל דמו', actor:'מנהל דמו', audience:'chamal', legacy:'roles', responsibilities:['הפעלת תרחיש חתום','ניקוי דמו','ייצוא ניסוי','בדיקת הרשאות','הפרדת דמו מנתוני אמת']},
     rpc:{title:'מ״מ חילוץ', actor:'מ״מ — משתמש מחובר', audience:'rpc', legacy:'role-dashboard', responsibilities:['טבלת האירועים (מוקדים) של המחלקה שלי בלבד — הקשה על אירוע פותחת את הפצועים שלו לפי סדר הפינוי','הודעה (באנר ורטט) כשפצוע מהמחלקה מגיע לנאפ״ל או מפונה לבית חולים','צפייה בתג, עדיפות פינוי (דחוף / לא דחוף), אזור, לכוד/נייד וסטטוס פינוי לפצועי המחלקה שלי בלבד','צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע — לזיהוי פיזי בשטח','ראיית חובש אחראי לכל פצוע (כינוי קריאה בלבד, לא שם)','סדר פינוי מומלץ למחלקה שלי, זהה למה שחוג"ד/מ״פ רפואה רואים','ספירות לכודים (דחוף / לא דחוף / טרם מוין), בנאפ״ל, פונו לבי״ח וסה״כ לכל אירוע','ללא גישה לצבע מיון, חסם, מדדים, טיפול או מנגנון פציעה','לא מגיש בקשות תגבור / אספקה','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה']},
     rcc:{title:'מ״פ חילוץ', actor:'מ״פ חילוץ — משתמש מחובר', audience:'rcc', legacy:'role-dashboard', responsibilities:['טבלת כל האירועים הפתוחים בפלוגה שלי — הקשה על אירוע פותחת את הפצועים שלו לפי סדר הפינוי','הודעה (באנר ורטט) כשפצוע מגיע לנאפ״ל או מפונה לבית חולים, ורשימת עדכוני הפינוי בפס העליון','צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע — לזיהוי פיזי בשטח','ספירות דחוף, לכודים, באתר, בפינוי ופונו לכל אירוע','סדר פינוי מומלץ לכלל הפלוגה, זהה למה שמ״פ רפואה רואה','צפייה בבקשות אספקה פתוחות (לוגיסטיקת פלוגת חילוץ)','ללא גישה לצבע מיון, חסם, מדדים, טיפול או מנגנון פציעה','לא מגיש בקשות תגבור רפואי','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סוג אירוע, מצב מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה','סגירת אירוע אחרי שכל הפצועים נמסרו (לא ניתן לעקוף את חסימת הסגירה)']}
@@ -6805,7 +6805,8 @@ function roleScopedRequests(role){
 }
 function roleAlertRows(role){
   const audience=roleConfig(role).audience;
-  return buildAlertObjects(roleScopedPatients(role)).filter(a=>a.audience.includes(audience) || (role==='physician' && a.type==='MEDICAL_REINFORCEMENT_REQUEST'));
+  const reportSites=COMPANY_COMMAND_ROLES.has(role) ? allSites.map(s=>s.id).filter(id=>id!=='ALL') : null;
+  return buildAlertObjects(roleScopedPatients(role), reportSites).filter(a=>a.audience.includes(audience) || (role==='physician' && a.type==='MEDICAL_REINFORCEMENT_REQUEST'));
 }
 function medicOperationalTopLine(){
   ensureSiteReadiness();
@@ -7802,7 +7803,7 @@ function renderSweepBoardForPc(){
   const completed=sweepSessionsForBoard().map(s=>roleRow(
     `הושלמה · ${s.zone}`,
     `${s.medicName} · ${s.casualtyCountInSweep} פצועים · אדום ${s.counts?.red||0} · צהוב ${s.counts?.yellow||0} · ירוק ${s.counts?.green||0} · שחור ${s.counts?.black||0} · לכודים ${s.trapped} · לא ניידים ${s.immobile||0} · חסמים ${s.tourniquets} · נתיבי אוויר ${s.airwayInterventions||0} · חסר מדדים ${s.missingFullVitals} · זהות לא ידועה ${s.unknownIdentity||0} · ציוד: ${supplyGaps}${s.arrivalToSweepCompletionMinutes!==null&&s.arrivalToSweepCompletionMinutes!==undefined?' · זמן מהגעה '+s.arrivalToSweepCompletionMinutes+' דק׳':''}`,
-    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><button class="demo-mini-btn" onclick="demoReassignWithinPlatoon()">שייך חובש למעקב</button><button class="demo-mini-btn" onclick="openReinforcementRequest()">בקש תגבור רפואי</button><button class="demo-mini-btn" onclick="openReinforcementRequest()">בקש פראמדיק</button><button class="demo-mini-btn" onclick="toast('בקשת פינוי נרשמה לחמ״ל')">בקש פינוי</button><button class="demo-mini-btn" onclick="toast('מעבר לשלב מעקב אושר')">אשר מעבר לשלב מעקב</button><button class="demo-mini-btn" onclick="showRoleDrilldown('patients')">פתח רשימת פצועים באזור</button></div>`
+    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><button class="demo-mini-btn" onclick="demoReassignWithinPlatoon()">שייך חובש למעקב</button><button class="demo-mini-btn" onclick="openReinforcementRequest()">בקש תגבור רפואי</button><button class="demo-mini-btn" onclick="openReinforcementRequest()">בקש פראמדיק</button><button class="demo-mini-btn" onclick="toast('בקשת פינוי נרשמה לחמ״ל רפואי')">בקש פינוי</button><button class="demo-mini-btn" onclick="toast('מעבר לשלב מעקב אושר')">אשר מעבר לשלב מעקב</button><button class="demo-mini-btn" onclick="showRoleDrilldown('patients')">פתח רשימת פצועים באזור</button></div>`
   )).join('');
   return roleSection('סריקות MSTART פעילות / הושלמו', activeRows + completed || roleRow('אין סריקות MSTART פעילות','כאשר חובש יסיים סריקה, תופיע כאן תמונת הסריקה וחוב ההערכה.'));
 }
@@ -8446,7 +8447,7 @@ function positionCommandSticky(){
   sticky.style.top=`${headerTop+header.offsetHeight}px`;
 }
 window.addEventListener('resize', positionCommandSticky);
-// ── חמ״ל panel (V2.99.92) ──
+// ── חמ״ל רפואי panel (V2.99.93) ──
 // The control room's own screen instead of the generic role page (docs/ROLE_COMMAND_MODEL_v2.6.md
 // "Chamal / Operator / Observer": picture quality - sync, duplicates, external report conflicts,
 // pending requests). One page, nothing behind a tab: the shared status strip (server contact,
@@ -8466,18 +8467,22 @@ function chamalSiteCardHtml(site){
     : `<span style="color:var(--orange)">${st.t0?'T0 לא קריא':'T0 טרם נקבע'}</span>`;
   const status=st.siteClear?.cleared?'אתר נקי':(INCIDENT_STATUS_LABELS[st.incidentStatus]||st.incidentStatus);
   // Golden hour (the full screen's 45 / 60 minute watchdog thresholds), for casualties still on the
-  // way out: not evacuated, and not black / deceased. Counted from the injury time; how many of those
-  // times are estimates (no time entered in the field) and how many cannot be read is always shown.
+  // way out: not evacuated, and not black / deceased. Counted from the injury time. Always shown
+  // beside the count: how many times are estimates (incident opening time, no time entered), how many
+  // have neither an injury nor an incident time (counted from when the record was made, which can be
+  // the sync time on a pulled record, so too short), and how many lie in the future (device clock),
+  // which are left out of the count rather than read as "within the hour".
   const open=pts.filter(p=>evacuationStage(p)!=='evacuated' && !isDeceasedForEvac(p));
-  const gh={amber:0,red:0,estimated:0,unknown:0};
+  const gh={amber:0,red:0,estimated:0,unknown:0,future:0};
   open.forEach(p=>{
     const inj=patientInjuryTime(p);
-    if(!Number.isFinite(inj.ms)){ gh.unknown++; return; }
-    if(inj.estimated) gh.estimated++;
+    if(!Number.isFinite(inj.ms) || inj.source==='event_time'){ gh.unknown++; if(!Number.isFinite(inj.ms)) return; }
+    else if(inj.estimated) gh.estimated++;
+    if(inj.ms>Date.now()+60000){ gh.future++; return; }
     const level=watchdogState(Math.floor((Date.now()-inj.ms)/60000),45,60);
     if(level==='red') gh.red++; else if(level==='amber') gh.amber++;
   });
-  const ghNotes=[gh.estimated?`${gh.estimated} לפי שעה משוערת`:'', gh.unknown?`${gh.unknown} ללא שעת פציעה`:''].filter(Boolean).join(' · ');
+  const ghNotes=[gh.estimated?`${gh.estimated} לפי שעה משוערת`:'', gh.unknown?`${gh.unknown} ללא שעת פציעה (לפי שעת רישום)`:'', gh.future?`${gh.future} שעת פציעה בעתיד, בדוק שעון`:''].filter(Boolean).join(' · ');
   const ghMain=gh.red||gh.amber ? `${gh.red} עברו 60 דק׳ · ${gh.amber} מעל 45 דק׳` : 'אף פצוע לא מעל 45 דק׳';
   const ghLine=`<div class="chamal-site-line" data-chamal-golden style="${gh.red?'color:var(--red);font-weight:800':gh.amber?'color:var(--orange);font-weight:800':''}">⏱ שעת זהב (לא פונו, ללא שחורים): ${ghMain}${ghNotes?` · <span style="color:var(--orange)">${ghNotes}</span>`:''}</div>`;
   const stage=k=>pts.filter(p=>evacuationStage(p)===k).length;
@@ -8490,7 +8495,7 @@ function chamalSiteCardHtml(site){
   return `<div class="chamal-site" data-chamal-site="${escAttr(site.id)}">
     <div class="chamal-site-head"><div><div class="chamal-site-name">${escAttr(site.name)}</div><div class="chamal-site-line">${escAttr(incidentTypeLabel(site.id))} · ${escAttr(status)} · ${t0}</div></div><div class="chamal-site-total">${pts.length}<span>פצועים</span></div></div>
     ${siteTriageGridHtml(pts)}
-    ${(()=>{ const pending=pts.filter(p=>!['red','yellow','green','black'].includes(p.triage)).length; return pending?`<div class="chamal-site-line" data-chamal-pending style="color:var(--orange);font-weight:800">ממתינים למיון: ${pending}</div>`:''; })()}
+    ${(()=>{ const pending=pts.filter(p=>triageKey(p.triage)==='pending' && !isDeceasedForEvac(p)).length; return pending?`<div class="chamal-site-line" data-chamal-pending style="color:var(--orange);font-weight:800">ממתינים למיון: ${pending}</div>`:''; })()}
     <div class="chamal-site-line" data-chamal-evac>בזירה ${stage('on_scene')} · בדרך לנאפ״ל ${stage('to_evac_point')} · בנאפ״ל ${stage('evac_point')}${wait!==null?` (עד ${wait} דק׳)`:''} · פונו ${stage('evacuated')}</div>
     ${ghLine}
     ${ext}
@@ -9151,7 +9156,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
 // physician in a company); and sets which unit works the active site. Every change is written to
 // unit_audit on the server.
 function canManagePlatoonRoster(){ return !!currentUser && COMPANY_COMMAND_ROLES.has(currentUser.role); }
-// Dashboards that show the roster panel (owner, 2026-10-23: מ״פ רפואה, חמ״ל and admin place medical
+// Dashboards that show the roster panel (owner, 2026-10-23: מ״פ רפואה, חמ״ל רפואי and admin place medical
 // staff in the company's platoons). The server already allows them (app.is_unit_manager()).
 const ROSTER_PANEL_ROLES=new Set(['cc','chamal','admin']);
 const UNIT_MEMBER_ROLE_LABELS={pc:'חוג״ד', rpc:'מ״מ', rcc:'מ״פ חילוץ', medic:'חובש', paramedic:'פראמדיק', physician:'רופא'};
@@ -9295,7 +9300,7 @@ function updateExperimentLine(){
   const mins=Math.max(0, Math.round((Date.now()-started.getTime())/60000));
   const notes=observerNotes().length;
   const conflicts=conflictLog().length;
-  const line=`תרחיש: ${siteData.name||'ללא מוקד'} · תפקידים: חובש/חוג"ד/לוגיסטיקה/מ״פ רפואה/חמ״ל · מכשיר: ${getDeviceId()} · התחלה: ${started.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})} · שלב: ${experimentPhase} · ${notes} הערות · ${conflicts} התנגשויות · ${mins} דק׳`;
+  const line=`תרחיש: ${siteData.name||'ללא מוקד'} · תפקידים: חובש/חוג"ד/לוגיסטיקה/מ״פ רפואה/חמ״ל רפואי · מכשיר: ${getDeviceId()} · התחלה: ${started.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})} · שלב: ${experimentPhase} · ${notes} הערות · ${conflicts} התנגשויות · ${mins} דק׳`;
   ['experiment-line-dashboard','experiment-line-command'].forEach(id=>{const el=document.getElementById(id); if(el) el.textContent=line;});
 }
 function showObserverNote(){
@@ -11041,7 +11046,7 @@ function patientAlertObjects(pts){
   });
   return alerts;
 }
-function buildAlertObjects(pts=patients){
+function buildAlertObjects(pts=patients, reportSites=null){
   const alerts=patientAlertObjects(pts);
   serverWatchdogAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
   tourniquetSnoozeAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
@@ -11059,13 +11064,11 @@ function buildAlertObjects(pts=patients){
     if(auth.incidentType && auth.incidentType!==typeReport.type) pushAlert(alerts,{id:`incident-type-mismatch-${typeReport.siteId}`,type:'INCIDENT_TYPE_MISMATCH',severity:'medium',owner:'pc',audience:['pc','cc'],escalatesTo:null,actionRequired:'acknowledge',scope:'site',category:'integrity',siteId:typeReport.siteId,title:'פער בסוג אירוע: חובש מול חילוץ',detail:`חילוץ: ${INCIDENT_TYPE_LABELS[auth.incidentType]} · חובש: ${INCIDENT_TYPE_LABELS[typeReport.type]} · סוג החילוץ נשאר בתוקף`});
   }
   const conflicts=externalConflictCount(pts,reports);
-  // Per site, and only against a report that exists (V2.99.92). Before, the field count of every
-  // patient passed in (all sites, for CC and chamal) was compared with the reports of cmdActiveSite
-  // alone, and with no report every field casualty counted as a "gap".
-  [...new Set(pts.map(p=>p.siteId||'SITE_A'))].forEach(siteId=>{
-    const siteReports=siteExternalReports(siteId);
-    if(!siteReports.length) return;
-    const gaps=externalConflictCount(pts.filter(p=>(p.siteId||'SITE_A')===siteId), siteReports);
+  // Per site, and only against a report that exists (V2.99.93; externalGapsBySite). Before, the
+  // field count of every patient passed in (all sites for CC and chamal, one platoon for PC) was
+  // compared with the reports of cmdActiveSite alone, and with no report every field casualty
+  // counted as a "gap".
+  externalGapsBySite(pts, reportSites).forEach(({siteId,gaps})=>{
     if(gaps>0) pushAlert(alerts,{id:`external-conflict-${siteId}`,type:'EXTERNAL_REPORT_CONFLICT',severity:gaps>2?'high':'medium',owner:'chamal',audience:['pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'verify_report',scope:'site',category:'integrity',siteId,title:`פער דיווח חיצוני מול שדה · ${siteNameById(siteId)}`,detail:`${gaps} פערים בין דיווח חיצוני לספירה מאושרת`});
   });
   const unsynced=pts.reduce((sum,p)=>sum+(p.unsyncedEvents||0),0)+localOutboxCount();
@@ -12022,7 +12025,7 @@ function findExternalReportByKey(key, siteId){
     || allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id)).find(r=>externalReportLinkKey(r)===key) || null;
 }
 function openReportLinkSheet(key, siteId){
-  if(!canUpdateEvacuationTracking()){ toast('שיוך דיווח לפצוע — חוג״ד, מ״פ רפואה, חמ״ל או רופא'); return; }
+  if(!canUpdateEvacuationTracking()){ toast('שיוך דיווח לפצוע — חוג״ד, מ״פ רפואה, חמ״ל רפואי או רופא'); return; }
   const r=findExternalReportByKey(key, siteId); if(!r){ toast('הדיווח לא נמצא'); return; }
   reportLinkState={key, siteId, patientId:null, mda:null};
   let modal=document.getElementById('report-link-modal');
@@ -12418,7 +12421,7 @@ let evacSheetState={patientId:null, mode:'update', mda:null};
 function openEvacuationSheet(id, mode='update'){
   const p=patients.find(x=>x.id===id); if(!p) return;
   if(mode==='handover' && !C5Rules.canChangePatientStatus(p)){ toast('כבר נרשמה מסירה — לא ניתן לשלוח שוב'); return; }
-  if(mode==='update' && !canUpdateEvacuationTracking()){ toast('עדכון יעד / סיווג מד״א — חוג״ד, מ״פ רפואה, חמ״ל או רופא'); return; }
+  if(mode==='update' && !canUpdateEvacuationTracking()){ toast('עדכון יעד / סיווג מד״א — חוג״ד, מ״פ רפואה, חמ״ל רפואי או רופא'); return; }
   ensureEvacDestinationDatalist();
   evacSheetState={patientId:id, mode, mda:p.mdaClassification||null};
   let modal=document.getElementById('evac-sheet-modal');
@@ -12458,7 +12461,7 @@ function confirmEvacuationSheet(){
 }
 function updatePatientEvacuation(id, {destination='', mdaClassification=null, silent=false}={}){
   const p=patients.find(x=>x.id===id); if(!p) return;
-  if(!canUpdateEvacuationTracking()){ if(!silent) toast('עדכון יעד / סיווג מד״א — חוג״ד, מ״פ רפואה, חמ״ל או רופא'); return; }
+  if(!canUpdateEvacuationTracking()){ if(!silent) toast('עדכון יעד / סיווג מד״א — חוג״ד, מ״פ רפואה, חמ״ל רפואי או רופא'); return; }
   const payload=evacuationPayload(destination, mdaClassification);
   if(!payload.destination_facility && !payload.mda_classification){ if(!silent) toast('לא הוזן יעד או סיווג מד״א'); return; }
   applyEvacuationPayloadLocally(p, payload);
@@ -14353,7 +14356,7 @@ let cmdPanelOpen={priority:true,locations:true,reinforcement:true,heatmap:false,
 function companyLabelForSite(siteId){
   return siteId==='SITE_B' ? 'פלוגה ב / BRAVO' : siteId==='SITE_A' ? 'פלוגה א / ALFA' : 'כל הפלוגות';
 }
-// The PC's command screen shows its own platoon's site only; מ״פ רפואה, חמ״ל and every other
+// The PC's command screen shows its own platoon's site only; מ״פ רפואה, חמ״ל רפואי and every other
 // command role see every site, including the "all sites" tab.
 function pcPlatoonSite(){
   const site=PLATOON_SITE[pcPlatoonId]||'SITE_A';
@@ -14486,7 +14489,7 @@ function renderCmdTabs(){
 }
 function switchCmdSite(id){
   if(!canSeeCommandSite(id)){
-    toast('חוג״ד רואה רק את מוקד המחלקה שלו · מ״פ רפואה וחמ״ל רואים את כל המוקדים');
+    toast('חוג״ד רואה רק את מוקד המחלקה שלו · מ״פ רפואה וחמ״ל רפואי רואים את כל המוקדים');
     return;
   }
   cmdActiveSite=id; cmdFilter='all';
@@ -14542,6 +14545,22 @@ function sectorFromLocation(location=''){
   const floor=(location.match(/קומה\s*([^,]+)/)||[])[1] || 'קרקע/לא ידוע';
   return {building:building.trim(), floor:floor.trim()};
 }
+// External report against the field, per site (V2.99.93). The sites looked at: every site that has a
+// casualty in pts, plus every site in view that has a report (a report with no field casualty yet is
+// the whole gap). Each site's report is compared with that site's whole field count
+// (getSitePatients), never with a platoon's share of it or with another site's casualties. Sites with
+// no report are left out: no report is not a gap.
+// scopeSites: the sites the viewer covers. The role dashboards pass it (company command: every site);
+// the full command screen leaves it out and uses its own site picker.
+function externalGapsBySite(pts, scopeSites=null){
+  const scope=scopeSites || (cmdActiveSite==='ALL' ? commandVisibleSites() : [cmdActiveSite]);
+  const ids=new Set(pts.map(p=>p.siteId||'SITE_A'));
+  scope.forEach(id=>{ if(siteExternalReports(id).length) ids.add(id); });
+  return [...ids].filter(id=>id!=='ALL').map(siteId=>{
+    const reports=siteExternalReports(siteId);
+    return {siteId, reports:reports.length, gaps:reports.length?externalConflictCount(getSitePatients(siteId), reports):0};
+  }).filter(x=>x.reports>0);
+}
 function externalConflictCount(pts, reports){
   const field={red:0,yellow:0,green:0};
   pts.forEach(p=>{if(field[p.triage]!==undefined) field[p.triage]++;});
@@ -14549,23 +14568,37 @@ function externalConflictCount(pts, reports){
   return Math.abs(field.red-reported.red)+Math.abs(field.yellow-reported.yellow)+Math.abs(field.green-reported.green);
 }
 // Two casualties are a suspected duplicate only on the same site, in the same recorded zone, with an
-// overlapping injury or both trapped / without access (V2.99.92). The field flows keep the site
+// overlapping injury or both trapped / without access (V2.99.93). The field flows keep the site
 // address in location and the zone in locDetail (zoneLabel(), sometimes followed by " · " and a
 // description), so the zone is read from there; location was the site address and never told two
 // places apart. Before, sites were not compared, an unparsed location counted as one sector and two
 // casualties who were both "not trapped" matched, so almost every pair on every site was flagged.
 const DUPLICATE_UNKNOWN_ZONES=new Set(['','לא צוין','אזור לא צוין']);
 function duplicateZoneOf(p){ return String(p.zone||String(p.locDetail||'').split(' · ')[0]||'').trim(); }
+// Words that say nothing about the casualty: the placeholders the flows write when no injury was
+// entered, the site's injury mechanism they fall back to, and generic words. Without this, every
+// casualty registered without an injury "overlapped" with every other one (V2.99.93).
+const DUPLICATE_PLACEHOLDER_INJURIES=['לא תועד','הערכת MSTART בלבד','פעולה מצילת חיים בשטח','פעולה מצילת חיים','דיווח שדה ראשוני — לא הוערך קלינית'];
+const DUPLICATE_GENERIC_WORDS=['פגיעת','פגיעה','פציעה','פציעת','חשד','מדווח','בשטח','ראשוני'];
+function duplicateInjuryTokens(p, ignore){
+  return String(p.injury||'').split(/[\s+,/·—\-]+/).filter(t=>t.length>2 && !ignore.has(t));
+}
+function duplicateIgnoredTokens(){
+  const words=[...DUPLICATE_PLACEHOLDER_INJURIES, siteData?.lastMechanism||'', ...(siteData?.likelyMechanisms||[])].join(' ');
+  return new Set([...words.split(/[\s+,/·—\-]+/), ...DUPLICATE_GENERIC_WORDS].filter(Boolean));
+}
 function isTrappedForDuplicate(p){ return ['trapped','access_blocked'].includes(normalizeTrapStatus(p)); }
 function duplicateCandidates(pts){
   const pairs=[];
+  const ignore=duplicateIgnoredTokens();
   for(let i=0;i<pts.length;i++){
     for(let j=i+1;j<pts.length;j++){
       const a=pts[i], b=pts[j];
       if((a.siteId||'SITE_A')!==(b.siteId||'SITE_A')) continue;
       const za=duplicateZoneOf(a), zb=duplicateZoneOf(b);
       const sameSector=!DUPLICATE_UNKNOWN_ZONES.has(za) && za===zb;
-      const injuryOverlap=(a.injury||'').split(/[ +,]/).some(token=>token.length>2 && (b.injury||'').includes(token));
+      const tb=new Set(duplicateInjuryTokens(b, ignore));
+      const injuryOverlap=duplicateInjuryTokens(a, ignore).some(token=>tb.has(token));
       const bothTrapped=isTrappedForDuplicate(a) && isTrappedForDuplicate(b);
       if(sameSector && (injuryOverlap || bothTrapped)) pairs.push([a,b]);
     }
@@ -15602,7 +15635,7 @@ function renderReinforcementPanel(){
   setCmdPanelMeta('reinforcement', `${open.length} פתוחות מתוך ${visible.length}`);
   const createButton=`<div style="padding:8px 16px 0"><button class="btn-primary" onclick="openReinforcementRequest()" style="background:var(--accent)">+ בקשת תגבור רפואי</button></div>`;
   if(!visible.length){
-    body.innerHTML=createButton+`<div class="alert-banner muted" style="margin-top:8px"><span>✓</span><div><div class="alert-banner-title" style="color:var(--muted)">אין בקשות תגבור פתוחות</div><div class="alert-banner-sub">חוג"ד יוצר בקשה, מ״פ רפואה/חמ״ל מאשרים ומשייכים משאב.</div></div></div>`;
+    body.innerHTML=createButton+`<div class="alert-banner muted" style="margin-top:8px"><span>✓</span><div><div class="alert-banner-title" style="color:var(--muted)">אין בקשות תגבור פתוחות</div><div class="alert-banner-sub">חוג"ד יוצר בקשה, מ״פ רפואה/חמ״ל רפואי מאשרים ומשייכים משאב.</div></div></div>`;
     return;
   }
   body.innerHTML=createButton+visible.map(r=>{
@@ -15634,7 +15667,7 @@ function renderCommandOperationalPanels(pts, site){
   const evacBlocked=pts.filter(p=>p.triage==='red' && !['evacuating','evacuated','handed_over'].includes(p.patientStatus));
   const unsynced=pts.reduce((sum,p)=>sum+(p.unsyncedEvents||0),0)+localOutboxCount();
   const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id)):siteExternalReports(cmdActiveSite);
-  const conflicts=externalConflictCount(pts,reports);
+  const conflicts=externalGapsBySite(pts).reduce((sum,x)=>sum+x.gaps,0);
   setCmdPanelMeta('priority', `${pts.filter(p=>p.triage==='red').length} אדומים · ${stale.length} מידע ישן · ${unsynced} לא סונכרן`);
   const commandMacro = commandRole==='pc'
     ? renderExtractedCounterBoard()
@@ -15759,7 +15792,7 @@ function renderCommandOperationalPanels(pts, site){
   setCmdPanelMeta('alerts', `${buildAlertObjects(pts).filter(a=>a.audience.includes(roleAudience)).length} מנותבות`);
 }
 // One row per field device: real device_presence signed in, inferred from patients in the local demo.
-// Shared by the full command screen's device panel and the חמ״ל panel (V2.99.92).
+// Shared by the full command screen's device panel and the חמ״ל רפואי panel (V2.99.93).
 function commandDeviceRows(pts){
   const deviceMap=new Map();
   if(currentUser && _remoteDevicePresence.length){
@@ -15793,7 +15826,7 @@ function renderCmdContent(){
     ? `${site.name} — חוג״ד (${platoonName(pcPlatoonId)})`
     : commandRole==='cc'
       ? (cmdActiveSite==='ALL'?'כל המוקדים בפלוגה — מ״פ רפואה':`${site.name} — מ״פ רפואה`)
-      : (cmdActiveSite==='ALL'?'כל המוקדים מכל הפלוגות — חמ״ל':site.name);
+      : (cmdActiveSite==='ALL'?'כל המוקדים מכל הפלוגות — חמ״ל רפואי':site.name);
   const c={red:0,yellow:0,green:0,black:0};
   pts.forEach(p=>{if(c[p.triage]!==undefined)c[p.triage]++;});
   if(cmdActiveSite==='ALL' || cmdActiveSite==='SITE_A'){
@@ -17435,7 +17468,7 @@ function showIncidentCloseModal(ctx){
   if(title) title.textContent='לא ניתן לסגור את האירוע';
   const sub=document.getElementById('incident-close-sub');
   if(sub) sub.textContent=`${n} פצועים באירוע טרם נמסרו (לא הועברו, לא פונו עצמאית ולא נקבע מוות). יש להשלים מסירה לפני סגירה.`
-    +(ctx.canOverride?' פיקוד רפואה רשאי לסגור בעקיפה עם סיבה מתועדת.':' רק חוג״ד / מ״פ רפואה / חמ״ל / רופא רשאים לסגור בעקיפה.');
+    +(ctx.canOverride?' פיקוד רפואה רשאי לסגור בעקיפה עם סיבה מתועדת.':' רק חוג״ד / מ״פ רפואה / חמ״ל רפואי / רופא רשאים לסגור בעקיפה.');
   const list=document.getElementById('incident-close-list');
   if(list) list.innerHTML=ctx.openPatients.map(p=>`<div class="close-guard-row"><strong>${escAttr(p.visual_id||p.id||'')}</strong><span>${escAttr(TRIAGE_LABELS[p.triage]||p.triage||'')} · ${escAttr(STATUS_LABELS[p.status]||p.status||'')}</span></div>`).join('');
   const override=document.getElementById('incident-close-override');

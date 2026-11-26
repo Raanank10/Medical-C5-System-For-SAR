@@ -1,4 +1,4 @@
-// Real-browser test of the חמ״ל panel (V2.99.92) and the three picture-quality fixes that came with it:
+// Real-browser test of the חמ״ל רפואי (role key chamal) panel (V2.99.93) and the three picture-quality fixes that came with it:
 // - chamal gets its own panel (one card per site, clinical alerts apart from picture-quality alerts,
 //   devices, open requests) instead of the generic role page; responsibilities sit behind a chip
 // - suspected duplicates: by the recorded zone (locDetail, as the field flows write it; location is the
@@ -15,6 +15,8 @@ const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '..');
 const file = path.join(root, 'index.html');
 const PIN = '135790';
+
+const siteNameByIdSafe = (id) => ({ SITE_A: 'מוקד A', SITE_B: 'מוקד B' }[id]);
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -45,6 +47,10 @@ async function open(browser, viewport) {
     patients.push({ ...base, id: 'cp-b3', visualId: 'B-03', triage: 'black', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', location: 'ב.ג. 45', locDetail: 'קומה 3', injury: 'מעיכה', createdAt: ago(90), tInjury: Date.now() - 90 * 60000, tInjurySource: 'entered' });
     patients.push({ ...base, id: 'cp-b4', visualId: 'B-04', triage: 'pending', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', location: 'ב.ג. 45', locDetail: 'חצר', injury: 'לא ידוע' });
     patients.push({ ...base, id: 'cp-b2', visualId: 'B-02', triage: 'yellow', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', location: 'ב.ג. 45', locDetail: 'קומה 2 / דירה 5', injury: 'שבר', trapStatus: 'trapped' });
+    // Same zone, both registered without an injury (placeholder text), not trapped: never a duplicate.
+    // A-07's injury time is in the future (wrong device clock): named on the golden-hour line, not counted.
+    patients.push({ ...base, id: 'cp-a6', visualId: 'A-06', triage: 'green', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', location: 'הרצל 12', locDetail: 'קומה 4', injury: 'לא תועד', trapStatus: 'not_trapped' });
+    patients.push({ ...base, id: 'cp-a7', visualId: 'A-07', triage: 'green', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', location: 'הרצל 12', locDetail: 'קומה 4', injury: 'לא תועד', trapStatus: 'not_trapped', tInjury: Date.now() + 3 * 3600000, tInjurySource: 'entered' });
     createMedicalResourceRequest({ resourceType: 'doctor_treatment', siteId: 'SITE_A', targetLocation: 'לובי' });
     startRoleDashboard('chamal');
   });
@@ -72,6 +78,8 @@ async function checkPanel(browser, viewport) {
       clinicalRect: clinical.getBoundingClientRect().toJSON(),
       qualityRect: quality.getBoundingClientRect().toJSON(),
       devices: body.querySelectorAll('[data-chamal-device]').length,
+      goldenA: body.querySelector('[data-chamal-site="SITE_A"] [data-chamal-golden]')?.textContent || '',
+      title: document.querySelector('#screen-role-dashboard .header-title, #screen-role-dashboard h1, #role-dashboard-title')?.textContent || document.getElementById('screen-role-dashboard').innerText.slice(0, 200),
       golden: body.querySelector('[data-chamal-site="SITE_B"] [data-chamal-golden]')?.textContent || '',
       pendingB: body.querySelector('[data-chamal-site="SITE_B"] [data-chamal-pending]')?.textContent || '',
       responsibilitiesShown: text.includes('אמינות נתונים ו-Sync'),
@@ -88,12 +96,15 @@ async function checkPanel(browser, viewport) {
   assert(info.sticky, `${tag}: the shared command status strip is missing`);
   assert(!info.hasGenericMetrics, `${tag}: chamal still renders the generic metrics row`);
   assert(info.sites.map((s) => s.id).join(',') === 'SITE_A,SITE_B', `${tag}: expected one card per site, got ${info.sites.map((s) => s.id)}`);
-  assert(info.evacLine.includes('בזירה 4') && info.evacLine.includes('בנאפ״ל'), `${tag}: site A evacuation line wrong: ${info.evacLine}`);
+  assert(info.evacLine.includes('בזירה 6') && info.evacLine.includes('בנאפ״ל'), `${tag}: site A evacuation line wrong: ${info.evacLine}`);
   assert(info.externalLine.includes('אין'), `${tag}: site A has no external report, line says: ${info.externalLine}`);
   assert(!info.responsibilitiesShown && info.hasChip, `${tag}: responsibilities must sit behind the chip, not at the top`);
   assert(info.devices >= 1, `${tag}: no device rows`);
+  assert(info.title.includes('חמ״ל רפואי'), `${tag}: the role is shown as חמ״ל רפואי: ${info.title}`);
+  assert(info.goldenA.includes('בדוק שעון'), `${tag}: a future injury time must be named on the golden-hour line: ${info.goldenA}`);
   assert(info.pendingB.includes('ממתינים למיון: 1'), `${tag}: site B has one casualty waiting for triage, card says: ${info.pendingB}`);
-  assert(info.golden.includes('אף פצוע לא מעל 45') && info.golden.includes('משוערת'), `${tag}: golden-hour line must leave out the 90-min black casualty and name the estimated times: ${info.golden}`);
+  // Site B: B-01, B-02, B-04 have no injury time and the demo has no incident time; B-03 (black, 90 min) is left out.
+  assert(info.golden.includes('אף פצוע לא מעל 45') && info.golden.includes('3 ללא שעת פציעה'), `${tag}: golden-hour line must leave out the 90-min black casualty and name the 3 casualties timed from registration: ${info.golden}`);
   assert(!info.rawKey, `${tag}: a raw missing-data key is on screen`);
   assert(!info.overflowX, `${tag}: the page scrolls sideways: ${info.overflowX}`);
 
@@ -143,6 +154,8 @@ async function checkPanel(browser, viewport) {
   }));
   assert(ext.line.includes('פערים'), `${tag}: site A external line should report the gap: ${ext.line}`);
   assert(ext.alert, `${tag}: a report that disagrees with the field must raise the gap alert`);
+  const extTitle = await page.evaluate(() => [...document.querySelectorAll('[data-chamal-quality] .cmd-strip-alert-title')].map((t) => t.textContent).find((t) => t.includes('פער דיווח חיצוני')) || '');
+  assert(extTitle.includes(siteNameByIdSafe('SITE_A')), `${tag}: the gap alert names its site: ${extTitle}`);
 
   // "פתח מוקד במסך המלא" opens the full screen on that site, and it shows no raw missing-data key.
   await page.click('[data-chamal-site="SITE_B"] .chamal-site-open');
@@ -194,9 +207,39 @@ async function checkPanel(browser, viewport) {
   console.log(`  ${tag}: ok`);
 }
 
+// A site with an external report and no field casualty yet: the whole report is the gap, for the
+// חמ״ל רפואי and on the full command screen (before, sites were only looked at through their casualties).
+async function checkReportWithoutCasualties(browser) {
+  const context = await browser.newContext({ viewport: { width: 412, height: 915 } });
+  const page = await context.newPage();
+  await page.route('**/supabase-js@*/**', (r) => r.fulfill({ contentType: 'application/javascript', body: '' }));
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  page.on('dialog', (d) => d.accept());
+  await page.goto('file://' + file, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#screen-pin-gate.active', { timeout: 5000 });
+  await page.fill('#pin-gate-setup-new', PIN); await page.fill('#pin-gate-setup-confirm', PIN); await page.click('#pin-gate-setup-btn');
+  await page.waitForTimeout(300);
+  const r = await page.evaluate(() => {
+    patients.push({ id: 'cz-a1', visualId: 'A-01', triage: 'red', siteId: 'SITE_A', location: 'הרצל 12', locDetail: 'לובי', vitals: {}, events: [], patientStatus: 'identified', createdAt: new Date().toISOString() });
+    allSites.find((x) => x.id === 'SITE_B').externalReports = [{ id: 'ext-z', source: 'mda', red: 3, yellow: 0, green: 0, at: new Date().toISOString() }];
+    startRoleDashboard('chamal');
+    const panel = [...document.querySelectorAll('[data-chamal-quality] .cmd-strip-alert-title')].map((t) => t.textContent);
+    openLegacyForRole('chamal'); switchCmdSite('ALL'); renderCommander();
+    const full = document.getElementById('screen-commander').innerText;
+    return { panel, fullGap: (full.match(/(\d+) פערי דיווח חיצוני מול שדה/) || [])[1] || null, fullHasGapText: full.includes('פערי דיווח חיצוני') };
+  });
+  assert(r.panel.some((t) => t.includes('פער דיווח חיצוני') && t.includes('מוקד B')), `report with no casualties: no gap alert for site B: ${JSON.stringify(r.panel)}`);
+  assert(r.fullGap === null || r.fullGap === '3', `report with no casualties: full screen should count 3 gaps (site B only), got ${r.fullGap}`);
+  assert(errors.length === 0, `report with no casualties: page errors: ${errors.join(' | ')}`);
+  await context.close();
+  console.log('  report without casualties: ok');
+}
+
 (async () => {
   const browser = await chromium.launch();
   try {
+    await checkReportWithoutCasualties(browser);
     await checkPanel(browser, { width: 412, height: 915 });
     await checkPanel(browser, { width: 1440, height: 900 });
     console.log('browser_chamal_panel_test: PASS');
