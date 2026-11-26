@@ -5803,9 +5803,9 @@ async function loadRealMedicProfiles(){
   }catch(e){}
 }
 async function updateIncidentWithMetadata(client, incidentId, patchFn){
-  const cur=await client.from('incidents').select('metadata').eq('id',incidentId).single();
+  const cur=await client.from('incidents').select('metadata,address').eq('id',incidentId).single();
   if(cur.error) throw cur.error;
-  const patch=patchFn({...(cur.data?.metadata||{})});
+  const patch=patchFn({...(cur.data?.metadata||{})}, cur.data||{});
   const upd=await client.from('incidents').update(patch).eq('id',incidentId).select('id');
   if(upd.error) throw upd.error;
   if(!upd.data?.length) throw new Error('אין הרשאה לעדכן את האירוע');
@@ -5817,14 +5817,33 @@ async function assignRealMedic(profileId, address, note){
   const medic=_realMedicProfiles.find(p=>p.id===profileId);
   const nowIso=new Date().toISOString();
   // 1. Address + note before the membership, so the medic never sees the assignment without them.
-  await updateIncidentWithMetadata(client, incidentId, metadata=>{
+  let prevEntry, prevAddress;
+  await updateIncidentWithMetadata(client, incidentId, (metadata, row)=>{
+    prevEntry=(metadata.medic_assignments||{})[profileId];
+    prevAddress=row.address;
     metadata.medic_assignments={...(metadata.medic_assignments||{}), [profileId]:{note, assigned_by_name:_myDisplayName||'חוג"ד', assigned_at:nowIso}};
     return address ? {metadata, address} : {metadata};
   });
   // 2. The medic's membership: grants access and marks this as their current assignment (the
   // medic phone takes the newest assigned membership).
   const mem=await client.from('incident_memberships').upsert({incident_id:incidentId, profile_id:profileId, role_at_incident:medic?.role||'medic', assigned_by:currentUser.id, created_at:nowIso},{onConflict:'incident_id,profile_id'});
-  if(mem.error) throw mem.error;
+  if(mem.error){
+    // Refused: take back the note (and the address, if it is still ours), so the incident does not
+    // show an assignment the server never made (WP-27 review 2026-11-26).
+    try{
+      await updateIncidentWithMetadata(client, incidentId, (metadata, row)=>{
+        const ma={...(metadata.medic_assignments||{})};
+        if(ma[profileId]?.assigned_at===nowIso){ if(prevEntry===undefined) delete ma[profileId]; else ma[profileId]=prevEntry; }
+        metadata.medic_assignments=ma;
+        return (address && row.address===address && prevAddress!==address) ? {metadata, address:prevAddress??null} : {metadata};
+      });
+    }catch(_){}
+    // A relieved medic: only his PC, the CC, chamal or admin give him access back (database/096).
+    if(mem.error.code==='42501' && /access back/.test(mem.error.message||'')){
+      throw new Error('החובש הוחלף באתר הזה. רק החוג"ד שלו, מ״פ רפואה, חמ"ל או מנהל מערכת יכולים להחזיר לו גישה');
+    }
+    throw mem.error;
+  }
   if(address) activeIncident.address=address;
 }
 // A board's (rescue panel, PC/CC buttons) type changes go to the server one by one through
