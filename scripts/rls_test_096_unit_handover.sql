@@ -522,6 +522,8 @@ begin
     execute 'reset role';
     select count(*) into n from incident_memberships where incident_id = Z and profile_id = MA and access_ended_at is not null and read_only_since is not null;
     insert into _c values ('merge: ended member copied for late records only', n::text, '1');
+    select (merged_copy_from = X)::text into s from incident_memberships where incident_id = Z and profile_id = MA;
+    insert into _c values ('merge (098): the late-records copy is marked with its source', coalesce(s, 'null'), 'true');
     perform set_config('request.jwt.claims', json_build_object('sub', MA, 'role', 'authenticated')::text, true);
     execute 'set local role authenticated';
     insert into _c values ('merge: ended member does not see the target', pg_temp.t96_view(Z)::text, 'false');
@@ -587,6 +589,12 @@ begin
     select count(*) into n from events where incident_id = T2 and type = 'INCIDENT_MERGED'
       and payload_json::text like '%display_name%';
     insert into _c values ('merge (098): no names in the event log', n::text, '0');
+    perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    update incident_memberships set assigned_by = CC, created_at = clock_timestamp() where incident_id = T2 and profile_id = MA2;
+    j := public.merge_incident(S2, T2, 'duplicate', 'dev-cc', 't96-merge3');
+    execute 'reset role';
+    insert into _c values ('merge (098): a repeat drops someone re-assigned since', coalesce((select string_agg(e->>'profile_id', ',') from jsonb_array_elements(j->'memberships_kept_ended') e), '-'), LG::text);
 
     -- A company that left and came back (link ended 'returned') no longer counts as left; a link in
     -- force on the duplicate does. R3: A hands it to B and B hands it back. S3: B reinforces, then is
@@ -624,6 +632,29 @@ begin
       insert into _c values ('merge (098): a physician edits merged_copy_from directly', 'allowed', 'refused');
     exception when insufficient_privilege then insert into _c values ('merge (098): a physician edits merged_copy_from directly', case when sqlerrm like '%relief fields%' then 'refused' else 'refused elsewhere: ' || sqlerrm end, 'refused'); end;
     execute 'reset role';
+    perform set_config('request.jwt.claims', json_build_object('sub', PCA, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    begin
+      update incident_memberships set merged_copy_from = S3 where incident_id = R3 and profile_id = MA2;
+      get diagnostics n = row_count;
+      insert into _c values ('merge (098): a PC marks his medic''s row as a merge copy', case when n = 0 then 'no row reached' else 'allowed' end, 'refused');
+    exception when insufficient_privilege then insert into _c values ('merge (098): a PC marks his medic''s row as a merge copy', case when sqlerrm like '%relief fields%' then 'refused' else 'refused elsewhere: ' || sqlerrm end, 'refused'); end;
+    execute 'reset role';
+    perform set_config('app.membership_relief_via_rpc', 'on', true);
+    update incident_memberships set read_only_since = now() where incident_id = R3 and profile_id = MB;
+    perform set_config('app.membership_relief_via_rpc', '', true);
+    select (merged_copy_from is null)::text into s from incident_memberships where incident_id = R3 and profile_id = MB;
+    insert into _c values ('merge (098): an RPC changing a copy''s state clears the mark', s, 'true');
+    update incident_memberships set merged_copy_from = R3 where incident_id = R3 and profile_id = MB;
+    perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    update incident_memberships set assigned_by = CC, created_at = clock_timestamp() where incident_id = R3 and profile_id = MB;
+    execute 'reset role';
+    select (merged_copy_from is null and read_only_since is null)::text into s from incident_memberships where incident_id = R3 and profile_id = MB;
+    insert into _c values ('merge (098): re-assignment gives access back and clears the mark', s, 'true');
+    select count(*) into n from unit_audit where target_incident_id = R3 and target_profile_id = MB and detail->>'kind' = 'access_restored_by_assignment'
+      and detail->'before'->>'merged_copy_from' is not null and detail->'after'->'merged_copy_from' = 'null'::jsonb;
+    insert into _c values ('merge (098): that re-assignment audited with the mark before and after', n::text, '1');
   end if;
 
   select string_agg(case when got = want then 'ok   ' else 'FAIL ' end || label || ': got ' || got || ', want ' || want, E'\n'),

@@ -8,7 +8,8 @@
 --     again only when it carries this mark; any other such row is the target's own decision and stays
 --     (listed in memberships_kept_ended, with names and state, so the CC can re-assign).
 --  2. The 096 guard treats merged_copy_from as a relief field: only the CC, chamal or admin change it
---     directly, and a re-assignment that gives access back clears it.
+--     directly, a re-assignment that gives access back clears it, and any later change to a copy's
+--     read-only or ended state (an RPC's too) clears it, so the row then counts as the site's decision.
 --  3. One unit_audit row (before and after) per person already on the target whose membership the
 --     merge changes or keeps ended; memberships_added counts new rows only; the event payload carries
 --     profile ids only.
@@ -41,6 +42,13 @@ begin
        ('none', 'postgres', 'service_role', 'supabase_admin', 'supabase_auth_admin', 'supabase_storage_admin')
      or coalesce(current_setting('app.membership_relief_via_rpc', true), '') = 'on' then
     if tg_op = 'DELETE' then return old; end if;
+    -- 098: once anything (an RPC included) changes a merge copy's read-only or ended state, the row
+    -- is the site's own decision, not a copy: the mark goes, so a later merge cannot undo it.
+    if tg_op = 'UPDATE' and old.merged_copy_from is not null
+       and new.merged_copy_from is not distinct from old.merged_copy_from
+       and (new.read_only_since is distinct from old.read_only_since or new.access_ended_at is distinct from old.access_ended_at) then
+      new.merged_copy_from := null;
+    end if;
     return new;
   end if;
   if tg_op = 'DELETE' then
@@ -123,6 +131,8 @@ begin
   return new;
 end;
 $function$;
+-- Defensive repeat of 096: the guard is a trigger function only.
+revoke all on function app.guard_membership_relief_fields() from public, anon, authenticated;
 
 CREATE OR REPLACE FUNCTION public.merge_incident(p_source_id uuid, p_target_id uuid, p_reason text, p_device_id text DEFAULT NULL::text, p_local_event_id text DEFAULT NULL::text)
  RETURNS jsonb
