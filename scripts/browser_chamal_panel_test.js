@@ -51,6 +51,14 @@ async function open(browser, viewport) {
     // A-07's injury time is in the future (wrong device clock): named on the golden-hour line, not counted.
     patients.push({ ...base, id: 'cp-a6', visualId: 'A-06', triage: 'green', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', location: 'הרצל 12', locDetail: 'קומה 4', injury: 'לא תועד', trapStatus: 'not_trapped' });
     patients.push({ ...base, id: 'cp-a7', visualId: 'A-07', triage: 'green', siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', location: 'הרצל 12', locDetail: 'קומה 4', injury: 'לא תועד', trapStatus: 'not_trapped', tInjury: Date.now() + 3 * 3600000, tInjurySource: 'entered' });
+    // A true pair by injury: same site and zone, not trapped, "שבר ירך" / "חשד לשבר בירך" (prefix ב).
+    // The last injury typed on this phone is the same words: it must not hide the pair.
+    patients.push({ ...base, id: 'cp-b5', visualId: 'B-05', triage: 'yellow', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', location: 'ב.ג. 45', locDetail: 'חדר מדרגות', injury: 'שבר ירך', trapStatus: 'not_trapped' });
+    patients.push({ ...base, id: 'cp-b6', visualId: 'B-06', triage: 'yellow', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', location: 'ב.ג. 45', locDetail: 'חדר מדרגות', injury: 'חשד לשבר בירך', trapStatus: 'not_trapped' });
+    // Same zone, both with the MSTART sweep's template injury: not a pair.
+    patients.push({ ...base, id: 'cp-b7', visualId: 'B-07', triage: 'green', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', location: 'ב.ג. 45', locDetail: 'קומה 1', injury: 'פגיעת קריסה / לכידה', trapStatus: 'not_trapped' });
+    patients.push({ ...base, id: 'cp-b8', visualId: 'B-08', triage: 'green', siteId: 'SITE_B', assignedPlatoonId: 'PLT-B', location: 'ב.ג. 45', locDetail: 'קומה 1', injury: 'פגיעת קריסה / לכידה', trapStatus: 'not_trapped' });
+    siteData.lastMechanism = 'שבר ירך';
     createMedicalResourceRequest({ resourceType: 'doctor_treatment', siteId: 'SITE_A', targetLocation: 'לובי' });
     startRoleDashboard('chamal');
   });
@@ -103,8 +111,8 @@ async function checkPanel(browser, viewport) {
   assert(info.title.includes('חמ״ל רפואי'), `${tag}: the role is shown as חמ״ל רפואי: ${info.title}`);
   assert(info.goldenA.includes('בדוק שעון'), `${tag}: a future injury time must be named on the golden-hour line: ${info.goldenA}`);
   assert(info.pendingB.includes('ממתינים למיון: 1'), `${tag}: site B has one casualty waiting for triage, card says: ${info.pendingB}`);
-  // Site B: B-01, B-02, B-04 have no injury time and the demo has no incident time; B-03 (black, 90 min) is left out.
-  assert(info.golden.includes('אף פצוע לא מעל 45') && info.golden.includes('3 ללא שעת פציעה'), `${tag}: golden-hour line must leave out the 90-min black casualty and name the 3 casualties timed from registration: ${info.golden}`);
+  // Site B: B-01, B-02, B-04..B-08 have no injury time and the demo has no incident time; B-03 (black, 90 min) is left out.
+  assert(info.golden.includes('אף פצוע לא מעל 45') && info.golden.includes('7 ללא שעת פציעה'), `${tag}: golden-hour line must leave out the 90-min black casualty and name the 7 casualties with no known injury time: ${info.golden}`);
   assert(!info.rawKey, `${tag}: a raw missing-data key is on screen`);
   assert(!info.overflowX, `${tag}: the page scrolls sideways: ${info.overflowX}`);
 
@@ -113,8 +121,9 @@ async function checkPanel(browser, viewport) {
   assert(!info.clinicalTitles.some((t) => t.includes('כפילות')), `${tag}: a duplicate alert is in the clinical column`);
   // Duplicates: exactly the same-sector trapped pair, by visual id, nothing across sites.
   const dupes = info.qualityTitles.filter((t) => t.includes('כפילות'));
-  assert(dupes.length === 1, `${tag}: expected exactly one suspected duplicate, got ${JSON.stringify(dupes)}`);
-  assert(/A-03 ↔ A-04|A-04 ↔ A-03/.test(dupes[0]), `${tag}: duplicate must name visual ids A-03/A-04: ${dupes[0]}`);
+  assert(dupes.length === 2, `${tag}: expected exactly two suspected duplicates (A-03/A-04 trapped, B-05/B-06 injury), got ${JSON.stringify(dupes)}`);
+  assert(dupes.some((d) => /A-03 ↔ A-04|A-04 ↔ A-03/.test(d)), `${tag}: trapped pair A-03/A-04 missing: ${dupes}`);
+  assert(dupes.some((d) => /B-05 ↔ B-06|B-06 ↔ B-05/.test(d)), `${tag}: injury pair B-05/B-06 missing (prefix or last-typed injury hid it): ${dupes}`);
   assert(!info.qualityTitles.some((t) => t.includes('פער דיווח חיצוני')), `${tag}: external-report gap alert with no report filed`);
 
   if (viewport.width >= 1024) {
@@ -227,10 +236,17 @@ async function checkReportWithoutCasualties(browser) {
     const panel = [...document.querySelectorAll('[data-chamal-quality] .cmd-strip-alert-title')].map((t) => t.textContent);
     openLegacyForRole('chamal'); switchCmdSite('ALL'); renderCommander();
     const full = document.getElementById('screen-commander').innerText;
-    return { panel, fullGap: (full.match(/(\d+) פערי דיווח חיצוני מול שדה/) || [])[1] || null, fullHasGapText: full.includes('פערי דיווח חיצוני') };
+    // The count sits in the duplicates panel (collapsed by default), so read its text directly.
+    const dupPanel = document.getElementById('cmd-duplicates').textContent;
+    // The full screen was left on ALL as chamal; a PC dashboard opened now must still see only its own
+    // site's external gap, never site B's (before, its scope came from the last command screen state).
+    const pcSite = pcPlatoonSite();
+    const pcGaps = roleAlertRows('pc').filter((a) => a.type === 'EXTERNAL_REPORT_CONFLICT').map((a) => a.siteId);
+    return { panel, pcSite, pcGaps, fullGap: (dupPanel.match(/(\d+) פערי דיווח חיצוני מול שדה/) || [])[1] || null };
   });
   assert(r.panel.some((t) => t.includes('פער דיווח חיצוני') && t.includes('מוקד B')), `report with no casualties: no gap alert for site B: ${JSON.stringify(r.panel)}`);
-  assert(r.fullGap === null || r.fullGap === '3', `report with no casualties: full screen should count 3 gaps (site B only), got ${r.fullGap}`);
+  assert(r.pcGaps.every((id) => id === r.pcSite), `PC dashboard saw another site's external gap: ${r.pcGaps} (own site ${r.pcSite})`);
+  assert(r.fullGap === '3', `report with no casualties: full screen should count 3 gaps (site B only), got ${r.fullGap}`);
   assert(errors.length === 0, `report with no casualties: page errors: ${errors.join(' | ')}`);
   await context.close();
   console.log('  report without casualties: ok');

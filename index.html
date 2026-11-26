@@ -6805,7 +6805,8 @@ function roleScopedRequests(role){
 }
 function roleAlertRows(role){
   const audience=roleConfig(role).audience;
-  const reportSites=COMPANY_COMMAND_ROLES.has(role) ? allSites.map(s=>s.id).filter(id=>id!=='ALL') : null;
+  const reportSites=COMPANY_COMMAND_ROLES.has(role) ? allSites.map(s=>s.id).filter(id=>id!=='ALL')
+    : role==='pc' ? [pcPlatoonSite()] : null;
   return buildAlertObjects(roleScopedPatients(role), reportSites).filter(a=>a.audience.includes(audience) || (role==='physician' && a.type==='MEDICAL_REINFORCEMENT_REQUEST'));
 }
 function medicOperationalTopLine(){
@@ -8476,13 +8477,13 @@ function chamalSiteCardHtml(site){
   const gh={amber:0,red:0,estimated:0,unknown:0,future:0};
   open.forEach(p=>{
     const inj=patientInjuryTime(p);
+    if(Number.isFinite(inj.ms) && inj.ms>Date.now()+60000){ gh.future++; return; }
     if(!Number.isFinite(inj.ms) || inj.source==='event_time'){ gh.unknown++; if(!Number.isFinite(inj.ms)) return; }
     else if(inj.estimated) gh.estimated++;
-    if(inj.ms>Date.now()+60000){ gh.future++; return; }
     const level=watchdogState(Math.floor((Date.now()-inj.ms)/60000),45,60);
     if(level==='red') gh.red++; else if(level==='amber') gh.amber++;
   });
-  const ghNotes=[gh.estimated?`${gh.estimated} לפי שעה משוערת`:'', gh.unknown?`${gh.unknown} ללא שעת פציעה (לפי שעת רישום)`:'', gh.future?`${gh.future} שעת פציעה בעתיד, בדוק שעון`:''].filter(Boolean).join(' · ');
+  const ghNotes=[gh.estimated?`${gh.estimated} לפי שעה משוערת`:'', gh.unknown?`${gh.unknown} ללא שעת פציעה ידועה`:'', gh.future?`${gh.future} שעת פציעה בעתיד, בדוק שעון`:''].filter(Boolean).join(' · ');
   const ghMain=gh.red||gh.amber ? `${gh.red} עברו 60 דק׳ · ${gh.amber} מעל 45 דק׳` : 'אף פצוע לא מעל 45 דק׳';
   const ghLine=`<div class="chamal-site-line" data-chamal-golden style="${gh.red?'color:var(--red);font-weight:800':gh.amber?'color:var(--orange);font-weight:800':''}">⏱ שעת זהב (לא פונו, ללא שחורים): ${ghMain}${ghNotes?` · <span style="color:var(--orange)">${ghNotes}</span>`:''}</div>`;
   const stage=k=>pts.filter(p=>evacuationStage(p)===k).length;
@@ -8495,7 +8496,7 @@ function chamalSiteCardHtml(site){
   return `<div class="chamal-site" data-chamal-site="${escAttr(site.id)}">
     <div class="chamal-site-head"><div><div class="chamal-site-name">${escAttr(site.name)}</div><div class="chamal-site-line">${escAttr(incidentTypeLabel(site.id))} · ${escAttr(status)} · ${t0}</div></div><div class="chamal-site-total">${pts.length}<span>פצועים</span></div></div>
     ${siteTriageGridHtml(pts)}
-    ${(()=>{ const pending=pts.filter(p=>triageKey(p.triage)==='pending' && !isDeceasedForEvac(p)).length; return pending?`<div class="chamal-site-line" data-chamal-pending style="color:var(--orange);font-weight:800">ממתינים למיון: ${pending}</div>`:''; })()}
+    ${(()=>{ const pending=pts.filter(p=>['pending','unknown'].includes(triageKey(p.triage)) && !isDeceasedForEvac(p)).length; return pending?`<div class="chamal-site-line" data-chamal-pending style="color:var(--orange);font-weight:800">ממתינים למיון: ${pending}</div>`:''; })()}
     <div class="chamal-site-line" data-chamal-evac>בזירה ${stage('on_scene')} · בדרך לנאפ״ל ${stage('to_evac_point')} · בנאפ״ל ${stage('evac_point')}${wait!==null?` (עד ${wait} דק׳)`:''} · פונו ${stage('evacuated')}</div>
     ${ghLine}
     ${ext}
@@ -14575,17 +14576,23 @@ function externalConflictCount(pts, reports){
 // casualties who were both "not trapped" matched, so almost every pair on every site was flagged.
 const DUPLICATE_UNKNOWN_ZONES=new Set(['','לא צוין','אזור לא צוין']);
 function duplicateZoneOf(p){ return String(p.zone||String(p.locDetail||'').split(' · ')[0]||'').trim(); }
-// Words that say nothing about the casualty: the placeholders the flows write when no injury was
-// entered, the site's injury mechanism they fall back to, and generic words. Without this, every
-// casualty registered without an injury "overlapped" with every other one (V2.99.93).
-const DUPLICATE_PLACEHOLDER_INJURIES=['לא תועד','הערכת MSTART בלבד','פעולה מצילת חיים בשטח','פעולה מצילת חיים','דיווח שדה ראשוני — לא הוערך קלינית'];
+// Words that say nothing about the casualty: the template texts the flows write when no injury was
+// entered (MSTART sweep, life-saving action, rescue-chain report), the site's likely mechanisms (a
+// site setting) and generic words. Without this, every casualty registered without an injury
+// "overlapped" with every other one (V2.99.93). siteData.lastMechanism is deliberately not ignored:
+// it is the last injury typed on this phone, a real injury, and ignoring it would hide a true pair.
+const DUPLICATE_PLACEHOLDER_INJURIES=['לא תועד','הערכת MSTART בלבד','פעולה מצילת חיים בשטח','פעולה מצילת חיים','דיווח שדה ראשוני — לא הוערך קלינית','פגיעת קריסה / לכידה','חסם עורקים הונח (דיווח שדה ראשוני)','דימום מסיבי מדווח'];
 const DUPLICATE_GENERIC_WORDS=['פגיעת','פגיעה','פציעה','פציעת','חשד','מדווח','בשטח','ראשוני'];
+const DUPLICATE_TOKEN_SPLIT=/[\s+,/·—\-.():;"'״׳!?]+/;
+// One leading Hebrew prefix letter (ב ה ו ל מ ש כ) is dropped from words of 4+ letters, so "בראש"
+// matches "ראש". Different forms of a word ("שבר" / "שבורה") still do not match.
+function duplicateTokenStem(t){ return t.length>=4 && /^[בהולמשכ]/.test(t) ? t.slice(1) : t; }
 function duplicateInjuryTokens(p, ignore){
-  return String(p.injury||'').split(/[\s+,/·—\-]+/).filter(t=>t.length>2 && !ignore.has(t));
+  return String(p.injury||'').split(DUPLICATE_TOKEN_SPLIT).filter(t=>t.length>2 && !ignore.has(t) && !ignore.has(duplicateTokenStem(t))).map(duplicateTokenStem);
 }
 function duplicateIgnoredTokens(){
-  const words=[...DUPLICATE_PLACEHOLDER_INJURIES, siteData?.lastMechanism||'', ...(siteData?.likelyMechanisms||[])].join(' ');
-  return new Set([...words.split(/[\s+,/·—\-]+/), ...DUPLICATE_GENERIC_WORDS].filter(Boolean));
+  const words=[...DUPLICATE_PLACEHOLDER_INJURIES, ...(siteData?.likelyMechanisms||[])].join(' ');
+  return new Set([...words.split(DUPLICATE_TOKEN_SPLIT), ...DUPLICATE_GENERIC_WORDS].filter(Boolean).flatMap(t=>[t, duplicateTokenStem(t)]));
 }
 function isTrappedForDuplicate(p){ return ['trapped','access_blocked'].includes(normalizeTrapStatus(p)); }
 function duplicateCandidates(pts){
