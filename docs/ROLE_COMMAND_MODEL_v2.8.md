@@ -120,6 +120,7 @@ Signed in, a PC (or any command role: pc/cc/chamal/admin/physician) can assign a
 PC phone:
 1. Writes the address to `incidents.address` and the note to `incidents.metadata.medic_assignments[<medic profile id>] = {note, assigned_by_name, assigned_at}`. The assigner's name goes in metadata because a medic cannot read other profiles. An update that changes no row fails loudly instead of silently.
 2. Then upserts the medic's `incident_memberships` row (`assigned_by` = PC, `created_at` = now). That membership is also what lets the medic enter and push into the incident.
+3. If the server refuses the membership, the phone takes back the note it just wrote (the previous `medic_assignments` entry, or none) and the address if it is still the one it wrote, and shows the reason. Since `database/096` (WP-27, not applied live yet) one access rule applies here: a relieved medic gets access back only from his own PC, the CC, chamal or admin, so a physician is refused (owner 2026-11-26), and the phone says in Hebrew that the medic was relieved at this site and who can give him access back.
 
 Medic phone:
 - Reads its newest membership with `assigned_by` set, plus that incident's row, at login, on every 45-second incident refresh and when the Movement screen opens.
