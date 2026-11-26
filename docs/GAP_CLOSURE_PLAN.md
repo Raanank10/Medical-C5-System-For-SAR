@@ -845,6 +845,8 @@ No rows were written to the migration list to make it look complete: a row there
 
 **Done when.** Every step highlights a visible panel with data, on both phone sizes, and the test fails if a panel moves.
 
+**Done (V2.99.94, owner answers 2026-11-26).** (1) The tour runs in the sandbox with its own sample patients (`startTourSandbox` / `seedTourSandboxData`): no server reads or writes, the phone's state restored on exit, the card says "נתוני הדגמה". (2) Signed-in PC and CC can start it, **only outside an incident** (owner, after the session found that in the sandbox the phone's alarms read the sample patients and nothing arrives from other phones, so inside an incident real alarms would be held back until the tour ends): PC from the incident picker, CC from the all-incidents view; inside an open incident `startGuidedTour()` refuses with a message. On exit the phone pushes and polls open-incident alerts at once. Steps carry their tab (`setCommandPanelTab`), collapsible sections are found by key (`data-section`, added to `renderCollapsibleSection`), a step whose panel is missing or not visible is skipped and logged (`console.warn`), and the panel is scrolled to just below the stuck command strip. 7 PC and 6 CC steps, each saying who acts on that panel. `scripts/browser_guided_tour_test.js` fails on today's `main` (reproduced the table above, plus empty panels) and passes on this branch at 375x812 and 412x915; mutation-checked (no tab switch, no refusal, no sample data each fail it). `smoke_v2_9925` left unchanged and still passes (nothing removed). Found on the way, not fixed here: the CC "תעדוף פינוי פלוגתי" count ignores the focus filter (count 1, list "אין פצועים במיקוד הנוכחי").
+
 ---
 
 ### WP-44: Guided tour for RPC and RCC (P3, after WP-43)
@@ -955,7 +957,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-41 Banner: patient to / at the נאפ"ל | P2 | Done (V2.99.79), no SQL | this PR | owner 2026-11-18/19; send + arrival, medic / paramedic / physician, open or close, 15 s |
 | WP-42 Medic asks to close their site | P2 | Not started, design questions | | from WP-28; spec v1.2 Medic Site Close Rule |
 | WP-38 Resupply raises the medic's bag | P2 | Done (V2.99.74): `database/082` applied live by the owner, `sync-log` v18 deployed 2026-11-18; live two-phone check pending | #132 | owner 2026-11-18: the medic confirms, by what arrived; the PC's / logistics' "delivered" = handed over, waiting for the medic |
-| WP-43 Guided tour hidden panels | P2 | Not started, 2 owner questions | | found 2026-11-24: 4 of 15 steps visible on V2.99.90; tab-aware steps + real browser test |
+| WP-43 Guided tour hidden panels | P2 | Done in this PR (V2.99.94), no SQL | this PR | owner 2026-11-26: sandbox with sample data; signed in only outside an incident (PC picker, CC all-incidents view), sync on exit; 7 PC + 6 CC steps, tab-aware, invisible panels skipped and logged; `browser_guided_tour_test.js` |
 | WP-44 RPC / RCC tour | P3 | Not started, after WP-43 | | max 5 steps each, same engine |
 | WP-45 Role intro | P3 | Not started, 2 owner questions | | owner 2026-11-23; one source in `ROLE_DEFS`, medic first, no server change |
 

@@ -954,6 +954,11 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     <div id="incident-picker-list"></div>
     <button class="demo-mini-btn" style="width:100%;margin-top:4px" onclick="refreshIncidentPicker()">רענן רשימה</button>
   </div>
+  <div class="demo-panel" style="margin:16px;display:none" id="incident-picker-tour">
+    <div class="demo-strip-title">סיור מודרך</div>
+    <div class="demo-strip-sub" style="margin-bottom:10px">מסכי הפיקוד עם נתוני הדגמה, כשני דקות. זמין כאן, מחוץ לאירוע: במהלכו הטלפון לא מקבל עדכונים מהשרת.</div>
+    <button class="demo-mini-btn" style="width:100%;min-height:48px" data-guided-tour-start onclick="startGuidedTour()">התחל סיור במסך הפיקוד</button>
+  </div>
   <div class="demo-panel" style="margin:16px" id="incident-open-panel">
     <div class="demo-strip-title" id="incident-open-title">פתיחת אירוע חדש</div>
     <div class="demo-strip-sub" id="incident-open-sub" style="margin-bottom:12px"></div>
@@ -1045,7 +1050,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9991</div>
+      <div class="demo-kicker">Demo V2.9994</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1142,7 +1147,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9991</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9994</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1152,7 +1157,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9991</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9994</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2152,7 +2157,8 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     <div id="guided-tour-title" style="font-weight:900;color:var(--accent)"></div>
     <div id="guided-tour-count" style="font-family:var(--mono);font-size:12px;color:var(--muted)"></div>
   </div>
-  <div id="guided-tour-text" style="font-size:13px;line-height:1.5;margin:6px 0 10px"></div>
+  <div id="guided-tour-text" style="font-size:13px;line-height:1.5;margin:6px 0 4px"></div>
+  <div id="guided-tour-sample" style="font-size:11px;color:var(--muted);margin:0 0 10px">נתוני הדגמה · הנתונים שלך לא מוצגים, לא משתנים ולא נשלחים</div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
     <button class="demo-mini-btn" id="guided-tour-prev" onclick="guidedTourPrev()">הקודם</button>
     <button class="demo-mini-btn" id="guided-tour-next" style="background:var(--accent);border-color:var(--accent);color:#fff" onclick="guidedTourNext()">הבא</button>
@@ -3563,7 +3569,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.91';
+const APP_VERSION = '2.99.94';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -6645,85 +6651,186 @@ function endBriefingDemo(){
   renderDashboard(); renderAlerts();
   toast('ההדגמה הסתיימה · המצב הקודם שוחזר');
 }
-// ── Guided tour of the PC / CC dashboards ──
-// Read-only: it only navigates between role dashboards and highlights real panels. It creates no
-// patients and writes nothing, so it is safe on a phone that is also carrying real data.
+// ── Guided tour of the PC / CC dashboards (WP-43, owner 2026-11-26) ──
+// Runs in the sandbox (startTourSandbox): sample patients, no server reads or writes, the phone's own
+// state restored exactly on exit. Each step names the command-panel tab its panel lives in, so the
+// tour switches tabs the way a tap does; a step whose panel is missing or not visible is skipped and
+// logged, never shown as if it worked (scripts/browser_guided_tour_test.js fails on any skip).
+// Signed in it runs only outside an incident (PC from the incident picker, CC from the all-incidents
+// view): in the sandbox the phone's alarms read the sample patients and nothing arrives from other
+// phones, so inside an incident it would hold back real alarms. On exit a signed-in phone syncs at once.
 const GUIDED_TOUR_STEPS = [
-  {role:'pc', sel:'.role-top-grid', title:'חוג״ד · תמונת מצב מהירה', text:'פצועי המחלקה, התראות לפעולה, בקשות פתוחות ומוקדים. זה הדבר הראשון שחוג״ד רואה.'},
-  {role:'pc', section:'סטטוס אתר', title:'סטטוס אתר מהחילוץ', text:'מה שמ״מ / מ״פ חילוץ קבעו: סוג אירוע, T0, מצב מבנה ואתר נקי. חוג״ד מקבל עדכון, לא מאשר. סוג אירוע: חובש קובע כשאין סוג; חוג״ד יכול לשנות סוג שקבע חובש, לא סוג שקבע חילוץ.'},
-  {role:'pc', section:'משימות חוג״ד עכשיו', title:'משימות עכשיו', text:'מה דורש החלטה שלך עכשיו, מחולק למיידי / מבצעי / השלמה.'},
-  {role:'pc', section:'עומס חובשים', title:'עומס חובשים', text:'לכל חובש: כמה פצועים, אדומים, לכודים, חסמים ומתי עדכן לאחרונה. מכאן גם משייכים חובש לאירוע.'},
-  {role:'pc', sel:'.stat-grid', title:'ספירת מיון', text:'אדום / צהוב / ירוק / לכודים במחלקה, מתעדכן מכל החובשים.'},
-  {role:'pc', section:'⏱ חסמי עורקים פעילים', title:'חסמי עורקים', text:'כל חסם פעיל עם שעון רץ: תזכורת ב-45 דק׳, אזהרה ב-60 דק׳ וקריטי ב-120 דק׳.'},
-  {role:'pc', section:'לוח פצועים מחלקתי', title:'לוח פצועים', text:'כל הפצועים לפי עדיפות פינוי. לחיצה על פצוע פותחת את התיק שלו.'},
-  {role:'pc', section:'חוב הערכה אחרי סריקה', title:'חוב הערכה', text:'פצועים שסומנו בסריקה מהירה ועדיין חסרים להם מדדים או הערכה מלאה.'},
-  {role:'pc', section:'תור בקשות ציוד', title:'בקשות ציוד', text:'בקשות ציוד מכל המכשירים, בזמן אמת מהשרת.'},
-  {role:'cc', sel:'.role-top-grid', title:'מ״פ רפואה · תמונת פלוגה', text:'מחלקות ומוקדים פעילים, אדום/צהוב ובקשות חוג״ד פתוחות בכל הפלוגה.'},
-  {role:'cc', section:'תמונת משאבים פלוגתית', title:'משאבים פלוגתיים', text:'מה זמין לשיוך בפלוגה: צוותים, רכבים וציוד.'},
-  {role:'cc', section:'עומס מחלקות', title:'עומס מחלקות', text:'אדום/צהוב לפי מחלקה, כדי לראות איפה צריך תגבור.'},
-  {role:'cc', section:'תעדוף פינוי פלוגתי', title:'תעדוף פינוי', text:'סדר פינוי מומלץ לכל הפלוגה, מעל רמת המחלקה.'},
-  {role:'cc', section:'בקשות משאב רפואי פתוחות', title:'בקשות משאב', text:'בקשות תגבור רפואי מחוג״ד שמחכות להחלטה שלך.'},
-  {role:'cc', section:'תור רופא', title:'תור רופא', text:'חשד לנפטר שמחכה לאישור רופא. זה אישור קליני, לא קביעת מוות רשמית.'}
+  {role:'pc', tab:'overview', section:'סטטוס אתר', title:'סטטוס אתר מהחילוץ', text:'סוג אירוע, T0, מצב מבנה ואתר נקי, כפי שקבעו מ״מ / מ״פ חילוץ. אתה לא מאשר אותם, אתה מתכנן סביבם.'},
+  {role:'pc', tab:'overview', key:'pc-evac-priority', title:'תעדוף פינוי', text:'סדר הפינוי של המחלקה. החילוץ ומ״פ רפואה רואים את אותו סדר, אז הוא קובע מי יוצא ראשון.'},
+  {role:'pc', tab:'action', section:'משימות חוג״ד עכשיו', title:'משימות עכשיו', text:'מה מחכה להחלטה שלך: מיידי / מבצעי / השלמה. מה שלא נסגר כאן נשאר פתוח אצל החובש.'},
+  {role:'pc', tab:'action', key:'pc-tq-watch', title:'חסמי עורקים', text:'כל חסם פעיל עם הזמן מאז ההנחה. אתה העין השנייה: הטלפון של החובש מתריע, ואתה רואה מי מתקרב להחלטה.'},
+  {role:'pc', tab:'action', key:'pc-assessment-debt', title:'חוב הערכה', text:'פצועים מהסריקה המהירה שחסרים להם מדדים או הערכה מלאה. בלי מדדים אין מגמה ואין התראת הידרדרות.'},
+  {role:'pc', tab:'forces', key:'pc-medic-load', title:'עומס חובשים', text:'לכל חובש: כמה פצועים, אדומים, לכודים, חסמים ומתי עדכן. חובש שלא עדכן הרבה זמן הוא נקודה עיוורת.'},
+  {role:'pc', tab:'supply', key:'pc-resupply', title:'השלמות ציוד', text:'בקשות ציוד מהחובשים. אתה מאשר מהרכב או מעביר למ״פ, והחובש רואה את ההחלטה בטלפון שלו.'},
+  {role:'cc', tab:'overview', section:'כל האירועים — פצועים לפי מיון', title:'כל האירועים', text:'פצועים לפי מיון בכל האירועים הפתוחים בפלוגה. הקשה על שורה פותחת את האירוע.'},
+  {role:'cc', tab:'overview', key:'cc-evac-priority', title:'תעדוף פינוי פלוגתי', text:'סדר פינוי לכל הפלוגה, מעל רמת המחלקה. זה הסדר שהחילוץ רואה.'},
+  {role:'cc', tab:'action', key:'cc-resource-requests', title:'בקשות משאב', text:'בקשות תגבור רפואי מחוג״ד. בקשה שלא נענתה נשארת פתוחה אצלו.'},
+  {role:'cc', tab:'action', key:'cc-death-queue', title:'תור רופא', text:'חשד לנפטר שמחכה לאישור רופא. זה אישור קליני, לא קביעת מוות רשמית.'},
+  {role:'cc', tab:'forces', key:'cc-platoon-load', title:'עומס מחלקות', text:'אדום / צהוב לפי מחלקה, כדי לראות איפה צריך תגבור לפני שמבקשים ממך.'},
+  {role:'cc', tab:'supply', section:'סטטוס רכב חוג״ד לפי מחלקה', title:'רכבי חוג״ד', text:'מה נשאר בכל רכב מחלקה. חוסר כאן הוא הבקשה הבאה שתגיע אליך.'}
 ];
-let _guidedTour=null; // {index, screen, role}
+let _guidedTour=null; // {steps, index, origin:{screen, role, tab, signedInRole}, skipped:[], timer}
 function findTourTarget(step){
   const body=document.getElementById('role-dashboard-body');
-  if(!body) return null;
-  if(step.sel) return body.querySelector(step.sel);
+  if(!body || !step) return null;
+  if(step.key) return body.querySelector(`.role-section[data-section="${step.key}"]`);
   const title=[...body.querySelectorAll('.role-section-title')].find(t=>t.textContent.trim().startsWith(step.section));
   return title?.closest('.role-section')||null;
+}
+function tourTargetVisible(el){
+  if(!el || el.closest('[hidden]')) return false;
+  const r=el.getBoundingClientRect();
+  return r.height>0 && r.width>0 && (typeof el.checkVisibility!=='function' || el.checkVisibility());
+}
+// Put the panel's top just below the sticky command strip, so neither the strip above nor the tour
+// card below covers it (scrollIntoView 'center' left the top under the strip on a 375x812 phone).
+function scrollTourTarget(el){
+  const sticky=document.querySelector('#screen-role-dashboard.active #command-sticky');
+  // Where the strip sits once it sticks: its CSS top (below the header) plus its own height.
+  const stuckBottom=sticky ? (parseFloat(getComputedStyle(sticky).top)||0) + sticky.getBoundingClientRect().height : 0;
+  const top=window.scrollY + el.getBoundingClientRect().top - stuckBottom - 12;
+  window.scrollTo({top:Math.max(0, top), behavior:'auto'});
 }
 function clearTourHighlight(){
   document.querySelectorAll('.tour-highlight').forEach(el=>el.classList.remove('tour-highlight'));
 }
+function highlightTourTarget(el){
+  el.classList.add('tour-highlight');
+  el.classList.remove('collapsed'); // shown open for the tour only; the next render keeps the user's choice
+}
+// Sample data for the tour: platoon A, every panel the steps point at has something in it. No
+// tourniquet is past the 45-minute notice, so the sandbox itself raises no alarm or vibration.
+function seedTourSandboxData(){
+  const now=Date.now();
+  const base={events:[], location:'בניין הדגמה', locDetail:'קומה 2', patientStatus:'in_treatment', siteId:'SITE_A', assignedPlatoonId:'PLT-A', trapStatus:'not_trapped', assignedMedicId:'USR-COHEN'};
+  patients.push(
+    {...base, id:'tour-r1', visualId:'P001', triage:'red', injury:'קטיעה', vitals:{pulse:122,spo2:93,rr:26,avpu:'V'}, lastVitalsAt:now-6*60000,
+      tourniquet:{appliedAt:now-35*60000, limb:'רגל ימין'}, tourniquets:[{id:'TQ-D1', limb:'rl', appliedAt:now-35*60000, status:'active'}]},
+    {...base, id:'tour-r2', visualId:'P002', triage:'red', injury:'חזה', vitals:{pulse:116,spo2:94,rr:28,avpu:'A'}, trapStatus:'trapped', lastVitalsAt:now-8*60000, assignedMedicId:'USR-LEVI'},
+    {...base, id:'tour-y1', visualId:'P003', triage:'yellow', injury:'אגן', vitals:null, needsFullAssessment:true, assessmentDebt:['missing_vitals'], flowMode:'quick', lastVitalsAt:null},
+    {...base, id:'tour-g1', visualId:'P004', triage:'green', injury:'חתכים', vitals:{pulse:84,spo2:99,rr:16,avpu:'A'}, lastVitalsAt:now-5*60000, assignedMedicId:'USR-LEVI'},
+    {...base, id:'tour-b1', visualId:'P005', triage:'yellow', injury:'כוויות', vitals:{pulse:98,spo2:97,rr:18,avpu:'A'}, lastVitalsAt:now-9*60000, siteId:'SITE_B', assignedPlatoonId:'PLT-B', assignedMedicId:null}
+  );
+  createMedicalResourceRequest({resourceType:'paramedic', urgency:'immediate', siteId:'SITE_A', targetLocation:'בניין הדגמה', reasonCodes:['red_patient','tourniquet'], linkedPatientIds:['tour-r1'], requestedByRole:'pc'});
+  createMedicalResourceRequest({resourceType:'doctor_death_cert', urgency:'high', siteId:'SITE_A', targetLocation:'בניין הדגמה', reasonCodes:['suspected_deceased'], requestedByRole:'medic'});
+  createResupplyRequest({items:[{item:'tourniquets', quantity:2}], linkedPatientId:'tour-r1', urgency:'high', reason:'manual_request'});
+}
+function startTourSandbox(){
+  _demoSandbox={snapshot:snapshotSandboxState(), screen:activeScreenId(), timers:[], tour:true, user:currentUser};
+  // The tour shows the local-demo view of the sample data: no signed-in identity, platoon filter or
+  // server list in the sandbox. currentUser comes back on exit (endTourSandbox).
+  currentUser=null;
+  patients=[]; reinforcementRequests=[]; pcReviews=[];
+  pcTruckStock={...PC_TRUCK_BASELINE}; companyStock={...COMPANY_STOCK_BASELINE};
+  medicIncidentAssignments={};
+  state=freshState();
+  allSites.forEach(s=>{ if(s.id!=='ALL') s.externalReports=[]; });
+  siteData={...emptySiteData(), name:'מוקד הדגמה', address:'כתובת הדגמה', eventType:'collapse', buildingType:'partial_collapse'};
+  ensureSiteReadiness();
+  seedTourSandboxData();
+}
+function endTourSandbox(){
+  if(!_demoSandbox || !_demoSandbox.tour) return;
+  const {snapshot, timers, user}=_demoSandbox;
+  timers.forEach(clearTimeout);
+  _demoSandbox=null;
+  closeAllOpenModals();
+  restoreSandboxState(snapshot);
+  currentUser=user;
+}
+function guidedTourRefusal(){
+  if(!currentUser) return '';
+  if(activeIncident) return 'הסיור זמין מחוץ לאירוע בלבד: במהלכו הטלפון לא מקבל עדכונים והתראות מהאירוע. צא למסך בחירת האירוע והפעל משם.';
+  if(!['pc','cc','admin'].includes(mapServerRole(currentUser.role))) return 'הסיור מיועד לחוג״ד ולמ״פ רפואה';
+  return '';
+}
+function canStartGuidedTour(){ return !_demoSandbox && !guidedTourRefusal(); }
 function startGuidedTour(){
   if(_demoSandbox){ toast('סיים קודם את ההדגמה'); return; }
-  _guidedTour={index:0, screen:activeScreenId(), role:activeRoleDashboard};
+  const refusal=guidedTourRefusal();
+  if(refusal){ toast(refusal); return; }
+  const signedInRole=currentUser ? mapServerRole(currentUser.role) : null;
+  const steps=['pc','cc'].includes(signedInRole) ? GUIDED_TOUR_STEPS.filter(s=>s.role===signedInRole) : GUIDED_TOUR_STEPS.slice();
+  const origin={screen:activeScreenId(), role:activeRoleDashboard, tab:commandPanelTab, signedInRole};
+  startTourSandbox();
+  _guidedTour={steps, index:0, origin, skipped:[]};
   // Dashboards re-render on their own refresh cycles, which drops the highlight - re-apply it.
   _guidedTour.timer=setInterval(()=>{
     if(!_guidedTour || document.querySelector('.tour-highlight')) return;
-    findTourTarget(GUIDED_TOUR_STEPS[_guidedTour.index])?.classList.add('tour-highlight');
+    const el=findTourTarget(_guidedTour.steps[_guidedTour.index]);
+    if(tourTargetVisible(el)) highlightTourTarget(el);
   },1000);
-  showGuidedTourStep();
+  showGuidedTourStep(1);
 }
-function showGuidedTourStep(){
+// dir: 1 forward, -1 back. A step whose panel is missing or not visible is skipped in that direction.
+function showGuidedTourStep(dir=1){
   if(!_guidedTour) return;
-  const step=GUIDED_TOUR_STEPS[_guidedTour.index];
-  if(activeScreenId()!=='role-dashboard' || activeRoleDashboard!==step.role) startRoleDashboard(step.role);
-  clearTourHighlight();
-  const target=findTourTarget(step);
-  if(target){
-    target.classList.add('tour-highlight');
-    target.scrollIntoView({block:'center', behavior:'smooth'});
+  const steps=_guidedTour.steps;
+  while(_guidedTour.index>=0 && _guidedTour.index<steps.length){
+    const step=steps[_guidedTour.index];
+    // Render every step from the sandbox data: the screen open when the tour started was drawn from
+    // the phone's own state (for a signed-in CC, the all-incidents view).
+    if(activeScreenId()!=='role-dashboard') startRoleDashboard(step.role);
+    else{ activeRoleDashboard=step.role; renderRoleDashboard(step.role); }
+    setCommandPanelTab(step.tab);
+    clearTourHighlight();
+    const target=findTourTarget(step);
+    if(tourTargetVisible(target)){
+      highlightTourTarget(target);
+      scrollTourTarget(target);
+      const card=document.getElementById('guided-tour-card');
+      if(!card) return;
+      card.style.display='block';
+      document.getElementById('guided-tour-count').textContent=`${_guidedTour.index+1} / ${steps.length}`;
+      document.getElementById('guided-tour-title').textContent=step.title;
+      document.getElementById('guided-tour-text').textContent=step.text;
+      document.getElementById('guided-tour-prev').disabled=_guidedTour.index===0;
+      document.getElementById('guided-tour-next').textContent=_guidedTour.index===steps.length-1?'סיום':'הבא';
+      return;
+    }
+    if(!_guidedTour.skipped.includes(step.title)) _guidedTour.skipped.push(step.title);
+    console.warn('guided tour: panel not shown, step skipped', step.role, step.tab, step.key||step.section);
+    _guidedTour.index+=dir;
   }
-  const card=document.getElementById('guided-tour-card');
-  if(!card) return;
-  card.style.display='block';
-  document.getElementById('guided-tour-count').textContent=`${_guidedTour.index+1} / ${GUIDED_TOUR_STEPS.length}`;
-  document.getElementById('guided-tour-title').textContent=step.title;
-  document.getElementById('guided-tour-text').textContent=step.text+(target?'':' (האזור לא מוצג כרגע במסך הזה)');
-  document.getElementById('guided-tour-prev').disabled=_guidedTour.index===0;
-  document.getElementById('guided-tour-next').textContent=_guidedTour.index===GUIDED_TOUR_STEPS.length-1?'סיום':'הבא';
+  if(_guidedTour.index<0){ _guidedTour.index=0; return; }
+  endGuidedTour();
 }
 function guidedTourNext(){
   if(!_guidedTour) return;
-  if(_guidedTour.index>=GUIDED_TOUR_STEPS.length-1) return endGuidedTour();
-  _guidedTour.index++; showGuidedTourStep();
+  if(_guidedTour.index>=_guidedTour.steps.length-1) return endGuidedTour();
+  _guidedTour.index++; showGuidedTourStep(1);
 }
 function guidedTourPrev(){
   if(!_guidedTour || _guidedTour.index===0) return;
-  _guidedTour.index--; showGuidedTourStep();
+  _guidedTour.index--; showGuidedTourStep(-1);
 }
 function endGuidedTour(){
   if(!_guidedTour) return;
-  const {screen, role, timer}=_guidedTour;
+  const {origin, timer}=_guidedTour;
   clearInterval(timer);
   _guidedTour=null;
   clearTourHighlight();
   const card=document.getElementById('guided-tour-card');
   if(card) card.style.display='none';
-  activeRoleDashboard=role;
-  goTo(screen||'role-dashboard');
+  endTourSandbox();
+  if(origin.signedInRole==='pc'){ openIncidentPicker(); }
+  else if(origin.signedInRole==='cc'){ enterCcAllIncidentsView(); }
+  else{
+    activeRoleDashboard=origin.role;
+    goTo(origin.screen||'demo');
+    if(origin.screen==='role-dashboard') setCommandPanelTab(origin.tab||'overview');
+    commandPanelTab=origin.tab||'overview';
+  }
+  // Nothing was pushed or pulled while the tour ran: catch up now instead of waiting for the timers.
+  if(currentUser){
+    try{ syncPush(); }catch(e){ console.error(e); }
+    try{ pollIncidentOpenAlerts(); }catch(e){ console.error(e); }
+  }
 }
 function startPcDemo(screen){
   goTo(screen);
@@ -7085,7 +7192,7 @@ function renderCollapsibleSection(key,title,html,count=0,options={}){
   const criticalCount=Number(options.criticalCount||0);
   const collapsed=criticalCount>0?false:isDashboardSectionCollapsed(key);
   const body=html || renderOperationalEmptyState(options.emptyMessage||'אין פריטים להצגה');
-  return `<div class="role-section ${collapsed?'collapsed':''}">
+  return `<div class="role-section ${collapsed?'collapsed':''}" data-section="${key}">
     <div class="role-section-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
       <span>${title} · ${count}</span>
       <button class="demo-mini-btn" onclick="toggleDashboardSection('${key}')">${collapsed?'פתח':'כווץ'}${criticalCount?` · קריטי ${criticalCount}`:''}</button>
@@ -15878,7 +15985,8 @@ function renderCcOverviewPanel(){
   const pick='<div class="role-row"><div class="role-row-title">בחר אירוע</div><div class="role-row-sub">הקש על אירוע בטבלאות בלשונית תמונת מצב כדי לראות את הפצועים, ההתראות והבקשות שלו.</div></div>';
   const panels={
     overview:`${roleSection('כל האירועים — פצועים לפי מיון', renderAllIncidentsTriageTable())}
-      <button class="demo-mini-btn" style="width:100%;margin-top:4px" onclick="openIncidentPicker()">רשימת אירועים · פתיחה ומיזוג כפילויות</button>`,
+      <button class="demo-mini-btn" style="width:100%;margin-top:4px" onclick="openIncidentPicker()">רשימת אירועים · פתיחה ומיזוג כפילויות</button>
+      ${canStartGuidedTour()?'<button class="demo-mini-btn" style="width:100%;margin-top:8px;min-height:48px" data-guided-tour-start onclick="startGuidedTour()">סיור מודרך במסך הפיקוד (נתוני הדגמה)</button>':''}`,
     action:pick,
     forces:pick+(canManagePlatoonRoster()?roleSection('פלוגות ומחלקות — שיבוץ', '<div id="platoon-roster-panel" style="font-size:13px;color:var(--muted)">טוען…</div>'):''),
     supply:pick
@@ -16965,6 +17073,8 @@ async function refreshIncidentPicker(){
   renderIncidentContext();
 }
 function renderIncidentPicker(){
+  const tourPanel=document.getElementById('incident-picker-tour');
+  if(tourPanel) tourPanel.style.display=canStartGuidedTour()?'':'none';
   const list=document.getElementById('incident-picker-list');
   if(!list) return;
   const errEl=document.getElementById('incident-picker-error');
