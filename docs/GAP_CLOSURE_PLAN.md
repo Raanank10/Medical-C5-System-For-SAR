@@ -957,7 +957,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-41 Banner: patient to / at the נאפ"ל | P2 | Done (V2.99.79), no SQL | this PR | owner 2026-11-18/19; send + arrival, medic / paramedic / physician, open or close, 15 s |
 | WP-42 Medic asks to close their site | P2 | Not started, design questions | | from WP-28; spec v1.2 Medic Site Close Rule |
 | WP-38 Resupply raises the medic's bag | P2 | Done (V2.99.74): `database/082` applied live by the owner, `sync-log` v18 deployed 2026-11-18; live two-phone check pending | #132 | owner 2026-11-18: the medic confirms, by what arrived; the PC's / logistics' "delivered" = handed over, waiting for the medic |
-| WP-43 Guided tour hidden panels | P2 | Done in this PR (V2.99.94), no SQL | this PR | owner 2026-11-26: sandbox with sample data; signed in only when the server said within 2 min that no incident is open (PC picker, CC all-incidents view), 3-minute cap, ends on screen lock, sync on exit; 7 PC + 6 CC steps, tab-aware, invisible panels skipped and logged; `browser_guided_tour_test.js` |
+| WP-43 Guided tour hidden panels | P2 | Done (V2.99.94), no SQL | #165 | owner 2026-11-26: sandbox with sample data; signed in only when the server said within 2 min that no incident is open (PC picker, CC all-incidents view), 3-minute cap, ends on screen lock, sync on exit; 7 PC + 6 CC steps, tab-aware, invisible panels skipped and logged; `browser_guided_tour_test.js` |
 | WP-44 RPC / RCC tour | P3 | Not started, after WP-43 | | max 5 steps each, same engine |
 | WP-45 Role intro | P3 | Not started, 2 owner questions | | owner 2026-11-23; one source in `ROLE_DEFS`, medic first, no server change |
 

@@ -228,7 +228,7 @@ async function checkFile(browser, file) {
   await pc.page.click('#medic-assign-modal button:has-text("שייך לאירוע")');
   await pc.page.waitForTimeout(400);
   const toasts = await pc.page.evaluate(() => window.__toasts);
-  assert(toasts.some((x) => x.includes('החובש הוחלף באתר הזה') && x.includes('חמ"ל')), `${rel}: a refused re-assign must say why in Hebrew (got ${JSON.stringify(toasts)})`);
+  assert(toasts.some((x) => x.includes('החובש הוחלף באתר הזה') && x.includes('חמ״ל רפואי')), `${rel}: a refused re-assign must say why in Hebrew (got ${JSON.stringify(toasts)})`);
   state = await db();
   const inc1r = state.incidents.find((i) => i.id === INC1);
   assert(inc1r.metadata.medic_assignments[MEDIC].note === 'כניסה משער צפוני', `${rel}: a refused re-assign must take its note back (got ${inc1r.metadata.medic_assignments[MEDIC].note})`);

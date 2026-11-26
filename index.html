@@ -2118,7 +2118,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div class="modal-overlay panic-modal hidden" id="trap-status-modal" onclick="closeTrapStatusModal(event)">
   <div class="modal-sheet panic-sheet" style="border-color:var(--yellow);box-shadow:0 22px 90px rgba(244,162,97,.2)">
     <div class="panic-title" style="color:var(--yellow)">סטטוס חילוץ אחרון</div>
-    <div class="panic-message">בחר מצב בינארי לפני סגירה: לכוד או לא לכוד. אם אין זמן, ניתן לשמור כחסר נתון והחמ״ל רפואי יראה שיש לקחת מדדים.</div>
+    <div class="panic-message">בחר מצב בינארי לפני סגירה: לכוד או לא לכוד. אם אין זמן, ניתן לשמור כחסר נתון והחמ״ל הרפואי יראה שיש לקחת מדדים.</div>
     <div class="tap-grid tap-grid-2">
       <button class="tap-btn" onclick="confirmTrapStatus('trapped')"><span class="icon">⛓️</span><div style="font-weight:800">לכוד</div></button>
       <button class="tap-btn" onclick="confirmTrapStatus('not_trapped')"><span class="icon">🚶</span><div style="font-weight:800">לא לכוד</div></button>
@@ -5861,7 +5861,7 @@ async function assignRealMedic(profileId, address, note){
     }catch(_){}
     // A relieved medic: only his PC, the CC, chamal or admin give him access back (database/096).
     if(mem.error.code==='42501' && /access back/.test(mem.error.message||'')){
-      throw new Error('החובש הוחלף באתר הזה. רק החוג"ד שלו, מ״פ רפואה, חמ"ל או מנהל מערכת יכולים להחזיר לו גישה');
+      throw new Error('החובש הוחלף באתר הזה. רק החוג"ד שלו, מ״פ רפואה, חמ״ל רפואי או מנהל מערכת יכולים להחזיר לו גישה');
     }
     throw mem.error;
   }
@@ -8001,7 +8001,7 @@ function renderSweepBoardForPc(){
   const completed=sweepSessionsForBoard().map(s=>roleRow(
     `הושלמה · ${s.zone}`,
     `${s.medicName} · ${s.casualtyCountInSweep} פצועים · אדום ${s.counts?.red||0} · צהוב ${s.counts?.yellow||0} · ירוק ${s.counts?.green||0} · שחור ${s.counts?.black||0} · לכודים ${s.trapped} · לא ניידים ${s.immobile||0} · חסמים ${s.tourniquets} · נתיבי אוויר ${s.airwayInterventions||0} · חסר מדדים ${s.missingFullVitals} · זהות לא ידועה ${s.unknownIdentity||0} · ציוד: ${supplyGaps}${s.arrivalToSweepCompletionMinutes!==null&&s.arrivalToSweepCompletionMinutes!==undefined?' · זמן מהגעה '+s.arrivalToSweepCompletionMinutes+' דק׳':''}`,
-    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><button class="demo-mini-btn" onclick="demoReassignWithinPlatoon()">שייך חובש למעקב</button><button class="demo-mini-btn" onclick="openReinforcementRequest()">בקש תגבור רפואי</button><button class="demo-mini-btn" onclick="openReinforcementRequest()">בקש פראמדיק</button><button class="demo-mini-btn" onclick="toast('בקשת פינוי נרשמה לחמ״ל רפואי')">בקש פינוי</button><button class="demo-mini-btn" onclick="toast('מעבר לשלב מעקב אושר')">אשר מעבר לשלב מעקב</button><button class="demo-mini-btn" onclick="showRoleDrilldown('patients')">פתח רשימת פצועים באזור</button></div>`
+    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><button class="demo-mini-btn" onclick="demoReassignWithinPlatoon()">שייך חובש למעקב</button><button class="demo-mini-btn" onclick="openReinforcementRequest()">בקש תגבור רפואי</button><button class="demo-mini-btn" onclick="openReinforcementRequest()">בקש פראמדיק</button><button class="demo-mini-btn" onclick="toast('בקשת פינוי נרשמה לחמ״ל הרפואי')">בקש פינוי</button><button class="demo-mini-btn" onclick="toast('מעבר לשלב מעקב אושר')">אשר מעבר לשלב מעקב</button><button class="demo-mini-btn" onclick="showRoleDrilldown('patients')">פתח רשימת פצועים באזור</button></div>`
   )).join('');
   return roleSection('סריקות MSTART פעילות / הושלמו', activeRows + completed || roleRow('אין סריקות MSTART פעילות','כאשר חובש יסיים סריקה, תופיע כאן תמונת הסריקה וחוב ההערכה.'));
 }
