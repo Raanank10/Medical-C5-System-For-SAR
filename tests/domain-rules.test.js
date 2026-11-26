@@ -638,6 +638,13 @@ assert.deepEqual(rules.RESCUE_PRIORITIES, ["urgent", "pending", "not_urgent"]);
   const tq = { at: T, source: "tq:left_leg:123", review: { m: "treated" } };
   assert.equal(rules.mergeMarchReviews([tq, { at: T + 1, source: "A", review: { m: "clear" } }]).m, "treated");
   assert.equal(rules.mergeMarchReviews([tq, { at: T + 1, source: "A", review: { m: "effective" }, seen: { m: { "tq:left_leg:123": T } } }]).m, "effective");
+  // Aliases: a reassessment that saw the tourniquet under its limb + minute name still covers it once
+  // its event key is known; seen records both names.
+  const tqEv = { at: 0, source: "tq:dev1:local-1", aliases: ["tq:right_leg:999"], review: { m: "treated" } };
+  assert.equal(rules.mergeMarchReviews([tqEv, { at: T, source: "B", review: { m: "effective" }, seen: { m: { "tq:right_leg:999": 0 } } }]).m, "effective");
+  assert.deepEqual(rules.marchSeenFrom([tqEv]), { m: { "tq:dev1:local-1": 0, "tq:right_leg:999": 0 } });
+  // A seen map's inherited keys never count.
+  assert.equal(rules.mergeMarchReviews([{ at: 0, source: "constructor", review: { m: "treated" } }, { at: T, source: "B", review: { m: "effective" }, seen: { m: {} } }]).m, "treated");
   // PAWS letters keep plain newest-wins.
   assert.equal(rules.mergeMarchReviews([{ at: T, source: "A", review: { s: "treated" } }, { at: T + 1, source: "B", review: { s: "clear" } }]).s, "clear");
   // marchSeenFrom: latest treated stamp per source per MARCH letter.

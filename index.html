@@ -3439,19 +3439,24 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   // A casualty's review is built from every MARCH-PAWS save on every phone (the New Patient form's
   // march_review, then each later "טיפולים MARCH-PAWS" save, which carries only the letters touched
   // then), plus M treatments the phone knows from elsewhere (an active tourniquet, recorded continued
-  // bleeding). Per letter the newest documented value wins, so a later treatment reopens a letter
-  // that was effective and a reassessment closes one that was treated.
+  // bleeding). For PAWS letters the newest documented value wins; MARCH letters follow the rule below.
   // For MARCH letters (owner 2026-11-25, "treated wins across phones"): a treatment is closed only by
   // a reassessment from the same source stamped after it (one clock), or by one whose `seen` says it
   // knew that treatment. Phone clocks are never compared across sources, so a phone with a fast clock or
   // one that was offline and never saw the treatment cannot hide it.
-  // Entries: {at: ms, review, source?, seen?}. `source` names whose clock `at` is (a phone id, or a
-  // stable key for a tourniquet / bleeding record); `seen` is {letter: {source: latest treated at}}.
+  // Entries: {at: ms, review, source?, seen?, aliases?}. `source` names whose clock `at` is (a phone
+  // id, or a stable key for a tourniquet / bleeding record); `seen` is {letter: {source: latest
+  // treated at}}. PAWS letters keep plain newest-wins.
+  // A treatment may also carry `aliases`: other names the same treatment had on some phone (a
+  // tourniquet's limb + minute before its event key was known), so a reassessment that saw it under
+  // that name still covers it.
   function marchEntryCovers(closer, treated, letter) {
-    if (closer.source === treated.source && closer.at >= treated.at) return true;
     const seen = closer.seen && closer.seen[letter];
-    const t = seen && typeof seen === "object" ? Number(seen[treated.source]) : NaN;
-    return Number.isFinite(t) && t >= treated.at;
+    return [treated.source, ...treated.aliases].some((source) => {
+      if (closer.source === source && closer.at >= treated.at) return true;
+      const t = seen && typeof seen === "object" && Object.prototype.hasOwnProperty.call(seen, source) ? Number(seen[source]) : NaN;
+      return Number.isFinite(t) && t >= treated.at;
+    });
   }
   function normalizeMarchEntries(entries) {
     const list = [];
@@ -3461,7 +3466,8 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
       if (!Number.isFinite(at) || !review || typeof review !== "object") return;
       const source = entry.source === undefined || entry.source === null ? "" : String(entry.source);
       const seen = entry.seen && typeof entry.seen === "object" ? entry.seen : null;
-      list.push({ at, review, source, seen });
+      const aliases = Array.isArray(entry.aliases) ? entry.aliases.filter((a) => typeof a === "string" && a && a !== source) : [];
+      list.push({ at, review, source, seen, aliases });
     });
     return list;
   }
@@ -3502,7 +3508,9 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
       MARCH_LETTERS.forEach((id) => {
         if (entry.review[id] !== "treated") return;
         const bySource = seen[id] || (seen[id] = {});
-        if (bySource[entry.source] === undefined || entry.at > bySource[entry.source]) bySource[entry.source] = entry.at;
+        [entry.source, ...entry.aliases].forEach((source) => {
+          if (bySource[source] === undefined || entry.at > bySource[source]) bySource[source] = entry.at;
+        });
       });
     });
     return seen;
@@ -10667,8 +10675,12 @@ function markSweepTourniquetEffectiveness(tourniquetId, effectiveness){
 // minutes (D1: the server rule is authoritative); the same 30 is sent here so a check does not
 // stretch the server's cadence to its 60-minute default.
 function queueTourniquetReassessment(p, tq, effectiveness){
+  // WP-31: each "bleeding continues" is its own M treatment, keyed by this check's event so every
+  // phone names it the same way (the server row's last_reassessed_event_id) and a new one reopens M.
+  const leid=`local-${Date.now()}-${uid()}`;
+  if(tq) tq.bleedEventKey=effectiveness==='bleeding_continues' ? `${getDeviceId()}:${leid}` : null;
   if(!tq?.serverLimb) return;
-  saveLocalEvent({type:'TOURNIQUET_REASSESSMENT',detail:`${p.visualId||p.id} · ${tq.id} · ${effectiveness==='bleeding_continues'?'דימום ממשיך':'דימום נשלט'}`,
+  saveLocalEvent({type:'TOURNIQUET_REASSESSMENT',local_event_id:leid,detail:`${p.visualId||p.id} · ${tq.id} · ${effectiveness==='bleeding_continues'?'דימום ממשיך':'דימום נשלט'}`,
     warn:effectiveness==='bleeding_continues',patient_id:p.id,
     payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb:tq.serverLimb,tourniquet_status:effectiveness==='bleeding_continues'?'bleeding_continues':'effective',
       effectiveness,clinical_context:'unknown',next_reassessment_interval_minutes:30}});
@@ -13366,7 +13378,14 @@ function toggleMarchReassess(id){
   saveActiveRecoveryState('step7');
 }
 function marchReviewFromState(){
-  return Object.fromEntries(MARCH_PAWS_SECTIONS.map(sec=>[sec.id, marchSectionStatus(sec)]));
+  return Object.fromEntries(MARCH_PAWS_SECTIONS.map(sec=>{
+    const status=marchSectionStatus(sec);
+    // WP-31: a tourniquet is its own M treatment (marchSyntheticEntries), so its "דימום נשלט" check can
+    // close it. An M treated only by tourniquets is not also recorded here as "treated", or that copy
+    // would stay open after the check. Reassessed, it is recorded ("effective" with march_seen).
+    if(sec.id==='m' && status==='treated' && !sec.keys.some(k=>k!=='tourniquet' && state.interventions.has(k))) return [sec.id, null];
+    return [sec.id, status];
+  }));
 }
 function toggleMarchClear(btn, id){
   const sec=MARCH_PAWS_SECTIONS.find(s=>s.id===id);
@@ -13499,7 +13518,7 @@ function localMarchReviews(p){
 // every phone (the server row's applied_event_id leads back to it) and unchanged when its time or limb
 // is corrected, so a correction does not reopen M. Its own check counts as the reassessment:
 // "דימום נשלט" (effective, synced as tourniquet_status) closes it on every phone; "bleeding
-// continues" keeps it open until it is checked again or M is reassessed after it. Recorded active
+// continues" (each check its own key) keeps it open until it is checked again or M is reassessed after it. Recorded active
 // bleeding with no tourniquet behind it is this phone's own record (other phones do not see it).
 // A tourniquet whose event cannot be traced yet falls back to limb + applied minute (safe: M stays
 // open until a reassessment that saw that key).
@@ -13511,6 +13530,7 @@ function marchTqIdentity(tq){
   if(!tq.appliedDeviceId && tq.source!=='server') tq.appliedDeviceId=getDeviceId();
   return tq;
 }
+function marchTqFallbackKey(t){ return `tq:${t.limb||'?'}:${marchTqMinute(t.appliedAt)}`; }
 function marchTqKey(t){
   if(t.source==='server'){
     const k=t.appliedEventId && MARCH_TQ_EVENT_KEYS.get(t.appliedEventId);
@@ -13518,18 +13538,36 @@ function marchTqKey(t){
   } else if(t.appliedLocalEventId){
     return `tq:${t.appliedDeviceId||getDeviceId()}:${t.appliedLocalEventId}`;
   }
-  return `tq:${t.limb||'?'}:${marchTqMinute(t.appliedAt)}`;
+  return marchTqFallbackKey(t);
 }
+// The newest "bleeding continues" check on a tourniquet, by its event.
+function marchBleedKey(t){
+  if(t.source==='server'){
+    const k=t.lastCheckEventId && MARCH_TQ_EVENT_KEYS.get(t.lastCheckEventId);
+    if(k) return `bleed:${k}`;
+  } else if(t.bleedEventKey){
+    return `bleed:${t.bleedEventKey}`;
+  }
+  return `bleed:${marchTqKey(t)}`;
+}
+// Stamped 0: the key alone names the treatment, so a later time correction (owner 2026-11-26) cannot
+// move it past what a reassessment saw. The limb + minute name is an alias, so a reassessment saved
+// before this phone knew the event key (offline cold start) still covers it.
 function marchSyntheticEntries(p){
   const out=[];
   let tqBleeding=false;
   activeTourniquets(p||{}).forEach(t=>{
-    if(t.effectiveness==='effective' && t.status!=='ineffective') return; // "דימום נשלט" closes it
-    const key=marchTqKey(t);
     const bleeding=t.status==='ineffective' || t.effectiveness==='bleeding_continues';
-    if(bleeding) tqBleeding=true;
-    // Bleeding continues: its own source, stamped 0 so any reassessment that saw it closes it.
-    out.push({at:Number(t.appliedAt)||0, source:bleeding?`bleed:${key}`:key, review:{m:'treated'}});
+    const key=marchTqKey(t);
+    // "דימום נשלט" (owner 2026-11-26) is this tourniquet's reassessment: M documented as effective for
+    // it. It covers nothing else (no seen), so a dressing still waiting for its reassessment stays open.
+    if(t.effectiveness==='effective' && !bleeding){ out.push({at:0, source:`tqcheck:${key}`, review:{m:'effective'}}); return; }
+    const fallback=marchTqFallbackKey(t);
+    out.push({at:0, source:key, aliases:fallback!==key?[fallback]:[], review:{m:'treated'}});
+    if(bleeding){
+      tqBleeding=true;
+      out.push({at:0, source:marchBleedKey(t), review:{m:'treated'}});
+    }
   });
   if(p && !tqBleeding && (p.hemorrhageControl?.status==='bleeding_continues' || p.activeBleeding)){
     const at=Number(p.hemorrhageControl?.lastCheckedAt)||0;
@@ -14098,7 +14136,7 @@ function renderSummary(){
     <div class="summary-row"><span class="summary-key">פציעה</span><span class="summary-val">${state.injury||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">מצב</span><span class="summary-val">${STATUS_LABELS[state.patientStatus]||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">טיפולים שניתנו</span><span class="summary-val">${intStr||'ללא'}</span></div>
-    ${state.flowMode!=='quick' && state.triage!=='black'?`<div class="summary-row" style="align-items:flex-start"><span class="summary-key">MARCH-PAWS</span><span class="summary-val" style="font-size:12px;line-height:1.7">${marchReviewSummaryHtml(marchReviewFromState())}</span></div>`:''}
+    ${state.flowMode!=='quick' && state.triage!=='black'?`<div class="summary-row" style="align-items:flex-start"><span class="summary-key">MARCH-PAWS</span><span class="summary-val" style="font-size:12px;line-height:1.7">${marchReviewSummaryHtml(marchShownReview())}</span></div>`:''}
     <div class="summary-row"><span class="summary-key">מלאי אישי</span><span class="summary-val"><button class="demo-mini-btn" style="padding:7px 10px;margin:0" onclick="showOwnInventory()">הצג מלאי שלי</button> <button class="demo-mini-btn" style="padding:7px 10px;margin:0" onclick="restockMedicBag()">התיק חודש</button></span></div>
     <div class="summary-row" style="align-items:flex-start"><span class="summary-key">העברה לא מקוונת</span><span class="summary-val"><textarea id="offline-transport-payload" readonly style="height:68px;direction:ltr;font-family:var(--mono);font-size:10px;margin-bottom:8px">${lastTacticalPayload}</textarea><button class="demo-mini-btn" style="padding:7px 10px;margin:0" onclick="copyTacticalDataString()">העתק payload</button></span></div>
     <div class="summary-row"><span class="summary-key">חתימת טיפול</span><span class="summary-val device-id">${deviceId}</span></div>
@@ -18257,10 +18295,12 @@ function applyRescuePatientBoard(rows, incidentId){
 // Active tourniquets from the server (tourniquets table, RLS-scoped by app.can_access_incident).
 // Applied only to patients this device received from another device: a patient created here
 // keeps its own, richer tourniquet records (effectiveness, later limb correction, notes).
-const SERVER_TOURNIQUET_COLUMNS='id,patient_id,limb,applied_at,is_active,tourniquet_status,applied_event_id';
+const SERVER_TOURNIQUET_COLUMNS='id,patient_id,limb,applied_at,is_active,tourniquet_status';
 // How the start time was set (database/081): 'phone', 'entered' (from the body, with when it was
 // entered) or 'unknown' (already on the patient, no time yet).
-const SERVER_TOURNIQUET_TIME_COLUMNS='id,time_source,time_entered_at';
+// WP-31: the events behind a row (application, newest check) give its MARCH key on every phone. Read
+// here, not in the main select, so a problem with them never stops the tourniquets themselves.
+const SERVER_TOURNIQUET_TIME_COLUMNS='id,time_source,time_entered_at,applied_event_id,last_reassessed_event_id';
 // One patient's active tourniquets from server rows (SERVER_TOURNIQUET_COLUMNS).
 function serverTourniquetRecords(rows, patientId, timeMeta=null){
   const metaById=new Map((timeMeta||[]).map(m=>[m.id, m]));
@@ -18269,9 +18309,9 @@ function serverTourniquetRecords(rows, patientId, timeMeta=null){
     // tourniquet_status comes from TOURNIQUET_REASSESSMENT (effectiveness check, V2.99.42).
     const effectiveness=r.tourniquet_status==='bleeding_continues'?'bleeding_continues':r.tourniquet_status==='effective'?'effective':'unknown';
     const tq={id:`SRV-${r.id}`, appliedAt:Date.parse(r.applied_at)||null, limb:meta.key, limbLabel:meta.label, side:meta.side, bodyPart:meta.bodyPart,
-      appliedBy:'(מכשיר אחר)', source:'server', status:effectiveness==='bleeding_continues'?'ineffective':'active', effectiveness, reasonForAdditional:null, note:'',
-      appliedEventId:r.applied_event_id||null};
+      appliedBy:'(מכשיר אחר)', source:'server', status:effectiveness==='bleeding_continues'?'ineffective':'active', effectiveness, reasonForAdditional:null, note:''};
     const time=metaById.get(r.id);
+    if(time){ tq.appliedEventId=time.applied_event_id||null; tq.lastCheckEventId=time.last_reassessed_event_id||null; }
     if(time && ['phone','entered','unknown'].includes(time.time_source)){
       tq.timeSource=time.time_source;
       tq.timeUnknown=time.time_source==='unknown';
@@ -18425,8 +18465,8 @@ function applyRemoteTreatments(rows){
 // sends one as NOTE_ADDED (kind march_review). Read them from events (RLS decides who sees what),
 // so the PC's debt row and the patient card show the letters another phone documented. Values
 // other than treated / effective / clear are dropped by C5Rules.mergeMarchReviews.
-// Only the review and the note's kind leave the server (PostgREST JSON paths), not the rest of the
-// create payload or a note's text.
+// From the payload only the review, march_seen and the note's kind leave the server (PostgREST JSON
+// paths), not the rest of the create payload or a note's text.
 // actor_role is bound to the writer's profile role (database/075), so only reviews written by a
 // role that records treatments count (NOTE_ADDED is also open to cc, chamal, logistics and the
 // rescue chain). march_seen says which treatments a closing save had seen (owner 2026-11-25).
@@ -18451,9 +18491,10 @@ async function pullRemoteMarchReviews(incidentId){
   if(!currentUser) return;
   const client=getSupabaseClient();
   if(!client) return;
-  // Each tourniquet's key on every phone is its TOURNIQUET_APPLIED event (device + local id); the
-  // server row's applied_event_id points at that event's id.
-  const tq=await pullEventPages(()=>client.from('events').select('id,device_id,local_event_id').eq('incident_id', incidentId).eq('type','TOURNIQUET_APPLIED').order('id'));
+  // Each tourniquet's key on every phone is its TOURNIQUET_APPLIED event (device + local id), and its
+  // newest "bleeding continues" its TOURNIQUET_REASSESSMENT; the server row's applied_event_id /
+  // last_reassessed_event_id point at those events' ids.
+  const tq=await pullEventPages(()=>client.from('events').select('id,device_id,local_event_id').eq('incident_id', incidentId).in('type',['TOURNIQUET_APPLIED','TOURNIQUET_REASSESSMENT']).order('id'));
   let newKeys=false;
   (tq?.rows||[]).forEach(row=>{
     if(!row?.id || !row.device_id || !row.local_event_id) return;
@@ -18507,6 +18548,7 @@ function applyRemoteMarchReviews(rows, opts={}){
       const ids=new Set(next.map(e=>e.id));
       next=[...(p.remoteMarchReviews||[]).filter(e=>e.source && !ids.has(e.id)), ...next];
     }
+    const once=new Set(); next=next.filter(e=>!e.id || (once.has(e.id) ? false : once.add(e.id))); // a page boundary can repeat a row
     next=next.sort((a,b)=>a.at-b.at);
     if(JSON.stringify(p.remoteMarchReviews||[])===JSON.stringify(next)) return;
     p.remoteMarchReviews=next;

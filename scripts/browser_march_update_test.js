@@ -118,8 +118,8 @@ async function main() {
     assert(tq && tq.payload.limb === 'left_arm' && tq.payload.source === 'march_update', `the new tourniquet is sent, got ${JSON.stringify(tq?.payload)}`);
     assert(saved.tqs.join() === 'TQ-001:left_leg,TQ-002:left_arm', `the tourniquet is added to the casualty's list, got ${saved.tqs}`);
     const note = saved.events.find((e) => e.type === 'NOTE_ADDED');
-    assert(note && note.payload.kind === 'march_review' && note.payload.march_review.h === 'clear' && note.payload.march_review.r === 'treated' && note.payload.march_review.m === 'treated' && note.payload.march_review.w === null,
-      `the per-letter review is sent as a NOTE_ADDED, got ${JSON.stringify(note?.payload)}`);
+    assert(note && note.payload.kind === 'march_review' && note.payload.march_review.h === 'clear' && note.payload.march_review.r === 'treated' && note.payload.march_review.m === null && note.payload.march_review.w === null,
+      `the per-letter review is sent as a NOTE_ADDED (a tourniquet alone is its own M treatment, not "treated" in the review), got ${JSON.stringify(note?.payload)}`);
     assert(saved.history && saved.history.includes('חבישה אוטמת לחזה'), `the patient card history shows the treatment, got ${saved.history}`);
 
     // 4. Back without saving: nothing clinical sent, back on the card.
@@ -289,7 +289,7 @@ async function main() {
       const last = p.marchReviews[p.marchReviews.length - 1];
       return { closedByCheck, m: patientMarchReview(p).m, sawB: !!note.payload_json.march_seen?.m?.['phone-b'], stampEq: Date.parse(note.local_timestamp) === last.at };
     }, CHILD);
-    assert(snap.closedByCheck !== 'treated' || false, `"דימום נשלט" on every tourniquet closes their M treatments, got ${snap.closedByCheck}`);
+    assert(snap.closedByCheck !== 'treated', `"דימום נשלט" on every tourniquet closes their M treatments, got ${snap.closedByCheck}`);
     assert(!snap.sawB && snap.m === 'treated', `a treatment that arrived after the screen opened stays open, got ${JSON.stringify(snap)}`);
     assert(snap.stampEq, 'the local review is stamped with its NOTE_ADDED local_timestamp');
 
@@ -318,6 +318,57 @@ async function main() {
     });
     assert(tqKey.sameEvent && tqKey.local === tqKey.remote, `a tourniquet has one key on every phone, got ${JSON.stringify(tqKey)}`);
     assert(tqKey.before === 'effective' && tqKey.after === 'effective' && tqKey.second === 'treated', `a correction keeps M closed, a new tourniquet reopens it, got ${JSON.stringify(tqKey)}`);
+
+    // Round 3 (owner 2026-11-26): "דימום נשלט" closes a tourniquet entered through a MARCH-PAWS save;
+    // a later time correction keeps M closed; an offline reassessment (limb + minute name) still covers
+    // the tourniquet once its event key is known; a repeat "bleeding continues" reopens M; the server
+    // row's event ids come from the side query.
+    const r3 = await page.evaluate(() => {
+      const out = {};
+      const p = { id: 'r3-1', visualId: 'P-R3', triage: 'red', patientStatus: 'observing', tourniquets: [], marchReviews: [] };
+      patients.push(p);
+      const tq = { id: 'TQ-001', limb: 'right_leg', appliedAt: Date.now() - 600000, status: 'active', serverLimb: 'right_leg' };
+      p.tourniquets.push(tq); queueTourniquetAppliedEvent(p, tq, { source: 'march_update' });
+      p.marchReviews.push({ at: Date.now(), source: getDeviceId(), review: { m: null, a: 'clear' }, seen: {} }); // a MARCH save that added only the tourniquet
+      out.open = patientMarchReview(p).m;
+      tq.effectiveness = 'effective'; queueTourniquetReassessment(p, tq, 'effective');
+      out.checked = patientMarchStatus(p).letters.m;
+      // A dressing waiting for reassessment is not hidden by the tourniquet check.
+      p.marchReviews.push({ at: Date.now(), source: getDeviceId(), review: { m: 'treated' }, seen: {} });
+      out.dressing = patientMarchReview(p).m;
+      p.marchReviews.pop();
+      // Time correction to a later time after a reassessment of an unchecked tourniquet.
+      tq.effectiveness = 'unknown';
+      p.marchReviews.push({ at: Date.now(), source: getDeviceId(), review: { m: 'effective' }, seen: C5Rules.marchSeenFrom(patientMarchEntries(p)) });
+      tq.appliedAt += 4 * 60000;
+      out.later = patientMarchReview(p).m;
+      // Bleeding continues -> reopens; reassess; "נשלט"; bleeding again -> reopens again.
+      tq.status = 'ineffective'; tq.effectiveness = 'bleeding_continues'; queueTourniquetReassessment(p, tq, 'bleeding_continues');
+      out.bleed1 = patientMarchReview(p).m;
+      p.marchReviews.push({ at: Date.now() + 1, source: getDeviceId(), review: { m: 'effective' }, seen: C5Rules.marchSeenFrom(patientMarchEntries(p)) });
+      out.reassessed = patientMarchReview(p).m;
+      tq.status = 'active'; tq.effectiveness = 'effective'; queueTourniquetReassessment(p, tq, 'effective');
+      tq.status = 'ineffective'; tq.effectiveness = 'bleeding_continues'; queueTourniquetReassessment(p, tq, 'bleeding_continues');
+      out.bleed2 = patientMarchReview(p).m;
+      patients.splice(patients.indexOf(p), 1);
+      // Server row: event ids from the side query; an offline reassessment under the limb + minute name.
+      const applied = Date.parse('2026-11-26T08:00:00Z');
+      const rows = [{ id: 'row1', patient_id: 'r3-2', limb: 'left_leg', applied_at: new Date(applied).toISOString(), is_active: true, tourniquet_status: 'applied' }];
+      const [srv] = serverTourniquetRecords(rows, 'r3-2', [{ id: 'row1', time_source: 'phone', applied_event_id: 'ev-a', last_reassessed_event_id: null }]);
+      out.srvEvent = srv.appliedEventId;
+      const q = { id: 'r3-2', triage: 'red', patientStatus: 'observing', tourniquets: [srv] };
+      MARCH_TQ_EVENT_KEYS.delete('ev-a');
+      q.marchReviews = [{ at: Date.now(), source: getDeviceId(), review: { m: 'effective' }, seen: C5Rules.marchSeenFrom(patientMarchEntries(q)) }];
+      MARCH_TQ_EVENT_KEYS.set('ev-a', 'phoneA:local-1');
+      out.aliasKey = marchTqKey(srv);
+      out.alias = patientMarchReview(q).m;
+      return out;
+    });
+    assert(r3.open === 'treated' && r3.checked === 'complete', `"דימום נשלט" closes a tourniquet from a MARCH save, got ${JSON.stringify(r3)}`);
+    assert(r3.dressing === 'treated', `the tourniquet check does not close a dressing, got ${r3.dressing}`);
+    assert(r3.later === 'effective', `a later time correction keeps M closed, got ${r3.later}`);
+    assert(r3.bleed1 === 'treated' && r3.reassessed === 'effective' && r3.bleed2 === 'treated', `each "bleeding continues" reopens M, got ${JSON.stringify(r3)}`);
+    assert(r3.srvEvent === 'ev-a' && r3.aliasKey === 'tq:phoneA:local-1' && r3.alias === 'effective', `server event key from the side query; offline reassessment still covers it, got ${JSON.stringify(r3)}`);
 
     // march_seen from other phones: letters only, no prototype keys, at most 50 sources per letter.
     const san = await page.evaluate(() => {
