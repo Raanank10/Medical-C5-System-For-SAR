@@ -372,8 +372,7 @@ async function main() {
 
     // Round 4: a tourniquet recorded in a MARCH save stays an M treatment after conversion, on another
     // phone too (march_tq), and "nothing needed" is refused. A check on another phone's tourniquet is
-    // still not sent (no serverLimb; who may act on another phone's tourniquet is an open owner
-    // decision), as before this PR.
+    // sent (WP-46, owner 2026-11-26).
     const r4 = await page.evaluate(() => {
       const out = {};
       const p = { id: 'r4-1', visualId: 'P-R4', triage: 'red', patientStatus: 'observing', tourniquets: [], marchReviews: [] };
@@ -404,7 +403,7 @@ async function main() {
       return out;
     });
     assert(r4.local === 'needs_reassessment' && r4.remote === 'needs_reassessment' && r4.clearRefused, `a converted tourniquet stays an M treatment here and on another phone, got ${JSON.stringify(r4)}`);
-    assert(r4.sent === null && r4.bleedKey, `a check on another phone's tourniquet is not sent (unchanged) but reopens M here, got ${JSON.stringify(r4)}`);
+    assert(r4.sent === 'left_arm' && r4.bleedKey, `a check on another phone's tourniquet is sent (WP-46) and keyed by its event, got ${JSON.stringify(r4)}`);
 
     // march_seen from other phones: letters only, no prototype keys, at most 50 sources per letter.
     const san = await page.evaluate(() => {

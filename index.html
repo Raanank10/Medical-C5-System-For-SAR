@@ -1041,7 +1041,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9992</div>
+      <div class="demo-kicker">Demo V2.9994</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1138,7 +1138,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9992</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9994</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1148,7 +1148,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9992</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9994</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3659,7 +3659,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.92';
+const APP_VERSION = '2.99.94';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -10373,6 +10373,7 @@ function cancelLastTourniquetEntry(tourniquetId=null, patientId=null){
     saveLocalEvent({type:'TOURNIQUET_RELEASED',detail:`${p.id} · ${tq.id} · בוטל רישום חסם — טעות הקלדה`,warn:false,patient_id:p.id,
       payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb:tq.serverLimb,reason:'entry_cancelled'}});
   }
+  marchRecordTourniquetChange(p, tq, 'cancelled'); // WP-46: never a treatment, leaves M everywhere
   saveDemoState();
   rerenderAfterTourniquetFix(p);
 }
@@ -10477,6 +10478,7 @@ function convertTourniquetToDirectPressure(patientId, tourniquetId){
     saveLocalEvent({type:'TOURNIQUET_RELEASED',detail:`${p.visualId||p.id} · ${detail}`,warn:false,patient_id:p.id,
       payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb:tq.serverLimb,reason:'converted_direct_pressure',minutes_on_limb:Number.isFinite(minutes)?minutes:null}});
   }
+  marchRecordTourniquetChange(p, tq, 'converted'); // WP-46: M keeps it on every phone
   saveDemoState();
   renderTourniquetTimeAlert();
   rerenderAfterTourniquetFix(p);
@@ -13524,6 +13526,7 @@ function localMarchReviews(p){
 // A tourniquet whose event cannot be traced yet falls back to limb + applied minute (safe: M stays
 // open until a reassessment that saw that key).
 const MARCH_TQ_EVENT_KEYS=new Map(); // events.id -> '<device>:<local_event_id>' (pullRemoteMarchReviews)
+const TQ_EVENT_META=new Map(); // events.id -> {device, leid, role, type, reason} (WP-46)
 function marchTqMinute(ms){ return Math.round((Number(ms)||0)/60000); }
 function marchTqIdentity(tq){
   if(!tq) return null;
@@ -13583,14 +13586,30 @@ function marchSyntheticEntries(p){
 }
 // A save lists the tourniquets it recorded (march_tq): each stays an M treatment by its key, on every
 // phone, after the tourniquet is converted or removed, until a reassessment that saw it.
+// A typo-cancel lists the tourniquet in march_tq_cancelled (WP-46): it was never a treatment, so it
+// leaves M on every phone.
 function marchEntriesFromReviews(entries){
   const out=[];
-  entries.forEach(e=>(Array.isArray(e.tq)?e.tq:[]).forEach(k=>{ if(typeof k==='string' && k) out.push({at:0, source:k, review:{m:'treated'}}); }));
+  const cancelled=new Set();
+  entries.forEach(e=>(Array.isArray(e.tqCancelled)?e.tqCancelled:[]).forEach(k=>cancelled.add(k)));
+  entries.forEach(e=>(Array.isArray(e.tq)?e.tq:[]).forEach(k=>{ if(typeof k==='string' && k && !cancelled.has(k)) out.push({at:0, source:k, review:{m:'treated'}}); }));
   return out;
+}
+// A conversion or a typo-cancel says so to every phone's MARCH (a review note with no letters): a
+// converted tourniquet stays an M treatment after its server row is released; a cancelled one leaves.
+function marchRecordTourniquetChange(p, tq, change){
+  const key=marchTqKey(tq);
+  const stamp=new Date();
+  const field=change==='cancelled' ? 'march_tq_cancelled' : 'march_tq';
+  saveLocalEvent({type:'NOTE_ADDED', local_timestamp:stamp.toISOString(), detail:`MARCH · ${p.visualId||p.id} · ${tq.id} ${change==='cancelled'?'בוטל':'הומר'}`, warn:false, patient_id:p.id,
+    payload_json:{kind:'march_review', march_review:{}, [field]:[key], source:'tourniquet_'+change}});
+  p.marchReviews=localMarchReviews(p);
+  p.marchReviews.push({at:stamp.getTime(), review:{}, source:getDeviceId(), seen:{}, ...(change==='cancelled'?{tqCancelled:[key]}:{tq:[key]})});
 }
 function patientMarchEntries(p){
   const saves=[...localMarchReviews(p), ...(p?.remoteMarchReviews||[])];
-  return [...saves, ...marchEntriesFromReviews(saves), ...marchSyntheticEntries(p)];
+  const cancelled=new Set(saves.flatMap(e=>Array.isArray(e.tqCancelled)?e.tqCancelled:[]));
+  return [...saves, ...marchEntriesFromReviews(saves), ...marchSyntheticEntries(p).filter(e=>!cancelled.has(e.source))];
 }
 function patientMarchReview(p){
   return C5Rules.mergeMarchReviews(patientMarchEntries(p));
@@ -18328,6 +18347,10 @@ function serverTourniquetRecords(rows, patientId, timeMeta=null){
       appliedBy:'(מכשיר אחר)', source:'server', status:effectiveness==='bleeding_continues'?'ineffective':'active', effectiveness, reasonForAdditional:null, note:''};
     const time=metaById.get(r.id);
     if(time){ tq.appliedEventId=time.applied_event_id||null; tq.lastCheckEventId=time.last_reassessed_event_id||null; }
+    // WP-46 (owner 2026-11-26): any clinical role may act on another phone's tourniquet (check any
+    // time, convert within its limit, cancel a typo, correct the limb), so those actions are sent for
+    // the server's own limb; the recording phone follows them (applyOwnTourniquetUpdates).
+    if(r.limb) tq.serverLimb=String(r.limb);
     if(time && ['phone','entered','unknown'].includes(time.time_source)){
       tq.timeSource=time.time_source;
       tq.timeUnknown=time.time_source==='unknown';
@@ -18486,7 +18509,7 @@ function applyRemoteTreatments(rows){
 // actor_role is bound to the writer's profile role (database/075), so only reviews written by a
 // role that records treatments count (NOTE_ADDED is also open to cc, chamal, logistics and the
 // rescue chain). march_seen says which treatments a closing save had seen (owner 2026-11-25).
-const REMOTE_MARCH_COLUMNS='id,patient_id,device_id,actor_role,type,local_timestamp,march_review:payload_json->march_review,march_seen:payload_json->march_seen,march_tq:payload_json->march_tq,kind:payload_json->>kind';
+const REMOTE_MARCH_COLUMNS='id,patient_id,device_id,actor_role,type,local_timestamp,march_review:payload_json->march_review,march_seen:payload_json->march_seen,march_tq:payload_json->march_tq,march_tq_cancelled:payload_json->march_tq_cancelled,kind:payload_json->>kind';
 const REMOTE_MARCH_LIMIT=1000;
 // Pages of REMOTE_MARCH_LIMIT until a short page; up to REMOTE_MARCH_MAX_PAGES, then whatever was
 // read is added to (never replaces) what this phone knows.
@@ -18510,16 +18533,128 @@ async function pullRemoteMarchReviews(incidentId){
   // Each tourniquet's key on every phone is its TOURNIQUET_APPLIED event (device + local id), and its
   // newest "bleeding continues" its TOURNIQUET_REASSESSMENT; the server row's applied_event_id /
   // last_reassessed_event_id point at those events' ids.
-  const tq=await pullEventPages(()=>client.from('events').select('id,device_id,local_event_id').eq('incident_id', incidentId).in('type',['TOURNIQUET_APPLIED','TOURNIQUET_REASSESSMENT']).order('id'));
+  const tq=await pullEventPages(()=>client.from('events').select('id,device_id,local_event_id,actor_role,type,reason:payload_json->>reason').eq('incident_id', incidentId).in('type',['TOURNIQUET_APPLIED','TOURNIQUET_REASSESSMENT','TOURNIQUET_RELEASED']).order('id'));
   let newKeys=false;
   (tq?.rows||[]).forEach(row=>{
     if(!row?.id || !row.device_id || !row.local_event_id) return;
-    const k=`${String(row.device_id).slice(0,120)}:${String(row.local_event_id).slice(0,120)}`;
+    const device=String(row.device_id).slice(0,120), leid=String(row.local_event_id).slice(0,120);
+    TQ_EVENT_META.set(row.id, {device, leid, role:row.actor_role||null, type:row.type, reason:row.reason||null});
+    const k=`${device}:${leid}`;
     if(MARCH_TQ_EVENT_KEYS.get(row.id)!==k){ MARCH_TQ_EVENT_KEYS.set(row.id, k); newKeys=true; }
   });
+  if(tq) pullOwnTourniquetUpdates(client, incidentId);
   const res=await pullEventPages(()=>client.from('events').select(REMOTE_MARCH_COLUMNS).eq('incident_id', incidentId).in('type',['PATIENT_CREATED','NOTE_ADDED']).not('payload_json->march_review','is',null).order('local_timestamp',{ascending:false}).order('id'));
   if(!res){ if(newKeys) refreshActiveScreenData(); return; }
   applyRemoteMarchReviews(res.rows, {partial:!res.complete, incidentId, newKeys});
+}
+// ── WP-46: the phone that recorded a tourniquet follows what other phones did to it ──
+// applyServerTourniquets skips casualties this phone created (their local record wins), so another
+// phone's check, limb correction, conversion or typo-cancel never reached it. Here each of this
+// phone's own tourniquets is matched to its server row by its TOURNIQUET_APPLIED event and follows
+// actions by OTHER devices. Owner 2026-11-26: a conversion (or a typo-cancel) elsewhere alerts here
+// and then cancels every alarm that tourniquet caused. A casualty with a local change still waiting
+// in the outbox is left alone until it is pushed.
+const OWN_TQ_COLUMNS='id,patient_id,limb,applied_at,is_active,tourniquet_status,applied_event_id,released_event_id,released_at,last_reassessed_event_id';
+async function pullOwnTourniquetUpdates(client, incidentId){
+  let r;
+  try{ r=await client.from('tourniquets').select(OWN_TQ_COLUMNS).eq('incident_id', incidentId).limit(2000); }
+  catch(e){ return; }
+  if(r.error || !Array.isArray(r.data)) return;
+  applyOwnTourniquetUpdates(r.data, incidentId);
+}
+function tqRoleLabel(role){ return (typeof ROLE_LABELS!=='undefined' && ROLE_LABELS[SERVER_ROLE_TO_CLIENT_ROLE[role]||role]) || role || 'טלפון אחר'; }
+// Stays until "הבנתי" is tapped (owner: alert about it), one line per tourniquet, newest on top.
+function tourniquetRemoteNotice(text){
+  let box=document.getElementById('tq-remote-notice');
+  if(!box){
+    box=document.createElement('div');
+    box.id='tq-remote-notice';
+    box.setAttribute('role','alert');
+    box.style.cssText='position:fixed;top:12px;left:12px;right:12px;z-index:620;display:flex;flex-direction:column;gap:8px';
+    document.body.appendChild(box);
+  }
+  const row=document.createElement('div');
+  row.className='tq-remote-notice-row';
+  row.style.cssText='background:var(--card,#1c1c1e);border:2px solid var(--orange);border-radius:12px;padding:12px;display:flex;gap:10px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,0.35)';
+  const msg=document.createElement('div');
+  msg.style.cssText='flex:1;font-size:14px;font-weight:800;line-height:1.4;color:var(--text)';
+  msg.textContent=text;
+  const ok=document.createElement('button');
+  ok.textContent='הבנתי';
+  ok.style.cssText='min-height:44px;min-width:72px;border-radius:10px;border:none;background:var(--orange);color:#000;font-weight:900';
+  ok.onclick=()=>{ row.remove(); if(!box.children.length) box.remove(); };
+  row.append(msg, ok);
+  box.prepend(row);
+  try{ navigator.vibrate?.([200,100,200]); }catch(e){}
+}
+function applyOwnTourniquetUpdates(rows, incidentId){
+  const me=getDeviceId();
+  const site=incidentId ? INCIDENT_ID_TO_SITE[incidentId] : null;
+  const pending=patientsWithPendingLocalEdits();
+  const byKey=new Map();
+  rows.forEach(row=>{ const m=row?.applied_event_id && TQ_EVENT_META.get(row.applied_event_id); if(m) byKey.set(`${m.device}:${m.leid}`, row); });
+  const notices=[];
+  let changed=false;
+  for(const p of patients){
+    if(p.sourcedFromRemote || pending.has(p.id)) continue;
+    if(site && p.siteId && p.siteId!==site) continue;
+    for(const tq of ensureTourniquetArray(p)){
+      if(tq.source==='server' || !tq.appliedLocalEventId || !['active','ineffective'].includes(tq.status)) continue;
+      const row=byKey.get(`${tq.appliedDeviceId||me}:${tq.appliedLocalEventId}`);
+      if(!row) continue;
+      const limb=()=>tq.limbLabel||tourniquetLimbMeta(tq.limb).label;
+      const who=id=>{ const m=id && TQ_EVENT_META.get(id); return m && m.device!==me ? m : null; };
+      // Released on another phone: converted to direct pressure, or cancelled as a typo.
+      const rel=row.is_active===false ? who(row.released_event_id) : null;
+      if(rel){
+        const cancelled=rel.reason==='entry_cancelled';
+        const at=Date.parse(row.released_at||'')||Date.now();
+        tq.status=cancelled?'removed_error':'converted';
+        if(cancelled) tq.removedErrorAt=at; else { tq.convertedAt=at; tq.convertedByRole=rel.role; }
+        tq.remoteRelease={role:rel.role, reason:rel.reason, at};
+        tq.timeAlertOpen=null; tq.timeAlertSnooze=null; // every alarm this tourniquet caused
+        const text=cancelled
+          ? `רישום החסם (${limb()}) של ${p.visualId||p.id} בוטל כטעות הקלדה בטלפון אחר (${tqRoleLabel(rel.role)}) · כל ההתראות שלו בוטלו`
+          : `החסם (${limb()}) של ${p.visualId||p.id} הומר ללחץ ישיר בטלפון אחר (${tqRoleLabel(rel.role)}) · כל ההתראות שלו בוטלו`;
+        p.events=p.events||[];
+        p.events.unshift({type:cancelled?'TOURNIQUET_ENTRY_CANCELLED':'TOURNIQUET_CONVERTED', time:nowT(), detail:text, warn:!cancelled});
+        notices.push(text);
+        changed=true;
+        continue;
+      }
+      // A check from another phone ("דימום נשלט" / "bleeding continues").
+      if(row.last_reassessed_event_id && row.last_reassessed_event_id!==tq.lastCheckEventId){
+        const chk=who(row.last_reassessed_event_id);
+        tq.lastCheckEventId=row.last_reassessed_event_id;
+        if(chk){
+          const eff=row.tourniquet_status==='bleeding_continues'?'bleeding_continues':row.tourniquet_status==='effective'?'effective':null;
+          if(eff){
+            tq.effectiveness=eff;
+            tq.status=eff==='bleeding_continues'?'ineffective':'active';
+            tq.bleedEventKey=eff==='bleeding_continues'?`${chk.device}:${chk.leid}`:null;
+            const text=eff==='bleeding_continues'
+              ? `דימום ממשיך בחסם (${limb()}) של ${p.visualId||p.id} · נבדק בטלפון אחר (${tqRoleLabel(chk.role)})`
+              : `החסם (${limb()}) של ${p.visualId||p.id} נבדק בטלפון אחר (${tqRoleLabel(chk.role)}) · דימום נשלט`;
+            p.events=p.events||[];
+            p.events.unshift({type:'TOURNIQUET_REASSESSMENT', time:nowT(), detail:text, warn:eff==='bleeding_continues'});
+            if(eff==='bleeding_continues') notices.push(text);
+          }
+        }
+        changed=true;
+      }
+      // A limb recorded or corrected on another phone (the server row moved to it).
+      if(row.limb && tq.serverLimb && row.limb!==tq.serverLimb){
+        const meta=tourniquetLimbMeta(row.limb);
+        tq.limb=meta.key; tq.limbLabel=meta.label; tq.side=meta.side; tq.bodyPart=meta.bodyPart; tq.serverLimb=String(row.limb);
+        p.events=p.events||[];
+        p.events.unshift({type:'TOURNIQUET_LIMB_RECORDED', time:nowT(), detail:`${tq.id} · חסם: ${meta.label} (תוקן בטלפון אחר)`, warn:false});
+        changed=true;
+      }
+    }
+    if(changed) syncLegacyTourniquetAlias(p);
+  }
+  if(changed){ saveDemoState(); renderTourniquetTimeAlert(); refreshActiveScreenData(); }
+  notices.forEach(tourniquetRemoteNotice);
 }
 const MARCH_SEEN_MAX_SOURCES=50;
 function sanitizeMarchSeen(raw){
@@ -18552,8 +18687,9 @@ function applyRemoteMarchReviews(rows, opts={}){
     if(!Number.isFinite(at)) return;
     const review={};
     MARCH_PAWS_SECTIONS.forEach(sec=>{ if(Object.prototype.hasOwnProperty.call(mr, sec.id) && ['treated','effective','clear'].includes(mr[sec.id])) review[sec.id]=mr[sec.id]; });
-    const tq=Array.isArray(row.march_tq) ? row.march_tq.filter(k=>typeof k==='string' && k && k.length<=260).slice(0,20) : [];
-    (byPatient[row.patient_id]||(byPatient[row.patient_id]=[])).push({at, review, source:String(row.device_id||''), seen:sanitizeMarchSeen(row.march_seen), tq, id:String(row.id||'')});
+    const keys=v=>Array.isArray(v) ? v.filter(k=>typeof k==='string' && k && k.length<=260).slice(0,20) : [];
+    const tq=keys(row.march_tq), tqCancelled=keys(row.march_tq_cancelled);
+    (byPatient[row.patient_id]||(byPatient[row.patient_id]=[])).push({at, review, source:String(row.device_id||''), seen:sanitizeMarchSeen(row.march_seen), tq, tqCancelled, id:String(row.id||'')});
   });
   // Only this incident's casualties (as applyServerTourniquets).
   const site=opts.incidentId ? INCIDENT_ID_TO_SITE[opts.incidentId] : null;
