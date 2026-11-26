@@ -497,24 +497,28 @@ declare
   v_ro integer;
   v_added integer;
 begin
+  perform set_config('app.membership_relief_via_rpc', 'on', true);
   insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by, relief_pending_since)
   select p_incident_id, p.id, 'pc', auth.uid(), p_at
   from profiles p
   where p.role = 'pc' and p.is_active and p.company_id = p_company_id
   on conflict (incident_id, profile_id) do nothing;
   get diagnostics v_added = row_count;
+  -- Keyed on the person's own role, not the membership label (a relabelled membership must not
+  -- escape relief; review 2026-11-26). A logistics officer is never relieved (owner 2026-11-26).
   update incident_memberships set relief_pending_since = p_at
   where incident_id = p_incident_id and read_only_since is null and relief_pending_since is null
-    and role_at_incident in ('pc','medic','paramedic')
+    and profile_id in (select p.id from profiles p where p.role in ('pc','medic','paramedic'))
     and profile_id in (select app.company_profile_ids(p_company_id));
   select count(*) into v_pending from incident_memberships
   where incident_id = p_incident_id and read_only_since is null and relief_pending_since is not null
     and profile_id in (select app.company_profile_ids(p_company_id));
   update incident_memberships set read_only_since = p_at
   where incident_id = p_incident_id and read_only_since is null
-    and role_at_incident in ('rcc','rpc')
+    and profile_id in (select p.id from profiles p where p.role in ('rcc','rpc'))
     and profile_id in (select app.company_profile_ids(p_company_id));
   get diagnostics v_ro = row_count;
+  perform set_config('app.membership_relief_via_rpc', '', true);
   return jsonb_build_object('relief_pending', v_pending, 'read_only', v_ro, 'pcs_kept', v_added);
 end;
 $function$;
@@ -529,11 +533,13 @@ as $function$
 declare
   v_count integer;
 begin
+  perform set_config('app.membership_relief_via_rpc', 'on', true);
   update incident_memberships set read_only_since = null, access_ended_at = null, relief_pending_since = null, relieved_by = null
   where incident_id = p_incident_id and access_ended_at is null
     and (read_only_since is not null or relief_pending_since is not null)
     and profile_id in (select app.company_profile_ids(p_company_id));
   get diagnostics v_count = row_count;
+  perform set_config('app.membership_relief_via_rpc', '', true);
   return v_count;
 end;
 $function$;
@@ -658,12 +664,14 @@ begin
   values (p_incident_id, 'reinforcing', p_company_id, v_now, v_reason, auth.uid())
   returning id into v_link;
 
+  perform set_config('app.membership_relief_via_rpc', 'on', true);
   insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by)
   select p_incident_id, p.id, 'pc', auth.uid()
   from profiles p
   where p.role = 'pc' and p.is_active and p.company_id = p_company_id
   on conflict (incident_id, profile_id) do update set read_only_since = null, access_ended_at = null, relief_pending_since = null, relieved_by = null;
   get diagnostics v_pcs = row_count;
+  perform set_config('app.membership_relief_via_rpc', '', true);
 
   perform app.write_unit_audit('incident_unit_changed', p_company_id, null, null, p_incident_id,
     v_inc.company_id, v_inc.company_id, v_inc.platoon_id, v_inc.platoon_id,
@@ -738,6 +746,7 @@ begin
     raise exception 'that company has no read-only access to the site' using errcode = '22023';
   end if;
   -- Whoever still waits for relief is relieved now (by the CC) and ends with the rest.
+  perform set_config('app.membership_relief_via_rpc', 'on', true);
   update incident_memberships set read_only_since = coalesce(read_only_since, v_now),
          relieved_by = case when read_only_since is null then auth.uid() else relieved_by end,
          access_ended_at = v_now
@@ -745,6 +754,7 @@ begin
     and (read_only_since is not null or relief_pending_since is not null)
     and profile_id in (select app.company_profile_ids(p_company_id));
   get diagnostics v_members = row_count;
+  perform set_config('app.membership_relief_via_rpc', '', true);
   perform app.write_unit_audit('incident_unit_changed', p_company_id, null, null, p_incident_id,
     null, null, null, null, jsonb_build_object('kind', 'access_ended', 'company_id', p_company_id, 'members_ended', v_members, 'link_id', v_link));
   perform app.append_incident_lifecycle_event(p_incident_id, 'INCIDENT_UNIT_ACCESS_ENDED',
@@ -781,10 +791,12 @@ begin
           or (v_role = 'pc' and v_target_company is not null and v_target_company = app.my_company_id())) then
     raise exception 'only the person himself, his PC or the CC may confirm his relief' using errcode = '42501';
   end if;
+  perform set_config('app.membership_relief_via_rpc', 'on', true);
   update incident_memberships set read_only_since = v_now, relieved_by = auth.uid()
   where incident_id = p_incident_id and profile_id = v_target
     and relief_pending_since is not null and read_only_since is null;
   get diagnostics v_done = row_count;
+  perform set_config('app.membership_relief_via_rpc', '', true);
   if v_done = 0 then
     raise exception 'no relief is waiting for this person on this site' using errcode = '22023';
   end if;
@@ -1230,6 +1242,7 @@ begin
   -- copied with his access ended, so he does not see the target but his records from before his
   -- relief, redirected here by sync-log (067), are still accepted (re-review 2026-11-25). The
   -- duplicate's read-only companies lose their view with it (owner 2026-11-22: links left as is).
+  perform set_config('app.membership_relief_via_rpc', 'on', true);
   insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by, relief_pending_since)
   select p_target_id, m.profile_id, m.role_at_incident, coalesce(m.assigned_by, auth.uid()), m.relief_pending_since
   from incident_memberships m where m.incident_id = p_source_id
@@ -1243,6 +1256,7 @@ begin
     and m.read_only_since is not null
   on conflict (incident_id, profile_id) do nothing;
   get diagnostics v_count = row_count; v_moved := v_moved || jsonb_build_object('memberships_late_records_only', v_count);
+  perform set_config('app.membership_relief_via_rpc', '', true);
   update device_presence s set incident_id = p_target_id
   where s.incident_id = p_source_id
     and not exists (select 1 from device_presence t where t.incident_id = p_target_id and t.actor_id = s.actor_id and t.device_id = s.device_id);
@@ -1314,52 +1328,94 @@ $function$
 
 
 -- ---------------------------------------------------------------------------------------------
--- 8. Who may change the relief fields directly (owner 2026-11-26)
+-- 8. Who may change the relief fields directly (owner 2026-11-26; review 2026-11-26)
 -- ---------------------------------------------------------------------------------------------
--- The 045 policies let cc, chamal, admin and physician (and a PC for his own medics) write
--- incident_memberships through the API. Owner 2026-11-26: only the CC or chamal may edit the relief
--- fields (read_only_since, access_ended_at, relief_pending_since, relieved_by) directly; everyone
--- else changes them only through the 096 functions. And a PC who re-assigns his own medic (the
--- usual upsert, which never sends these fields) gives him full access back.
--- This trigger function deliberately runs as the caller (no security definer): the 096 functions
--- run as their owner and are not checked here, a direct API write runs as `authenticated` and is.
--- It reads nothing the caller could not; app.current_user_role() is itself security definer.
+-- The 045 policies let cc, chamal, admin and physician (and a PC for his own medics) insert, update
+-- and delete incident_memberships through the API. Owner 2026-11-26: only the CC or chamal edit the
+-- relief fields (read_only_since, access_ended_at, relief_pending_since, relieved_by) directly;
+-- everyone else changes them only through the 096 functions, which mark their writes with
+-- app.membership_relief_via_rpc (transaction-local, the same pattern as 053's
+-- app.incident_unit_via_rpc; the API cannot set it). Re-assigning a medic (the client's upsert,
+-- which never sends the relief fields) gives him full access back when the PC of his company, the
+-- CC or chamal does it; for anyone else it is refused instead of silently changing nothing. Deleting
+-- a membership that carries relief fields is CC / chamal only: it would undo a relief, and the row
+-- is what lets his records from before the relief in. Every such change is written to unit_audit.
 create or replace function app.guard_membership_relief_fields()
 returns trigger
 language plpgsql
+security definer
 set search_path to 'public'
 as $function$
 declare
   v_role text := app.current_user_role()::text;
+  v_row incident_memberships;
+  v_locked boolean := false;
+  v_kind text;
+  v_before jsonb;
 begin
-  if current_user not in ('authenticated', 'anon') then
+  -- Only API writes are checked: the session role is `authenticated` for every PostgREST call, also
+  -- inside a SECURITY DEFINER function, while migrations, the owner and service_role are not. The
+  -- 096 functions mark their own writes.
+  if coalesce(current_setting('role', true), '') not in ('authenticated', 'anon')
+     or coalesce(current_setting('app.membership_relief_via_rpc', true), '') = 'on' then
+    if tg_op = 'DELETE' then return old; end if;
     return new;
   end if;
-  if v_role in ('cc', 'chamal') then
-    return new;
+  if tg_op = 'DELETE' then
+    v_row := old;
+  else
+    v_row := new;
   end if;
-  if tg_op = 'INSERT' then
+  if tg_op <> 'INSERT' then
+    v_locked := old.read_only_since is not null or old.access_ended_at is not null
+                or old.relief_pending_since is not null or old.relieved_by is not null;
+    v_before := jsonb_build_object('read_only_since', old.read_only_since, 'access_ended_at', old.access_ended_at,
+                                   'relief_pending_since', old.relief_pending_since, 'relieved_by', old.relieved_by);
+  end if;
+  if tg_op = 'DELETE' then
+    if v_locked then
+      if coalesce(v_role, '') not in ('cc', 'chamal') then
+        raise exception 'only the CC or chamal may remove a membership that carries relief fields' using errcode = '42501';
+      end if;
+      v_kind := 'membership_with_relief_removed';
+    end if;
+  elsif tg_op = 'INSERT' then
     if new.read_only_since is not null or new.access_ended_at is not null
        or new.relief_pending_since is not null or new.relieved_by is not null then
-      raise exception 'only the CC or chamal may set relief fields on a site membership' using errcode = '42501';
+      if coalesce(v_role, '') not in ('cc', 'chamal') then
+        raise exception 'only the CC or chamal may set relief fields on a site membership' using errcode = '42501';
+      end if;
+      v_kind := 'relief_fields_set';
     end if;
-    return new;
-  end if;
-  if new.read_only_since is distinct from old.read_only_since
+  elsif new.read_only_since is distinct from old.read_only_since
      or new.access_ended_at is distinct from old.access_ended_at
      or new.relief_pending_since is distinct from old.relief_pending_since
      or new.relieved_by is distinct from old.relieved_by then
-    raise exception 'only the CC or chamal may change relief fields on a site membership' using errcode = '42501';
-  end if;
-  -- A PC re-assigning his medic (the 045 policy already limits him to his own company's medics on a
-  -- site he fully works) restores the medic's access.
-  if v_role = 'pc' and (old.read_only_since is not null or old.access_ended_at is not null
-                        or old.relief_pending_since is not null) then
+    if coalesce(v_role, '') not in ('cc', 'chamal') then
+      raise exception 'only the CC or chamal may change relief fields on a site membership' using errcode = '42501';
+    end if;
+    v_kind := 'relief_fields_edited';
+  elsif v_locked and (new.assigned_by is distinct from old.assigned_by or new.created_at is distinct from old.created_at
+                      or new.role_at_incident is distinct from old.role_at_incident) then
+    -- A re-assignment (or a role change) of someone relieved: the PC of his company (the policy
+    -- already limits a PC to that), the CC or chamal give him full access back.
+    if coalesce(v_role, '') not in ('pc', 'cc', 'chamal') then
+      raise exception 'only the CC, chamal or his own PC can give a relieved member access back' using errcode = '42501';
+    end if;
     new.read_only_since := null;
     new.access_ended_at := null;
     new.relief_pending_since := null;
     new.relieved_by := null;
+    v_kind := 'access_restored_by_assignment';
   end if;
+  if v_kind is not null then
+    perform app.write_unit_audit('incident_unit_changed',
+      (select coalesce(p.company_id, pl.company_id) from profiles p left join platoons pl on pl.id = p.platoon_id where p.id = v_row.profile_id),
+      null, v_row.profile_id, v_row.incident_id, null, null, null, null,
+      jsonb_build_object('kind', v_kind, 'role_at_incident', v_row.role_at_incident,
+        'by_role', v_role, 'before', v_before));
+  end if;
+  if tg_op = 'DELETE' then return old; end if;
   return new;
 end;
 $function$;
@@ -1369,7 +1425,7 @@ begin
   if not exists (select 1 from pg_trigger where tgrelid = 'public.incident_memberships'::regclass
                  and tgname = 'trg_guard_membership_relief_fields') then
     create trigger trg_guard_membership_relief_fields
-      before insert or update on incident_memberships
+      before insert or update or delete on incident_memberships
       for each row execute function app.guard_membership_relief_fields();
   end if;
 end $$;

@@ -18,6 +18,7 @@ declare
   RCCA uuid := (select id from profiles where role = 'rcc' and is_active order by created_at limit 1);
   RPCA uuid := (select id from profiles where role = 'rpc' and is_active order by created_at limit 1);
   LG uuid := (select id from profiles where role = 'logistics_officer' and is_active order by created_at limit 1);
+  ADM uuid := (select id from profiles where role = 'admin' and is_active order by created_at limit 1);
   Z uuid := gen_random_uuid();   -- target of a merge
   CA uuid; CB uuid; PA1 uuid;
   X uuid := gen_random_uuid();   -- site handed over from A to B
@@ -349,6 +350,9 @@ begin
   execute 'reset role';
   update incidents set status = 'active', closed_at = null where id = Y;
 
+  -- ---- A relabelled membership does not escape relief (review 2026-11-26): MA's Y row says logistics.
+  update incident_memberships set role_at_incident = 'logistics_officer' where incident_id = Y and profile_id = MA;
+
   -- ---- Hand Y to B: B comes back full, A read-only
   perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
@@ -363,6 +367,11 @@ begin
   execute 'set local role authenticated';
   insert into _c values ('A PC on Y after handover: waits for relief', (public.get_incident_unit_links(Y))->>'my_access', 'relief_pending');
   execute 'reset role';
+  select (relief_pending_since is not null)::text into s from incident_memberships where incident_id = Y and profile_id = MA;
+  insert into _c values ('relabelled medic still waits for relief', s, 'true');
+  perform set_config('request.jwt.claims', json_build_object('sub', PCA, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  execute 'reset role';
 
   -- ---- Relief fields (owner 2026-11-26): only the CC or chamal edit them directly; a PC who
   -- re-assigns his own medic gives him full access back.
@@ -373,17 +382,54 @@ begin
   begin
     update incident_memberships set access_ended_at = null where incident_id = Y and profile_id = MB;
     insert into _c values ('PC edits a relief field directly', 'allowed', 'refused');
-  exception when insufficient_privilege then insert into _c values ('PC edits a relief field directly', 'refused', 'refused'); end;
-  insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by) values (Y, MB, 'medic', PCB)
-  on conflict (incident_id, profile_id) do update set assigned_by = excluded.assigned_by, role_at_incident = excluded.role_at_incident;
+  exception when insufficient_privilege then insert into _c values ('PC edits a relief field directly', case when sqlerrm like '%relief fields%' then 'refused' else 'refused elsewhere: ' || sqlerrm end, 'refused'); end;
+  -- Same shape as the app's assign upsert (index.html, assign flow): it always sends a fresh created_at.
+  insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by, created_at) values (Y, MB, 'medic', PCB, clock_timestamp())
+  on conflict (incident_id, profile_id) do update set assigned_by = excluded.assigned_by, role_at_incident = excluded.role_at_incident, created_at = excluded.created_at;
   execute 'reset role';
   select (read_only_since is null and access_ended_at is null)::text into s from incident_memberships where incident_id = Y and profile_id = MB;
   insert into _c values ('PC re-assigns his ended medic: access back', s, 'true');
+  select count(*) into n from unit_audit where target_incident_id = Y and target_profile_id = MB and detail->>'kind' = 'access_restored_by_assignment' and detail ? 'before';
+  insert into _c values ('PC re-assign written to unit_audit', n::text, '1');
+  -- A's PC on the site his company handed over cannot restore his medic (policy: not his site any more).
+  perform set_config('request.jwt.claims', json_build_object('sub', PCA, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by) values (X, MA, 'medic', PCA)
+    on conflict (incident_id, profile_id) do update set assigned_by = excluded.assigned_by;
+    insert into _c values ('A PC restores his medic on the handed-over site', 'allowed', 'refused');
+  exception when insufficient_privilege then insert into _c values ('A PC restores his medic on the handed-over site', 'refused', 'refused'); end;
+  execute 'reset role';
+  -- Admin is not CC / chamal: refused directly (owner 2026-11-26).
+  update incident_memberships set read_only_since = now() - interval '5 minutes' where incident_id = Y and profile_id = MB;
+  perform set_config('request.jwt.claims', json_build_object('sub', ADM, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    update incident_memberships set read_only_since = null where incident_id = Y and profile_id = MB;
+    insert into _c values ('admin edits a relief field directly', 'allowed', 'refused');
+  exception when insufficient_privilege then insert into _c values ('admin edits a relief field directly', case when sqlerrm like '%relief fields%' then 'refused' else 'refused elsewhere: ' || sqlerrm end, 'refused'); end;
+  begin
+    update incident_memberships set assigned_by = ADM, created_at = clock_timestamp() where incident_id = Y and profile_id = MB;
+    insert into _c values ('admin re-assigns a relieved medic', 'allowed (silently locked?)', 'refused');
+  exception when insufficient_privilege then insert into _c values ('admin re-assigns a relieved medic', case when sqlerrm like '%access back%' then 'refused' else 'refused elsewhere: ' || sqlerrm end, 'refused'); end;
+  begin
+    delete from incident_memberships where incident_id = Y and profile_id = MB;
+    insert into _c values ('admin removes a relieved membership', 'allowed', 'refused');
+  exception when insufficient_privilege then insert into _c values ('admin removes a relieved membership', case when sqlerrm like '%relief fields%' then 'refused' else 'refused elsewhere: ' || sqlerrm end, 'refused'); end;
+  begin
+    insert into incident_memberships (incident_id, profile_id, role_at_incident, assigned_by, read_only_since) values (Y, MA2, 'medic', ADM, now());
+    insert into _c values ('admin inserts a membership with relief fields', 'allowed', 'refused');
+  exception when insufficient_privilege then insert into _c values ('admin inserts a membership with relief fields', case when sqlerrm like '%relief fields%' then 'refused' else 'refused elsewhere: ' || sqlerrm end, 'refused');
+  end;
+  execute 'reset role';
+  update incident_memberships set read_only_since = null where incident_id = Y and profile_id = MB;
   perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   update incident_memberships set relieved_by = CC where incident_id = Y and profile_id = MB;
   get diagnostics n = row_count;
   insert into _c values ('CC edits a relief field directly', n::text, '1');
+  select count(*) into n from unit_audit where target_incident_id = Y and target_profile_id = MB and detail->>'kind' = 'relief_fields_edited';
+  insert into _c values ('CC direct edit written to unit_audit', n::text, '1');
   execute 'reset role';
   update incident_memberships set relieved_by = null where incident_id = Y and profile_id = MB;
 
@@ -398,7 +444,7 @@ begin
   begin
     update incident_memberships set read_only_since = now() where incident_id = Y and profile_id = MB;
     insert into _c values ('physician edits a relief field directly', 'allowed', 'refused');
-  exception when insufficient_privilege then insert into _c values ('physician edits a relief field directly', 'refused', 'refused'); end;
+  exception when insufficient_privilege then insert into _c values ('physician edits a relief field directly', case when sqlerrm like '%relief fields%' then 'refused' else 'refused elsewhere: ' || sqlerrm end, 'refused'); end;
   execute 'reset role';
 
   -- ---- Merge: a read-only or ended member of the duplicate gets no access to the target, a wait for
