@@ -10,7 +10,7 @@ v2.0 moves the demo from a shared dashboard to a role-based medical command syst
   - Medical CC,
   - Doctor / Paramedic,
   - Logistics Officer,
-  - Chamal / Operator,
+  - Medical Chamal / Operator,
   - Admin / Demo Controller.
 - Role dashboards now show:
   - top situation summary,

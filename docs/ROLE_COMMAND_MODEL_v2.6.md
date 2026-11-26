@@ -11,7 +11,7 @@ The medic workflow is split into two operational phases:
    - Site and zone context.
    - Initial evacuated counts by severity.
    - Report source: civilian, fire/rescue, MDA, police, or other.
-   - Data is visible to חוג״ד, חמ״ל, and מ״פ רפואה and remains editable later.
+   - Data is visible to חוג״ד, חמ״ל רפואי, and מ״פ רפואה and remains editable later.
 
 2. `MSTART — סריקה מהירה`
    - Dedicated sweep screen, not a full patient form.
@@ -185,7 +185,7 @@ Senior medical review queue. Owns severe reviews, treatment guidance requests, p
 
 Owns medical stock, equipment requests, burn rate, shortages, and resupply status. Clinical context should be limited to what is required for logistics decisions.
 
-### Chamal / Operator / Observer
+### Medical Chamal / Operator / Observer
 
 Owns control-room picture quality: sync, duplicates, external report conflicts, unassigned objects, pending requests, event timeline, and AAR/export support.
 
@@ -285,7 +285,7 @@ Advanced views:
 - `AAR — מה למדנו`
 - `רופא / פראמדיק`
 - `לוגיסטיקה`
-- `חמ״ל`
+- `חמ״ל רפואי`
 
 ## Medical Handover Wording
 

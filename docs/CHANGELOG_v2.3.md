@@ -6,7 +6,7 @@ Demo V2.3 sharpens the prototype around the medical command chain and company-le
 
 - Split the first page into a recommended demo path and advanced views.
 - Recommended path: `חובש — התחלת טיפול`, `חוג״ד — תמונת מצב`, `מ״פ רפואה`.
-- Advanced views: `AAR — מה למדנו`, `רופא / פראמדיק`, `לוגיסטיקה`, `חמ״ל`.
+- Advanced views: `AAR — מה למדנו`, `רופא / פראמדיק`, `לוגיסטיקה`, `חמ״ל רפואי`.
 - Added an explicit demo action for the death-certification chain.
 
 ## Medic Flow

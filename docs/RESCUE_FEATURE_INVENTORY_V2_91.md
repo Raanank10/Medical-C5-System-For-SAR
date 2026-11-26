@@ -114,13 +114,13 @@ Each feature is tracked by: feature name, user role, UI entry points, function n
 | Non-official wording | medic/doctor | black panels | UI text + request functions | black panels/request rows | request text | all command views | unsafe-to-delete | critical | no official death wording by medic |
 | Second black escalation | PC/CC | death cert request logic | `createDeathCertificationRequest` | request board | existing death requests | CC queue | unsafe-to-delete | high | second request escalation |
 
-## M. CHAMAL / Operator
+## M. MEDICAL CHAMAL / Operator
 
 | Feature | Role | UI entry points | Functions | DOM ids/classes | State/localStorage/events | Output views | Classification | Risk | Smoke test |
 |---|---|---|---|---|---|---|---|---|---|
-| Data integrity / overview | CHAMAL | role dashboard, commander panels | `renderRoleDashboard`, commander renderers | role board | patients, requests, local events | CHAMAL/dashboard | demo-only | medium | role renders |
-| External reports and sync | CHAMAL/commander | commander sections | sync/status renderers | sync pills | `demoSyncMode`, `lastSyncAt` | command views | demo-only | low | static render |
-| AAR support | CHAMAL | AAR/export | `saveLocalEvent`, export handlers | AAR screen | `outbox` | AAR/export | core/current | medium | AAR renders |
+| Data integrity / overview | MEDICAL CHAMAL | role dashboard, commander panels | `renderRoleDashboard`, commander renderers | role board | patients, requests, local events | MEDICAL CHAMAL/dashboard | demo-only | medium | role renders |
+| External reports and sync | MEDICAL CHAMAL/commander | commander sections | sync/status renderers | sync pills | `demoSyncMode`, `lastSyncAt` | command views | demo-only | low | static render |
+| AAR support | MEDICAL CHAMAL | AAR/export | `saveLocalEvent`, export handlers | AAR screen | `outbox` | AAR/export | core/current | medium | AAR renders |
 
 ## N. AAR
 
@@ -138,7 +138,7 @@ Each feature is tracked by: feature name, user role, UI entry points, function n
 | Demo save/load | all | automatic/local controls | `saveDemo`, `loadDemo` | none | `DEMO_STORAGE_KEY` | all | core/current | high | save/load |
 | Active draft recovery | medic | reload/session recovery | `restoreActiveRecoveryState`, `hydrateActiveDraft` | none | `ACTIVE_RECOVERY_KEY` | old wizard/sweep/monitoring | unsafe-to-delete | high | recovery path static check |
 | Device id | all | automatic | `getDeviceId` | device id spans | `DEVICE_ID_KEY` | signatures/export | core/current | low | key unchanged |
-| Observer/conflict state | CHAMAL/demo | observer panels | observer note functions | note panel | `OBSERVER_NOTES_KEY`, `CONFLICT_LOG_KEY` | CHAMAL/AAR | demo-only | medium | keys unchanged |
+| Observer/conflict state | MEDICAL CHAMAL/demo | observer panels | observer note functions | note panel | `OBSERVER_NOTES_KEY`, `CONFLICT_LOG_KEY` | MEDICAL CHAMAL/AAR | demo-only | medium | keys unchanged |
 
 ## P. Legacy Wizard
 

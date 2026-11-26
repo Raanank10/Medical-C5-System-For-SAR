@@ -14,7 +14,7 @@ The system should help command know the current casualty picture, the time-criti
 
 Count of patients in the incident excluding closed/read-only records.
 
-Used by: PC, CC, Chamal.
+Used by: PC, CC, Medical Chamal.
 
 ### Active Red Patients
 
@@ -104,7 +104,7 @@ Primary fields:
 - `milestone_evacuated`
 - `is_triage_breach_overdue`
 
-Decision use: high-throughput Chamal/AAR analysis without forcing routine dashboard refreshes to scan raw events.
+Decision use: high-throughput Medical Chamal/AAR analysis without forcing routine dashboard refreshes to scan raw events.
 
 ### Medic To Critical Ratio
 

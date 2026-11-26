@@ -100,6 +100,8 @@ function handle(server, req) {
   if (req.table === 'incident_memberships') {
     if (req.op === 'upsert') {
       if (!COMMAND.includes(u.role)) return { data: null, error: { message: 'rls: insert denied' } };
+      // database/096's guard: re-assigning a relieved medic by a role that may not give access back.
+      if (server.refuseRelieved) return { data: null, error: { code: '42501', message: 'only the CC, chamal, admin or his own PC can give a relieved member access back' } };
       const p = clone(req.payload);
       const ex = server.members.find((r) => r.incident_id === p.incident_id && r.profile_id === p.profile_id);
       if (ex) { if (!req.ignoreDup) Object.assign(ex, p); } else server.members.push({ created_at: new Date().toISOString(), ...p });
@@ -214,6 +216,25 @@ async function checkFile(browser, file) {
   assert(inc1.address === 'רחוב בדיקה 1', `${rel}: assignment must write the address to the incident`);
   assert(inc1.metadata?.medic_assignments?.[MEDIC]?.note === 'כניסה משער צפוני', `${rel}: assignment must write the note to incident metadata`);
   assert(inc1.metadata.medic_assignments[MEDIC].assigned_by_name === 'חוג"ד בדיקה', `${rel}: the assigner's name must travel in metadata`);
+
+  // Refused re-assign (WP-27, owner 2026-11-26: a physician may not give a relieved medic access
+  // back): the incident keeps the earlier note and address, and the PC is told why in Hebrew.
+  SERVER.refuseRelieved = true;
+  await pc.page.locator('button:has-text("שייך חובש לאירוע")').first().click();
+  await pc.page.waitForSelector('#medic-assign-real-wrap', { state: 'visible' });
+  await pc.page.fill('#medic-assign-address', 'רחוב אחר 9');
+  await pc.page.fill('#medic-assign-note', 'הערה שנדחתה');
+  await pc.page.evaluate(() => { window.__toasts = []; const t = window.toast; window.toast = (x) => { window.__toasts.push(x); return t(x); }; });
+  await pc.page.click('#medic-assign-modal button:has-text("שייך לאירוע")');
+  await pc.page.waitForTimeout(400);
+  const toasts = await pc.page.evaluate(() => window.__toasts);
+  assert(toasts.some((x) => x.includes('החובש הוחלף באתר הזה') && x.includes('חמ"ל')), `${rel}: a refused re-assign must say why in Hebrew (got ${JSON.stringify(toasts)})`);
+  state = await db();
+  const inc1r = state.incidents.find((i) => i.id === INC1);
+  assert(inc1r.metadata.medic_assignments[MEDIC].note === 'כניסה משער צפוני', `${rel}: a refused re-assign must take its note back (got ${inc1r.metadata.medic_assignments[MEDIC].note})`);
+  assert(inc1r.address === 'רחוב בדיקה 1', `${rel}: a refused re-assign must take its address back (got ${inc1r.address})`);
+  SERVER.refuseRelieved = false;
+  await pc.page.evaluate(() => hideMedicAssignModal());
 
   // Phone 3, rescue (rpc): sets the incident type on incident 1; it must reach the server.
   const rpc = await openPhone(context, file);

@@ -701,6 +701,8 @@ input[type=range]{width:100%;accent-color:var(--orange);}
 .demo-icon{width:42px;height:42px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
 .demo-strip{margin:0 16px 12px;background:rgba(67,97,238,0.08);border:1px solid rgba(67,97,238,0.45);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px;justify-content:space-between;}
 .demo-strip-title{font-weight:700;font-size:13px;color:var(--accent);}
+.demo-strip.signed-in-compact{background:none;border:none;padding:0;margin:0 16px 6px;justify-content:flex-end;}
+.demo-strip.signed-in-compact>div:first-child{display:none;}
 .demo-strip-sub{font-size:11px;color:var(--muted);margin-top:2px;}
 .sync-pill{font-family:var(--mono);font-size:10px;border:1px solid var(--green);color:var(--green);border-radius:999px;padding:4px 8px;white-space:nowrap;}
 .sync-pill.stale{border-color:var(--orange);color:var(--orange);}
@@ -758,6 +760,13 @@ textarea{resize:vertical;min-height:70px;}
 .incident-strip.draft{background:rgba(255,107,53,0.14);border-bottom-color:var(--orange);}
 .incident-strip.closed{background:rgba(255,59,59,0.14);border-bottom-color:var(--red);}
 .incident-strip button{background:none;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer;white-space:nowrap;}
+.incident-readonly-banner{display:none;background:rgba(245,197,24,0.16);border-bottom:2px solid #f5c518;padding:8px 16px;font-size:13px;font-weight:700;color:var(--text);}
+.incident-unit-panel .unit-link-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--border);font-size:12px;}
+.incident-unit-panel .unit-mode{display:flex;gap:8px;margin-bottom:8px;}
+.incident-readonly-banner button{display:block;width:100%;min-height:48px;margin-top:8px;border-radius:10px;border:2px solid #f5c518;background:#f5c518;color:#111;font-size:16px;font-weight:800;cursor:pointer;}
+.incident-readonly-banner .relief-waiting button{display:inline-block;width:auto;min-height:36px;margin:4px 0 0;padding:0 12px;font-size:13px;background:transparent;color:var(--text);}
+.relief-waiting{margin-top:6px;font-size:12px;font-weight:400;}
+.incident-unit-panel .unit-mode button{flex:1;}
 .open-alert-banner{display:none;flex-direction:column;gap:8px;background:rgba(255,107,53,0.16);border-bottom:2px solid var(--orange);padding:10px 16px;font-size:13px;color:var(--text);}
 .open-alert-banner.pulse{animation:openAlertPulse 1.4s ease-in-out infinite;}
 @keyframes openAlertPulse{0%,100%{background:rgba(255,107,53,0.10);}50%{background:rgba(255,107,53,0.32);}}
@@ -886,7 +895,10 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     <button onclick="openIncidentPicker()">החלף / כל האירועים</button>
   </div>
 </div>
+<div id="incident-readonly-banner" class="incident-readonly-banner" role="status" aria-live="polite"></div>
 <div id="incident-open-alert-banner" class="open-alert-banner"></div>
+<div id="incident-unit-notice-banner" class="open-alert-banner" role="alert"></div>
+<div id="incident-relief-overdue-banner" class="open-alert-banner" role="alert"></div>
 <div id="rcc-evac-banner" class="rcc-evac-banner" role="status" aria-live="polite"></div>
 <div id="medic-extraction-banner" class="rcc-evac-banner medic-extraction-banner" role="alert" aria-live="assertive"></div>
 
@@ -954,6 +966,11 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     <div class="login-error" id="incident-picker-error"></div>
     <div id="incident-picker-list"></div>
     <button class="demo-mini-btn" style="width:100%;margin-top:4px" onclick="refreshIncidentPicker()">רענן רשימה</button>
+  </div>
+  <div class="demo-panel" style="margin:16px;display:none" id="incident-picker-tour">
+    <div class="demo-strip-title">סיור מודרך</div>
+    <div class="demo-strip-sub" style="margin-bottom:10px">מסכי הפיקוד עם נתוני הדגמה, כשתי דקות. זמין רק כשאין אף אירוע פתוח: במהלכו הטלפון לא מקבל עדכונים מהשרת. נסגר מעצמו אחרי 3 דקות או כשהמסך ננעל.</div>
+    <button class="demo-mini-btn" style="width:100%;min-height:48px" data-guided-tour-start onclick="startGuidedTour()">התחל סיור במסך הפיקוד</button>
   </div>
   <div class="demo-panel" style="margin:16px" id="incident-open-panel">
     <div class="demo-strip-title" id="incident-open-title">פתיחת אירוע חדש</div>
@@ -1046,7 +1063,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9993</div>
+      <div class="demo-kicker">Demo V2.9995</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1143,7 +1160,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9993</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9995</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1153,7 +1170,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9993</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9995</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2153,7 +2170,8 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     <div id="guided-tour-title" style="font-weight:900;color:var(--accent)"></div>
     <div id="guided-tour-count" style="font-family:var(--mono);font-size:12px;color:var(--muted)"></div>
   </div>
-  <div id="guided-tour-text" style="font-size:13px;line-height:1.5;margin:6px 0 10px"></div>
+  <div id="guided-tour-text" style="font-size:13px;line-height:1.5;margin:6px 0 4px"></div>
+  <div id="guided-tour-sample" style="font-size:11px;color:var(--muted);margin:0 0 10px">נתוני הדגמה · הנתונים שלך לא מוצגים, לא משתנים ולא נשלחים · נסגר מעצמו אחרי 3 דקות או כשהמסך ננעל</div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
     <button class="demo-mini-btn" id="guided-tour-prev" onclick="guidedTourPrev()">הקודם</button>
     <button class="demo-mini-btn" id="guided-tour-next" style="background:var(--accent);border-color:var(--accent);color:#fff" onclick="guidedTourNext()">הבא</button>
@@ -3392,6 +3410,18 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     return { level: ms >= EVAC_POINT_WAIT_CRITICAL_MS ? "critical" : "warning", minutes: Math.floor(ms / 60000) };
   }
 
+  // Relief not confirmed (WP-27, owner 2026-11-22/23): after a handover or a release, the leaving
+  // company's medical staff keep recording until each confirms "הוחלפתי - מסרתי". Still waiting
+  // 30 minutes later: the site's PC and the CC are alerted, so nobody keeps writing on a site he
+  // has left without anyone noticing. Counted from when that person started waiting.
+  const RELIEF_OVERDUE_MS = 30 * 60 * 1000;
+  function reliefOverdueMinutes(pendingSinceMs, nowMs = Date.now()) {
+    const since = Number(pendingSinceMs);
+    if (!Number.isFinite(since) || since <= 0) return null;
+    const ms = nowMs - since;
+    return ms >= RELIEF_OVERDUE_MS ? Math.floor(ms / 60000) : null;
+  }
+
   function rescueEvacPriority(triage, tourniquetActive) {
     if (triage === "red" || tourniquetActive === true) return "urgent";
     if (triage === "yellow" || triage === "green" || triage === "black") return "not_urgent";
@@ -3441,6 +3471,8 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     EVAC_POINT_WAIT_CRITICAL_MS,
     EVAC_POINT_WAIT_WARN_MS,
     evacPointWaitAlert,
+    reliefOverdueMinutes,
+    RELIEF_OVERDUE_MS,
     isCriticalAlert,
     isDeviceSilent,
     isFinalPatientStatus,
@@ -3550,7 +3582,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.93';
+const APP_VERSION = '2.99.95';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -4592,6 +4624,7 @@ async function verifyOfflineProfile(){
   if(!client) return;
   let r;
   try{ r=await client.from('profiles').select('role,is_active').eq('id',currentUser.id).single(); }catch(e){ return; }
+  if(!currentUser) return; // signed out, or the guided tour's sandbox opened meanwhile: checked again on the next 'online'
   if(r.error && isNetworkFailure(r.error)) return; // still unreachable: try again on the next 'online'
   if(r.error || !r.data || !r.data.is_active){ toast('החשבון אינו פעיל בשרת · נותקת'); await signOut(); return; }
   const roleChanged=r.data.role!==currentUser.role;
@@ -4639,6 +4672,7 @@ function enterAuthenticatedRole(serverRole){
   }
 }
 async function signOut(){
+  if(_guidedTour) endGuidedTour({signingOut:true});
   const client=getSupabaseClient();
   if(client){ try{ await client.auth.signOut(); }catch(e){} }
   try{ localStorage.removeItem(LAST_PROFILE_KEY); }catch(e){}
@@ -5790,9 +5824,9 @@ async function loadRealMedicProfiles(){
   }catch(e){}
 }
 async function updateIncidentWithMetadata(client, incidentId, patchFn){
-  const cur=await client.from('incidents').select('metadata').eq('id',incidentId).single();
+  const cur=await client.from('incidents').select('metadata,address').eq('id',incidentId).single();
   if(cur.error) throw cur.error;
-  const patch=patchFn({...(cur.data?.metadata||{})});
+  const patch=patchFn({...(cur.data?.metadata||{})}, cur.data||{});
   const upd=await client.from('incidents').update(patch).eq('id',incidentId).select('id');
   if(upd.error) throw upd.error;
   if(!upd.data?.length) throw new Error('אין הרשאה לעדכן את האירוע');
@@ -5804,14 +5838,33 @@ async function assignRealMedic(profileId, address, note){
   const medic=_realMedicProfiles.find(p=>p.id===profileId);
   const nowIso=new Date().toISOString();
   // 1. Address + note before the membership, so the medic never sees the assignment without them.
-  await updateIncidentWithMetadata(client, incidentId, metadata=>{
+  let prevEntry, prevAddress;
+  await updateIncidentWithMetadata(client, incidentId, (metadata, row)=>{
+    prevEntry=(metadata.medic_assignments||{})[profileId];
+    prevAddress=row.address;
     metadata.medic_assignments={...(metadata.medic_assignments||{}), [profileId]:{note, assigned_by_name:_myDisplayName||'חוג"ד', assigned_at:nowIso}};
     return address ? {metadata, address} : {metadata};
   });
   // 2. The medic's membership: grants access and marks this as their current assignment (the
   // medic phone takes the newest assigned membership).
   const mem=await client.from('incident_memberships').upsert({incident_id:incidentId, profile_id:profileId, role_at_incident:medic?.role||'medic', assigned_by:currentUser.id, created_at:nowIso},{onConflict:'incident_id,profile_id'});
-  if(mem.error) throw mem.error;
+  if(mem.error){
+    // Refused: take back the note (and the address, if it is still ours), so the incident does not
+    // show an assignment the server never made (WP-27 review 2026-11-26).
+    try{
+      await updateIncidentWithMetadata(client, incidentId, (metadata, row)=>{
+        const ma={...(metadata.medic_assignments||{})};
+        if(ma[profileId]?.assigned_at===nowIso){ if(prevEntry===undefined) delete ma[profileId]; else ma[profileId]=prevEntry; }
+        metadata.medic_assignments=ma;
+        return (address && row.address===address && prevAddress!==address) ? {metadata, address:prevAddress??null} : {metadata};
+      });
+    }catch(_){}
+    // A relieved medic: only his PC, the CC, chamal or admin give him access back (database/096).
+    if(mem.error.code==='42501' && /access back/.test(mem.error.message||'')){
+      throw new Error('החובש הוחלף באתר הזה. רק החוג"ד שלו, מ״פ רפואה, חמ"ל או מנהל מערכת יכולים להחזיר לו גישה');
+    }
+    throw mem.error;
+  }
   if(address) activeIncident.address=address;
 }
 // A board's (rescue panel, PC/CC buttons) type changes go to the server one by one through
@@ -6154,8 +6207,11 @@ async function runIncidentAssignmentPull(){
     await pullIncidentTypeReports(client);
     await pullRemoteSweeps(client);
     await pullRealPlatoons(client);
-    const prevKey=assignmentKey(_myRealAssignment);
+    const prevAssignment=_myRealAssignment, prevKey=assignmentKey(prevAssignment);
     await pullMyAssignment(client);
+    // Started before the guided tour opened: keep the old value so the next pull after the tour
+    // still sees the new assignment and enters it (WP-43 review).
+    if(inDemoSandbox()){ _myRealAssignment=prevAssignment; return; }
     const a=_myRealAssignment;
     if(a && assignmentKey(a)!==prevKey && a.incident){
       // Not in any incident yet (picker on screen): go straight to the assigned one.
@@ -6350,6 +6406,9 @@ function tacticalPlatoonRollup(platoonId){
 // patients into a real incident (and the clear functions wipe the outbox, which would drop
 // real unsynced events), so every user-reachable entry point refuses instead.
 function blockDemoDataWhileLoggedIn(){
+  // The guided tour sets currentUser=null in its sandbox; the phone's real outbox, conflict log and
+  // bags must stay out of reach of the demo clear buttons all the same (WP-43 review).
+  if(_demoSandbox?.tour){ toast('הסיור פתוח: סיים או לחץ "יציאה" קודם'); return true; }
   if(!currentUser) return false;
   toast('במצב מחובר אין נתוני דמו: הנתונים מגיעים מהשטח בלבד');
   return true;
@@ -6435,6 +6494,7 @@ function saveDemoState(){
           await persistConflictLog();
         }
       }
+      if(_demoSandbox) return; // queued before a sandbox opened: it would store the sample data (WP-43)
       demoRevision += 1;
       await secureSetItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:6,appVersion:APP_VERSION,revision:demoRevision,savedAt:new Date().toISOString(),experimentStartedAt,experimentPhase,siteData,patients,reinforcementRequests,pcReviews,pcTruckStock,companyStock,handledPatientIds,medicIncidentAssignments,demoSyncMode,lastSyncAt}));
     }catch(e){}
@@ -6495,6 +6555,9 @@ function flushLocalStateForUnload(){
 }
 window.addEventListener('beforeunload', flushLocalStateForUnload);
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushLocalStateForUnload(); });
+// A guided tour nobody is looking at only keeps the phone deaf: end it when the screen locks or the
+// app goes to the background (owner 2026-11-26), so the phone syncs and alarms again at once.
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden' && _guidedTour) endGuidedTour(); });
 // ── Sandboxed briefing demo ("תדריך מ״פ / חוג״ד ב־60 שניות") ──
 // The scripted briefing needs fake patients, but this app shares one live database across every
 // test phone, so the demo runs in an isolated sandbox: the current local state is snapshotted,
@@ -6602,7 +6665,7 @@ function startBriefingDemo(){
   });
 }
 function endBriefingDemo(){
-  if(!_demoSandbox) return;
+  if(!_demoSandbox || _demoSandbox.tour) return;
   const {snapshot, screen, timers}=_demoSandbox;
   timers.forEach(clearTimeout);
   _demoSandbox=null;
@@ -6613,85 +6676,219 @@ function endBriefingDemo(){
   renderDashboard(); renderAlerts();
   toast('ההדגמה הסתיימה · המצב הקודם שוחזר');
 }
-// ── Guided tour of the PC / CC dashboards ──
-// Read-only: it only navigates between role dashboards and highlights real panels. It creates no
-// patients and writes nothing, so it is safe on a phone that is also carrying real data.
+// ── Guided tour of the PC / CC dashboards (WP-43, owner 2026-11-26) ──
+// Runs in the sandbox (startTourSandbox): sample patients, no server reads or writes, the phone's own
+// state restored exactly on exit. Each step names the command-panel tab its panel lives in, so the
+// tour switches tabs the way a tap does; a step whose panel is missing or not visible is skipped and
+// logged, never shown as if it worked (scripts/browser_guided_tour_test.js fails on any skip).
+// Signed in it runs only outside an incident (PC from the incident picker, CC from the all-incidents
+// view): in the sandbox the phone's alarms read the sample patients and nothing arrives from other
+// phones, so inside an incident it would hold back real alarms. On exit a signed-in phone syncs at once.
 const GUIDED_TOUR_STEPS = [
-  {role:'pc', sel:'.role-top-grid', title:'חוג״ד · תמונת מצב מהירה', text:'פצועי המחלקה, התראות לפעולה, בקשות פתוחות ומוקדים. זה הדבר הראשון שחוג״ד רואה.'},
-  {role:'pc', section:'סטטוס אתר', title:'סטטוס אתר מהחילוץ', text:'מה שמ״מ / מ״פ חילוץ קבעו: סוג אירוע, T0, מצב מבנה ואתר נקי. חוג״ד מקבל עדכון, לא מאשר. סוג אירוע: חובש קובע כשאין סוג; חוג״ד יכול לשנות סוג שקבע חובש, לא סוג שקבע חילוץ.'},
-  {role:'pc', section:'משימות חוג״ד עכשיו', title:'משימות עכשיו', text:'מה דורש החלטה שלך עכשיו, מחולק למיידי / מבצעי / השלמה.'},
-  {role:'pc', section:'עומס חובשים', title:'עומס חובשים', text:'לכל חובש: כמה פצועים, אדומים, לכודים, חסמים ומתי עדכן לאחרונה. מכאן גם משייכים חובש לאירוע.'},
-  {role:'pc', sel:'.stat-grid', title:'ספירת מיון', text:'אדום / צהוב / ירוק / לכודים במחלקה, מתעדכן מכל החובשים.'},
-  {role:'pc', section:'⏱ חסמי עורקים פעילים', title:'חסמי עורקים', text:'כל חסם פעיל עם שעון רץ: תזכורת ב-45 דק׳, אזהרה ב-60 דק׳ וקריטי ב-120 דק׳.'},
-  {role:'pc', section:'לוח פצועים מחלקתי', title:'לוח פצועים', text:'כל הפצועים לפי עדיפות פינוי. לחיצה על פצוע פותחת את התיק שלו.'},
-  {role:'pc', section:'חוב הערכה אחרי סריקה', title:'חוב הערכה', text:'פצועים שסומנו בסריקה מהירה ועדיין חסרים להם מדדים או הערכה מלאה.'},
-  {role:'pc', section:'תור בקשות ציוד', title:'בקשות ציוד', text:'בקשות ציוד מכל המכשירים, בזמן אמת מהשרת.'},
-  {role:'cc', sel:'.role-top-grid', title:'מ״פ רפואה · תמונת פלוגה', text:'מחלקות ומוקדים פעילים, אדום/צהוב ובקשות חוג״ד פתוחות בכל הפלוגה.'},
-  {role:'cc', section:'תמונת משאבים פלוגתית', title:'משאבים פלוגתיים', text:'מה זמין לשיוך בפלוגה: צוותים, רכבים וציוד.'},
-  {role:'cc', section:'עומס מחלקות', title:'עומס מחלקות', text:'אדום/צהוב לפי מחלקה, כדי לראות איפה צריך תגבור.'},
-  {role:'cc', section:'תעדוף פינוי פלוגתי', title:'תעדוף פינוי', text:'סדר פינוי מומלץ לכל הפלוגה, מעל רמת המחלקה.'},
-  {role:'cc', section:'בקשות משאב רפואי פתוחות', title:'בקשות משאב', text:'בקשות תגבור רפואי מחוג״ד שמחכות להחלטה שלך.'},
-  {role:'cc', section:'תור רופא', title:'תור רופא', text:'חשד לנפטר שמחכה לאישור רופא. זה אישור קליני, לא קביעת מוות רשמית.'}
+  {role:'pc', tab:'overview', section:'סטטוס אתר', title:'סטטוס אתר מהחילוץ', text:'סוג אירוע, T0, מצב מבנה ואתר נקי, כפי שקבעו מ״מ / מ״פ חילוץ. אתה לא מאשר אותם, אתה מתכנן סביבם.'},
+  {role:'pc', tab:'overview', key:'pc-evac-priority', title:'תעדוף פינוי', text:'סדר פינוי מומלץ למחלקה. ההחלטה מי יוצא ראשון שלך; החילוץ ומ״פ רפואה רואים את אותו סדר מומלץ.'},
+  {role:'pc', tab:'action', section:'משימות חוג״ד עכשיו', title:'משימות עכשיו', text:'מה מחכה להחלטה שלך: מיידי / מבצעי / השלמה. מה שלא נסגר כאן נשאר פתוח אצל החובש.'},
+  {role:'pc', tab:'action', key:'pc-tq-watch', title:'חסמי עורקים', text:'כל חסם פעיל עם הזמן מאז ההנחה. ההתראות עולות גם בטלפון שלך וגם אצל החובש; כאן אתה רואה מי מתקרב להחלטה.'},
+  {role:'pc', tab:'action', key:'pc-assessment-debt', title:'חוב הערכה', text:'פצועים מהסריקה המהירה שחסרים להם מדדים או הערכה מלאה. בלי מדדים אין מגמה, ולכן אין התראת הידרדרות לפצוע הזה.'},
+  {role:'pc', tab:'forces', key:'pc-medic-load', title:'עומס חובשים', text:'לכל חובש: כמה פצועים, אדומים, לכודים, חסמים ומתי עדכן. חובש שלא עדכן הרבה זמן הוא נקודה עיוורת.'},
+  {role:'pc', tab:'supply', key:'pc-resupply', title:'השלמות ציוד', text:'בקשות ציוד מהחובשים. אתה מאשר מהרכב או מעביר למ״פ, והחובש רואה את ההחלטה בטלפון שלו.'},
+  {role:'cc', tab:'overview', section:'כל האירועים — פצועים לפי מיון', title:'כל האירועים', text:'פצועים לפי מיון בכל האירועים הפתוחים בפלוגה. הקשה על שורה פותחת את האירוע.'},
+  {role:'cc', tab:'overview', key:'cc-evac-priority', title:'תעדוף פינוי פלוגתי', text:'סדר פינוי מומלץ לכל הפלוגה, מעל רמת המחלקה. זה הסדר שהחילוץ רואה; ההחלטה שלך.'},
+  {role:'cc', tab:'action', key:'cc-resource-requests', title:'בקשות משאב', text:'בקשות תגבור רפואי מחוג״ד. בקשה שלא נענתה נשארת פתוחה אצלו.'},
+  {role:'cc', tab:'action', key:'cc-death-queue', title:'תור רופא', text:'חשד לנפטר שמחכה לאישור רופא. זה אישור קליני, לא קביעת מוות רשמית.'},
+  {role:'cc', tab:'forces', key:'cc-platoon-load', title:'עומס מחלקות', text:'אדום / צהוב לפי מחלקה, כדי לראות איפה צריך תגבור לפני שמבקשים ממך.'},
+  {role:'cc', tab:'supply', section:'סטטוס רכב חוג״ד לפי מחלקה', title:'רכבי חוג״ד', text:'מה נשאר בכל רכב מחלקה. חוסר כאן הוא הבקשה הבאה שתגיע אליך.'}
 ];
-let _guidedTour=null; // {index, screen, role}
+let _guidedTour=null; // {steps, index, origin:{screen, role, tab, signedInRole}, skipped:[], timer, deadline}
+// Hard cap (owner 2026-11-26): while the tour runs the phone gets no server updates, so it ends by
+// itself after 3 minutes, syncs and says why. A full tour takes about 1.5-2 minutes.
+const GUIDED_TOUR_MAX_MS=3*60*1000;
+// Signed in, the tour needs the server to have said "no open incident" this recently (owner
+// 2026-11-26): with no incident there is no team on site whose first minutes it could delay.
+const GUIDED_TOUR_LIST_FRESH_MS=2*60*1000;
 function findTourTarget(step){
   const body=document.getElementById('role-dashboard-body');
-  if(!body) return null;
-  if(step.sel) return body.querySelector(step.sel);
+  if(!body || !step) return null;
+  if(step.key) return body.querySelector(`.role-section[data-section="${step.key}"]`);
   const title=[...body.querySelectorAll('.role-section-title')].find(t=>t.textContent.trim().startsWith(step.section));
   return title?.closest('.role-section')||null;
+}
+function tourTargetVisible(el){
+  if(!el || el.closest('[hidden]')) return false;
+  const r=el.getBoundingClientRect();
+  return r.height>0 && r.width>0 && (typeof el.checkVisibility!=='function' || el.checkVisibility());
+}
+// Put the panel's top just below the sticky command strip, so neither the strip above nor the tour
+// card below covers it (scrollIntoView 'center' left the top under the strip on a 375x812 phone).
+function scrollTourTarget(el){
+  const sticky=document.querySelector('#screen-role-dashboard.active #command-sticky');
+  // Where the strip sits once it sticks: its CSS top (below the header) plus its own height.
+  const stuckBottom=sticky ? (parseFloat(getComputedStyle(sticky).top)||0) + sticky.getBoundingClientRect().height : 0;
+  const top=window.scrollY + el.getBoundingClientRect().top - stuckBottom - 12;
+  window.scrollTo({top:Math.max(0, top), behavior:'auto'});
 }
 function clearTourHighlight(){
   document.querySelectorAll('.tour-highlight').forEach(el=>el.classList.remove('tour-highlight'));
 }
+function highlightTourTarget(el){
+  el.classList.add('tour-highlight');
+  el.classList.remove('collapsed'); // shown open for the tour only; the next render keeps the user's choice
+}
+// Sample data for the tour: platoon A, every panel the steps point at has something in it. No
+// tourniquet is near the 45-minute notice (25 minutes, and the tour ends itself well before 20 more),
+// so the sandbox itself raises no alarm or vibration.
+function seedTourSandboxData(){
+  const now=Date.now();
+  const base={events:[], location:'בניין הדגמה', locDetail:'קומה 2', patientStatus:'in_treatment', siteId:'SITE_A', assignedPlatoonId:'PLT-A', trapStatus:'not_trapped', assignedMedicId:'USR-COHEN'};
+  patients.push(
+    {...base, id:'tour-r1', visualId:'P001', triage:'red', injury:'קטיעה', vitals:{pulse:122,spo2:93,rr:26,avpu:'V'}, lastVitalsAt:now-6*60000,
+      tourniquet:{appliedAt:now-25*60000, limb:'רגל ימין'}, tourniquets:[{id:'TQ-D1', limb:'rl', appliedAt:now-25*60000, status:'active'}]},
+    {...base, id:'tour-r2', visualId:'P002', triage:'red', injury:'חזה', vitals:{pulse:116,spo2:94,rr:28,avpu:'A'}, trapStatus:'trapped', lastVitalsAt:now-8*60000, assignedMedicId:'USR-LEVI'},
+    {...base, id:'tour-y1', visualId:'P003', triage:'yellow', injury:'אגן', vitals:null, needsFullAssessment:true, assessmentDebt:['missing_vitals'], flowMode:'quick', lastVitalsAt:null},
+    {...base, id:'tour-g1', visualId:'P004', triage:'green', injury:'חתכים', vitals:{pulse:84,spo2:99,rr:16,avpu:'A'}, lastVitalsAt:now-5*60000, assignedMedicId:'USR-LEVI'},
+    {...base, id:'tour-b1', visualId:'P005', triage:'yellow', injury:'כוויות', vitals:{pulse:98,spo2:97,rr:18,avpu:'A'}, lastVitalsAt:now-9*60000, siteId:'SITE_B', assignedPlatoonId:'PLT-B', assignedMedicId:null}
+  );
+  createMedicalResourceRequest({resourceType:'paramedic', urgency:'immediate', siteId:'SITE_A', targetLocation:'בניין הדגמה', reasonCodes:['red_patient','tourniquet'], linkedPatientIds:['tour-r1'], requestedByRole:'pc'});
+  createMedicalResourceRequest({resourceType:'doctor_death_cert', urgency:'high', siteId:'SITE_A', targetLocation:'בניין הדגמה', reasonCodes:['suspected_deceased'], requestedByRole:'medic'});
+  createResupplyRequest({items:[{item:'tourniquets', quantity:2}], linkedPatientId:'tour-r1', urgency:'high', reason:'manual_request'});
+}
+function startTourSandbox(){
+  _demoSandbox={snapshot:snapshotSandboxState(), screen:activeScreenId(), timers:[], tour:true, user:currentUser};
+  // The tour shows the local-demo view of the sample data: no signed-in identity, platoon filter or
+  // server list in the sandbox. currentUser comes back on exit (endTourSandbox).
+  currentUser=null;
+  patients=[]; reinforcementRequests=[]; pcReviews=[];
+  pcTruckStock={...PC_TRUCK_BASELINE}; companyStock={...COMPANY_STOCK_BASELINE};
+  medicIncidentAssignments={};
+  state=freshState();
+  allSites.forEach(s=>{ if(s.id!=='ALL') s.externalReports=[]; });
+  siteData={...emptySiteData(), name:'מוקד הדגמה', address:'כתובת הדגמה', eventType:'collapse', buildingType:'partial_collapse'};
+  ensureSiteReadiness();
+  seedTourSandboxData();
+}
+function endTourSandbox(){
+  if(!_demoSandbox || !_demoSandbox.tour) return;
+  const {snapshot, timers, user}=_demoSandbox;
+  timers.forEach(clearTimeout);
+  _demoSandbox=null;
+  closeAllOpenModals();
+  restoreSandboxState(snapshot);
+  currentUser=user;
+}
+function guidedTourRefusal(){
+  // In the sandbox the phone's alarm loop reads the sample patients, so a real tourniquet's banner,
+  // snooze and next level would be held back until the tour ends (clinical review, WP-43).
+  if((patients||[]).some(p=>!['handed_over','deceased'].includes(p.patientStatus) && activeTourniquets(p).length))
+    return 'יש חסם עורקים פעיל בטלפון: הסיור לא זמין, כדי שההתראות שלו לא יעוכבו.';
+  if(!currentUser) return '';
+  if(activeIncident) return 'הסיור זמין מחוץ לאירוע בלבד: במהלכו הטלפון לא מקבל עדכונים והתראות מהאירוע. צא למסך בחירת האירוע והפעל משם.';
+  const role=mapServerRole(currentUser.role);
+  if(!['pc','cc','admin'].includes(role)) return 'הסיור מיועד לחוג״ד ולמ״פ רפואה';
+  if(!_openIncidentsAt || Date.now()-_openIncidentsAt>GUIDED_TOUR_LIST_FRESH_MS)
+    return 'הסיור זמין רק כשהשרת אישר שאין אירוע פתוח: אין עדכון טרי מהשרת. נסה שוב כשיש חיבור.';
+  if((_openIncidents||[]).length) return 'יש אירוע פתוח: הסיור זמין רק כשאין אף אירוע פתוח.';
+  // The all-incidents view is the CC's alert screen across every open incident: no tour while it
+  // shows an alert line (owner 2026-11-26), since nothing new arrives while the tour runs.
+  if(role==='cc' && ccOverviewIncidentAlerts().length) return 'יש התראות פתוחות באירועים: הסיור לא זמין עד שיטופלו.';
+  return '';
+}
+function canStartGuidedTour(){ return !_demoSandbox && !guidedTourRefusal(); }
 function startGuidedTour(){
   if(_demoSandbox){ toast('סיים קודם את ההדגמה'); return; }
-  _guidedTour={index:0, screen:activeScreenId(), role:activeRoleDashboard};
+  const refusal=guidedTourRefusal();
+  if(refusal){ toast(refusal); return; }
+  const signedInRole=currentUser ? mapServerRole(currentUser.role) : null;
+  const steps=['pc','cc'].includes(signedInRole) ? GUIDED_TOUR_STEPS.filter(s=>s.role===signedInRole) : GUIDED_TOUR_STEPS.slice();
+  const origin={screen:activeScreenId(), role:activeRoleDashboard, tab:commandPanelTab, signedInRole};
+  try{ startTourSandbox(); }
+  catch(e){ console.error(e); endTourSandbox(); toast('הסיור לא נפתח · המצב שוחזר'); return; }
+  _guidedTour={steps, index:0, origin, skipped:[]};
+  _guidedTour.deadline=setTimeout(()=>{
+    if(!_guidedTour) return;
+    endGuidedTour();
+    toast('הסיור הסתיים אחרי 3 דקות: הטלפון חזר לקבל עדכונים');
+  }, GUIDED_TOUR_MAX_MS);
   // Dashboards re-render on their own refresh cycles, which drops the highlight - re-apply it.
   _guidedTour.timer=setInterval(()=>{
     if(!_guidedTour || document.querySelector('.tour-highlight')) return;
-    findTourTarget(GUIDED_TOUR_STEPS[_guidedTour.index])?.classList.add('tour-highlight');
+    const el=findTourTarget(_guidedTour.steps[_guidedTour.index]);
+    if(tourTargetVisible(el)) highlightTourTarget(el);
   },1000);
-  showGuidedTourStep();
+  try{ showGuidedTourStep(1); }
+  catch(e){ console.error(e); toast('הסיור לא נפתח · המצב שוחזר'); endGuidedTour(); }
 }
-function showGuidedTourStep(){
+// dir: 1 forward, -1 back. A step whose panel is missing or not visible is skipped in that direction.
+function showGuidedTourStep(dir=1){
   if(!_guidedTour) return;
-  const step=GUIDED_TOUR_STEPS[_guidedTour.index];
-  if(activeScreenId()!=='role-dashboard' || activeRoleDashboard!==step.role) startRoleDashboard(step.role);
-  clearTourHighlight();
-  const target=findTourTarget(step);
-  if(target){
-    target.classList.add('tour-highlight');
-    target.scrollIntoView({block:'center', behavior:'smooth'});
+  const steps=_guidedTour.steps;
+  while(_guidedTour.index>=0 && _guidedTour.index<steps.length){
+    const step=steps[_guidedTour.index];
+    // Render every step from the sandbox data: the screen open when the tour started was drawn from
+    // the phone's own state (for a signed-in CC, the all-incidents view).
+    if(activeScreenId()!=='role-dashboard') startRoleDashboard(step.role);
+    else{ activeRoleDashboard=step.role; renderRoleDashboard(step.role); }
+    setCommandPanelTab(step.tab);
+    clearTourHighlight();
+    const target=findTourTarget(step);
+    if(tourTargetVisible(target)){
+      highlightTourTarget(target);
+      scrollTourTarget(target);
+      const card=document.getElementById('guided-tour-card');
+      if(!card) return;
+      card.style.display='block';
+      document.getElementById('guided-tour-count').textContent=`${_guidedTour.index+1} / ${steps.length}`;
+      document.getElementById('guided-tour-title').textContent=step.title;
+      document.getElementById('guided-tour-text').textContent=step.text;
+      document.getElementById('guided-tour-prev').disabled=_guidedTour.index===0;
+      document.getElementById('guided-tour-next').textContent=_guidedTour.index===steps.length-1?'סיום':'הבא';
+      return;
+    }
+    if(!_guidedTour.skipped.includes(step.title)) _guidedTour.skipped.push(step.title);
+    console.warn('guided tour: panel not shown, step skipped', step.role, step.tab, step.key||step.section);
+    _guidedTour.index+=dir;
   }
-  const card=document.getElementById('guided-tour-card');
-  if(!card) return;
-  card.style.display='block';
-  document.getElementById('guided-tour-count').textContent=`${_guidedTour.index+1} / ${GUIDED_TOUR_STEPS.length}`;
-  document.getElementById('guided-tour-title').textContent=step.title;
-  document.getElementById('guided-tour-text').textContent=step.text+(target?'':' (האזור לא מוצג כרגע במסך הזה)');
-  document.getElementById('guided-tour-prev').disabled=_guidedTour.index===0;
-  document.getElementById('guided-tour-next').textContent=_guidedTour.index===GUIDED_TOUR_STEPS.length-1?'סיום':'הבא';
+  if(_guidedTour.index<0){ _guidedTour.index=0; return showGuidedTourStep(1); }
+  endGuidedTour();
 }
 function guidedTourNext(){
   if(!_guidedTour) return;
-  if(_guidedTour.index>=GUIDED_TOUR_STEPS.length-1) return endGuidedTour();
-  _guidedTour.index++; showGuidedTourStep();
+  if(_guidedTour.index>=_guidedTour.steps.length-1) return endGuidedTour();
+  _guidedTour.index++; showGuidedTourStep(1);
 }
 function guidedTourPrev(){
   if(!_guidedTour || _guidedTour.index===0) return;
-  _guidedTour.index--; showGuidedTourStep();
+  _guidedTour.index--; showGuidedTourStep(-1);
 }
-function endGuidedTour(){
+function endGuidedTour(opts={}){
   if(!_guidedTour) return;
-  const {screen, role, timer}=_guidedTour;
+  const {origin, timer, deadline}=_guidedTour;
   clearInterval(timer);
+  clearTimeout(deadline);
   _guidedTour=null;
   clearTourHighlight();
   const card=document.getElementById('guided-tour-card');
   if(card) card.style.display='none';
-  activeRoleDashboard=role;
-  goTo(screen||'role-dashboard');
+  endTourSandbox();
+  if(opts.signingOut) return; // signOut() continues with the real client and clears the session
+  if(origin.signedInRole==='pc'){ openIncidentPicker(); }
+  else if(origin.signedInRole==='cc'){ enterCcAllIncidentsView(); }
+  else{
+    activeRoleDashboard=origin.role;
+    goTo(origin.screen||'demo');
+    if(origin.screen==='role-dashboard') setCommandPanelTab(origin.tab||'overview');
+    commandPanelTab=origin.tab||'overview';
+  }
+  // Alarms read the sample patients during the tour: re-check the real ones now (a level crossed
+  // meanwhile is raised once), and redraw so no sample banner or chip is left over the real screen.
+  try{ checkTourniquetTimeAlerts(); renderTourniquetTimeAlert(); checkPcReviewAlerts(); renderAlerts(); }catch(e){ console.error(e); }
+  saveDemoState(); // a save dropped while the sandbox was open (see saveDemoState) is made now
+  // Nothing was pushed or pulled while the tour ran: catch up now instead of waiting for the timers.
+  if(currentUser){
+    // A deactivated-account check that landed during the tour was dropped (verifyOfflineProfile): run it again.
+    if(currentUser.offlineProfile){ try{ verifyOfflineProfile(); }catch(e){ console.error(e); } }
+    try{ syncPush(); }catch(e){ console.error(e); }
+    try{ pollIncidentOpenAlerts(); }catch(e){ console.error(e); }
+  }
 }
 function startPcDemo(screen){
   goTo(screen);
@@ -7055,7 +7252,7 @@ function renderCollapsibleSection(key,title,html,count=0,options={}){
   const criticalCount=Number(options.criticalCount||0);
   const collapsed=criticalCount>0?false:isDashboardSectionCollapsed(key);
   const body=html || renderOperationalEmptyState(options.emptyMessage||'אין פריטים להצגה');
-  return `<div class="role-section ${collapsed?'collapsed':''}">
+  return `<div class="role-section ${collapsed?'collapsed':''}" data-section="${key}">
     <div class="role-section-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
       <span>${title} · ${count}</span>
       <button class="demo-mini-btn" onclick="toggleDashboardSection('${key}')">${collapsed?'פתח':'כווץ'}${criticalCount?` · קריטי ${criticalCount}`:''}</button>
@@ -8305,7 +8502,7 @@ function renderCcQuickActions(){
     <button class="cc-action-chip" onclick="generateSitrep()">📋 דיווח רדיו</button>
     <button class="cc-action-chip" onclick="openReinforcementRequest({resourceType:'doctor_treatment'})">🏥 בקש רופא</button>
     <button class="cc-action-chip" onclick="openReinforcementRequest({resourceType:'urgent_evac'})">🚑 בקש פינוי</button>
-    <button class="cc-action-chip" onclick="demoReassignBetweenPlatoons()">🔁 העבר פצוע בין מחלקות</button>
+    <button class="cc-action-chip" onclick="demoReassignBetweenPlatoons()">${currentUser?'🔁 העברת אתר / תגבור פלוגה':'🔁 העבר פצוע בין מחלקות'}</button>
   </div>`;
 }
 function renderCcEvacuationFunnel(){
@@ -8448,7 +8645,7 @@ function positionCommandSticky(){
   sticky.style.top=`${headerTop+header.offsetHeight}px`;
 }
 window.addEventListener('resize', positionCommandSticky);
-// ── חמ״ל רפואי panel (V2.99.93) ──
+// ── חמ״ל רפואי panel (V2.99.95) ──
 // The control room's own screen instead of the generic role page (docs/ROLE_COMMAND_MODEL_v2.6.md
 // "Chamal / Operator / Observer": picture quality - sync, duplicates, external report conflicts,
 // pending requests). One page, nothing behind a tab: the shared status strip (server contact,
@@ -9041,6 +9238,8 @@ function renderRoleDashboard(role=activeRoleDashboard){
   if(sub) sub.textContent=cfg.actor;
   const ctx=document.getElementById('role-context-line');
   if(ctx) ctx.textContent='כל השמות בדמו פיקטיביים. זהו V2.995: כל פצוע הוא כרטיס פיקודי צבעוני עם מקור סיווג, חוב הערכה ופעולה הבאה.';
+  // Signed in, the demo title and text are noise above the fold in an operation; only the sync pill stays.
+  ctx?.closest('.demo-strip')?.classList.toggle('signed-in-compact', !!currentUser);
   const metrics=[
     roleMetric(pts.length, role==='medic'?'הפצועים שלי':role==='pc'?'פצועי המחלקה':role==='rpc'?'פצועי המחלקה (טקטי)':role==='rcc'?'פצועי הפלוגה (טקטי)':'פצועים גלויים'),
     roleMetric(alerts.length, 'התראות לפעולה'),
@@ -9252,6 +9451,13 @@ async function setIncidentUnit(value){
   if(!activeIncident) return;
   const platoonId=value.startsWith('p:') ? value.slice(2) : null;
   const companyId=value.startsWith('c:') ? value.slice(2) : platoonId ? (_realPlatoons.find(p=>p.id===platoonId)?.company_id||null) : null;
+  // Another company taking a site that already has one is a handover (WP-27): the old company keeps
+  // read-only access until the CC ends it. Choosing a platoon of the same company stays here.
+  if(_activeIncidentCompanyId && companyId!==_activeIncidentCompanyId){
+    toast('העברת אתר לפלוגה אחרת: דרך "העברה / תגבור פלוגה" ברשימת האירועים (נדרשת סיבה)');
+    openIncidentUnitPanel(activeIncident.id);
+    return;
+  }
   if(await platoonRpc('set_incident_unit', {p_incident_id:activeIncident.id, p_company_id:companyId, p_platoon_id:platoonId}, value?'המוקד שויך':'השיוך הוסר')){
     _activeIncidentCompanyId=companyId; _activeIncidentPlatoonId=platoonId;
   }
@@ -9280,6 +9486,8 @@ function demoReassignWithinPlatoon(){
   toast('פצוע הועבר בין חובשים · אירוע נרשם בלוג');
 }
 function demoReassignBetweenPlatoons(){
+  // Signed in, the CC moves or reinforces the whole site (WP-27, database/096); no single patient moves.
+  if(currentUser){ openIncidentUnitPanel(activeIncident?.id||null); return; }
   const p=patients.find(x=>x.triage==='red')||patients[0];
   if(!p){ toast('אין פצועים'); return; }
   reassignPatient(p.id,{toPlatoonId:p.assignedPlatoonId==='PLT-B'?'PLT-A':'PLT-B',assignedByRole:'cc',reason:'איזון עומס בין מחלקות'});
@@ -9443,6 +9651,7 @@ setInterval(updateClock,1000); updateClock();
 const TERMINAL_STATUSES = new Set(['deceased','evacuating','evacuated','handed_over','closed','self_evacuated']);
 
 function goHome(){
+  if(guidedTourBlocksNavigation()) return;
   if(currentUser){ openIncidentPicker(); return; }
   hideSameZoneFab();
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -9484,7 +9693,14 @@ function projectPatientStatus(nextStatus, eventType, payload={}){
   syncComputedStatusDisplay();
 }
 
+function guidedTourBlocksNavigation(){
+  if(!_guidedTour) return false;
+  toast('הסיור פתוח על נתוני הדגמה: סיים או לחץ "יציאה" קודם');
+  return true;
+}
 function goTo(screen){
+  // Leaving the tour's screen would let records be made in the sandbox and silently discarded.
+  if(screen!=='role-dashboard' && guidedTourBlocksNavigation()) return;
   setTimeout(renderMedicExtractionBanner,0); // extraction calls follow the screen (medic home in the demo)
   if(screen!=='sweep') hideSameZoneFab();
   Object.keys(vitalCountdowns||{}).forEach(k=>stopCountTimer(k, false));
@@ -11065,7 +11281,7 @@ function buildAlertObjects(pts=patients, reportSites=null){
     if(auth.incidentType && auth.incidentType!==typeReport.type) pushAlert(alerts,{id:`incident-type-mismatch-${typeReport.siteId}`,type:'INCIDENT_TYPE_MISMATCH',severity:'medium',owner:'pc',audience:['pc','cc'],escalatesTo:null,actionRequired:'acknowledge',scope:'site',category:'integrity',siteId:typeReport.siteId,title:'פער בסוג אירוע: חובש מול חילוץ',detail:`חילוץ: ${INCIDENT_TYPE_LABELS[auth.incidentType]} · חובש: ${INCIDENT_TYPE_LABELS[typeReport.type]} · סוג החילוץ נשאר בתוקף`});
   }
   const conflicts=externalConflictCount(pts,reports);
-  // Per site, and only against a report that exists (V2.99.93; externalGapsBySite). Before, the
+  // Per site, and only against a report that exists (V2.99.95; externalGapsBySite). Before, the
   // field count of every patient passed in (all sites for CC and chamal, one platoon for PC) was
   // compared with the reports of cmdActiveSite alone, and with no report every field casualty
   // counted as a "gap".
@@ -14524,7 +14740,9 @@ function patientSyncRejectionBanner(p){
     <div style="font-weight:900;font-size:14px;color:var(--red)">⛔ ${title}</div>
     <div style="font-size:12px;margin-top:4px">${detail}</div>
     ${r.code?`<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px">${escAttr(r.code)}${r.message?' · '+escAttr(r.message):''}</div>`:''}
-    <button class="btn-secondary" style="margin-top:8px" onclick="retryPatientSync('${p.id}')">שלח שוב לשרת</button>
+    ${typeof isActiveIncidentReadOnly==='function' && isActiveIncidentReadOnly() && r.code==='FORBIDDEN_ACTOR_ROLE'
+      ? `<div data-relief-rejection style="font-size:12px;font-weight:700;margin-top:6px">נרשם אחרי שהוחלפת: השרת לא יקבל אותו. מסור/י את הפרטים בעל פה לחוג״ד של האתר או לחובש המחליף, ודווח/י למ״פ רפואה. שליחה חוזרת לא תעזור.</div>`
+      : `<button class="btn-secondary" style="margin-top:8px" onclick="retryPatientSync('${p.id}')">שלח שוב לשרת</button>`}
   </div>`;
 }
 // Re-queue this patient's rejected events (create first, in original outbox order) for the next
@@ -14546,7 +14764,7 @@ function sectorFromLocation(location=''){
   const floor=(location.match(/קומה\s*([^,]+)/)||[])[1] || 'קרקע/לא ידוע';
   return {building:building.trim(), floor:floor.trim()};
 }
-// External report against the field, per site (V2.99.93). The sites looked at: every site that has a
+// External report against the field, per site (V2.99.95). The sites looked at: every site that has a
 // casualty in pts, plus every site in view that has a report (a report with no field casualty yet is
 // the whole gap). Each site's report is compared with that site's whole field count
 // (getSitePatients), never with a platoon's share of it or with another site's casualties. Sites with
@@ -14569,7 +14787,7 @@ function externalConflictCount(pts, reports){
   return Math.abs(field.red-reported.red)+Math.abs(field.yellow-reported.yellow)+Math.abs(field.green-reported.green);
 }
 // Two casualties are a suspected duplicate only on the same site, in the same recorded zone, with an
-// overlapping injury or both trapped / without access (V2.99.93). The field flows keep the site
+// overlapping injury or both trapped / without access (V2.99.95). The field flows keep the site
 // address in location and the zone in locDetail (zoneLabel(), sometimes followed by " · " and a
 // description), so the zone is read from there; location was the site address and never told two
 // places apart. Before, sites were not compared, an unparsed location counted as one sector and two
@@ -14579,7 +14797,7 @@ function duplicateZoneOf(p){ return String(p.zone||String(p.locDetail||'').split
 // Words that say nothing about the casualty: the template texts the flows write when no injury was
 // entered (MSTART sweep, life-saving action, rescue-chain report), the site's likely mechanisms (a
 // site setting) and generic words. Without this, every casualty registered without an injury
-// "overlapped" with every other one (V2.99.93). siteData.lastMechanism is deliberately not ignored:
+// "overlapped" with every other one (V2.99.95). siteData.lastMechanism is deliberately not ignored:
 // it is the last injury typed on this phone, a real injury, and ignoring it would hide a true pair.
 const DUPLICATE_PLACEHOLDER_INJURIES=['לא תועד','הערכת MSTART בלבד','פעולה מצילת חיים בשטח','פעולה מצילת חיים','דיווח שדה ראשוני — לא הוערך קלינית','פגיעת קריסה / לכידה','חסם עורקים הונח (דיווח שדה ראשוני)','דימום מסיבי מדווח'];
 const DUPLICATE_GENERIC_WORDS=['פגיעת','פגיעה','פציעה','פציעת','חשד','מדווח','בשטח','ראשוני'];
@@ -15799,7 +16017,7 @@ function renderCommandOperationalPanels(pts, site){
   setCmdPanelMeta('alerts', `${buildAlertObjects(pts).filter(a=>a.audience.includes(roleAudience)).length} מנותבות`);
 }
 // One row per field device: real device_presence signed in, inferred from patients in the local demo.
-// Shared by the full command screen's device panel and the חמ״ל רפואי panel (V2.99.93).
+// Shared by the full command screen's device panel and the חמ״ל רפואי panel (V2.99.95).
 function commandDeviceRows(pts){
   const deviceMap=new Map();
   if(currentUser && _remoteDevicePresence.length){
@@ -15979,7 +16197,8 @@ function renderCcOverviewPanel(){
   const pick='<div class="role-row"><div class="role-row-title">בחר אירוע</div><div class="role-row-sub">הקש על אירוע בטבלאות בלשונית תמונת מצב כדי לראות את הפצועים, ההתראות והבקשות שלו.</div></div>';
   const panels={
     overview:`${roleSection('כל האירועים — פצועים לפי מיון', renderAllIncidentsTriageTable())}
-      <button class="demo-mini-btn" style="width:100%;margin-top:4px" onclick="openIncidentPicker()">רשימת אירועים · פתיחה ומיזוג כפילויות</button>`,
+      <button class="demo-mini-btn" style="width:100%;margin-top:4px" onclick="openIncidentPicker()">רשימת אירועים · פתיחה ומיזוג כפילויות</button>
+      ${canStartGuidedTour()?'<button class="demo-mini-btn" style="width:100%;margin-top:8px;min-height:48px" data-guided-tour-start onclick="startGuidedTour()">סיור מודרך במסך הפיקוד (נתוני הדגמה)</button>':''}`,
     action:pick,
     forces:pick+(canManagePlatoonRoster()?roleSection('פלוגות ומחלקות — שיבוץ', '<div id="platoon-roster-panel" style="font-size:13px;color:var(--muted)">טוען…</div>'):''),
     supply:pick
@@ -16688,6 +16907,9 @@ let _platoonsByCompany={}; // company id -> [{id,name}], for the banner's platoo
 let _openDupesShownFor=null; // location the duplicate warning was shown for; a second press opens anyway
 let _workingIncidentId=null; // which incident patients[] currently holds (in memory only)
 let _openIncidents=[];
+// When the server last answered list_open_incidents (ms). A failed pull keeps the old list, so an empty
+// list alone does not prove there is no open incident (guided tour rule, owner 2026-11-26).
+let _openIncidentsAt=0;
 let _incidentListError='';
 let _incidentOverviewState={}; // incidentId -> get_incident_command_state row, picker overview only
 let _legacySiteB=null;
@@ -16739,6 +16961,7 @@ async function refreshOpenIncidents(){
   if(result.error){ _incidentListError='טעינת האירועים נכשלה: '+(result.error.message||''); return false; }
   _incidentListError='';
   _openIncidents=Array.isArray(result.data)?result.data:[];
+  _openIncidentsAt=Date.now();
   if(currentUser.role==='rcc' || currentUser.role==='rpc'){
     // RCC / RPC: no patients table, no command state (database/074). The rescue board per incident and
     // the site authority rows instead (RCC panel).
@@ -16910,6 +17133,10 @@ async function pollIncidentOpenAlerts(){
   if(!currentUser) return;
   await refreshIncidentOpenAlerts();
   renderIncidentOpenAlertBanner();
+  await refreshIncidentUnitNotices();
+  renderIncidentUnitNoticeBanner();
+  await refreshPendingReliefs();
+  renderReliefOverdueBanner();
 }
 setInterval(()=>{ if(currentUser && INCIDENT_OPEN_ALERT_ROLES.has(currentUser.role)) pollIncidentOpenAlerts(); }, 20000);
 function renderIncidentOpenAlertBanner(){
@@ -16998,6 +17225,10 @@ async function activateIncident(inc){
   activeIncident={id:inc.id, visual_id:inc.visual_id, status:inc.status, location_name:inc.location_name, address:inc.address||'', incident_type:inc.incident_type||null, incident_types:incidentTypesFromRow(inc), draft_resolution:inc.draft_resolution||null,
     opened_by:inc.opened_by!==undefined?inc.opened_by:(prev?prev.opened_by:undefined), false_alarm:!!(inc.false_alarm||prev?.false_alarm),
     t_zero:inc.t_zero||prev?.t_zero||null}; // the alert time, injury time's default (WP-23)
+  // WP-27: keep this phone's relief / read-only state across a re-entry, and ask the server now.
+  if(prev?.access_mode){ activeIncident.access_mode=prev.access_mode; activeIncident.read_only_since=prev.read_only_since||null; activeIncident.site_company_name=prev.site_company_name||null; }
+  else if(inc.read_only) activeIncident.access_mode='read_only';
+  refreshActiveIncidentAccess().then(()=>renderIncidentContext()).catch(()=>{});
   if(_workingIncidentId!==inc.id){ resetWorkingStateForIncident(inc); _workingIncidentId=inc.id; }
   siteData.name=siteData.name||inc.location_name||'';
   siteData.address=siteData.address||inc.address||'';
@@ -17058,6 +17289,8 @@ async function refreshIncidentPicker(){
   renderIncidentContext();
 }
 function renderIncidentPicker(){
+  const tourPanel=document.getElementById('incident-picker-tour');
+  if(tourPanel) tourPanel.style.display=canStartGuidedTour()?'':'none';
   const list=document.getElementById('incident-picker-list');
   if(!list) return;
   const errEl=document.getElementById('incident-picker-error');
@@ -17079,12 +17312,13 @@ function renderIncidentPicker(){
       const st=_incidentOverviewState[inc.id];
       const counts=st ? ` · אדומים פעילים ${st.active_red_patients??0} · חסרי מדדים ${st.patients_missing_full_vitals??0} · התראות ${st.active_watchdog_alerts??0}` : '';
       const isCurrent=activeIncident?.id===inc.id;
-      const enterLabel=isCurrent?'המשך באירוע':(inc.is_member||hasBlanketIncidentAccess())?'כניסה':'הצטרף לאירוע';
+      const enterLabel=inc.read_only?'צפייה':isCurrent?'המשך באירוע':(inc.is_member||hasBlanketIncidentAccess())?'כניסה':'הצטרף לאירוע';
       return `<div class="incident-card ${inc.status==='draft'?'draft':''}">
-        <div class="incident-card-head"><strong>${escAttr(inc.visual_id||'')} · ${escAttr(inc.location_name||'')}</strong><span class="incident-status-badge ${escAttr(inc.status)}">${escAttr(SERVER_INCIDENT_STATUS_LABELS[inc.status]||inc.status)}</span></div>
+        <div class="incident-card-head"><strong>${escAttr(inc.visual_id||'')} · ${escAttr(inc.location_name||'')}</strong><span class="incident-status-badge ${escAttr(inc.status)}">${escAttr(SERVER_INCIDENT_STATUS_LABELS[inc.status]||inc.status)}</span>${inc.read_only?'<span class="incident-status-badge closed" data-readonly-badge>צפייה בלבד</span>':''}</div>
         <div class="incident-card-meta">${inc.address?escAttr(inc.address)+' · ':''}${incidentTypesRowLabel(inc)?`<span data-incident-card-types>${escAttr(incidentTypesRowLabel(inc))}</span> · `:''}נפתח ${inc.opened_at?new Date(inc.opened_at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):''}${inc.opened_by_name?' ע״י '+escAttr(inc.opened_by_name):''} · ${inc.patient_count||0} פצועים${counts}</div>
-        <div class="incident-card-actions"><button onclick="enterIncidentFromPicker('${escAttr(inc.id)}')">${enterLabel}</button>${canMergeIncidents() && ['active','staging'].includes(inc.status) && _openIncidents.length>1 ? `<button onclick="toggleIncidentMergePanel('${escAttr(inc.id)}')">מיזוג כפילות</button>`:''}</div>
+        <div class="incident-card-actions"><button onclick="enterIncidentFromPicker('${escAttr(inc.id)}')">${enterLabel}</button>${canMergeIncidents() && ['active','staging'].includes(inc.status) && _openIncidents.length>1 ? `<button onclick="toggleIncidentMergePanel('${escAttr(inc.id)}')">מיזוג כפילות</button>`:''}${canChangeIncidentUnit() && ['active','staging'].includes(inc.status) ? `<button onclick="toggleIncidentUnitPanel('${escAttr(inc.id)}')">העברה / תגבור פלוגה</button>`:''}</div>
         ${_mergePanelFor===inc.id && canMergeIncidents() ? incidentMergePanelHtml(inc) : ''}
+        ${_unitPanelFor===inc.id && canChangeIncidentUnit() ? incidentUnitPanelHtml(inc) : ''}
       </div>`;
     }).join('');
   }
@@ -17110,7 +17344,7 @@ function renderIncidentPicker(){
 async function enterIncidentFromPicker(incidentId){
   const inc=_openIncidents.find(i=>i.id===incidentId);
   if(!inc) return;
-  if(!inc.is_member && !hasBlanketIncidentAccess()){
+  if(!inc.is_member && !inc.read_only && !hasBlanketIncidentAccess()){
     const client=getSupabaseClient();
     let r;
     try{ r=await client.rpc('join_incident', {p_incident_id:incidentId}); }catch(e){ r={error:e}; }
@@ -17267,6 +17501,290 @@ async function switchToMergedIncident(targetId, targetVisualId){
     toast(`האירוע ${fromLabel} אוחד לתוך ${target.visual_id||targetVisualId||''} · עוברים אליו. נתונים שטרם נשלחו יישלחו לשם.`);
     await activateIncident(target);
   }finally{ _switchingToMerged=false; }
+}
+
+// ── Move a site to another company, or reinforce it (WP-27, database/096) ──
+// CC / chamal / admin, from the incident picker. Handover: the site becomes the other company's (its
+// PC, RCC and rescue chain), the old company sees it read-only until the CC ends that. Reinforce:
+// the other company's PC joins as a full member and assigns his own medics; the site stays with its
+// company and its PC leads; "release" makes the reinforcing company read-only. Relief (owner
+// 2026-11-22): on a handover or a release the leaving company's medical staff keep recording until
+// each taps "הוחלפתי - מסרתי" (or his PC / the CC marks him); its RCC / RPC are read-only at once.
+// A read-only phone is told so on the strip; a record it makes after that is refused by the server
+// and shows as a sync rejection (records from before are still accepted).
+const INCIDENT_UNIT_CHANGE_ROLES=new Set(['cc','chamal','admin']);
+const INCIDENT_UNIT_NOTICE_ROLES=new Set(['pc','rcc','rpc']);
+const INCIDENT_FULL_ACCESS_ROLES=new Set(['cc','chamal','admin','physician']); // never read-only (app.can_access_incident)
+let _unitPanelFor=null;            // incident id whose handover / reinforce panel is open in the picker
+let _unitPanelMode='handover';
+let _unitLinksByIncident={};       // incident id -> get_incident_unit_links() result
+let _incidentUnitNotices=[];       // list_incident_unit_notices() rows not acknowledged by this user
+let _seenUnitNoticeIds=new Set();
+function canChangeIncidentUnit(){ return INCIDENT_UNIT_CHANGE_ROLES.has(currentUser?.role); }
+function unitCompanyName(id, fallback){
+  const c=Array.isArray(_realCompanies) ? _realCompanies.find(x=>x.id===id) : null;
+  return c?.name || fallback || 'פלוגה';
+}
+async function loadIncidentUnitLinks(incidentId){
+  const client=getSupabaseClient();
+  if(!client || !incidentId) return null;
+  let r;
+  try{ r=await client.rpc('get_incident_unit_links', {p_incident_id:incidentId}); }catch(e){ return null; }
+  if(r.error || !r.data) return r.error ? {error:r.error} : null;
+  _unitLinksByIncident[incidentId]=r.data;
+  return r.data;
+}
+async function toggleIncidentUnitPanel(id){
+  _unitPanelFor=_unitPanelFor===id?null:id;
+  _unitPanelMode='handover';
+  renderIncidentPicker();
+  if(!_unitPanelFor) return;
+  const client=getSupabaseClient();
+  if(client && !Array.isArray(_realCompanies)) await pullRealPlatoons(client);
+  await loadIncidentUnitLinks(id);
+  if(_unitPanelFor===id) renderIncidentPicker();
+}
+function setIncidentUnitPanelMode(mode){ _unitPanelMode=mode==='reinforce'?'reinforce':'handover'; renderIncidentPicker(); }
+// From the CC quick action or the roster: the picker with this incident's panel open.
+async function openIncidentUnitPanel(incidentId){
+  openIncidentPicker();
+  if(incidentId && _unitPanelFor!==incidentId) await toggleIncidentUnitPanel(incidentId);
+}
+function incidentUnitPanelHtml(inc){
+  const id=escAttr(inc.id);
+  const links=_unitLinksByIncident[inc.id];
+  const siteCompanyId=links?.company_id ?? inc.company_id ?? null;
+  const siteCompany=siteCompanyId ? unitCompanyName(siteCompanyId, links?.company_name) : 'ללא פלוגה';
+  const open=(links?.links||[]).filter(l=>!l.ended_at);
+  const reinforcing=open.filter(l=>l.kind==='reinforcing' && !l.read_only_since);
+  const readOnly=open.filter(l=>l.read_only_since);
+  const companies=(Array.isArray(_realCompanies)?_realCompanies:[]).filter(c=>c.is_active!==false && c.id!==siteCompanyId
+    && (_unitPanelMode==='handover' || !reinforcing.some(l=>l.company_id===c.id)));
+  const time=t=>t?new Date(t).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):'';
+  const waiting=incidentReliefWaitingHtml(inc.id, links);
+  const rows=[
+    ...reinforcing.map(l=>`<div class="unit-link-row" data-unit-link="${escAttr(l.id)}"><span>🤝 ${escAttr(unitCompanyName(l.company_id,l.company_name))} מתגברת מ־${time(l.started_at)}</span><button onclick="releaseIncidentUnit('${id}','${escAttr(l.company_id)}')">שחרור תגבור</button></div>`),
+    ...readOnly.map(l=>`<div class="unit-link-row" data-unit-link="${escAttr(l.id)}"><span>👁 ${escAttr(unitCompanyName(l.company_id,l.company_name))} · ${l.kind==='former'?'העבירה את האתר ב־':'שוחררה מתגבור ב־'}${time(l.read_only_since)} · צפייה אחרי החלפה</span><button onclick="endIncidentUnitAccess('${id}','${escAttr(l.company_id)}')">סיום גישה</button></div>`)
+  ].join('');
+  const explain=_unitPanelMode==='handover'
+    ? `העברת האתר: הפלוגה שתבחר/י מקבלת את האתר (החוג״ד, מ״פ החילוץ, והמחלקה תיבחר מחדש). הצוות הרפואי של ${escAttr(siteCompany)} ממשיך לתעד עד שכל אחד מאשר "הוחלפתי - מסרתי", ואז צפייה בלבד עד שתסיים/י את הגישה. מ״פ ומ״מ החילוץ שלה בצפייה בלבד מיד.`
+    : `תגבור: החוג״ד של הפלוגה שתבחר/י מצטרף לאתר ומשבץ את החובשים שלו. האתר נשאר של ${escAttr(siteCompany)} והחוג״ד שלה מוביל.`;
+  return `<div class="incident-merge-panel incident-unit-panel" data-unit-panel="${id}">
+    <div class="demo-strip-sub" style="margin-bottom:6px">פלוגת האתר: <b>${escAttr(siteCompany)}</b></div>
+    ${rows}
+    ${waiting}
+    <div class="unit-mode" style="margin-top:8px"><button data-unit-mode="handover" class="${_unitPanelMode==='handover'?'primary':''}" onclick="setIncidentUnitPanelMode('handover')">העברת האתר</button><button data-unit-mode="reinforce" class="${_unitPanelMode==='reinforce'?'primary':''}" onclick="setIncidentUnitPanelMode('reinforce')">תגבור</button></div>
+    <div class="demo-strip-sub" style="margin-bottom:6px">${explain}</div>
+    ${links?.error ? '<div class="login-error">טעינת שיוך הפלוגות נכשלה, בדוק/י חיבור</div>' : ''}
+    ${companies.length ? `<select id="unit-company-${id}"><option value="">${_unitPanelMode==='handover'?'לאיזו פלוגה להעביר?':'איזו פלוגה מתגברת?'}</option>${companies.map(c=>`<option value="${escAttr(c.id)}">${escAttr(c.name)}</option>`).join('')}</select>` : '<div class="demo-strip-sub">אין פלוגה אחרת לבחירה.</div>'}
+    <input type="text" id="unit-reason-${id}" oninput="const e=document.getElementById('unit-error-${id}'); if(e) e.textContent='';" placeholder="${_unitPanelMode==='handover'?'סיבה (חובה), לדוגמה: מחלקה א יוצאת למנוחה':'סיבה (חובה), לדוגמה: עומס פצועים'}">
+    <div class="login-error" id="unit-error-${id}"></div>
+    <button onclick="submitIncidentUnitChange('${id}')">${_unitPanelMode==='handover'?'העבר את האתר':'הוסף תגבור'}</button>
+  </div>`;
+}
+async function incidentUnitRpc(name, args){
+  const client=getSupabaseClient();
+  if(!client) return {error:{message:'אין חיבור לשרת'}};
+  try{ return await client.rpc(name, args); }catch(e){ return {error:e}; }
+}
+async function afterIncidentUnitChange(incidentId){
+  await loadIncidentUnitLinks(incidentId);
+  await refreshIncidentContext();
+  if(document.getElementById('screen-incident-picker')?.classList.contains('active')) renderIncidentPicker();
+}
+async function submitIncidentUnitChange(incidentId){
+  const mode=_unitPanelMode;
+  const companyId=document.getElementById('unit-company-'+incidentId)?.value||'';
+  const reason=(document.getElementById('unit-reason-'+incidentId)?.value||'').trim();
+  const err=document.getElementById('unit-error-'+incidentId);
+  if(err) err.textContent='';
+  if(!companyId){ if(err) err.textContent='נא לבחור פלוגה'; return; }
+  if(!reason){ if(err) err.textContent='חובה לציין סיבה'; return; }
+  const inc=_openIncidents.find(i=>i.id===incidentId);
+  const to=unitCompanyName(companyId);
+  const q=mode==='handover'
+    ? `להעביר את ${inc?.visual_id||''} (${inc?.location_name||''}) ל${to}? הפלוגה הנוכחית תעבור לצפייה בלבד.`
+    : `לצרף את ${to} כתגבור ל${inc?.visual_id||''} (${inc?.location_name||''})?`;
+  if(!confirm(q)) return;
+  const r=await incidentUnitRpc(mode==='handover'?'handover_incident_unit':'reinforce_incident_unit',
+    {p_incident_id:incidentId, p_company_id:companyId, p_reason:reason, p_device_id:getDeviceId(), p_local_event_id:`incident-unit-${mode}-${newUuid()}`});
+  if(r.error || !r.data){ if(err) err.textContent=(mode==='handover'?'ההעברה נכשלה: ':'התגבור נכשל: ')+(r.error?.message||'שגיאה'); return; }
+  toast(mode==='handover'
+    ? `האתר הועבר ל${to} · ${r.data.relief_pending??0} מהצוות הרפואי הקודם ממתינים להחלפה · המחלקה תיבחר ע״י החוג״ד / מ״פ החילוץ`
+    : `${to} מתגברת · ${r.data.pcs_added?'החוג״ד שלה צורף ומשבץ את החובשים':'לפלוגה אין חוג״ד פעיל, יש לשבץ ידנית'}`);
+  await afterIncidentUnitChange(incidentId);
+}
+async function releaseIncidentUnit(incidentId, companyId){
+  if(!confirm(`לשחרר את ${unitCompanyName(companyId)} מהתגבור? הצוות הרפואי שלה ימשיך לתעד עד שכל אחד יאשר "הוחלפתי - מסרתי".`)) return;
+  const r=await incidentUnitRpc('release_incident_unit', {p_incident_id:incidentId, p_company_id:companyId, p_reason:null, p_device_id:getDeviceId(), p_local_event_id:`incident-unit-release-${newUuid()}`});
+  if(r.error){ toast('השחרור נכשל: '+(r.error.message||'')); return; }
+  toast(`${unitCompanyName(companyId)} שוחררה · ממתינים להחלפה: ${r.data?.relief_pending??0}`);
+  await afterIncidentUnitChange(incidentId);
+}
+async function endIncidentUnitAccess(incidentId, companyId){
+  if(!confirm(`לסיים את הגישה של ${unitCompanyName(companyId)} לאתר? היא לא תראה אותו יותר, וגם מי שעוד לא אישר החלפה יוחלף עכשיו.`)) return;
+  const r=await incidentUnitRpc('end_incident_unit_access', {p_incident_id:incidentId, p_company_id:companyId, p_device_id:getDeviceId(), p_local_event_id:`incident-unit-end-${newUuid()}`});
+  if(r.error){ toast('סיום הגישה נכשל: '+(r.error.message||'')); return; }
+  toast(`הגישה של ${unitCompanyName(companyId)} הסתיימה`);
+  await afterIncidentUnitChange(incidentId);
+}
+
+// This phone's own access to its incident: full, read-only (site handed over / reinforcement
+// released), or ended by the CC. Company-level roles are always full, so they are not asked.
+async function refreshActiveIncidentAccess(){
+  if(!currentUser || !activeIncident || INCIDENT_FULL_ACCESS_ROLES.has(currentUser.role)) return;
+  const was=activeIncident.access_mode||'full';
+  const r=await loadIncidentUnitLinks(activeIncident.id);
+  if(!r) return; // offline: keep the last answer
+  let mode=was;
+  if(r.error){ if(r.error.code==='42501') mode='ended'; else return; }
+  else mode=['read_only','relief_pending'].includes(r.my_access)?r.my_access:'full';
+  activeIncident.access_mode=mode;
+  activeIncident.read_only_since=r.error?activeIncident.read_only_since:(r.my_read_only_since||null);
+  activeIncident.site_company_name=r.error?activeIncident.site_company_name:(r.company_name||null);
+  persistActiveIncident();
+  if(mode!==was && mode!=='full'){
+    try{ navigator.vibrate?.([200,100,200]); }catch(e){}
+    toast(mode==='ended' ? 'הגישה שלך לאתר הסתיימה ע״י מ״פ רפואה'
+      : mode==='relief_pending' ? 'האתר הועבר / התגבור שוחרר: המשך לתעד עד שתמסור את הפצועים, ואז "הוחלפתי - מסרתי"'
+      : 'הוחלפת: צפייה בלבד. רישומים חדשים לא יתקבלו בשרת');
+  }
+}
+function isActiveIncidentReadOnly(){ return !!activeIncident && ['read_only','ended'].includes(activeIncident.access_mode); }
+// Who still waits for relief (the server lists the caller's company for a PC, everyone for the CC).
+// A PC or the CC can mark someone whose phone is gone; the person himself uses his own button.
+function incidentReliefWaitingHtml(incidentId, links, othersOnly){
+  const rows=(links?.relief_pending||[]).filter(x=>!(othersOnly && x.profile_id===currentUser?.id));
+  if(!rows.length || !(['pc'].includes(currentUser?.role) || canChangeIncidentUnit())) return '';
+  return `<div class="relief-waiting" data-relief-waiting="${escAttr(incidentId)}">ממתינים להחלפה: ${rows.map(x=>`<span class="unit-link-row" data-relief-row="${escAttr(x.profile_id)}"><span>${escAttr(x.display_name||'')} (${escAttr(({pc:'חוג״ד',medic:'חובש',paramedic:'פראמדיק'})[x.role]||x.role)})</span>${x.profile_id===currentUser?.id?'':`<button onclick="confirmIncidentRelief('${escAttr(x.profile_id)}','${escAttr(incidentId)}')">סמן כהוחלף</button>`}</span>`).join('')}</div>`;
+}
+async function confirmIncidentRelief(profileId, incidentId){
+  const incId=incidentId||activeIncident?.id;
+  if(!incId) return;
+  const self=!profileId || profileId===currentUser?.id;
+  const name=self?'':((_unitLinksByIncident[incId]?.relief_pending||[]).find(x=>x.profile_id===profileId)?.display_name||'');
+  // Review 2026-11-25: send this phone's records first. Until they reach the server the new team
+  // does not see them, and a record dated after the relief (a phone clock running fast) is refused.
+  if(self){
+    let unsent=unsentRecordsForIncident(incId);
+    if(unsent>0){
+      toast(`שולח ${unsent} רישומים לפני ההחלפה...`);
+      try{ await syncPush(); }catch(e){}
+      unsent=unsentRecordsForIncident(incId);
+    }
+    if(unsent>0 && !confirm(`⚠️ יש ${unsent} רישומים שעוד לא נשלחו לשרת. הצוות המחליף לא רואה אותם עד שיישלחו. מומלץ לחכות לקליטה ולשלוח שוב. לאשר החלפה בכל זאת?`)) return;
+  }
+  if(!confirm(self ? 'מסרת את הפצועים לצוות המחליף? אחרי האישור תוכל/י רק לצפות באתר.' : `לסמן ש${name} הוחלף/ה? מעכשיו צפייה בלבד עבורו/ה.`)) return;
+  const r=await incidentUnitRpc('confirm_incident_relief', {p_incident_id:incId, p_profile_id:self?null:profileId, p_device_id:getDeviceId(), p_local_event_id:`incident-relief-${newUuid()}`});
+  if(r.error){ toast('האישור נכשל'+(navigator.onLine===false?': אין חיבור לשרת, נסה/י שוב כשיחזור':': '+(r.error.message||''))); return; }
+  toast(self?'הוחלפת: צפייה בלבד באתר':`${name} סומן/ה כהוחלף/ה`);
+  await afterIncidentUnitChange(incId);
+}
+function renderIncidentReadOnlyBanner(){
+  const el=document.getElementById('incident-readonly-banner');
+  if(!el) return;
+  const pending=currentUser && activeIncident?.access_mode==='relief_pending';
+  if(!currentUser || (!isActiveIncidentReadOnly() && !pending)){ el.style.display='none'; el.textContent=''; return; }
+  if(pending){
+    el.style.display='block';
+    el.innerHTML=`📤 האתר הועבר${activeIncident.site_company_name?' ל'+escAttr(activeIncident.site_company_name):''} · המשך/י לתעד עד שתמסור/י את הפצועים
+      <button data-relief-self onclick="confirmIncidentRelief(null)">הוחלפתי - מסרתי</button>${incidentReliefWaitingHtml(activeIncident.id, _unitLinksByIncident[activeIncident.id], true)}`;
+    return;
+  }
+  const since=activeIncident.read_only_since?new Date(activeIncident.read_only_since).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):'';
+  el.style.display='block';
+  const text=activeIncident.access_mode==='ended'
+    ? '⛔ הגישה שלך לאתר הסתיימה. רישומים שלא נשלחו יישלחו; רישומים אחרי ההחלפה יידחו.'
+    : `👁 צפייה בלבד${since?' מ־'+since:''}${activeIncident.site_company_name?' · האתר אצל '+activeIncident.site_company_name:''}. רישומים חדשים לא יתקבלו בשרת · ${currentUser.role==='pc'?'פנה/י למ״פ רפואה':'פנה/י לחוג״ד או למ״פ רפואה'}`;
+  // A relieved PC can still mark his medics whose phones are gone.
+  el.innerHTML=escAttr(text)+(activeIncident.access_mode==='ended'?'':incidentReliefWaitingHtml(activeIncident.id, _unitLinksByIncident[activeIncident.id], true));
+}
+
+// B's PC / RCC / RPC: a site handed to their company, or their company sent to reinforce one.
+async function refreshIncidentUnitNotices(){
+  if(!currentUser || !INCIDENT_UNIT_NOTICE_ROLES.has(currentUser.role)){ _incidentUnitNotices=[]; return; }
+  const client=getSupabaseClient();
+  if(!client) return;
+  let r;
+  try{ r=await client.rpc('list_incident_unit_notices'); }catch(e){ return; }
+  if(r.error || !Array.isArray(r.data)) return;
+  _incidentUnitNotices=r.data;
+  const fresh=_incidentUnitNotices.filter(n=>!_seenUnitNoticeIds.has(n.link_id));
+  fresh.forEach(n=>_seenUnitNoticeIds.add(n.link_id));
+  if(fresh.length){ try{ navigator.vibrate?.([200,100,200]); }catch(e){} }
+}
+function renderIncidentUnitNoticeBanner(){
+  const el=document.getElementById('incident-unit-notice-banner');
+  if(!el) return;
+  const rows=currentUser ? _incidentUnitNotices : [];
+  if(!rows.length){ el.style.display='none'; el.innerHTML=''; el.classList.remove('pulse'); return; }
+  el.style.display='flex';
+  el.classList.add('pulse');
+  el.innerHTML=rows.map(n=>{
+    const where=`${escAttr(n.visual_id||'')} · ${escAttr(n.location_name||'')}`;
+    const time=n.at?new Date(n.at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):'';
+    const what=n.kind==='handover'
+      ? `<strong>📥 אתר הועבר לפלוגה שלך:</strong> ${where} · מ־${escAttr(n.from_company_name||'')} · ${time}${currentUser.role!=='rpc'?' · יש לבחור מחלקה ולשבץ חובשים':''}${n.relief_pending?` · ${n.relief_pending} מהצוות הקודם עדיין מחכים להחלפה`:''}`
+      : `<strong>🤝 הפלוגה שלך נשלחה לתגבר:</strong> ${where} · האתר של ${escAttr(n.site_company_name||'')} · ${time} · שבץ/י את החובשים שלך`;
+    return `<div class="open-alert-row" data-unit-notice="${escAttr(n.link_id)}"><div>${what}${n.reason?' · סיבה: '+escAttr(n.reason):''}</div>
+      <div class="actions"><button onclick="acknowledgeIncidentUnitNotice('${escAttr(n.link_id)}')">ראיתי</button>${activeIncident?.id===n.incident_id?'':`<button onclick="enterIncidentFromUnitNotice('${escAttr(n.incident_id)}')">כניסה</button>`}</div></div>`;
+  }).join('');
+}
+// Relief still not confirmed 30 minutes later (owner 2026-11-23): the site's PC and the CC are
+// alerted until the person is relieved or his access ends. The CC opens the site's panel to mark
+// him or end the access; the PC is told whom to ask (only that person's own PC or the CC may mark).
+const RELIEF_ALERT_ROLES=new Set(['pc','cc','chamal','admin']);
+let _pendingReliefs=[];
+let _pendingReliefsClockSkewMs=0; // server now minus phone now at the last fetch (review 2026-11-25)
+let _alertedOverdueReliefs=new Set();
+async function refreshPendingReliefs(){
+  if(!currentUser || !RELIEF_ALERT_ROLES.has(currentUser.role)){ _pendingReliefs=[]; return; }
+  const client=getSupabaseClient();
+  if(!client) return;
+  let r;
+  try{ r=await client.rpc('list_pending_reliefs'); }catch(e){ return; }
+  if(r.error || !Array.isArray(r.data)) return;
+  _pendingReliefs=r.data;
+  const serverNow=Date.parse(r.data[0]?.server_now||'');
+  if(Number.isFinite(serverNow)) _pendingReliefsClockSkewMs=serverNow-Date.now();
+}
+// Waiting time counted on the server's clock: pending_since is server time, so a phone clock that
+// is behind would otherwise delay or skip the alert.
+function overduePendingReliefs(nowMs=Date.now()+_pendingReliefsClockSkewMs){
+  return _pendingReliefs.map(x=>({...x, minutes:C5Rules.reliefOverdueMinutes(Date.parse(x.pending_since), nowMs)}))
+    .filter(x=>x.minutes!=null && x.profile_id!==currentUser?.id);
+}
+function renderReliefOverdueBanner(){
+  const el=document.getElementById('incident-relief-overdue-banner');
+  if(!el) return;
+  const rows=currentUser ? overduePendingReliefs() : [];
+  if(!rows.length){ el.style.display='none'; el.innerHTML=''; el.classList.remove('pulse'); return; }
+  const fresh=rows.filter(x=>!_alertedOverdueReliefs.has(x.incident_id+':'+x.profile_id));
+  fresh.forEach(x=>_alertedOverdueReliefs.add(x.incident_id+':'+x.profile_id));
+  if(fresh.length){ try{ navigator.vibrate?.([300,100,300]); }catch(e){} }
+  const bySite={};
+  rows.forEach(x=>{ (bySite[x.incident_id]=bySite[x.incident_id]||[]).push(x); });
+  el.style.display='flex';
+  el.classList.add('pulse');
+  el.innerHTML=Object.values(bySite).map(list=>{
+    const x=list[0];
+    const who=list.map(y=>`${escAttr(y.display_name||'')} (${escAttr(({pc:'חוג״ד',medic:'חובש',paramedic:'פראמדיק'})[y.role_at_incident]||y.role_at_incident)}, ${y.minutes} דק׳)`).join(' · ');
+    const action=canChangeIncidentUnit() ? `<button onclick="openIncidentUnitPanel('${escAttr(x.incident_id)}')">פתח</button>` : '';
+    return `<div class="open-alert-row" data-relief-overdue="${escAttr(x.incident_id)}"><div><strong>⏰ לא אישרו החלפה:</strong> ${escAttr(x.visual_id||'')} · ${escAttr(x.location_name||'')} · ${who}${canChangeIncidentUnit()?'':' · עדיין יכולים לתעד באתר; פנה/י לחוג״ד שלהם או למ״פ רפואה'}</div>
+      <div class="actions">${action}</div></div>`;
+  }).join('');
+}
+async function acknowledgeIncidentUnitNotice(linkId){
+  const r=await incidentUnitRpc('acknowledge_incident_unit_notice', {p_link_id:linkId});
+  if(r.error){ toast('האישור נכשל, בדוק/י חיבור'); return; }
+  _incidentUnitNotices=_incidentUnitNotices.filter(n=>n.link_id!==linkId);
+  renderIncidentUnitNoticeBanner();
+}
+async function enterIncidentFromUnitNotice(incidentId){
+  await refreshOpenIncidents();
+  const inc=_openIncidents.find(i=>i.id===incidentId);
+  if(!inc){ toast('האתר אינו זמין כעת, נסה/י שוב'); return; }
+  await activateIncident(inc);
 }
 
 // ── Closed incident: patient access ends, stored report (D9, database/068) ──
@@ -17553,6 +18071,11 @@ async function refreshIncidentContext(){
   await refreshIncidentOpenAlerts();
   renderIncidentContext();
   await pullIncidentAssignmentState();
+  // WP-27: own access, unit notices, relief alerts.
+  await refreshActiveIncidentAccess();
+  await refreshIncidentUnitNotices();
+  await refreshPendingReliefs();
+  renderIncidentContext();
 }
 setInterval(()=>{ if(currentUser) refreshIncidentContext(); }, 45000);
 function renderIncidentContext(){
@@ -17587,7 +18110,10 @@ function renderIncidentContext(){
       strip.style.display='none';
     }
   }
+  renderIncidentReadOnlyBanner();
   renderIncidentOpenAlertBanner();
+  renderIncidentUnitNoticeBanner();
+  renderReliefOverdueBanner();
 }
 
 // ── Sync push: outbox → deployed /sync/log Edge Function ──

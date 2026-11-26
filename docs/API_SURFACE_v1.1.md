@@ -354,7 +354,7 @@ Fallback sync runs every 60–90 seconds with exponential retry:
 
 # 5. Command Dashboard APIs
 
-These are not mobile operational APIs. They are service-role backed read models for חוג״ד / מ״פ רפואה / Chamal / Log-O dashboards.
+These are not mobile operational APIs. They are service-role backed read models for חוג״ד / מ״פ רפואה / Medical Chamal / Log-O dashboards.
 
 ```http
 GET /command/incidents/:incidentId/dashboard-state

@@ -1,4 +1,4 @@
-// Real-browser test of the חמ״ל רפואי (role key chamal) panel (V2.99.93) and the three picture-quality fixes that came with it:
+// Real-browser test of the חמ״ל רפואי (role key chamal) panel (V2.99.95) and the three picture-quality fixes that came with it:
 // - chamal gets its own panel (one card per site, clinical alerts apart from picture-quality alerts,
 //   devices, open requests) instead of the generic role page; responsibilities sit behind a chip
 // - suspected duplicates: by the recorded zone (locDetail, as the field flows write it; location is the
