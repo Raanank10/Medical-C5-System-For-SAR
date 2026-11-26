@@ -6778,7 +6778,8 @@ function startGuidedTour(){
   const signedInRole=currentUser ? mapServerRole(currentUser.role) : null;
   const steps=['pc','cc'].includes(signedInRole) ? GUIDED_TOUR_STEPS.filter(s=>s.role===signedInRole) : GUIDED_TOUR_STEPS.slice();
   const origin={screen:activeScreenId(), role:activeRoleDashboard, tab:commandPanelTab, signedInRole};
-  startTourSandbox();
+  try{ startTourSandbox(); }
+  catch(e){ console.error(e); endTourSandbox(); toast('הסיור לא נפתח · המצב שוחזר'); return; }
   _guidedTour={steps, index:0, origin, skipped:[]};
   _guidedTour.deadline=setTimeout(()=>{
     if(!_guidedTour) return;
@@ -6861,6 +6862,8 @@ function endGuidedTour(opts={}){
   saveDemoState(); // a save dropped while the sandbox was open (see saveDemoState) is made now
   // Nothing was pushed or pulled while the tour ran: catch up now instead of waiting for the timers.
   if(currentUser){
+    // A deactivated-account check that landed during the tour was dropped (verifyOfflineProfile): run it again.
+    if(currentUser.offlineProfile){ try{ verifyOfflineProfile(); }catch(e){ console.error(e); } }
     try{ syncPush(); }catch(e){ console.error(e); }
     try{ pollIncidentOpenAlerts(); }catch(e){ console.error(e); }
   }
