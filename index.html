@@ -956,7 +956,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-panel" style="margin:16px;display:none" id="incident-picker-tour">
     <div class="demo-strip-title">סיור מודרך</div>
-    <div class="demo-strip-sub" style="margin-bottom:10px">מסכי הפיקוד עם נתוני הדגמה, כשני דקות. זמין כאן, מחוץ לאירוע: במהלכו הטלפון לא מקבל עדכונים מהשרת.</div>
+    <div class="demo-strip-sub" style="margin-bottom:10px">מסכי הפיקוד עם נתוני הדגמה, כשתי דקות. זמין כאן, מחוץ לאירוע: במהלכו הטלפון לא מקבל עדכונים מהשרת.</div>
     <button class="demo-mini-btn" style="width:100%;min-height:48px" data-guided-tour-start onclick="startGuidedTour()">התחל סיור במסך הפיקוד</button>
   </div>
   <div class="demo-panel" style="margin:16px" id="incident-open-panel">
@@ -2158,7 +2158,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     <div id="guided-tour-count" style="font-family:var(--mono);font-size:12px;color:var(--muted)"></div>
   </div>
   <div id="guided-tour-text" style="font-size:13px;line-height:1.5;margin:6px 0 4px"></div>
-  <div id="guided-tour-sample" style="font-size:11px;color:var(--muted);margin:0 0 10px">נתוני הדגמה · הנתונים שלך לא מוצגים, לא משתנים ולא נשלחים</div>
+  <div id="guided-tour-sample" style="font-size:11px;color:var(--muted);margin:0 0 10px">נתוני הדגמה · הנתונים שלך לא מוצגים, לא משתנים ולא נשלחים · נסגר מעצמו אחרי 3 דקות</div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
     <button class="demo-mini-btn" id="guided-tour-prev" onclick="guidedTourPrev()">הקודם</button>
     <button class="demo-mini-btn" id="guided-tour-next" style="background:var(--accent);border-color:var(--accent);color:#fff" onclick="guidedTourNext()">הבא</button>
@@ -4611,6 +4611,7 @@ async function verifyOfflineProfile(){
   if(!client) return;
   let r;
   try{ r=await client.from('profiles').select('role,is_active').eq('id',currentUser.id).single(); }catch(e){ return; }
+  if(!currentUser) return; // signed out, or the guided tour's sandbox opened meanwhile: checked again on the next 'online'
   if(r.error && isNetworkFailure(r.error)) return; // still unreachable: try again on the next 'online'
   if(r.error || !r.data || !r.data.is_active){ toast('החשבון אינו פעיל בשרת · נותקת'); await signOut(); return; }
   const roleChanged=r.data.role!==currentUser.role;
@@ -4658,6 +4659,7 @@ function enterAuthenticatedRole(serverRole){
   }
 }
 async function signOut(){
+  if(_guidedTour) endGuidedTour({signingOut:true});
   const client=getSupabaseClient();
   if(client){ try{ await client.auth.signOut(); }catch(e){} }
   try{ localStorage.removeItem(LAST_PROFILE_KEY); }catch(e){}
@@ -6192,8 +6194,11 @@ async function runIncidentAssignmentPull(){
     await pullIncidentTypeReports(client);
     await pullRemoteSweeps(client);
     await pullRealPlatoons(client);
-    const prevKey=assignmentKey(_myRealAssignment);
+    const prevAssignment=_myRealAssignment, prevKey=assignmentKey(prevAssignment);
     await pullMyAssignment(client);
+    // Started before the guided tour opened: keep the old value so the next pull after the tour
+    // still sees the new assignment and enters it (WP-43 review).
+    if(inDemoSandbox()){ _myRealAssignment=prevAssignment; return; }
     const a=_myRealAssignment;
     if(a && assignmentKey(a)!==prevKey && a.incident){
       // Not in any incident yet (picker on screen): go straight to the assigned one.
@@ -6388,6 +6393,9 @@ function tacticalPlatoonRollup(platoonId){
 // patients into a real incident (and the clear functions wipe the outbox, which would drop
 // real unsynced events), so every user-reachable entry point refuses instead.
 function blockDemoDataWhileLoggedIn(){
+  // The guided tour sets currentUser=null in its sandbox; the phone's real outbox, conflict log and
+  // bags must stay out of reach of the demo clear buttons all the same (WP-43 review).
+  if(_demoSandbox?.tour){ toast('הסיור פתוח: סיים או לחץ "יציאה" קודם'); return true; }
   if(!currentUser) return false;
   toast('במצב מחובר אין נתוני דמו: הנתונים מגיעים מהשטח בלבד');
   return true;
@@ -6473,6 +6481,7 @@ function saveDemoState(){
           await persistConflictLog();
         }
       }
+      if(_demoSandbox) return; // queued before a sandbox opened: it would store the sample data (WP-43)
       demoRevision += 1;
       await secureSetItem(DEMO_STORAGE_KEY, JSON.stringify({schemaVersion:6,appVersion:APP_VERSION,revision:demoRevision,savedAt:new Date().toISOString(),experimentStartedAt,experimentPhase,siteData,patients,reinforcementRequests,pcReviews,pcTruckStock,companyStock,handledPatientIds,medicIncidentAssignments,demoSyncMode,lastSyncAt}));
     }catch(e){}
@@ -6640,7 +6649,7 @@ function startBriefingDemo(){
   });
 }
 function endBriefingDemo(){
-  if(!_demoSandbox) return;
+  if(!_demoSandbox || _demoSandbox.tour) return;
   const {snapshot, screen, timers}=_demoSandbox;
   timers.forEach(clearTimeout);
   _demoSandbox=null;
@@ -6661,20 +6670,23 @@ function endBriefingDemo(){
 // phones, so inside an incident it would hold back real alarms. On exit a signed-in phone syncs at once.
 const GUIDED_TOUR_STEPS = [
   {role:'pc', tab:'overview', section:'סטטוס אתר', title:'סטטוס אתר מהחילוץ', text:'סוג אירוע, T0, מצב מבנה ואתר נקי, כפי שקבעו מ״מ / מ״פ חילוץ. אתה לא מאשר אותם, אתה מתכנן סביבם.'},
-  {role:'pc', tab:'overview', key:'pc-evac-priority', title:'תעדוף פינוי', text:'סדר הפינוי של המחלקה. החילוץ ומ״פ רפואה רואים את אותו סדר, אז הוא קובע מי יוצא ראשון.'},
+  {role:'pc', tab:'overview', key:'pc-evac-priority', title:'תעדוף פינוי', text:'סדר פינוי מומלץ למחלקה. ההחלטה מי יוצא ראשון שלך; החילוץ ומ״פ רפואה רואים את אותו סדר מומלץ.'},
   {role:'pc', tab:'action', section:'משימות חוג״ד עכשיו', title:'משימות עכשיו', text:'מה מחכה להחלטה שלך: מיידי / מבצעי / השלמה. מה שלא נסגר כאן נשאר פתוח אצל החובש.'},
-  {role:'pc', tab:'action', key:'pc-tq-watch', title:'חסמי עורקים', text:'כל חסם פעיל עם הזמן מאז ההנחה. אתה העין השנייה: הטלפון של החובש מתריע, ואתה רואה מי מתקרב להחלטה.'},
-  {role:'pc', tab:'action', key:'pc-assessment-debt', title:'חוב הערכה', text:'פצועים מהסריקה המהירה שחסרים להם מדדים או הערכה מלאה. בלי מדדים אין מגמה ואין התראת הידרדרות.'},
+  {role:'pc', tab:'action', key:'pc-tq-watch', title:'חסמי עורקים', text:'כל חסם פעיל עם הזמן מאז ההנחה. ההתראות עולות גם בטלפון שלך וגם אצל החובש; כאן אתה רואה מי מתקרב להחלטה.'},
+  {role:'pc', tab:'action', key:'pc-assessment-debt', title:'חוב הערכה', text:'פצועים מהסריקה המהירה שחסרים להם מדדים או הערכה מלאה. בלי מדדים אין מגמה, ולכן אין התראת הידרדרות לפצוע הזה.'},
   {role:'pc', tab:'forces', key:'pc-medic-load', title:'עומס חובשים', text:'לכל חובש: כמה פצועים, אדומים, לכודים, חסמים ומתי עדכן. חובש שלא עדכן הרבה זמן הוא נקודה עיוורת.'},
   {role:'pc', tab:'supply', key:'pc-resupply', title:'השלמות ציוד', text:'בקשות ציוד מהחובשים. אתה מאשר מהרכב או מעביר למ״פ, והחובש רואה את ההחלטה בטלפון שלו.'},
   {role:'cc', tab:'overview', section:'כל האירועים — פצועים לפי מיון', title:'כל האירועים', text:'פצועים לפי מיון בכל האירועים הפתוחים בפלוגה. הקשה על שורה פותחת את האירוע.'},
-  {role:'cc', tab:'overview', key:'cc-evac-priority', title:'תעדוף פינוי פלוגתי', text:'סדר פינוי לכל הפלוגה, מעל רמת המחלקה. זה הסדר שהחילוץ רואה.'},
+  {role:'cc', tab:'overview', key:'cc-evac-priority', title:'תעדוף פינוי פלוגתי', text:'סדר פינוי מומלץ לכל הפלוגה, מעל רמת המחלקה. זה הסדר שהחילוץ רואה; ההחלטה שלך.'},
   {role:'cc', tab:'action', key:'cc-resource-requests', title:'בקשות משאב', text:'בקשות תגבור רפואי מחוג״ד. בקשה שלא נענתה נשארת פתוחה אצלו.'},
   {role:'cc', tab:'action', key:'cc-death-queue', title:'תור רופא', text:'חשד לנפטר שמחכה לאישור רופא. זה אישור קליני, לא קביעת מוות רשמית.'},
   {role:'cc', tab:'forces', key:'cc-platoon-load', title:'עומס מחלקות', text:'אדום / צהוב לפי מחלקה, כדי לראות איפה צריך תגבור לפני שמבקשים ממך.'},
   {role:'cc', tab:'supply', section:'סטטוס רכב חוג״ד לפי מחלקה', title:'רכבי חוג״ד', text:'מה נשאר בכל רכב מחלקה. חוסר כאן הוא הבקשה הבאה שתגיע אליך.'}
 ];
-let _guidedTour=null; // {steps, index, origin:{screen, role, tab, signedInRole}, skipped:[], timer}
+let _guidedTour=null; // {steps, index, origin:{screen, role, tab, signedInRole}, skipped:[], timer, deadline}
+// Hard cap (owner 2026-11-26): while the tour runs the phone gets no server updates, so it ends by
+// itself after 3 minutes, syncs and says why. A full tour takes about 1.5-2 minutes.
+const GUIDED_TOUR_MAX_MS=3*60*1000;
 function findTourTarget(step){
   const body=document.getElementById('role-dashboard-body');
   if(!body || !step) return null;
@@ -6704,13 +6716,14 @@ function highlightTourTarget(el){
   el.classList.remove('collapsed'); // shown open for the tour only; the next render keeps the user's choice
 }
 // Sample data for the tour: platoon A, every panel the steps point at has something in it. No
-// tourniquet is past the 45-minute notice, so the sandbox itself raises no alarm or vibration.
+// tourniquet is near the 45-minute notice (25 minutes, and the tour ends itself well before 20 more),
+// so the sandbox itself raises no alarm or vibration.
 function seedTourSandboxData(){
   const now=Date.now();
   const base={events:[], location:'בניין הדגמה', locDetail:'קומה 2', patientStatus:'in_treatment', siteId:'SITE_A', assignedPlatoonId:'PLT-A', trapStatus:'not_trapped', assignedMedicId:'USR-COHEN'};
   patients.push(
     {...base, id:'tour-r1', visualId:'P001', triage:'red', injury:'קטיעה', vitals:{pulse:122,spo2:93,rr:26,avpu:'V'}, lastVitalsAt:now-6*60000,
-      tourniquet:{appliedAt:now-35*60000, limb:'רגל ימין'}, tourniquets:[{id:'TQ-D1', limb:'rl', appliedAt:now-35*60000, status:'active'}]},
+      tourniquet:{appliedAt:now-25*60000, limb:'רגל ימין'}, tourniquets:[{id:'TQ-D1', limb:'rl', appliedAt:now-25*60000, status:'active'}]},
     {...base, id:'tour-r2', visualId:'P002', triage:'red', injury:'חזה', vitals:{pulse:116,spo2:94,rr:28,avpu:'A'}, trapStatus:'trapped', lastVitalsAt:now-8*60000, assignedMedicId:'USR-LEVI'},
     {...base, id:'tour-y1', visualId:'P003', triage:'yellow', injury:'אגן', vitals:null, needsFullAssessment:true, assessmentDebt:['missing_vitals'], flowMode:'quick', lastVitalsAt:null},
     {...base, id:'tour-g1', visualId:'P004', triage:'green', injury:'חתכים', vitals:{pulse:84,spo2:99,rr:16,avpu:'A'}, lastVitalsAt:now-5*60000, assignedMedicId:'USR-LEVI'},
@@ -6744,9 +6757,17 @@ function endTourSandbox(){
   currentUser=user;
 }
 function guidedTourRefusal(){
+  // In the sandbox the phone's alarm loop reads the sample patients, so a real tourniquet's banner,
+  // snooze and next level would be held back until the tour ends (clinical review, WP-43).
+  if((patients||[]).some(p=>!['handed_over','deceased'].includes(p.patientStatus) && activeTourniquets(p).length))
+    return 'יש חסם עורקים פעיל בטלפון: הסיור לא זמין, כדי שההתראות שלו לא יעוכבו.';
   if(!currentUser) return '';
   if(activeIncident) return 'הסיור זמין מחוץ לאירוע בלבד: במהלכו הטלפון לא מקבל עדכונים והתראות מהאירוע. צא למסך בחירת האירוע והפעל משם.';
-  if(!['pc','cc','admin'].includes(mapServerRole(currentUser.role))) return 'הסיור מיועד לחוג״ד ולמ״פ רפואה';
+  const role=mapServerRole(currentUser.role);
+  if(!['pc','cc','admin'].includes(role)) return 'הסיור מיועד לחוג״ד ולמ״פ רפואה';
+  // The all-incidents view is the CC's alert screen across every open incident: no tour while it
+  // shows an alert line (owner 2026-11-26), since nothing new arrives while the tour runs.
+  if(role==='cc' && ccOverviewIncidentAlerts().length) return 'יש התראות פתוחות באירועים: הסיור לא זמין עד שיטופלו.';
   return '';
 }
 function canStartGuidedTour(){ return !_demoSandbox && !guidedTourRefusal(); }
@@ -6759,13 +6780,19 @@ function startGuidedTour(){
   const origin={screen:activeScreenId(), role:activeRoleDashboard, tab:commandPanelTab, signedInRole};
   startTourSandbox();
   _guidedTour={steps, index:0, origin, skipped:[]};
+  _guidedTour.deadline=setTimeout(()=>{
+    if(!_guidedTour) return;
+    endGuidedTour();
+    toast('הסיור הסתיים אחרי 3 דקות: הטלפון חזר לקבל עדכונים');
+  }, GUIDED_TOUR_MAX_MS);
   // Dashboards re-render on their own refresh cycles, which drops the highlight - re-apply it.
   _guidedTour.timer=setInterval(()=>{
     if(!_guidedTour || document.querySelector('.tour-highlight')) return;
     const el=findTourTarget(_guidedTour.steps[_guidedTour.index]);
     if(tourTargetVisible(el)) highlightTourTarget(el);
   },1000);
-  showGuidedTourStep(1);
+  try{ showGuidedTourStep(1); }
+  catch(e){ console.error(e); toast('הסיור לא נפתח · המצב שוחזר'); endGuidedTour(); }
 }
 // dir: 1 forward, -1 back. A step whose panel is missing or not visible is skipped in that direction.
 function showGuidedTourStep(dir=1){
@@ -6797,7 +6824,7 @@ function showGuidedTourStep(dir=1){
     console.warn('guided tour: panel not shown, step skipped', step.role, step.tab, step.key||step.section);
     _guidedTour.index+=dir;
   }
-  if(_guidedTour.index<0){ _guidedTour.index=0; return; }
+  if(_guidedTour.index<0){ _guidedTour.index=0; return showGuidedTourStep(1); }
   endGuidedTour();
 }
 function guidedTourNext(){
@@ -6809,15 +6836,17 @@ function guidedTourPrev(){
   if(!_guidedTour || _guidedTour.index===0) return;
   _guidedTour.index--; showGuidedTourStep(-1);
 }
-function endGuidedTour(){
+function endGuidedTour(opts={}){
   if(!_guidedTour) return;
-  const {origin, timer}=_guidedTour;
+  const {origin, timer, deadline}=_guidedTour;
   clearInterval(timer);
+  clearTimeout(deadline);
   _guidedTour=null;
   clearTourHighlight();
   const card=document.getElementById('guided-tour-card');
   if(card) card.style.display='none';
   endTourSandbox();
+  if(opts.signingOut) return; // signOut() continues with the real client and clears the session
   if(origin.signedInRole==='pc'){ openIncidentPicker(); }
   else if(origin.signedInRole==='cc'){ enterCcAllIncidentsView(); }
   else{
@@ -6826,6 +6855,10 @@ function endGuidedTour(){
     if(origin.screen==='role-dashboard') setCommandPanelTab(origin.tab||'overview');
     commandPanelTab=origin.tab||'overview';
   }
+  // Alarms read the sample patients during the tour: re-check the real ones now (a level crossed
+  // meanwhile is raised once), and redraw so no sample banner or chip is left over the real screen.
+  try{ checkTourniquetTimeAlerts(); renderTourniquetTimeAlert(); checkPcReviewAlerts(); renderAlerts(); }catch(e){ console.error(e); }
+  saveDemoState(); // a save dropped while the sandbox was open (see saveDemoState) is made now
   // Nothing was pushed or pulled while the tour ran: catch up now instead of waiting for the timers.
   if(currentUser){
     try{ syncPush(); }catch(e){ console.error(e); }
@@ -9507,6 +9540,7 @@ setInterval(updateClock,1000); updateClock();
 const TERMINAL_STATUSES = new Set(['deceased','evacuating','evacuated','handed_over','closed','self_evacuated']);
 
 function goHome(){
+  if(guidedTourBlocksNavigation()) return;
   if(currentUser){ openIncidentPicker(); return; }
   hideSameZoneFab();
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -9548,7 +9582,14 @@ function projectPatientStatus(nextStatus, eventType, payload={}){
   syncComputedStatusDisplay();
 }
 
+function guidedTourBlocksNavigation(){
+  if(!_guidedTour) return false;
+  toast('הסיור פתוח על נתוני הדגמה: סיים או לחץ "יציאה" קודם');
+  return true;
+}
 function goTo(screen){
+  // Leaving the tour's screen would let records be made in the sandbox and silently discarded.
+  if(screen!=='role-dashboard' && guidedTourBlocksNavigation()) return;
   setTimeout(renderMedicExtractionBanner,0); // extraction calls follow the screen (medic home in the demo)
   if(screen!=='sweep') hideSameZoneFab();
   Object.keys(vitalCountdowns||{}).forEach(k=>stopCountTimer(k, false));

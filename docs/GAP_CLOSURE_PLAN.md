@@ -367,7 +367,7 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 6. WP-30 and WP-31 wait for an owner answer; ask it first in the session. (WP-28 answered and done 2026-11-21; WP-33 done.)
 7. WP-32 and WP-34 to WP-37 any time.
 8. WP-38 after WP-19 (owner 2026-11-18); WP-24 touches the same flow.
-9. WP-43 to WP-45 (onboarding, added 2026-11-24): WP-43 first (the PC / CC tour is broken today), WP-44 on its engine, WP-45 any time after WP-43. They touch `index.html` only; no SQL.
+9. WP-43 to WP-45 (onboarding, added 2026-11-24): WP-43 done (V2.99.94), WP-44 on its engine, WP-45 any time. They touch `index.html` only; no SQL.
 
 | Round 2 WP | Title | Priority | Needs from the owner first |
 | --- | --- | --- | --- |
@@ -396,7 +396,7 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 | WP-40 | 30 minutes waiting at the נאפ"ל alerts PC and CC | P2 | - (decided 2026-11-19) |
 | WP-41 | Medical staff see a patient sent to / arriving at the נאפ"ל | P2 | - (decided 2026-11-19) |
 | WP-42 | Medic asks to close their site (`MEDIC_SITE_CLOSE_REQUESTED`) | P2 | who approves, what "closed" changes |
-| WP-43 | The PC / CC guided tour points at hidden panels | P2 | tour in the sandbox? reachable when signed in? |
+| WP-43 | The PC / CC guided tour points at hidden panels | P2 | - (answered 2026-11-26) |
 | WP-44 | Guided tour for RPC and RCC | P3 | Hebrew text review |
 | WP-45 | One short intro per role (what / why / don't skip) | P3 | `enroute` strip, the 10 intros |
 
@@ -845,7 +845,7 @@ No rows were written to the migration list to make it look complete: a row there
 
 **Done when.** Every step highlights a visible panel with data, on both phone sizes, and the test fails if a panel moves.
 
-**Done (V2.99.94, owner answers 2026-11-26).** (1) The tour runs in the sandbox with its own sample patients (`startTourSandbox` / `seedTourSandboxData`): no server reads or writes, the phone's state restored on exit, the card says "נתוני הדגמה". (2) Signed-in PC and CC can start it, **only outside an incident** (owner, after the session found that in the sandbox the phone's alarms read the sample patients and nothing arrives from other phones, so inside an incident real alarms would be held back until the tour ends): PC from the incident picker, CC from the all-incidents view; inside an open incident `startGuidedTour()` refuses with a message. On exit the phone pushes and polls open-incident alerts at once. Steps carry their tab (`setCommandPanelTab`), collapsible sections are found by key (`data-section`, added to `renderCollapsibleSection`), a step whose panel is missing or not visible is skipped and logged (`console.warn`), and the panel is scrolled to just below the stuck command strip. 7 PC and 6 CC steps, each saying who acts on that panel. `scripts/browser_guided_tour_test.js` fails on today's `main` (reproduced the table above, plus empty panels) and passes on this branch at 375x812 and 412x915; mutation-checked (no tab switch, no refusal, no sample data each fail it). `smoke_v2_9925` left unchanged and still passes (nothing removed). Found on the way, not fixed here: the CC "תעדוף פינוי פלוגתי" count ignores the focus filter (count 1, list "אין פצועים במיקוד הנוכחי").
+**Done (V2.99.94, owner answers 2026-11-26).** (1) The tour runs in the sandbox with its own sample patients (`startTourSandbox` / `seedTourSandboxData`): no server reads or writes, the phone's state restored on exit, the card says "נתוני הדגמה". (2) Signed-in PC and CC (and admin, all 13 steps) can start it, **only outside an incident** (owner, after the session found that in the sandbox the phone's alarms read the sample patients and nothing arrives from other phones, so inside an incident real alarms would be held back until the tour ends): PC from the incident picker, CC from the all-incidents view; inside an open incident `startGuidedTour()` refuses with a message. On exit the phone pushes and polls open-incident alerts at once. Steps carry their tab (`setCommandPanelTab`), collapsible sections are found by key (`data-section`, added to `renderCollapsibleSection`), a step whose panel is missing or not visible is skipped and logged (`console.warn`), and the panel is scrolled to just below the stuck command strip. 7 PC and 6 CC steps, each saying who acts on that panel. `scripts/browser_guided_tour_test.js` fails on today's `main` (reproduced the table above, plus empty panels) and passes on this branch at 375x812 and 412x915; mutation-checked (no tab switch, no refusal, no sample data each fail it). Step 5 changed on purpose: `smoke_v2_9925` keeps its string assertions (nothing removed, find-before-delete) and gets a comment pointing to the new test; it still passes. Review agents (2026-11-26) found the phone deaf without limit and `currentUser=null` in the sandbox switching off the "signed in, no demo data" guards; owner decisions the same day: the tour ends by itself after 3 minutes, and a signed-in CC cannot start it while the all-incidents strip shows an alert line. Also added: refused while the phone has an active tourniquet; navigation out of the tour refused; the demo clear buttons refused while it is open; sign-out ends the tour first and then really signs out; alarms re-checked on exit; a state save queued before the tour cannot store the sample patients; an assignment pull in flight cannot act inside it. Each is covered by the test and was mutation-checked. Found on the way, not fixed here: the CC "תעדוף פינוי פלוגתי" count ignores the focus filter (count 1, list "אין פצועים במיקוד הנוכחי").
 
 ---
 
@@ -860,7 +860,7 @@ No rows were written to the migration list to make it look complete: a row there
 4. The banner and feed when a patient reaches the נאפ״ל or is evacuated.
 5. Site authority: T0, building status and site clear are final, with no medical approval; RCC closes the incident after every patient is handed over.
 
-Runs with data in the sandbox if the owner chose that in WP-43. Hebrew text reviewed by the owner.
+Runs in the tour sandbox with sample data (WP-43), which needs rescue-side sample data: `seedTourSandboxData` seeds platoon-A medical data only, and the rescue panel must still show no colour or tourniquet. Same rule as WP-43: outside an incident only (RPC / RCC from their incidents table). Hebrew text reviewed by the owner.
 
 **Verify.** `browser_guided_tour_test.js` extended to `rpc` and `rcc`; `browser_rcc_panel_test.js` and `browser_role_clinical_scope_test.js` still pass (the tour must not reveal a colour or a tourniquet to a rescue role).
 
@@ -883,7 +883,7 @@ Runs with data in the sandbox if the owner chose that in WP-43. Hebrew text revi
 2. Numbers in the text come from `C5DomainRules` constants (vitals 10 / 20 / 30 min, tourniquet levels), not typed into the copy, so a rule change cannot leave the intro wrong.
 3. Shown once per user + role + `ROLE_INTRO_VERSION` (raised when a role's workflow changes), stored in `localStorage` as `c5_seen_role_intro` (the `c5_seen_pc_reviews` pattern). Nothing sent to the server, no new event type (UI state is not clinical history; `event-contract.json` unchanged).
 4. A strip at the top of the role's landing screen, never a modal: one tap closes it ("הבנתי", at least 48 px), the screen under it stays usable, and it waits while a tourniquet banner or a critical alert is up.
-5. One "ⓘ התפקיד שלי" chip on every role screen (the `toggleRccResponsibilities()` pattern): it reopens the intro and the full "האחריות שלי" list; that list leaves the top of the generic dashboards. For PC / CC (and RPC / RCC after WP-44) the chip also starts the tour.
+5. One "ⓘ התפקיד שלי" chip on every role screen (the `toggleRccResponsibilities()` pattern): it reopens the intro and the full "האחריות שלי" list; that list leaves the top of the generic dashboards. For PC / CC (and RPC / RCC after WP-44) the chip also starts the tour, outside an incident only (WP-43); inside one it shows the intro and the list, no tour button.
 
 **Verify.** New `scripts/browser_role_intro_test.js`: shown once per role, shown again after a version bump, reopened from the chip, not shown over an active tourniquet banner, never covers the FAB or bottom bar; `browser_mobile_layout_test.js` passes at both sizes; no raw key on screen. Real check in the field usability sessions (T1): does a first-time medic finish the first patient without asking how?
 
@@ -957,7 +957,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-41 Banner: patient to / at the נאפ"ל | P2 | Done (V2.99.79), no SQL | this PR | owner 2026-11-18/19; send + arrival, medic / paramedic / physician, open or close, 15 s |
 | WP-42 Medic asks to close their site | P2 | Not started, design questions | | from WP-28; spec v1.2 Medic Site Close Rule |
 | WP-38 Resupply raises the medic's bag | P2 | Done (V2.99.74): `database/082` applied live by the owner, `sync-log` v18 deployed 2026-11-18; live two-phone check pending | #132 | owner 2026-11-18: the medic confirms, by what arrived; the PC's / logistics' "delivered" = handed over, waiting for the medic |
-| WP-43 Guided tour hidden panels | P2 | Done in this PR (V2.99.94), no SQL | this PR | owner 2026-11-26: sandbox with sample data; signed in only outside an incident (PC picker, CC all-incidents view), sync on exit; 7 PC + 6 CC steps, tab-aware, invisible panels skipped and logged; `browser_guided_tour_test.js` |
+| WP-43 Guided tour hidden panels | P2 | Done in this PR (V2.99.94), no SQL | this PR | owner 2026-11-26: sandbox with sample data; signed in only outside an incident (PC picker, CC all-incidents view, not with open CC alerts), 3-minute cap, sync on exit; 7 PC + 6 CC steps, tab-aware, invisible panels skipped and logged; `browser_guided_tour_test.js` |
 | WP-44 RPC / RCC tour | P3 | Not started, after WP-43 | | max 5 steps each, same engine |
 | WP-45 Role intro | P3 | Not started, 2 owner questions | | owner 2026-11-23; one source in `ROLE_DEFS`, medic first, no server change |
 

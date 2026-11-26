@@ -148,8 +148,16 @@ async function walkTour(page, label) {
           window.getSupabaseClient = () => { if (!inDemoSandbox()) window.__calls.client++; else window.__calls.sandboxClient = (window.__calls.sandboxClient || 0) + 1; return origClient(); };
           const origPush = syncPush; window.syncPush = (...a) => { window.__calls.push++; return origPush(...a); };
           const origAlerts = pollIncidentOpenAlerts; window.pollIncidentOpenAlerts = (...a) => { window.__calls.alerts++; return origAlerts(...a); };
+          // An unsent event from an earlier incident: the tour must not touch it.
+          getOutbox().push({ local_event_id: 'real-ev-1', type: 'NOTE_ADDED', patient_id: null, synced: false });
           openIncidentPicker();
         });
+        const stored = () => page.evaluate(() => JSON.stringify({
+          outbox: getOutbox().map((e) => e.local_event_id),
+          keys: [OUTBOX_KEY, CONFLICT_LOG_KEY, MEDIC_BAG_KEY].map((k) => localStorage.getItem(k)),
+          user: currentUser && [currentUser.id, currentUser.role],
+        }));
+        const storedBefore = await stored();
         const btn = await page.$('#screen-incident-picker [data-guided-tour-start]');
         check(!!btn && await btn.isVisible(), `${vp} signed-in PC: the incident picker must offer the tour ([data-guided-tour-start])`);
         if (btn) {
@@ -159,6 +167,13 @@ async function walkTour(page, label) {
           const during = await page.evaluate(() => ({ sandbox: inDemoSandbox(), banner: document.getElementById('guided-tour-text')?.closest('#guided-tour-card')?.innerText || '' }));
           check(during.sandbox, `${vp} signed-in PC: the tour must run in the sandbox`);
           check(/נתוני הדגמה/.test(during.banner), `${vp} signed-in PC: the tour card must say the data is sample data ("נתוני הדגמה")`);
+          // While it runs: no way out to the demo home, and the demo clear buttons are refused.
+          const blocked = await page.evaluate(() => {
+            goHome(); const afterHome = activeScreenId();
+            clearDemoPatientsOnly({ confirmReset: false });
+            return { afterHome, tour: !!_guidedTour, outbox: getOutbox().length };
+          });
+          check(blocked.afterHome === 'role-dashboard' && blocked.tour, `${vp} signed-in PC: "ראשי" during the tour must be refused (got ${JSON.stringify(blocked)})`);
           const pushBefore = await page.evaluate(() => window.__calls.push);
           const cards = await walkTour(page, `${vp} signed-in PC`);
           check(cards.length === expected, `${vp} signed-in PC: ${cards.length} cards for ${expected} PC steps (the picker tour is the PC's own steps only)`);
@@ -167,6 +182,12 @@ async function walkTour(page, label) {
           check(after.push > pushBefore && after.alerts > 0, `${vp} signed-in PC: exiting must sync at once (push ${pushBefore} -> ${after.push}, open-incident alerts polled ${after.alerts})`);
           const restored = await snapshot(page);
           check(JSON.parse(restored).patients.join() === JSON.parse(before).patients.join(), `${vp} signed-in PC: real patients must be back unchanged`);
+          const storedAfter = await stored();
+          check(storedAfter === storedBefore, `${vp} signed-in PC: the real outbox, conflict log, bags and signed-in user must be unchanged\n  before ${storedBefore}\n  after  ${storedAfter}`);
+          // The exit re-saves the phone's state (encrypted): it must be the real patients, never the sample ones.
+          await page.waitForTimeout(500);
+          const saved = await page.evaluate(async () => { const raw = await secureGetItem(DEMO_STORAGE_KEY); return raw ? JSON.parse(raw).patients.map((p) => p.id) : null; });
+          check(saved && saved.includes('real-1') && !saved.some((id) => id.startsWith('tour-')), `${vp} signed-in PC: stored state after the tour must hold the real patients only (got ${JSON.stringify(saved)})`);
         }
         check(!errors.length, `${vp} signed-in PC: page errors ${errors.join(' | ')}`);
         await context.close();
@@ -186,6 +207,72 @@ async function walkTour(page, label) {
         const refused = await page.evaluate(() => { startGuidedTour(); return { tour: !!_guidedTour, sandbox: inDemoSandbox(), screen: activeScreenId() }; });
         check(!refused.tour && !refused.sandbox && refused.screen === 'role-dashboard', `${vp} PC inside an incident: startGuidedTour() must be refused (got ${JSON.stringify(refused)})`);
         check(!errors.length, `${vp} PC inside an incident: page errors ${errors.join(' | ')}`);
+        await context.close();
+      }
+
+      // 3b. Signing out mid-tour (by hand, or the automatic sign-out of a deactivated account) ends
+      //     the tour and really signs out: the user does not come back when the card is gone.
+      {
+        const { page, errors, context } = await newPage(browser, viewport);
+        await page.evaluate(() => { currentUser = { id: 'stub-pc', email: 'pc@test', role: 'pc' }; activeIncident = null; openIncidentPicker(); startGuidedTour(); });
+        await page.waitForTimeout(500);
+        await page.evaluate(() => signOut());
+        await page.waitForTimeout(500);
+        const out = await page.evaluate(() => ({ user: currentUser, tour: !!_guidedTour, sandbox: inDemoSandbox(), card: getComputedStyle(document.getElementById('guided-tour-card')).display }));
+        check(out.user === null && !out.tour && !out.sandbox && out.card === 'none', `${vp} sign-out mid-tour: must end the tour and stay signed out (got ${JSON.stringify(out)})`);
+        check(!errors.length, `${vp} sign-out mid-tour: page errors ${errors.join(' | ')}`);
+        await context.close();
+      }
+
+      // 3c. An active tourniquet on the phone: the tour is refused (its alarms would be held back).
+      {
+        const { page, errors, context } = await newPage(browser, viewport);
+        await page.evaluate(() => {
+          patients.push({ id: 'real-tq', visualId: 'P901', triage: 'red', events: [], siteId: 'SITE_A', assignedPlatoonId: 'PLT-A', patientStatus: 'in_treatment',
+            tourniquet: { appliedAt: Date.now() - 50 * 60000, limb: 'יד שמאל' }, tourniquets: [{ id: 'TQ-R1', limb: 'la', appliedAt: Date.now() - 50 * 60000, status: 'active' }] });
+          goTo('demo');
+        });
+        const r = await page.evaluate(() => { startGuidedTour(); return { tour: !!_guidedTour, sandbox: inDemoSandbox(), patients: patients.map((p) => p.id) }; });
+        check(!r.tour && !r.sandbox && r.patients.join() === 'real-tq', `${vp} active tourniquet: the tour must be refused (got ${JSON.stringify(r)})`);
+        check(!errors.length, `${vp} active tourniquet: page errors ${errors.join(' | ')}`);
+        await context.close();
+      }
+
+      // 3d. Left open, the tour ends by itself after 3 minutes (owner 2026-11-26) and the phone syncs.
+      {
+        const { page, errors, context } = await newPage(browser, viewport);
+        await page.clock.install();
+        await page.evaluate(() => {
+          currentUser = { id: 'stub-pc', email: 'pc@test', role: 'pc' }; activeIncident = null;
+          window.__push = 0; const origPush = syncPush; window.syncPush = (...a) => { window.__push++; return origPush(...a); };
+          openIncidentPicker(); startGuidedTour();
+        });
+        await page.clock.fastForward(2 * 60 * 1000 + 50 * 1000);
+        const before = await page.evaluate(() => !!_guidedTour);
+        await page.clock.fastForward(20 * 1000);
+        const after = await page.evaluate(() => ({ tour: !!_guidedTour, sandbox: inDemoSandbox(), screen: activeScreenId(), user: currentUser && currentUser.id, push: window.__push }));
+        check(before, `${vp} time limit: the tour must still be open at 2:50`);
+        check(!after.tour && !after.sandbox && after.screen === 'incident-picker' && after.user === 'stub-pc' && after.push > 0,
+          `${vp} time limit: after 3 minutes the tour must end, back on the picker, signed in, synced (got ${JSON.stringify(after)})`);
+        check(!errors.length, `${vp} time limit: page errors ${errors.join(' | ')}`);
+        await context.close();
+      }
+
+      // 4b. Signed-in CC while the all-incidents strip shows an alert line: no button, refused.
+      {
+        const { page, errors, context } = await newPage(browser, viewport);
+        await page.evaluate(() => {
+          currentUser = { id: 'stub-cc', email: 'cc@test', role: 'cc' };
+          activeIncident = null; _openIncidents = []; _allIncidentTriage = {};
+          window.ccOverviewIncidentAlerts = () => [{ inc: { id: 'inc-x', visual_id: 'INC-9' }, groups: [{ rank: 0, alerts: [{ title: 'פצוע אדום' }] }] }];
+          enterCcAllIncidentsView();
+        });
+        await page.waitForTimeout(300);
+        const btn = await page.$('#screen-role-dashboard.active [data-guided-tour-start]');
+        check(!btn || !(await btn.isVisible()), `${vp} CC with an open alert: the all-incidents view must not offer the tour`);
+        const r = await page.evaluate(() => { startGuidedTour(); return { tour: !!_guidedTour, sandbox: inDemoSandbox() }; });
+        check(!r.tour && !r.sandbox, `${vp} CC with an open alert: startGuidedTour() must be refused (got ${JSON.stringify(r)})`);
+        check(!errors.length, `${vp} CC with an open alert: page errors ${errors.join(' | ')}`);
         await context.close();
       }
 
@@ -219,5 +306,5 @@ async function walkTour(page, label) {
     console.error(`browser_guided_tour_test: ${failures.length} failure(s)\n- ` + failures.join('\n- '));
     process.exit(1);
   }
-  console.log('browser_guided_tour_test: the PC / CC guided tour passed (local demo, signed-in PC picker, refusal inside an incident, signed-in CC all-incidents view; 375x812 and 412x915)');
+  console.log('browser_guided_tour_test: the PC / CC guided tour passed (local demo, signed-in PC picker, refusal inside an incident / with an active tourniquet / for a CC with open alerts, sign-out mid-tour, 3-minute limit, signed-in CC all-incidents view; 375x812 and 412x915)');
 })();
