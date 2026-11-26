@@ -93,7 +93,7 @@ A compromised, buggy, or malicious client could push malformed events, events fo
 
 *Mitigation status*: real and layered. `sync-log`'s "Atomic Individual Event Processing" quarantines malformed/unparseable events into `sync_ingestion_errors` rather than failing a whole batch or silently accepting bad data; `ROLE_ALLOWED_EVENT_TYPES` and RLS both gate event-type-vs-role; a dependency-blocked child event is quarantined, not inserted as an orphan. Verified live this session (real `FORBIDDEN_ACTOR_ROLE`/`MALFORMED_EVENT_ENVELOPE`/`BLOCKED_DEPENDENCY` rows already exist in `sync_ingestion_errors` from earlier testing, and are now visible in a dedicated command review panel rather than only a numeric count).
 
-*WP-27 (`database/096`, not applied live yet)*: a read-only phone's record is accepted when its phone time (`local_timestamp`, `t_injury`) is not later than the moment that person became read-only (`app.can_write_incident_late`). A phone that sets its clock back can keep writing to a site it was relieved from. Accepted on purpose, the same trust `068` gives late records after a close; the record still carries the real `actor_id` and `server_timestamp`, so the after-action report can spot it.
+*WP-27 (`database/096`, applied live 2026-11-26)*: a read-only phone's record is accepted when its phone time (`local_timestamp`, `t_injury`) is not later than the moment that person became read-only (`app.can_write_incident_late`). A phone that sets its clock back can keep writing to a site it was relieved from. Accepted on purpose, the same trust `068` gives late records after a close; the record still carries the real `actor_id` and `server_timestamp`, so the after-action report can spot it.
 
 ### T4: Privilege escalation at signup
 
