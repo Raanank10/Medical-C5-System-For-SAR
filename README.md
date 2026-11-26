@@ -27,7 +27,7 @@ The current implementation is intentionally lightweight: a standalone HTML proto
 | Field/command prototype | Active Demo V2.9993 (`APP_VERSION 2.99.93`) | `index.html` (single file; also the live demo) |
 | Product specification | Active V2.8 role/command model | `docs/ROLE_COMMAND_MODEL_v2.8.md`, `docs/ALERT_OWNERSHIP_v1.3.md`, `docs/C5_SENTINEL_SAR_MVP_SPEC_v1.2.md` |
 | API contract | v1.2, sync endpoints implemented | `docs/API_SURFACE_v1.2.md` — `/sync/log` push/pull is a real deployed Edge Function; Command Actions and most of the AAR API are still unbuilt |
-| Data model | Deployed to a live Supabase project, RLS enabled and audited | `database/001_postgresql_schema_v1.2.sql` + incremental files `004`-`078`; see `docs/RLS_AUDIT_v1.md` |
+| Data model | Deployed to a live Supabase project, RLS enabled and audited | `database/001_postgresql_schema_v1.2.sql` + incremental files `004`-`094`; see `docs/RLS_AUDIT_v1.md` |
 | Demo data | Draft seed data | `database/002_seed_demo_data_v1.2.sql` |
 | Analytics/AAR | Working local package, with a pytest suite and a real-incident export path | `analytics/c5_sentinel_sar_analytics_v1_1/` |
 | Production backend | Deployed | Real Supabase Auth, RLS-enforced Postgres, `/sync/log` Edge Function; see `docs/ARCHITECTURE.md`'s "Backend Deployment Status" |
