@@ -318,16 +318,17 @@ async function checkFile(browser, file) {
   assert(sp.t_injury_source === 'entered' && Date.parse(sp.t_injury) === entered50 && sp.t_injury_set_by_role === 'medic',
     `${rel}: the server marks the time entered by the medic`);
 
-  // Golden Hour on the command watchdog counts from when the incident began, the earlier of alert
-  // and opening, even after an injury time was entered (owner 2026-11-27, replacing WP-23's "from
-  // the injury time" for the golden hour only). The entered time still drives MIST and Crush.
+  // Golden Hour on the command watchdog counts from the earliest of the incident's alert, its opening
+  // and the entered injury time (owner 2026-11-27: "the earlier beats everything else"). Here the
+  // entered 50 minutes is earlier than the incident, so it counts. The entered time also drives MIST.
   const golden = await m1.page.evaluate((pid) => {
     const p = patients.find((x) => x.id === pid);
     const startMs = incidentAlertTimeMs(p);
-    return { row: computeWatchdogRows(patients).find((r) => r.patient === pid && r.name === 'Golden Hour'), expected: Math.floor((Date.now() - startMs) / 60000), known: Number.isFinite(startMs) };
+    const earliest = Math.min(...[startMs, p.tInjury].filter((t) => Number.isFinite(t)));
+    return { row: computeWatchdogRows(patients).find((r) => r.patient === pid && r.name === 'Golden Hour'), expected: Math.floor((Date.now() - earliest) / 60000), enteredFirst: earliest === p.tInjury };
   }, id);
-  assert(golden.known && golden.row && golden.row.detail.startsWith(`${golden.expected} דק׳`) && golden.row.detail.includes('מאז תחילת האירוע'),
-    `${rel}: Golden Hour counts from the incident start, not the entered injury time (got ${JSON.stringify(golden)})`);
+  assert(golden.row && golden.row.detail.startsWith(`${golden.expected} דק׳`) && golden.row.detail.includes(golden.enteredFirst ? 'מאז הפציעה' : 'מאז תחילת האירוע'),
+    `${rel}: Golden Hour counts from the earliest of incident start and entered injury time (got ${JSON.stringify(golden)})`);
 
   // MIST: the injury time is said; mechanism and injuries are no longer the same text.
   const mist = await m1.page.evaluate((pid) => mistTextForPatient(patients.find((p) => p.id === pid)), id);

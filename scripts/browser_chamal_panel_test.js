@@ -284,9 +284,16 @@ async function checkGoldenHourClock(browser) {
     patients.push({ ...base, id: 'gh-2', visualId: 'A-52', incidentId: 'INC-2' });
     patients.push({ ...base, id: 'gh-3', visualId: 'A-53', incidentId: 'INC-3' });
     patients.push({ ...base, id: 'gh-4', visualId: 'A-54', incidentId: 'INC-UNKNOWN' });
-    // Injury time entered 20 min ago, incident began 70 min ago: the golden hour is the incident's
-    // (owner: the earlier beats everything else); Crush keeps the casualty's own 20 minutes.
+    // Owner: "the earlier beats everything else". Injury time entered 20 min ago, incident began 70 min
+    // ago: the incident's 70. Crush keeps the casualty's own 20 minutes.
     patients.push({ ...base, id: 'gh-6', visualId: 'A-56', incidentId: 'INC-1', trapStatus: 'trapped', tInjury: Date.now() - 20 * 60000, tInjurySource: 'entered' });
+    // Entered 65 min ago, incident opened 50 min ago (INC-2): the entered 65 counts (the earlier).
+    patients.push({ ...base, id: 'gh-7', visualId: 'A-57', incidentId: 'INC-2', tInjury: Date.now() - 65 * 60000, tInjurySource: 'entered' });
+    // An incident whose only time is 20 min in the future: not used. Alone: a wrong clock, waiting;
+    // with an injury time entered 70 min ago: that time, red.
+    _openIncidents.push({ id: 'INC-4', t_zero: new Date(Date.now() + 20 * 60000).toISOString(), opened_at: null });
+    patients.push({ ...base, id: 'gh-8', visualId: 'A-58', incidentId: 'INC-4' });
+    patients.push({ ...base, id: 'gh-9', visualId: 'A-59', incidentId: 'INC-4', tInjury: Date.now() - 70 * 60000, tInjurySource: 'entered' });
     // A row pulled from before 088: its stored "injury time" is only the registration time.
     patients.push({ ...base, id: 'gh-5', visualId: 'A-55', incidentId: 'INC-1', tInjury: Date.now() - 5 * 60000, tInjurySource: 'event_time' });
     // First in the list, only a prompt: the panel must still open with a red row.
@@ -297,12 +304,15 @@ async function checkGoldenHourClock(browser) {
     const panel = document.getElementById('cmd-watchdogs').textContent;
     const firstRowRed = document.querySelector('#cmd-watchdogs .watchdog-row')?.classList.contains('red');
     currentUser = null; _openIncidents = []; activeIncident = null;
-    return { demo, card, firstRowRed, g6: g('gh-6'), c6: rows.find((x) => x.patient === 'gh-6' && x.name === 'Crush Syndrome'), g5: g('gh-5'), g1: g('gh-1'), g2: g('gh-2'), g3: g('gh-3'), g4: g('gh-4'), panel };
+    return { demo, card, firstRowRed, g7: g('gh-7'), g8: g('gh-8'), g9: g('gh-9'), g6: g('gh-6'), c6: rows.find((x) => x.patient === 'gh-6' && x.name === 'Crush Syndrome'), g5: g('gh-5'), g1: g('gh-1'), g2: g('gh-2'), g3: g('gh-3'), g4: g('gh-4'), panel };
   });
   assert(r.demo && r.demo.state === 'red' && r.demo.detail.includes('לפחות 90 דק׳'), `no injury or incident time: registration is a lower limit, 90 min is red ("לפחות"): ${JSON.stringify(r.demo)}`);
   assert(r.card.includes('1 עברו 60') && r.card.includes('נספרו לפחות מהרישום'), `site card: a casualty with no clock is counted on its lower limit and named: ${r.card}`);
   assert(r.firstRowRed, `watchdog panel: red rows first`);
-  assert(r.g6.state === 'red' && r.g6.detail.startsWith('70 דק׳'), `golden hour: the incident start beats an entered injury time: ${JSON.stringify(r.g6)}`);
+  assert(r.g6.state === 'red' && r.g6.detail.startsWith('70 דק׳'), `golden hour: a later entered injury time never shortens the incident's clock: ${JSON.stringify(r.g6)}`);
+  assert(r.g7.state === 'red' && r.g7.detail.startsWith('65 דק׳') && r.g7.detail.includes('מאז הפציעה'), `golden hour: an entered injury time earlier than the incident counts: ${JSON.stringify(r.g7)}`);
+  assert(r.g8.state === 'prompt' && r.g8.detail.includes('בדוק שעון'), `golden hour: an incident time in the future is a wrong clock, never ok: ${JSON.stringify(r.g8)}`);
+  assert(r.g9.state === 'red' && r.g9.detail.startsWith('70 דק׳'), `golden hour: a future incident time does not hide a valid entered time: ${JSON.stringify(r.g9)}`);
   assert(r.c6 && r.c6.state === 'ok' && r.c6.detail.includes('20 דק׳'), `crush keeps the entered injury time: ${JSON.stringify(r.c6)}`);
   assert(r.g5.state === 'red' && r.g5.detail.startsWith('70 דק׳'), `a stored registration-time "injury time" must give way to the incident's start: ${JSON.stringify(r.g5)}`);
   assert(r.g1.state === 'red' && r.g1.detail.startsWith('70 דק׳') && r.g1.detail.includes('מאז תחילת האירוע'), `active incident: from its T0 (70 min): ${JSON.stringify(r.g1)}`);
