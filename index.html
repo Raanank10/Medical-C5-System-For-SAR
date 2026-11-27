@@ -8675,22 +8675,25 @@ function chamalSiteCardHtml(site){
     : `<span style="color:var(--orange)">${st.t0?'T0 לא קריא':'T0 טרם נקבע'}</span>`;
   const status=st.siteClear?.cleared?'אתר נקי':(INCIDENT_STATUS_LABELS[st.incidentStatus]||st.incidentStatus);
   // Golden hour (the full screen's 45 / 60 minute watchdog thresholds), for casualties still on the
-  // way out: not evacuated, and not black / deceased. Counted from the injury time. Always shown
-  // beside the count: how many times are estimates (incident opening time, no time entered), how many
-  // have neither an injury nor an incident time (counted from when the record was made, which can be
-  // the sync time on a pulled record, so too short), and how many lie in the future (device clock),
-  // which are left out of the count rather than read as "within the hour".
+  // way out: not evacuated, and not black / deceased. Counted from when the incident began, the
+  // earlier of alert and opening, ahead of any entered injury time (goldenHourClock, owner 2026-11-27). Always shown beside the count: how many times are estimates
+  // (the incident's start, no time entered), how many have neither (counted on the registration time
+  // as a lower limit and named "לפחות"),
+  // and how many lie in the future (device clock), also left out rather than read as "within the hour".
   const open=pts.filter(p=>evacuationStage(p)!=='evacuated' && !isDeceasedForEvac(p));
   const gh={amber:0,red:0,estimated:0,unknown:0,future:0};
   open.forEach(p=>{
-    const inj=patientInjuryTime(p);
+    const inj=goldenHourClock(p);
     if(Number.isFinite(inj.ms) && inj.ms>Date.now()+60000){ gh.future++; return; }
-    if(!Number.isFinite(inj.ms) || inj.source==='event_time'){ gh.unknown++; if(!Number.isFinite(inj.ms)) return; }
+    if(!Number.isFinite(inj.ms)){ gh.unknown++; return; }
+    // No injury or incident time: the registration time is a lower limit, so they are counted on it
+    // (a casualty registered 70 minutes ago is at least 70 minutes from injury) and named.
+    if(inj.source==='event_time') gh.unknown++;
     else if(inj.estimated) gh.estimated++;
     const level=watchdogState(Math.floor((Date.now()-inj.ms)/60000),45,60);
     if(level==='red') gh.red++; else if(level==='amber') gh.amber++;
   });
-  const ghNotes=[gh.estimated?`${gh.estimated} לפי שעה משוערת`:'', gh.unknown?`${gh.unknown} ללא שעת פציעה ושעת אירוע`:'', gh.future?`${gh.future} שעת פציעה בעתיד, בדוק שעון`:''].filter(Boolean).join(' · ');
+  const ghNotes=[gh.estimated?`${gh.estimated} לפי שעה משוערת`:'', gh.unknown?`${gh.unknown} ללא שעת פציעה ושעת אירוע (נספרו לפחות מהרישום)`:'', gh.future?`${gh.future} שעת פציעה בעתיד, בדוק שעון`:''].filter(Boolean).join(' · ');
   const ghMain=gh.red||gh.amber ? `${gh.red} עברו 60 דק׳ · ${gh.amber} מעל 45 דק׳` : 'אף פצוע לא מעל 45 דק׳';
   const ghLine=`<div class="chamal-site-line" data-chamal-golden style="${gh.red?'color:var(--red);font-weight:800':gh.amber?'color:var(--orange);font-weight:800':''}">⏱ שעת זהב (לא פונו, ללא שחורים): ${ghMain}${ghNotes?` · <span style="color:var(--orange)">${ghNotes}</span>`:''}</div>`;
   const stage=k=>pts.filter(p=>evacuationStage(p)===k).length;
@@ -12826,6 +12829,8 @@ function mistInjuriesText(p){
 function mistInjuryTimeText(p){
   const it=patientInjuryTime(p);
   const minutes=Math.max(0, Math.floor((Date.now()-it.ms)/60000));
+  // No injury or incident time: say so, with the registration as a lower limit (owner 2026-11-27).
+  if(it.source==='event_time') return `לא ידועה (נרשם ${tourniquetHhmm(it.ms)}, לפני לפחות ${tourniquetAgoText(minutes)})`;
   return `${tourniquetHhmm(it.ms)}${it.estimated?' משוערת':''}, לפני ${tourniquetAgoText(minutes)}`;
 }
 function mistSummaryPayload(p){
@@ -15099,28 +15104,33 @@ function computeWatchdogRows(pts){
   const now=Date.now();
   const rows=[];
   pts.forEach(p=>{
-    // Golden Hour and Crush count from the injury time (WP-23): entered in the field, else the
-    // incident's alert time, marked "משוערת". Before WP-23 they counted from this phone's
-    // registration of the patient while the label already said T_injury.
+    // Golden Hour and Crush count from the injury time (WP-23): entered in the field, else when the
+    // casualty's incident began (the earlier of alert and opening), marked "משוערת". Before WP-23
+    // they counted from this phone's registration of the patient while the label said T_injury.
     // With no injury time entered they count from when the incident began (owner 2026-11-27: the
-    // earlier of alert and opening, incidentAlertTimeMs). With neither, there is no clock: the row is
-    // "prompt" and says so, rather than counting from when a phone registered the casualty.
+    // earlier of alert and opening, incidentAlertTimeMs). With neither, the injury time is unknown,
+    // but registration can only come after the injury, so the minutes since registration are a
+    // lower limit: "לפחות N דק׳". The row alarms on that limit (a red from it is always a true red)
+    // and is "prompt" only while the limit is under 45, never "ok" (clinical review 2026-11-27).
     // The Golden Hour row counts every registered casualty, evacuated and black ones included (the
     // spec's "Any registered patient", for after-action); the חמ״ל רפואי site card counts only the
     // ones still in the field, so the row says so to keep the two numbers apart.
-    const injury=patientInjuryTime(p);
     const label=p.visualId||p.id;
-    const noClock=injury.source==='event_time';
-    const ageMin=Math.max(0, Math.floor((now-injury.ms)/60000));
-    const injuryNote=injury.source==='entered' ? `מאז הפציעה ${tourniquetHhmm(injury.ms)}`
-      : injury.source==='incident_open' ? `מאז תחילת האירוע ${tourniquetHhmm(injury.ms)} (משוערת)`
-      : `מאז הפציעה ${tourniquetHhmm(injury.ms)} (משוערת)`;
-    const unknownDetail='אין שעת פציעה ואין שעת התראה או פתיחה לאירוע · לא ניתן לחשב';
-    const golden=noClock?'prompt':watchdogState(ageMin,45,60);
-    rows.push({patient:p.id, label, name:'Golden Hour', title:'Golden Hour · כל הפצועים (כולל שפונו ושחורים)', trigger:'Any registered patient', threshold:'T_injury +45m / +60m', state:golden, detail:noClock?unknownDetail:`${ageMin} דק׳ ${injuryNote}`});
+    const lowerBound=(level)=>level==='ok'?'prompt':level;
+    const clockRow=(clock)=>{
+      const noClock=clock.source==='event_time';
+      const ageMin=Math.max(0, Math.floor((now-clock.ms)/60000));
+      const note=clock.source==='entered' ? `מאז הפציעה ${tourniquetHhmm(clock.ms)}`
+        : clock.source==='incident_open' ? `מאז תחילת האירוע ${tourniquetHhmm(clock.ms)}`
+        : `מאז הפציעה ${tourniquetHhmm(clock.ms)} (משוערת)`;
+      return {state:noClock?lowerBound(watchdogState(ageMin,45,60)):watchdogState(ageMin,45,60),
+        detail:noClock?`לפחות ${ageMin} דק׳ (מהרישום) · אין שעת פציעה ואין שעת התראה או פתיחה לאירוע`:`${ageMin} דק׳ ${note}`};
+    };
+    const golden=clockRow(goldenHourClock(p));
+    rows.push({patient:p.id, label, name:'Golden Hour', title:'Golden Hour · כל הפצועים (כולל שפונו ושחורים)', trigger:'Any registered patient', threshold:'Incident start +45m / +60m', state:golden.state, detail:golden.detail});
     if(normalizeTrapStatus(p)==='trapped'){
-      const crush=noClock?'prompt':watchdogState(ageMin,45,60);
-      rows.push({patient:p.id, label, name:'Crush Syndrome', trigger:'Access = Trapped', threshold:'T_injury +45m', state:crush, detail:noClock?`לכוד · ${unknownDetail}`:`לכוד · ${ageMin} דק׳ ${injuryNote}`});
+      const crush=clockRow(patientInjuryTime(p));
+      rows.push({patient:p.id, label, name:'Crush Syndrome', trigger:'Access = Trapped', threshold:'T_injury +45m', state:crush.state, detail:`לכוד · ${crush.detail}`});
     }
     if(p.tourniquet?.appliedAt){
       const tqMin=Math.floor((now-p.tourniquet.appliedAt)/60000);
@@ -15157,7 +15167,9 @@ function renderWatchdogPanel(pts){
   setCmdPanelMeta('watchdogs', `${red} אדום · ${amber} ענבר · ${prompt} ממתין לתגובה`);
   const body=document.getElementById('cmd-watchdogs');
   if(!body) return;
-  const visible=(active.length?active:rows.slice(0,6)).slice(0,12);
+  // Red first, then amber, then prompt, so the no-clock prompts never push a red row out of the 12.
+  const rank={red:0,amber:1,prompt:2};
+  const visible=(active.length?[...active].sort((a,b)=>(rank[a.state]??3)-(rank[b.state]??3)):rows.slice(0,6)).slice(0,12);
   body.innerHTML=visible.map(r=>{
     const tag=r.state==='ok'?'ok':r.state;
     return `<div class="cmd-matrix-row watchdog-row ${tag}">
@@ -17245,7 +17257,8 @@ async function activateIncident(inc){
   const prev=activeIncident?.id===inc.id ? activeIncident : null;
   activeIncident={id:inc.id, visual_id:inc.visual_id, status:inc.status, location_name:inc.location_name, address:inc.address||'', incident_type:inc.incident_type||null, incident_types:incidentTypesFromRow(inc), draft_resolution:inc.draft_resolution||null,
     opened_by:inc.opened_by!==undefined?inc.opened_by:(prev?prev.opened_by:undefined), false_alarm:!!(inc.false_alarm||prev?.false_alarm),
-    t_zero:inc.t_zero||prev?.t_zero||null}; // the alert time, injury time's default (WP-23)
+    t_zero:inc.t_zero||prev?.t_zero||null, // the alert time, injury time's default (WP-23)
+    opened_at:inc.opened_at||prev?.opened_at||null}; // with t_zero, when the incident began (owner 2026-11-27)
   // WP-27: keep this phone's relief / read-only state across a re-entry, and ask the server now.
   if(prev?.access_mode){ activeIncident.access_mode=prev.access_mode; activeIncident.read_only_since=prev.read_only_since||null; activeIncident.site_company_name=prev.site_company_name||null; }
   else if(inc.read_only) activeIncident.access_mode='read_only';
@@ -19230,8 +19243,9 @@ function injuryTimeActorName(){ return currentUser ? (_myDisplayName || EVAC_POI
 // t_injury_default); in local demo mode, the site's T0 once the incident is official.
 // When the casualty's incident began (owner 2026-11-27, C5Rules.incidentClockStartMs): the earlier of
 // its alert time (T0) and its opening time. Signed in, the casualty's own incident: the active one,
-// or the incident list for a casualty of another incident (CC / חמ״ל רפואי see several). Before,
-// only the active incident's T0 was known and everyone else fell back to the registration time.
+// or the incident list (_openIncidents) for a casualty of another incident (CC / חמ״ל רפואי see
+// several). Before this, only the active incident's T0 was known and every other casualty fell back
+// to the registration time.
 // The local demo has no opening time, only the site's T0.
 function incidentAlertTimeMs(p){
   if(currentUser){
@@ -19243,16 +19257,28 @@ function incidentAlertTimeMs(p){
   const s=siteAuthority?.[p?.siteId||'SITE_A'];
   return C5Rules.incidentClockStartMs(Date.parse(s?.t0||''), NaN);
 }
-// {ms, source, estimated}: an entered or server time first, then the alert time, then (no T0
-// known) the registration time, which is what the server held before 088.
+// {ms, source, estimated}: an entered or server time first, then when the casualty's incident began
+// (incidentAlertTimeMs), then the registration time as source 'event_time', which the watchdog and
+// the חמ״ל רפואי card treat as "no clock". A stored 'event_time' (rows from before 088) is itself
+// only the registration time, so the incident's start is tried before it (owner 2026-11-27).
 function patientInjuryTime(p){
   const own=Number(p?.tInjury);
-  if(Number.isFinite(own) && own>0 && INJURY_TIME_SOURCE_LABELS[p.tInjurySource]) return {ms:own, source:p.tInjurySource, estimated:p.tInjurySource!=='entered'};
+  if(Number.isFinite(own) && own>0 && p.tInjurySource!=='event_time' && INJURY_TIME_SOURCE_LABELS[p.tInjurySource]) return {ms:own, source:p.tInjurySource, estimated:p.tInjurySource!=='entered'};
   const alertMs=incidentAlertTimeMs(p);
   if(Number.isFinite(alertMs) && alertMs>0) return {ms:alertMs, source:'incident_open', estimated:true};
   return {ms:patientClockStart(p), source:'event_time', estimated:true};
 }
 function injuryClockStart(p){ return patientInjuryTime(p).ms; }
+// Golden-hour clock (owner 2026-11-27): it starts when the incident began, the earlier of its alert
+// time and when anyone opened it, and that beats everything else, an entered injury time too. Only
+// when the phone knows neither does it fall back to the casualty's injury time (entered, else the
+// registration as a lower limit, source 'event_time'). Crush, MIST and the stored report keep the
+// casualty's own injury time (patientInjuryTime).
+function goldenHourClock(p){
+  const incidentMs=incidentAlertTimeMs(p);
+  if(Number.isFinite(incidentMs) && incidentMs>0) return {ms:incidentMs, source:'incident_open', estimated:false};
+  return patientInjuryTime(p);
+}
 function injuryTimeHhmm(p){ return tourniquetHhmm(injuryClockStart(p)); }
 function injuryTimeShortLabel(p){
   const it=patientInjuryTime(p);

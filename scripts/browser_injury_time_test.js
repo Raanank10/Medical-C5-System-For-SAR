@@ -318,10 +318,16 @@ async function checkFile(browser, file) {
   assert(sp.t_injury_source === 'entered' && Date.parse(sp.t_injury) === entered50 && sp.t_injury_set_by_role === 'medic',
     `${rel}: the server marks the time entered by the medic`);
 
-  // Golden Hour on the command watchdog counts from the injury time: 50 min = amber.
-  const golden = await m1.page.evaluate((pid) => computeWatchdogRows(patients).find((r) => r.patient === pid && r.name === 'Golden Hour'), id);
-  assert(golden && golden.state === 'amber' && golden.detail.startsWith('50 דק׳') && golden.detail.includes('מאז הפציעה') && !golden.detail.includes('משוערת'),
-    `${rel}: Golden Hour counts from the entered injury time (got ${JSON.stringify(golden)})`);
+  // Golden Hour on the command watchdog counts from when the incident began, the earlier of alert
+  // and opening, even after an injury time was entered (owner 2026-11-27, replacing WP-23's "from
+  // the injury time" for the golden hour only). The entered time still drives MIST and Crush.
+  const golden = await m1.page.evaluate((pid) => {
+    const p = patients.find((x) => x.id === pid);
+    const startMs = incidentAlertTimeMs(p);
+    return { row: computeWatchdogRows(patients).find((r) => r.patient === pid && r.name === 'Golden Hour'), expected: Math.floor((Date.now() - startMs) / 60000), known: Number.isFinite(startMs) };
+  }, id);
+  assert(golden.known && golden.row && golden.row.detail.startsWith(`${golden.expected} דק׳`) && golden.row.detail.includes('מאז תחילת האירוע'),
+    `${rel}: Golden Hour counts from the incident start, not the entered injury time (got ${JSON.stringify(golden)})`);
 
   // MIST: the injury time is said; mechanism and injuries are no longer the same text.
   const mist = await m1.page.evaluate((pid) => mistTextForPatient(patients.find((p) => p.id === pid)), id);

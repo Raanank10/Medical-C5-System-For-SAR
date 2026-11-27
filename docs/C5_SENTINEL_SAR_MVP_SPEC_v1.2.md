@@ -201,6 +201,8 @@ patient when the injury time is known to differ. Any override is logged as PATIE
 Until someone enters it, T_injury is shown as an estimate ("משוערת").
 ```
 
+Golden Hour (owner 2026-11-27, V2.99.96): the golden hour starts when the incident began, the earlier of its alert time (T0) and when anyone opened it, and that beats everything else, an entered injury time too (owner 2026-11-27, `goldenHourClock` / `incidentClockStartMs`). Only when the phone knows neither does the golden hour fall back to the casualty's injury time. Crush, the MIST handover and the stored report keep the casualty's own injury time. Until an injury time is entered, the phone's `T_injury` itself is also when the casualty's own incident began. With neither known (and for a row stored as `event_time`, which is only the registration time) registration can only come after the injury, so the minutes since registration are a lower limit: they are shown as "לפחות N דק׳", a row is red or amber on that limit (a red from it is always true) and "ממתין לתגובה" while it is under 45, never "ok" (clinical review 2026-11-27): the Golden Hour and Crush rows and the חמ״ל רפואי site card use it, and the MIST text says the injury time is unknown. The server's own default stays `t_injury_default` (= T₀).
+
 The command watchdog's Golden Hour and Crush Syndrome rows, the MIST handover and the stored after-action report count from `T_injury`. On the server the newest entry by phone time wins, so an older entry pushed late by an offline phone does not overwrite a newer correction.
 
 ### Site Guard and Patient Creation

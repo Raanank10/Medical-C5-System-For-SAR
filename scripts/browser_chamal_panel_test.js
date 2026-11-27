@@ -253,8 +253,8 @@ async function checkReportWithoutCasualties(browser) {
 }
 
 // Golden-hour clock (owner 2026-11-27): with no injury time entered it starts when the casualty's own
-// incident began, the earlier of T0 and the opening time; with neither there is no clock ("prompt",
-// not a count from registration). The full screen's row says it counts everyone, and shows visual ids.
+// incident began, the earlier of T0 and the opening time; with neither, registration is a lower limit:
+// "לפחות N דק׳", red on it once past 60, "prompt" while under 45, never "ok". The full screen's row says it counts everyone, and shows visual ids.
 async function checkGoldenHourClock(browser) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
@@ -270,8 +270,11 @@ async function checkGoldenHourClock(browser) {
     const ago = (m) => new Date(Date.now() - m * 60000).toISOString();
     const base = { triage: 'red', siteId: 'SITE_A', location: 'הרצל 12', locDetail: 'לובי', vitals: {}, events: [], patientStatus: 'identified', createdAt: ago(5) };
     // Demo, no T0 on the site: no clock at all.
-    patients.push({ ...base, id: 'gh-demo', visualId: 'A-50' });
+    // Registered 90 minutes ago with no injury or incident time: at least 90 minutes, so red.
+    patients.push({ ...base, id: 'gh-demo', visualId: 'A-50', createdAt: ago(90) });
     const demo = computeWatchdogRows(patients).find((x) => x.patient === 'gh-demo' && x.name === 'Golden Hour');
+    startRoleDashboard('chamal');
+    const card = document.querySelector('[data-chamal-site="SITE_A"] [data-chamal-golden]')?.textContent || '';
     // Signed in: the active incident (T0 70 min ago) and another incident (no T0 known, opened 50 min
     // ago; and one whose T0 is earlier than its opening).
     currentUser = { id: 'USR-CHAMAL-TEST', role: 'chamal', email: 'chamal@example.test' };
@@ -281,18 +284,31 @@ async function checkGoldenHourClock(browser) {
     patients.push({ ...base, id: 'gh-2', visualId: 'A-52', incidentId: 'INC-2' });
     patients.push({ ...base, id: 'gh-3', visualId: 'A-53', incidentId: 'INC-3' });
     patients.push({ ...base, id: 'gh-4', visualId: 'A-54', incidentId: 'INC-UNKNOWN' });
+    // Injury time entered 20 min ago, incident began 70 min ago: the golden hour is the incident's
+    // (owner: the earlier beats everything else); Crush keeps the casualty's own 20 minutes.
+    patients.push({ ...base, id: 'gh-6', visualId: 'A-56', incidentId: 'INC-1', trapStatus: 'trapped', tInjury: Date.now() - 20 * 60000, tInjurySource: 'entered' });
+    // A row pulled from before 088: its stored "injury time" is only the registration time.
+    patients.push({ ...base, id: 'gh-5', visualId: 'A-55', incidentId: 'INC-1', tInjury: Date.now() - 5 * 60000, tInjurySource: 'event_time' });
+    // First in the list, only a prompt: the panel must still open with a red row.
+    patients.unshift({ ...base, id: 'gh-0', visualId: 'A-49', incidentId: 'INC-UNKNOWN' });
     const rows = computeWatchdogRows(patients);
     const g = (id) => rows.find((x) => x.patient === id && x.name === 'Golden Hour');
     goTo('commander'); renderCommander();
     const panel = document.getElementById('cmd-watchdogs').textContent;
+    const firstRowRed = document.querySelector('#cmd-watchdogs .watchdog-row')?.classList.contains('red');
     currentUser = null; _openIncidents = []; activeIncident = null;
-    return { demo, g1: g('gh-1'), g2: g('gh-2'), g3: g('gh-3'), g4: g('gh-4'), panel };
+    return { demo, card, firstRowRed, g6: g('gh-6'), c6: rows.find((x) => x.patient === 'gh-6' && x.name === 'Crush Syndrome'), g5: g('gh-5'), g1: g('gh-1'), g2: g('gh-2'), g3: g('gh-3'), g4: g('gh-4'), panel };
   });
-  assert(r.demo && r.demo.state === 'prompt' && r.demo.detail.includes('לא ניתן לחשב'), `golden hour with no incident time must say so, not count from registration: ${JSON.stringify(r.demo)}`);
+  assert(r.demo && r.demo.state === 'red' && r.demo.detail.includes('לפחות 90 דק׳'), `no injury or incident time: registration is a lower limit, 90 min is red ("לפחות"): ${JSON.stringify(r.demo)}`);
+  assert(r.card.includes('1 עברו 60') && r.card.includes('נספרו לפחות מהרישום'), `site card: a casualty with no clock is counted on its lower limit and named: ${r.card}`);
+  assert(r.firstRowRed, `watchdog panel: red rows first`);
+  assert(r.g6.state === 'red' && r.g6.detail.startsWith('70 דק׳'), `golden hour: the incident start beats an entered injury time: ${JSON.stringify(r.g6)}`);
+  assert(r.c6 && r.c6.state === 'ok' && r.c6.detail.includes('20 דק׳'), `crush keeps the entered injury time: ${JSON.stringify(r.c6)}`);
+  assert(r.g5.state === 'red' && r.g5.detail.startsWith('70 דק׳'), `a stored registration-time "injury time" must give way to the incident's start: ${JSON.stringify(r.g5)}`);
   assert(r.g1.state === 'red' && r.g1.detail.startsWith('70 דק׳') && r.g1.detail.includes('מאז תחילת האירוע'), `active incident: from its T0 (70 min): ${JSON.stringify(r.g1)}`);
   assert(r.g2.state === 'amber' && r.g2.detail.startsWith('50 דק׳'), `another incident with no T0: from its opening (50 min), not registration: ${JSON.stringify(r.g2)}`);
   assert(r.g3.state === 'red' && r.g3.detail.startsWith('80 דק׳'), `another incident: the earlier of T0 (80) and opening (30): ${JSON.stringify(r.g3)}`);
-  assert(r.g4.state === 'prompt', `a casualty of an incident this phone does not know: no clock: ${JSON.stringify(r.g4)}`);
+  assert(r.g4.state === 'prompt' && r.g4.detail.includes('לפחות 5 דק׳'), `incident unknown, registered 5 min ago: prompt with the lower limit, never ok: ${JSON.stringify(r.g4)}`);
   assert(r.panel.includes('כולל שפונו ושחורים') && r.panel.includes('A-5') && !r.panel.includes('gh-'), `full-screen rows: say they count everyone, show visual ids: ${r.panel.slice(0, 300)}`);
   assert(errors.length === 0, `golden-hour clock: page errors: ${errors.join(' | ')}`);
   await context.close();
