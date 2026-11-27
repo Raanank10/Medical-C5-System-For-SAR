@@ -562,6 +562,9 @@ assert.deepEqual(rules.RESCUE_PRIORITIES, ["urgent", "pending", "not_urgent"]);
   assert.equal(rules.goldenHourStartMs([at("10:30"), at("09:20")], now), at("09:20"));             // a T0 in the future is not used
   assert.ok(Number.isNaN(rules.goldenHourStartMs([at("10:30")], now)));                             // only a future time: unknown
   assert.ok(Number.isNaN(rules.goldenHourStartMs([], now)));
+  assert.equal(rules.goldenHourStartMs([now + 60000], now), now + 60000);   // the 1-minute tolerance edge: kept
+  assert.ok(Number.isNaN(rules.goldenHourStartMs([now + 60001], now)));     // past it: a wrong clock
+  assert.ok(Number.isNaN(rules.goldenHourStartMs([0, -5, "x", null], now)));
 }
 
 // WP-40 (owner 2026-11-19): waiting for a vehicle after leaving for the נאפ״ל, from when the patient was sent.

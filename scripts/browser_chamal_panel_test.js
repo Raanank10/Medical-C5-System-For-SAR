@@ -289,11 +289,20 @@ async function checkGoldenHourClock(browser) {
     patients.push({ ...base, id: 'gh-6', visualId: 'A-56', incidentId: 'INC-1', trapStatus: 'trapped', tInjury: Date.now() - 20 * 60000, tInjurySource: 'entered' });
     // Entered 65 min ago, incident opened 50 min ago (INC-2): the entered 65 counts (the earlier).
     patients.push({ ...base, id: 'gh-7', visualId: 'A-57', incidentId: 'INC-2', tInjury: Date.now() - 65 * 60000, tInjurySource: 'entered' });
-    // An incident whose only time is 20 min in the future: not used. Alone: a wrong clock, waiting;
-    // with an injury time entered 70 min ago: that time, red.
+    // An incident whose only time is 20 min in the future: not used. Registered 5 min ago: the
+    // registration as a lower limit, waiting; registered 90 min ago: red on it; with an injury time
+    // entered 70 min ago: that time, red.
     _openIncidents.push({ id: 'INC-4', t_zero: new Date(Date.now() + 20 * 60000).toISOString(), opened_at: null });
     patients.push({ ...base, id: 'gh-8', visualId: 'A-58', incidentId: 'INC-4' });
     patients.push({ ...base, id: 'gh-9', visualId: 'A-59', incidentId: 'INC-4', tInjury: Date.now() - 70 * 60000, tInjurySource: 'entered' });
+    patients.push({ ...base, id: 'gh-10', visualId: 'A-60', incidentId: 'INC-4', createdAt: ago(90) });
+    // Registered 50 min ago, incident T0 set only now (made official later): at least 50, amber.
+    _openIncidents.push({ id: 'INC-5', t_zero: new Date().toISOString(), opened_at: null });
+    patients.push({ ...base, id: 'gh-11', visualId: 'A-61', incidentId: 'INC-5', createdAt: ago(50) });
+    // The server's stored default (incident_open = T0) ties with the incident start: not an estimate.
+    patients.push({ ...base, id: 'gh-12', visualId: 'A-62', incidentId: 'INC-1', tInjury: Date.parse(activeIncident.t_zero), tInjurySource: 'incident_open' });
+    // An entered time in the future with a valid incident: the incident's clock, and the row says so.
+    patients.push({ ...base, id: 'gh-13', visualId: 'A-63', incidentId: 'INC-1', tInjury: Date.now() + 2 * 3600000, tInjurySource: 'entered' });
     // A row pulled from before 088: its stored "injury time" is only the registration time.
     patients.push({ ...base, id: 'gh-5', visualId: 'A-55', incidentId: 'INC-1', tInjury: Date.now() - 5 * 60000, tInjurySource: 'event_time' });
     // First in the list, only a prompt: the panel must still open with a red row.
@@ -304,14 +313,18 @@ async function checkGoldenHourClock(browser) {
     const panel = document.getElementById('cmd-watchdogs').textContent;
     const firstRowRed = document.querySelector('#cmd-watchdogs .watchdog-row')?.classList.contains('red');
     currentUser = null; _openIncidents = []; activeIncident = null;
-    return { demo, card, firstRowRed, g7: g('gh-7'), g8: g('gh-8'), g9: g('gh-9'), g6: g('gh-6'), c6: rows.find((x) => x.patient === 'gh-6' && x.name === 'Crush Syndrome'), g5: g('gh-5'), g1: g('gh-1'), g2: g('gh-2'), g3: g('gh-3'), g4: g('gh-4'), panel };
+    return { demo, card, firstRowRed, g10: g('gh-10'), g11: g('gh-11'), g12: g('gh-12'), g13: g('gh-13'), g7: g('gh-7'), g8: g('gh-8'), g9: g('gh-9'), g6: g('gh-6'), c6: rows.find((x) => x.patient === 'gh-6' && x.name === 'Crush Syndrome'), g5: g('gh-5'), g1: g('gh-1'), g2: g('gh-2'), g3: g('gh-3'), g4: g('gh-4'), panel };
   });
   assert(r.demo && r.demo.state === 'red' && r.demo.detail.includes('לפחות 90 דק׳'), `no injury or incident time: registration is a lower limit, 90 min is red ("לפחות"): ${JSON.stringify(r.demo)}`);
   assert(r.card.includes('1 עברו 60') && r.card.includes('נספרו לפחות מהרישום'), `site card: a casualty with no clock is counted on its lower limit and named: ${r.card}`);
   assert(r.firstRowRed, `watchdog panel: red rows first`);
   assert(r.g6.state === 'red' && r.g6.detail.startsWith('70 דק׳'), `golden hour: a later entered injury time never shortens the incident's clock: ${JSON.stringify(r.g6)}`);
   assert(r.g7.state === 'red' && r.g7.detail.startsWith('65 דק׳') && r.g7.detail.includes('מאז הפציעה'), `golden hour: an entered injury time earlier than the incident counts: ${JSON.stringify(r.g7)}`);
-  assert(r.g8.state === 'prompt' && r.g8.detail.includes('בדוק שעון'), `golden hour: an incident time in the future is a wrong clock, never ok: ${JSON.stringify(r.g8)}`);
+  assert(r.g8.state === 'prompt' && r.g8.detail.includes('לפחות 5'), `golden hour: a future incident time is not used; the registration is the lower limit, waiting, never ok: ${JSON.stringify(r.g8)}`);
+  assert(r.g10.state === 'red' && r.g10.detail.includes('לפחות 90'), `golden hour: a future incident time must not hide a 90-minute registration: ${JSON.stringify(r.g10)}`);
+  assert(r.g11.state === 'amber' && r.g11.detail.includes('לפחות 50'), `golden hour: registered before the incident's T0: at least 50, amber: ${JSON.stringify(r.g11)}`);
+  assert(r.g12.state === 'red' && r.g12.detail.includes('מאז תחילת האירוע') && !r.g12.detail.includes('משוערת'), `golden hour: a stored T0 default is the incident start, not an estimate: ${JSON.stringify(r.g12)}`);
+  assert(r.g13.state === 'red' && r.g13.detail.startsWith('70 דק׳') && r.g13.detail.includes('שעת הפציעה שהוזנה בעתיד'), `golden hour: a future entered time is set aside and named: ${JSON.stringify(r.g13)}`);
   assert(r.g9.state === 'red' && r.g9.detail.startsWith('70 דק׳'), `golden hour: a future incident time does not hide a valid entered time: ${JSON.stringify(r.g9)}`);
   assert(r.c6 && r.c6.state === 'ok' && r.c6.detail.includes('20 דק׳'), `crush keeps the entered injury time: ${JSON.stringify(r.c6)}`);
   assert(r.g5.state === 'red' && r.g5.detail.startsWith('70 דק׳'), `a stored registration-time "injury time" must give way to the incident's start: ${JSON.stringify(r.g5)}`);
