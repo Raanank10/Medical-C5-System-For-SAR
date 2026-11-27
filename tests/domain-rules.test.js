@@ -541,6 +541,17 @@ assert.deepEqual(rules.RESCUE_PRIORITIES, ["urgent", "pending", "not_urgent"]);
   assert.equal(rules.RELIEF_OVERDUE_MS, 30 * 60000);
 }
 
+// Incident clock (owner 2026-11-27): earlier of T0 and the opening time; never a guess.
+{
+  const t0 = Date.parse("2026-11-27T10:00:00Z"), opened = Date.parse("2026-11-27T10:07:00Z");
+  assert.equal(rules.incidentClockStartMs(t0, opened), t0);          // alert first
+  assert.equal(rules.incidentClockStartMs(opened, t0), t0);          // order does not matter
+  assert.equal(rules.incidentClockStartMs(NaN, opened), opened);     // no T0: when it was opened
+  assert.equal(rules.incidentClockStartMs(t0, undefined), t0);
+  assert.ok(Number.isNaN(rules.incidentClockStartMs(NaN, NaN)));     // neither: unknown, not "now"
+  assert.ok(Number.isNaN(rules.incidentClockStartMs(0, null)));
+}
+
 // WP-40 (owner 2026-11-19): waiting for a vehicle after leaving for the נאפ״ל, from when the patient was sent.
 {
   const now = Date.parse("2026-11-19T12:00:00Z");

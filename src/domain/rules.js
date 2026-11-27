@@ -574,6 +574,15 @@
     return { level: ms >= EVAC_POINT_WAIT_CRITICAL_MS ? "critical" : "warning", minutes: Math.floor(ms / 60000) };
   }
 
+  // Incident clock (owner 2026-11-27): the golden hour of a casualty with no injury time entered
+  // starts when the incident began: the alert time (T0) or when anyone opened the incident,
+  // whichever came first. Never the time a phone registered the casualty, which can be late or
+  // the sync time. NaN when neither time is known, so the caller shows "unknown" instead of a clock.
+  function incidentClockStartMs(tZeroMs, openedAtMs) {
+    const times = [Number(tZeroMs), Number(openedAtMs)].filter((t) => Number.isFinite(t) && t > 0);
+    return times.length ? Math.min(...times) : NaN;
+  }
+
   // Relief not confirmed (WP-27, owner 2026-11-22/23): after a handover or a release, the leaving
   // company's medical staff keep recording until each confirms "הוחלפתי - מסרתי". Still waiting
   // 30 minutes later: the site's PC and the CC are alerted, so nobody keeps writing on a site he
@@ -635,6 +644,7 @@
     EVAC_POINT_WAIT_CRITICAL_MS,
     EVAC_POINT_WAIT_WARN_MS,
     evacPointWaitAlert,
+    incidentClockStartMs,
     reliefOverdueMinutes,
     RELIEF_OVERDUE_MS,
     isCriticalAlert,

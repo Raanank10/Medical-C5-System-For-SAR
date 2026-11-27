@@ -1,4 +1,4 @@
-// Real-browser test of the חמ״ל רפואי (role key chamal) panel (V2.99.95) and the three picture-quality fixes that came with it:
+// Real-browser test of the חמ״ל רפואי (role key chamal) panel (V2.99.96) and the three picture-quality fixes that came with it:
 // - chamal gets its own panel (one card per site, clinical alerts apart from picture-quality alerts,
 //   devices, open requests) instead of the generic role page; responsibilities sit behind a chip
 // - suspected duplicates: by the recorded zone (locDetail, as the field flows write it; location is the
@@ -252,9 +252,57 @@ async function checkReportWithoutCasualties(browser) {
   console.log('  report without casualties: ok');
 }
 
+// Golden-hour clock (owner 2026-11-27): with no injury time entered it starts when the casualty's own
+// incident began, the earlier of T0 and the opening time; with neither there is no clock ("prompt",
+// not a count from registration). The full screen's row says it counts everyone, and shows visual ids.
+async function checkGoldenHourClock(browser) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await page.route('**/supabase-js@*/**', (r) => r.fulfill({ contentType: 'application/javascript', body: '' }));
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  page.on('dialog', (d) => d.accept());
+  await page.goto('file://' + file, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#screen-pin-gate.active', { timeout: 5000 });
+  await page.fill('#pin-gate-setup-new', PIN); await page.fill('#pin-gate-setup-confirm', PIN); await page.click('#pin-gate-setup-btn');
+  await page.waitForTimeout(300);
+  const r = await page.evaluate(() => {
+    const ago = (m) => new Date(Date.now() - m * 60000).toISOString();
+    const base = { triage: 'red', siteId: 'SITE_A', location: 'הרצל 12', locDetail: 'לובי', vitals: {}, events: [], patientStatus: 'identified', createdAt: ago(5) };
+    // Demo, no T0 on the site: no clock at all.
+    patients.push({ ...base, id: 'gh-demo', visualId: 'A-50' });
+    const demo = computeWatchdogRows(patients).find((x) => x.patient === 'gh-demo' && x.name === 'Golden Hour');
+    // Signed in: the active incident (T0 70 min ago) and another incident (no T0 known, opened 50 min
+    // ago; and one whose T0 is earlier than its opening).
+    currentUser = { id: 'USR-CHAMAL-TEST', role: 'chamal', email: 'chamal@example.test' };
+    activeIncident = { id: 'INC-1', t_zero: ago(70), opened_at: ago(65) };
+    _openIncidents = [activeIncident, { id: 'INC-2', t_zero: null, opened_at: ago(50) }, { id: 'INC-3', t_zero: ago(80), opened_at: ago(30) }];
+    patients.push({ ...base, id: 'gh-1', visualId: 'A-51', incidentId: 'INC-1' });
+    patients.push({ ...base, id: 'gh-2', visualId: 'A-52', incidentId: 'INC-2' });
+    patients.push({ ...base, id: 'gh-3', visualId: 'A-53', incidentId: 'INC-3' });
+    patients.push({ ...base, id: 'gh-4', visualId: 'A-54', incidentId: 'INC-UNKNOWN' });
+    const rows = computeWatchdogRows(patients);
+    const g = (id) => rows.find((x) => x.patient === id && x.name === 'Golden Hour');
+    goTo('commander'); renderCommander();
+    const panel = document.getElementById('cmd-watchdogs').textContent;
+    currentUser = null; _openIncidents = []; activeIncident = null;
+    return { demo, g1: g('gh-1'), g2: g('gh-2'), g3: g('gh-3'), g4: g('gh-4'), panel };
+  });
+  assert(r.demo && r.demo.state === 'prompt' && r.demo.detail.includes('לא ניתן לחשב'), `golden hour with no incident time must say so, not count from registration: ${JSON.stringify(r.demo)}`);
+  assert(r.g1.state === 'red' && r.g1.detail.startsWith('70 דק׳') && r.g1.detail.includes('מאז תחילת האירוע'), `active incident: from its T0 (70 min): ${JSON.stringify(r.g1)}`);
+  assert(r.g2.state === 'amber' && r.g2.detail.startsWith('50 דק׳'), `another incident with no T0: from its opening (50 min), not registration: ${JSON.stringify(r.g2)}`);
+  assert(r.g3.state === 'red' && r.g3.detail.startsWith('80 דק׳'), `another incident: the earlier of T0 (80) and opening (30): ${JSON.stringify(r.g3)}`);
+  assert(r.g4.state === 'prompt', `a casualty of an incident this phone does not know: no clock: ${JSON.stringify(r.g4)}`);
+  assert(r.panel.includes('כולל שפונו ושחורים') && r.panel.includes('A-5') && !r.panel.includes('gh-'), `full-screen rows: say they count everyone, show visual ids: ${r.panel.slice(0, 300)}`);
+  assert(errors.length === 0, `golden-hour clock: page errors: ${errors.join(' | ')}`);
+  await context.close();
+  console.log('  golden-hour clock: ok');
+}
+
 (async () => {
   const browser = await chromium.launch();
   try {
+    await checkGoldenHourClock(browser);
     await checkReportWithoutCasualties(browser);
     await checkPanel(browser, { width: 412, height: 915 });
     await checkPanel(browser, { width: 1440, height: 900 });

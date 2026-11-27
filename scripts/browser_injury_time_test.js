@@ -292,7 +292,7 @@ async function checkFile(browser, file) {
   const id = await m1.page.evaluate(() => { siteData.currentZone = 'קומה 2'; createImmediateInterventionPatient('airway'); return patients[0].id; });
   const t0Hhmm = await m1.page.evaluate((t) => tourniquetHhmm(Date.parse(t)), T0);
   let row = await rowText(m1.page, id);
-  assert(row.includes('שעת פציעה (משוערת)') && row.includes(t0Hhmm) && row.includes('משוערת · שעת ההתראה'),
+  assert(row.includes('שעת פציעה (משוערת)') && row.includes(t0Hhmm) && row.includes('משוערת · תחילת האירוע'),
     `${rel}: before an entry the patient screen shows the alert time as an estimate (got "${row}")`);
   await syncAll(m1.page); await syncAll(m1.page);
   let sp = SERVER.patients.find((p) => p.id === id);

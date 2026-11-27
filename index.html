@@ -1063,7 +1063,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9995</div>
+      <div class="demo-kicker">Demo V2.9996</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1160,7 +1160,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9995</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9996</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1170,7 +1170,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9995</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9996</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3410,6 +3410,15 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     return { level: ms >= EVAC_POINT_WAIT_CRITICAL_MS ? "critical" : "warning", minutes: Math.floor(ms / 60000) };
   }
 
+  // Incident clock (owner 2026-11-27): the golden hour of a casualty with no injury time entered
+  // starts when the incident began: the alert time (T0) or when anyone opened the incident,
+  // whichever came first. Never the time a phone registered the casualty, which can be late or
+  // the sync time. NaN when neither time is known, so the caller shows "unknown" instead of a clock.
+  function incidentClockStartMs(tZeroMs, openedAtMs) {
+    const times = [Number(tZeroMs), Number(openedAtMs)].filter((t) => Number.isFinite(t) && t > 0);
+    return times.length ? Math.min(...times) : NaN;
+  }
+
   // Relief not confirmed (WP-27, owner 2026-11-22/23): after a handover or a release, the leaving
   // company's medical staff keep recording until each confirms "הוחלפתי - מסרתי". Still waiting
   // 30 minutes later: the site's PC and the CC are alerted, so nobody keeps writing on a site he
@@ -3471,6 +3480,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     EVAC_POINT_WAIT_CRITICAL_MS,
     EVAC_POINT_WAIT_WARN_MS,
     evacPointWaitAlert,
+    incidentClockStartMs,
     reliefOverdueMinutes,
     RELIEF_OVERDUE_MS,
     isCriticalAlert,
@@ -3582,7 +3592,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.95';
+const APP_VERSION = '2.99.96';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -8645,7 +8655,7 @@ function positionCommandSticky(){
   sticky.style.top=`${headerTop+header.offsetHeight}px`;
 }
 window.addEventListener('resize', positionCommandSticky);
-// ── חמ״ל רפואי panel (V2.99.95) ──
+// ── חמ״ל רפואי panel (V2.99.96) ──
 // The control room's own screen instead of the generic role page (docs/ROLE_COMMAND_MODEL_v2.6.md
 // "Chamal / Operator / Observer": picture quality - sync, duplicates, external report conflicts,
 // pending requests). One page, nothing behind a tab: the shared status strip (server contact,
@@ -8680,7 +8690,7 @@ function chamalSiteCardHtml(site){
     const level=watchdogState(Math.floor((Date.now()-inj.ms)/60000),45,60);
     if(level==='red') gh.red++; else if(level==='amber') gh.amber++;
   });
-  const ghNotes=[gh.estimated?`${gh.estimated} לפי שעה משוערת`:'', gh.unknown?`${gh.unknown} ללא שעת פציעה ידועה`:'', gh.future?`${gh.future} שעת פציעה בעתיד, בדוק שעון`:''].filter(Boolean).join(' · ');
+  const ghNotes=[gh.estimated?`${gh.estimated} לפי שעה משוערת`:'', gh.unknown?`${gh.unknown} ללא שעת פציעה ושעת אירוע`:'', gh.future?`${gh.future} שעת פציעה בעתיד, בדוק שעון`:''].filter(Boolean).join(' · ');
   const ghMain=gh.red||gh.amber ? `${gh.red} עברו 60 דק׳ · ${gh.amber} מעל 45 דק׳` : 'אף פצוע לא מעל 45 דק׳';
   const ghLine=`<div class="chamal-site-line" data-chamal-golden style="${gh.red?'color:var(--red);font-weight:800':gh.amber?'color:var(--orange);font-weight:800':''}">⏱ שעת זהב (לא פונו, ללא שחורים): ${ghMain}${ghNotes?` · <span style="color:var(--orange)">${ghNotes}</span>`:''}</div>`;
   const stage=k=>pts.filter(p=>evacuationStage(p)===k).length;
@@ -11281,7 +11291,7 @@ function buildAlertObjects(pts=patients, reportSites=null){
     if(auth.incidentType && auth.incidentType!==typeReport.type) pushAlert(alerts,{id:`incident-type-mismatch-${typeReport.siteId}`,type:'INCIDENT_TYPE_MISMATCH',severity:'medium',owner:'pc',audience:['pc','cc'],escalatesTo:null,actionRequired:'acknowledge',scope:'site',category:'integrity',siteId:typeReport.siteId,title:'פער בסוג אירוע: חובש מול חילוץ',detail:`חילוץ: ${INCIDENT_TYPE_LABELS[auth.incidentType]} · חובש: ${INCIDENT_TYPE_LABELS[typeReport.type]} · סוג החילוץ נשאר בתוקף`});
   }
   const conflicts=externalConflictCount(pts,reports);
-  // Per site, and only against a report that exists (V2.99.95; externalGapsBySite). Before, the
+  // Per site, and only against a report that exists (V2.99.96; externalGapsBySite). Before, the
   // field count of every patient passed in (all sites for CC and chamal, one platoon for PC) was
   // compared with the reports of cmdActiveSite alone, and with no report every field casualty
   // counted as a "gap".
@@ -14764,7 +14774,7 @@ function sectorFromLocation(location=''){
   const floor=(location.match(/קומה\s*([^,]+)/)||[])[1] || 'קרקע/לא ידוע';
   return {building:building.trim(), floor:floor.trim()};
 }
-// External report against the field, per site (V2.99.95). The sites looked at: every site that has a
+// External report against the field, per site (V2.99.96). The sites looked at: every site that has a
 // casualty in pts, plus every site in view that has a report (a report with no field casualty yet is
 // the whole gap). Each site's report is compared with that site's whole field count
 // (getSitePatients), never with a platoon's share of it or with another site's casualties. Sites with
@@ -14787,7 +14797,7 @@ function externalConflictCount(pts, reports){
   return Math.abs(field.red-reported.red)+Math.abs(field.yellow-reported.yellow)+Math.abs(field.green-reported.green);
 }
 // Two casualties are a suspected duplicate only on the same site, in the same recorded zone, with an
-// overlapping injury or both trapped / without access (V2.99.95). The field flows keep the site
+// overlapping injury or both trapped / without access (V2.99.96). The field flows keep the site
 // address in location and the zone in locDetail (zoneLabel(), sometimes followed by " · " and a
 // description), so the zone is read from there; location was the site address and never told two
 // places apart. Before, sites were not compared, an unparsed location counted as one sector and two
@@ -14797,7 +14807,7 @@ function duplicateZoneOf(p){ return String(p.zone||String(p.locDetail||'').split
 // Words that say nothing about the casualty: the template texts the flows write when no injury was
 // entered (MSTART sweep, life-saving action, rescue-chain report), the site's likely mechanisms (a
 // site setting) and generic words. Without this, every casualty registered without an injury
-// "overlapped" with every other one (V2.99.95). siteData.lastMechanism is deliberately not ignored:
+// "overlapped" with every other one (V2.99.96). siteData.lastMechanism is deliberately not ignored:
 // it is the last injury typed on this phone, a real injury, and ignoring it would hide a true pair.
 const DUPLICATE_PLACEHOLDER_INJURIES=['לא תועד','הערכת MSTART בלבד','פעולה מצילת חיים בשטח','פעולה מצילת חיים','דיווח שדה ראשוני — לא הוערך קלינית','פגיעת קריסה / לכידה','חסם עורקים הונח (דיווח שדה ראשוני)','דימום מסיבי מדווח'];
 const DUPLICATE_GENERIC_WORDS=['פגיעת','פגיעה','פציעה','פציעת','חשד','מדווח','בשטח','ראשוני'];
@@ -15092,14 +15102,25 @@ function computeWatchdogRows(pts){
     // Golden Hour and Crush count from the injury time (WP-23): entered in the field, else the
     // incident's alert time, marked "משוערת". Before WP-23 they counted from this phone's
     // registration of the patient while the label already said T_injury.
+    // With no injury time entered they count from when the incident began (owner 2026-11-27: the
+    // earlier of alert and opening, incidentAlertTimeMs). With neither, there is no clock: the row is
+    // "prompt" and says so, rather than counting from when a phone registered the casualty.
+    // The Golden Hour row counts every registered casualty, evacuated and black ones included (the
+    // spec's "Any registered patient", for after-action); the חמ״ל רפואי site card counts only the
+    // ones still in the field, so the row says so to keep the two numbers apart.
     const injury=patientInjuryTime(p);
+    const label=p.visualId||p.id;
+    const noClock=injury.source==='event_time';
     const ageMin=Math.max(0, Math.floor((now-injury.ms)/60000));
-    const injuryNote=`מאז הפציעה ${tourniquetHhmm(injury.ms)}${injury.estimated?' (משוערת)':''}`;
-    const golden=watchdogState(ageMin,45,60);
-    rows.push({patient:p.id, name:'Golden Hour', trigger:'Any registered patient', threshold:'T_injury +45m / +60m', state:golden, detail:`${ageMin} דק׳ ${injuryNote}`});
+    const injuryNote=injury.source==='entered' ? `מאז הפציעה ${tourniquetHhmm(injury.ms)}`
+      : injury.source==='incident_open' ? `מאז תחילת האירוע ${tourniquetHhmm(injury.ms)} (משוערת)`
+      : `מאז הפציעה ${tourniquetHhmm(injury.ms)} (משוערת)`;
+    const unknownDetail='אין שעת פציעה ואין שעת התראה או פתיחה לאירוע · לא ניתן לחשב';
+    const golden=noClock?'prompt':watchdogState(ageMin,45,60);
+    rows.push({patient:p.id, label, name:'Golden Hour', title:'Golden Hour · כל הפצועים (כולל שפונו ושחורים)', trigger:'Any registered patient', threshold:'T_injury +45m / +60m', state:golden, detail:noClock?unknownDetail:`${ageMin} דק׳ ${injuryNote}`});
     if(normalizeTrapStatus(p)==='trapped'){
-      const crush=watchdogState(ageMin,45,60);
-      rows.push({patient:p.id, name:'Crush Syndrome', trigger:'Access = Trapped', threshold:'T_injury +45m', state:crush, detail:`לכוד · ${ageMin} דק׳ ${injuryNote}`});
+      const crush=noClock?'prompt':watchdogState(ageMin,45,60);
+      rows.push({patient:p.id, label, name:'Crush Syndrome', trigger:'Access = Trapped', threshold:'T_injury +45m', state:crush, detail:noClock?`לכוד · ${unknownDetail}`:`לכוד · ${ageMin} דק׳ ${injuryNote}`});
     }
     if(p.tourniquet?.appliedAt){
       const tqMin=Math.floor((now-p.tourniquet.appliedAt)/60000);
@@ -15141,7 +15162,7 @@ function renderWatchdogPanel(pts){
     const tag=r.state==='ok'?'ok':r.state;
     return `<div class="cmd-matrix-row watchdog-row ${tag}">
       <div>
-        <div class="cmd-matrix-title">${r.name} · ${r.patient}</div>
+        <div class="cmd-matrix-title">${escAttr(r.title||r.name)} · ${escAttr(r.label||patients.find(x=>x.id===r.patient)?.visualId||r.patient)}</div>
         <div class="cmd-matrix-sub">${r.trigger} · ${r.threshold} · ${r.detail}</div>
       </div>
       <div class="watchdog-tag ${tag}">${r.state.toUpperCase()}</div>
@@ -16017,7 +16038,7 @@ function renderCommandOperationalPanels(pts, site){
   setCmdPanelMeta('alerts', `${buildAlertObjects(pts).filter(a=>a.audience.includes(roleAudience)).length} מנותבות`);
 }
 // One row per field device: real device_presence signed in, inferred from patients in the local demo.
-// Shared by the full command screen's device panel and the חמ״ל רפואי panel (V2.99.95).
+// Shared by the full command screen's device panel and the חמ״ל רפואי panel (V2.99.96).
 function commandDeviceRows(pts){
   const deviceMap=new Map();
   if(currentUser && _remoteDevicePresence.length){
@@ -19200,20 +19221,27 @@ function applyEvacPointArrivals(rows){
 // server the newest entry by phone time wins, so an older entry pushed late does not overwrite a
 // newer correction. Other phones read patients.t_injury with its own query (pullInjuryTimes).
 const INJURY_TIME_EDIT_ROLES=new Set(['medic','paramedic','physician','pc','admin']);
-const INJURY_TIME_SOURCE_LABELS={entered:'הוזנה בשטח', incident_open:'משוערת · שעת ההתראה', event_time:'משוערת · שעת הרישום'};
+const INJURY_TIME_SOURCE_LABELS={entered:'הוזנה בשטח', incident_open:'משוערת · תחילת האירוע', event_time:'משוערת · שעת הרישום'};
 function injuryTimeRole(){ return currentUser?.role || activeRoleDashboard; }
 function canEditInjuryTime(){ return INJURY_TIME_EDIT_ROLES.has(injuryTimeRole()); }
 // Signed in, the account's own name (currentMedicName() is the local demo medic).
 function injuryTimeActorName(){ return currentUser ? (_myDisplayName || EVAC_POINT_ROLE_NAMES[currentUser.role] || currentUser.role) : currentMedicName(); }
 // The incident's alert time: signed in, the active incident's T0 (open_incident() stores it as
 // t_injury_default); in local demo mode, the site's T0 once the incident is official.
+// When the casualty's incident began (owner 2026-11-27, C5Rules.incidentClockStartMs): the earlier of
+// its alert time (T0) and its opening time. Signed in, the casualty's own incident: the active one,
+// or the incident list for a casualty of another incident (CC / חמ״ל רפואי see several). Before,
+// only the active incident's T0 was known and everyone else fell back to the registration time.
+// The local demo has no opening time, only the site's T0.
 function incidentAlertTimeMs(p){
   if(currentUser){
-    if(p?.incidentId && activeIncident && p.incidentId!==activeIncident.id) return NaN;
-    return Date.parse(activeIncident?.t_zero||'');
+    const inc=(!p?.incidentId || p.incidentId===activeIncident?.id) ? activeIncident
+      : (_openIncidents||[]).find(i=>i.id===p.incidentId);
+    if(!inc) return NaN;
+    return C5Rules.incidentClockStartMs(Date.parse(inc.t_zero||''), Date.parse(inc.opened_at||''));
   }
   const s=siteAuthority?.[p?.siteId||'SITE_A'];
-  return Date.parse(s?.t0||'');
+  return C5Rules.incidentClockStartMs(Date.parse(s?.t0||''), NaN);
 }
 // {ms, source, estimated}: an entered or server time first, then the alert time, then (no T0
 // known) the registration time, which is what the server held before 088.
