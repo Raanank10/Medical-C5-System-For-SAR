@@ -8689,7 +8689,7 @@ function chamalSiteCardHtml(site){
   // Golden hour (the full screen's 45 / 60 minute watchdog thresholds), for casualties still on the
   // way out: not evacuated, and not black / deceased. Counted from the earliest of the incident's alert,
   // its opening, an entered injury time and the registration (goldenHourClock, owner 2026-11-27).
-  // "Estimated" is now only a stored estimate the phone could not tie to the incident. Always shown beside the count: how many times are estimates
+  // "Estimated" counts only a non-entered stored time that is not the incident's own start. Always shown beside the count: how many times are estimates
   // (the incident's start, no time entered), how many have neither (counted on the registration time
   // as a lower limit and named "לפחות"),
   // and how many lie in the future (device clock), also left out rather than read as "within the hour".
@@ -18349,7 +18349,7 @@ setInterval(()=>{ if(currentUser) syncPullAll(); }, 45000);
 // so this stays a thin read + merge, not a second projector.
 // A patient with any unsynced local outbox entry is left untouched this round: the medic's own
 // in-flight edit wins locally until it's actually pushed, rather than being clobbered mid-edit.
-const PROJECTED_PATIENT_COLUMNS = 'id,incident_id,visual_id,current_triage,current_status,status_recorded_at,access_status,needs_full_assessment,is_pediatric,pediatric_age_years,last_vitals_at,version,optional_name,identifying_description,physician_death_confirmed_at,physician_death_confirmed_by';
+const PROJECTED_PATIENT_COLUMNS = 'id,incident_id,created_at,visual_id,current_triage,current_status,status_recorded_at,access_status,needs_full_assessment,is_pediatric,pediatric_age_years,last_vitals_at,version,optional_name,identifying_description,physician_death_confirmed_at,physician_death_confirmed_by';
 const VALID_LOCAL_TRIAGE = new Set(['red','yellow','green','black','pending']);
 const VALID_LOCAL_STATUS = new Set(['identified','stabilizing','observing','evacuating','handed_over','closed','self_evacuated','deceased']);
 
@@ -18509,6 +18509,9 @@ function remotePatientRecord(row){
     patientAgeGroup:row.is_pediatric?'pediatric':'adult', patientAge:row.pediatric_age_years||null,
     fullName:row.optional_name||'לא מזוהה', identityStatus:row.optional_name?'reported':'unknown', temporaryDescription:row.identifying_description||'',
     assignedMedicId:null, assignedPlatoonId:null, tempPatientId:null,
+    // The server's registration time (V2.99.96): the golden hour's lower limit for a casualty with
+    // no incident or injury time; lastModifiedAt is the pull time and moves on every update.
+    createdAt:row.created_at||undefined,
     stockSnapshot:{}, lastTouchedBy:'(remote)', lastModifiedAt:new Date().toISOString(),
     confirmedClinical:true, unsyncedEvents:0, locationHistory:[], possibleDuplicate:false,
     time:nowT(), vitals:{...VITALS_NOT_ON_DEVICE}, vitalsCapture:null, txHistory:[],
