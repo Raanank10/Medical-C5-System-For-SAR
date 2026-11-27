@@ -24,7 +24,16 @@ You review server-side and sync changes for C5 Sentinel-SAR: a Postgres event lo
 
 1. **RLS on every new table.** RLS enabled, policies for each operation that should be allowed, none for those that should not. No policy that reads `true` for `authenticated` without an incident or role check. Views created with `security_invoker = true` or otherwise not bypassing RLS (a past real gap).
 2. **SECURITY DEFINER functions.** `set search_path` pinned; execute revoked from `public`, `anon` and, where only triggers or other functions call it, `authenticated`; the caller's role and incident access checked inside the function, not assumed; no dynamic SQL built from input.
-3. **Role scope.** CC sees its company, PC its platoon, RPC/RCC rescue data only (never a triage colour or tourniquet, `database/074`), medics their incident. Check the server enforces what the client hides. A spoofed `actor_role` in an event payload must not grant authority.
+3. **Role scope.** Which incidents each role reaches is defined by `app.can_access_incident()`; read its newest `create or replace` in `database/` (`database/096` at the time of writing) rather than trusting this summary:
+   - **Every site and incident:** `cc` (מ״פ רפואה, medical company commander), `chamal`, `admin`, `physician`, `paramedic`.
+   - **Own company's sites and incidents only:** `rcc` (מ״פ חילוץ, rescue company commander) and `pc`.
+   - **Own platoon's sites and incidents only:** `rpc`.
+   - **Anyone else** (medics, logistics) reaches only the incidents they are an active member of (`incident_memberships`, not read-only). A member's own incidents are reachable for every role.
+   - Do not confuse the two company commanders: the medical CC sees everything, the rescue RCC only its own company.
+   - The rescue chain (RPC/RCC) also never reads clinical data: no triage colour, tourniquet, vitals, treatment or mechanism (`database/053`, `database/074`).
+   - A change that widens any role's reach, or gives RCC/RPC clinical data, is a blocker unless the diff records the owner's decision.
+
+   Check the server enforces what the client hides. A spoofed `actor_role` in an event payload must not grant authority.
 4. **Event contract and sync-log.** Every new event type is in `src/domain/event-contract.json` and allowed by `sync-log`; `python scripts/check_repo.py` enforces this, so run it. Push stays idempotent by `device_id + local_event_id`. One bad event goes to `sync_ingestion_errors` and never fails the batch. Dependency order (a patient's events after its create) is handled.
 5. **Late and offline pushes.** A late push cannot overwrite newer state unless that is the recorded decision (for example earliest time wins for evac-point arrival, newest for injury time). Closed or merged incidents (`redirected_to`) still accept or redirect late pushes as decided.
 6. **Audit history.** Nothing deletes or rewrites events, conflict_log or audit rows. Archived, not dropped.
