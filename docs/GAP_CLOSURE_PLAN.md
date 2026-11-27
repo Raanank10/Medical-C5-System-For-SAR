@@ -399,6 +399,7 @@ The feature map was rebuilt on 2026-11-13 against `main` @ `0d79abc` (V2.99.71),
 | WP-43 | The PC / CC guided tour points at hidden panels | P2 | - (answered 2026-11-26) |
 | WP-44 | Guided tour for RPC and RCC | P3 | Hebrew text review |
 | WP-45 | One short intro per role (what / why / don't skip) | P3 | `enroute` strip, the 10 intros |
+| WP-46 | Command scope: the medical CC covers every site, an RCC only his company's | P2 | - (decided 2026-11-27) |
 
 ---
 
@@ -889,6 +890,21 @@ Runs in the tour sandbox with sample data (WP-43), which needs rescue-side sampl
 
 ---
 
+
+### WP-46: Command scope, medical CC over every site, RCC over his company's (P2, owner 2026-11-27)
+
+**Why.** After `database/098` (#167) the review asked whether a CC should merge only his own company's sites (`merge_incident` checks the role, not a company). The owner first agreed, then clarified against the structure in `docs/ROLE_COMMAND_MODEL_v2.8.md` ("Companies and platoons", confirmed 2026-10-20): there is one מ״פ רפואה (cc) over all three rescue companies.
+
+**Decision (owner 2026-11-27).** The medical CC is connected to every site and incident. An RCC (מ״פ חילוץ) is connected only to his own company's sites and incidents. So merging any site is correct for the CC, and nothing in `merge_incident` changes.
+
+**What the server already does (checked 2026-11-27, read-only).**
+- `app.can_access_incident`: cc (and chamal, admin, physician, paramedic) reach every incident; rcc and pc only `incidents.company_id = app.my_company_id()`; rpc only his platoon's. Since `096`, a former company keeps read-only access through `incident_unit_links`.
+- `merge_incident`, the handover / reinforce / release / end-access RPCs: cc, chamal and admin only. An RCC can do none of them.
+- Live accounts: the one cc, the chamal and the admin have no company (`profiles.company_id` null), as the model says.
+
+**Built (no SQL, no client change).** Seven checks in `scripts/rls_test_096_unit_handover.sql`: the CC has no company, reaches and lists sites of each company; an RCC reaches his own company's site, does not see or list another company's, and is refused `merge_incident`. 128/128 locally.
+
+**Not in scope.** Several medical companies (more than one cc). If that ever comes, CC scope for viewing, relief, handover and merge becomes its own WP.
 ## Tracks outside this plan's PRs
 
 These need a decision, people or money rather than a code change in this repo. Listed so nothing is lost:
@@ -960,6 +976,7 @@ These need a decision, people or money rather than a code change in this repo. L
 | WP-43 Guided tour hidden panels | P2 | Done in this PR (V2.99.94), no SQL | this PR | owner 2026-11-26: sandbox with sample data; signed in only when the server said within 2 min that no incident is open (PC picker, CC all-incidents view), 3-minute cap, ends on screen lock, sync on exit; 7 PC + 6 CC steps, tab-aware, invisible panels skipped and logged; `browser_guided_tour_test.js` |
 | WP-44 RPC / RCC tour | P3 | Not started, after WP-43 | | max 5 steps each, same engine |
 | WP-45 Role intro | P3 | Not started, 2 owner questions | | owner 2026-11-23; one source in `ROLE_DEFS`, medic first, no server change |
+| WP-46 CC / RCC command scope | P2 | Done in this PR: decision recorded, 7 SQL checks (128/128 locally), no SQL change | this PR | owner 2026-11-27: one medical CC over every site; an RCC only his company's; only cc / chamal / admin merge |
 
 ## Revisions after #73 (2026-10-19)
 
