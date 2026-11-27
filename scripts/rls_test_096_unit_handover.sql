@@ -23,6 +23,8 @@ declare
   T2 uuid := gen_random_uuid();
   W uuid := gen_random_uuid();
   W2 uuid := gen_random_uuid();
+  WA1 uuid := gen_random_uuid();
+  WA2 uuid := gen_random_uuid();
   R3 uuid := gen_random_uuid();
   S3 uuid := gen_random_uuid();
   S2 uuid := gen_random_uuid();   -- target of a merge
@@ -80,8 +82,11 @@ begin
 
   -- WP-46 (owner 2026-11-27): the medical CC (מ״פ רפואה) is connected to every site and incident;
   -- an RCC (מ״פ חילוץ) only to his own company's. Only cc, chamal and admin merge sites.
+  -- No caller while the sites are made (the B PC's claims are still set and would limit the insert).
+  perform set_config('request.jwt.claims', '{}', true);
   insert into incidents (id, visual_id, t_zero, t_injury_default, location_name, status, opened_at, company_id) values
-    (W, 'TEST96-W', t0, t0, 'TEST96 W', 'active', t0, CB), (W2, 'TEST96-W2', t0, t0, 'TEST96 W2', 'active', t0, CB);
+    (W, 'TEST96-W', t0, t0, 'TEST96 W', 'active', t0, CB), (W2, 'TEST96-W2', t0, t0, 'TEST96 W2', 'active', t0, CB),
+    (WA1, 'TEST96-WA1', t0, t0, 'TEST96 WA1', 'active', t0, CA), (WA2, 'TEST96-WA2', t0, t0, 'TEST96 WA2', 'active', t0, CA);
   perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   insert into _c values ('WP-46: the CC has no company', coalesce((select company_id::text from profiles where id = CC), 'none'), 'none');
@@ -95,10 +100,12 @@ begin
   insert into _c values ('WP-46: an RCC does not see another company''s site', pg_temp.t96_view(W)::text, 'false');
   select count(*) into n from public.list_open_incidents() where id in (W, W2);
   insert into _c values ('WP-46: an RCC does not list another company''s sites', n::text, '0');
+  -- Two sites of his own company, which he reaches, so only the role can refuse it.
+  insert into _c values ('WP-46: the RCC reaches both of his own sites', (pg_temp.t96_access(WA1) and pg_temp.t96_access(WA2))::text, 'true');
   begin
-    perform public.merge_incident(W2, W, 'duplicate', 'dev-rcc', 't96-rcc-merge');
-    insert into _c values ('WP-46: an RCC cannot merge sites', 'allowed', 'refused');
-  exception when insufficient_privilege then insert into _c values ('WP-46: an RCC cannot merge sites', 'refused', 'refused'); end;
+    perform public.merge_incident(WA2, WA1, 'duplicate', 'dev-rcc', 't96-rcc-merge');
+    insert into _c values ('WP-46: an RCC cannot merge even his own company''s sites', 'allowed', 'refused');
+  exception when insufficient_privilege then insert into _c values ('WP-46: an RCC cannot merge even his own company''s sites', 'refused', 'refused'); end;
   execute 'reset role';
 
   -- ---- Only cc/chamal/admin may hand over; a reason is required
