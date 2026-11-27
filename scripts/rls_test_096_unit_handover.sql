@@ -1,4 +1,4 @@
--- Rolled-back test for database/096, 097 and 098 (CC moves a site to another company / reinforces it, WP-27;
+-- Rolled-back test for database/096, 097 and 098, and the WP-46 command scope (CC moves a site to another company / reinforces it, WP-27;
 -- relief before read-only, owner 2026-11-22).
 -- Run after 095, 096, 097 and 098 are applied, through the Supabase connector's execute_sql (not pasted into
 -- the SQL editor from a phone: a long paste was cut off once, database/090). It ends with an error on purpose so
@@ -21,6 +21,10 @@ declare
   ADM uuid := (select id from profiles where role = 'admin' and is_active order by created_at limit 1);
   Z uuid := gen_random_uuid();
   T2 uuid := gen_random_uuid();
+  W uuid := gen_random_uuid();
+  W2 uuid := gen_random_uuid();
+  WA1 uuid := gen_random_uuid();
+  WA2 uuid := gen_random_uuid();
   R3 uuid := gen_random_uuid();
   S3 uuid := gen_random_uuid();
   S2 uuid := gen_random_uuid();   -- target of a merge
@@ -74,6 +78,34 @@ begin
   execute 'set local role authenticated';
   select count(*) into n from incidents where id = X;
   insert into _c values ('B PC sees X before', n::text, '0');
+  execute 'reset role';
+
+  -- WP-46 (owner 2026-11-27): the medical CC (מ״פ רפואה) is connected to every site and incident;
+  -- an RCC (מ״פ חילוץ) only to his own company's. Only cc, chamal and admin merge sites.
+  -- No caller while the sites are made (the B PC's claims are still set and would limit the insert).
+  perform set_config('request.jwt.claims', '{}', true);
+  insert into incidents (id, visual_id, t_zero, t_injury_default, location_name, status, opened_at, company_id) values
+    (W, 'TEST96-W', t0, t0, 'TEST96 W', 'active', t0, CB), (W2, 'TEST96-W2', t0, t0, 'TEST96 W2', 'active', t0, CB),
+    (WA1, 'TEST96-WA1', t0, t0, 'TEST96 WA1', 'active', t0, CA), (WA2, 'TEST96-WA2', t0, t0, 'TEST96 WA2', 'active', t0, CA);
+  perform set_config('request.jwt.claims', json_build_object('sub', CC, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  insert into _c values ('WP-46: the CC has no company', coalesce((select company_id::text from profiles where id = CC), 'none'), 'none');
+  insert into _c values ('WP-46: the CC reaches a site of each company', (pg_temp.t96_access(X) and pg_temp.t96_access(W))::text, 'true');
+  select count(*) into n from public.list_open_incidents() where id in (X, W, W2);
+  insert into _c values ('WP-46: the CC lists every company''s sites', n::text, '3');
+  execute 'reset role';
+  perform set_config('request.jwt.claims', json_build_object('sub', RCCA, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  insert into _c values ('WP-46: an RCC reaches his own company''s site', pg_temp.t96_access(X)::text, 'true');
+  insert into _c values ('WP-46: an RCC does not see another company''s site', pg_temp.t96_view(W)::text, 'false');
+  select count(*) into n from public.list_open_incidents() where id in (W, W2);
+  insert into _c values ('WP-46: an RCC does not list another company''s sites', n::text, '0');
+  -- Two sites of his own company, which he reaches, so only the role can refuse it.
+  insert into _c values ('WP-46: the RCC reaches both of his own sites', (pg_temp.t96_access(WA1) and pg_temp.t96_access(WA2))::text, 'true');
+  begin
+    perform public.merge_incident(WA2, WA1, 'duplicate', 'dev-rcc', 't96-rcc-merge');
+    insert into _c values ('WP-46: an RCC cannot merge even his own company''s sites', 'allowed', 'refused');
+  exception when insufficient_privilege then insert into _c values ('WP-46: an RCC cannot merge even his own company''s sites', 'refused', 'refused'); end;
   execute 'reset role';
 
   -- ---- Only cc/chamal/admin may hand over; a reason is required
