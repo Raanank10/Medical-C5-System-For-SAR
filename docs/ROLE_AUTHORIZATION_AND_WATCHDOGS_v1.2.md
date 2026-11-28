@@ -43,7 +43,7 @@ Watchdogs run locally for field awareness and must also be reproducible server-s
 
 | Watchdog | Trigger | Threshold | Alert |
 | --- | --- | ---: | --- |
-| Crush Syndrome | Access = Trapped | Golden-hour start +45m | Amber, escalating to Red if prolonged |
+| Crush Syndrome | Access = Trapped or no access | Golden-hour start +45m | Amber, escalating to Red if prolonged |
 | Golden Hour | Any registered patient | Golden-hour start +45m | Amber |
 | Golden Hour | Any registered patient | Golden-hour start +60m | Red |
 

@@ -8133,13 +8133,16 @@ function sortedPatientsByEvacPriority(list=patients){
 // syndrome). database/086 applies the same rule on the server.
 // Trapped since the incident started unless recorded otherwise: the official T0, else when the
 // incident was opened, else the casualty's registration.
+// The 60-minute long-entrapment rule runs on the same clock as every injury timer (owner
+// 2026-11-28: "put it on the same rule"): injuryTimerClock, the earliest of the casualty's own
+// incident's T0 and opening, an entered injury time and the registration. Before, it took the
+// first of site T0 / the active incident's T0 / opening / registration, always SITE_A and the active
+// incident signed in, and never an entered time. A clock in the future is unknown (null), so the
+// rule falls back to the priority check. The server (database/086) gets the same rule separately.
 function rescueTrappedMinutes(p){
-  const siteId=currentUser?'SITE_A':(p.siteId||'SITE_A');
-  const t0=Date.parse(ensureSiteStatusFields(siteId).t0||'');
-  const opened=currentUser?Date.parse(activeIncident?.t_zero||activeIncident?.opened_at||''):NaN;
-  const reg=Date.parse(p.createdAt||'');
-  const start=Number.isFinite(t0)?t0:Number.isFinite(opened)?opened:Number.isFinite(reg)?reg:null;
-  return start===null?null:Math.max(0,Math.floor((Date.now()-start)/60000));
+  const clock=injuryTimerClock(p);
+  if(!Number.isFinite(clock.ms) || clock.ms>Date.now()+60000) return null;
+  return Math.max(0,Math.floor((Date.now()-clock.ms)/60000));
 }
 function rescueExtractionRequirementOf(p){ return C5Rules.rescueExtractionRequirement(rescuePriorityOf(p), rescueTrappedMinutes(p)); }
 function rescueExtractionNeedsMedic(p){ return !!rescueExtractionRequirementOf(p); }
@@ -15146,9 +15149,13 @@ function computeWatchdogRows(pts){
     const golden=clockRow(ghClock);
     const futureNote=ghClock.futureEntered?' · שעת הפציעה שהוזנה בעתיד, בדוק שעון':'';
     rows.push({patient:p.id, label, name:'Golden Hour', title:'Golden Hour · כל הפצועים (כולל שפונו ושחורים)', trigger:'Any registered patient', threshold:'Earliest of T0 / opening / injury / registration +45m / +60m', state:golden.state, detail:golden.detail+futureNote});
-    if(normalizeTrapStatus(p)==='trapped'){
+    // "אין גישה" counts as trapped (owner 2026-11-19, and for Crush 2026-11-28): nobody knows
+    // whether a limb is pinned.
+    const trapState=normalizeTrapStatus(p);
+    if(trapState==='trapped' || trapState==='access_blocked'){
       const crush=clockRow(ghClock);
-      rows.push({patient:p.id, label, name:'Crush Syndrome', trigger:'Access = Trapped', threshold:'Earliest of T0 / opening / injury / registration +45m', state:crush.state, detail:`לכוד · ${crush.detail}${futureNote}`});
+      const trapWord=trapState==='trapped'?'לכוד':'אין גישה';
+      rows.push({patient:p.id, label, name:'Crush Syndrome', trigger:'Access = Trapped / no access', threshold:'Earliest of T0 / opening / injury / registration +45m', state:crush.state, detail:`${trapWord} · ${crush.detail}${futureNote}`});
     }
     if(p.tourniquet?.appliedAt){
       const tqMin=Math.floor((now-p.tourniquet.appliedAt)/60000);
@@ -19293,7 +19300,14 @@ function incidentAlertTimeMs(p){
 function patientInjuryTime(p){
   const own=Number(p?.tInjury);
   if(Number.isFinite(own) && own>0 && p.tInjurySource!=='event_time' && INJURY_TIME_SOURCE_LABELS[p.tInjurySource]) return {ms:own, source:p.tInjurySource, estimated:p.tInjurySource!=='entered'};
+  // The estimate is the incident's start, but never later than the registration (owner OK
+  // 2026-11-28): a T0 set after the casualty was registered, or in the future, cannot be when the
+  // injury happened; then the registration is the estimate, as a lower limit.
   const alertMs=incidentAlertTimeMs(p);
+  const registered=Date.parse(p?.createdAt||'');
+  const alertOk=Number.isFinite(alertMs) && alertMs>0 && alertMs<=Date.now()+60000;
+  if(alertOk && !(Number.isFinite(registered) && registered<alertMs)) return {ms:alertMs, source:'incident_open', estimated:true};
+  if(Number.isFinite(registered) && registered>0) return {ms:registered, source:'event_time', estimated:true};
   if(Number.isFinite(alertMs) && alertMs>0) return {ms:alertMs, source:'incident_open', estimated:true};
   return {ms:patientClockStart(p), source:'event_time', estimated:true};
 }

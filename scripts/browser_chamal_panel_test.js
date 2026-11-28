@@ -303,21 +303,31 @@ async function checkGoldenHourClock(browser) {
     patients.push({ ...base, id: 'gh-12', visualId: 'A-62', incidentId: 'INC-1', tInjury: Date.parse(activeIncident.t_zero), tInjurySource: 'incident_open' });
     // An entered time in the future with a valid incident: the incident's clock, and the row says so.
     patients.push({ ...base, id: 'gh-13', visualId: 'A-63', incidentId: 'INC-1', tInjury: Date.now() + 2 * 3600000, tInjurySource: 'entered' });
+    // "אין גישה" counts as trapped for Crush (owner 2026-11-19/28).
+    patients.push({ ...base, id: 'gh-14', visualId: 'A-64', incidentId: 'INC-1', trapStatus: 'access_blocked' });
     // A row pulled from before 088: its stored "injury time" is only the registration time.
     patients.push({ ...base, id: 'gh-5', visualId: 'A-55', incidentId: 'INC-1', tInjury: Date.now() - 5 * 60000, tInjurySource: 'event_time' });
     // First in the list, only a prompt: the panel must still open with a red row.
     patients.unshift({ ...base, id: 'gh-0', visualId: 'A-49', incidentId: 'INC-UNKNOWN' });
     const rows = computeWatchdogRows(patients);
+    // The 60-minute extraction rule and the recorded-injury estimate (owner 2026-11-28).
+    const extract = { g6: rescueTrappedMinutes(patients.find((x) => x.id === 'gh-6')), g11: rescueTrappedMinutes(patients.find((x) => x.id === 'gh-11')), g11Req: rescueExtractionRequirementOf(patients.find((x) => x.id === 'gh-6')) };
+    const est11 = patientInjuryTime(patients.find((x) => x.id === 'gh-11'));
+    const reg11 = Date.parse(patients.find((x) => x.id === 'gh-11').createdAt);
     const g = (id) => rows.find((x) => x.patient === id && x.name === 'Golden Hour');
     goTo('commander'); renderCommander();
     const panel = document.getElementById('cmd-watchdogs').textContent;
     const firstRowRed = document.querySelector('#cmd-watchdogs .watchdog-row')?.classList.contains('red');
     currentUser = null; _openIncidents = []; activeIncident = null;
-    return { demo, card, firstRowRed, g10: g('gh-10'), g11: g('gh-11'), g12: g('gh-12'), g13: g('gh-13'), g7: g('gh-7'), g8: g('gh-8'), g9: g('gh-9'), g6: g('gh-6'), c6: rows.find((x) => x.patient === 'gh-6' && x.name === 'Crush Syndrome'), g5: g('gh-5'), g1: g('gh-1'), g2: g('gh-2'), g3: g('gh-3'), g4: g('gh-4'), panel };
+    return { demo, card, firstRowRed, extract, est11ok: est11.ms === reg11 && est11.source === 'event_time', c14: rows.find((x) => x.patient === 'gh-14' && x.name === 'Crush Syndrome'), g10: g('gh-10'), g11: g('gh-11'), g12: g('gh-12'), g13: g('gh-13'), g7: g('gh-7'), g8: g('gh-8'), g9: g('gh-9'), g6: g('gh-6'), c6: rows.find((x) => x.patient === 'gh-6' && x.name === 'Crush Syndrome'), g5: g('gh-5'), g1: g('gh-1'), g2: g('gh-2'), g3: g('gh-3'), g4: g('gh-4'), panel };
   });
   assert(r.demo && r.demo.state === 'red' && r.demo.detail.includes('לפחות 90 דק׳'), `no injury or incident time: registration is a lower limit, 90 min is red ("לפחות"): ${JSON.stringify(r.demo)}`);
   assert(r.card.includes('1 עברו 60') && r.card.includes('נספרו לפחות מהרישום'), `site card: a casualty with no clock is counted on its lower limit and named: ${r.card}`);
   assert(r.firstRowRed, `watchdog panel: red rows first`);
+  assert(r.c14 && r.c14.state === 'red' && r.c14.detail.startsWith('אין גישה') && r.c14.detail.includes('70 דק׳'), `crush fires for "אין גישה" too: ${JSON.stringify(r.c14)}`);
+  assert(r.extract.g6 === 70 && r.extract.g11Req === 'medic_present', `the 60-minute extraction rule runs on the incident's 70 minutes, not the entered 20: ${JSON.stringify(r.extract)}`);
+  assert(r.extract.g11 === 50, `extraction rule: registered 50 min before a late T0 counts 50 (lower limit): ${JSON.stringify(r.extract)}`);
+  assert(r.est11ok, `an estimated injury time is never later than the registration`);
   assert(r.g6.state === 'red' && r.g6.detail.startsWith('70 דק׳'), `golden hour: a later entered injury time never shortens the incident's clock: ${JSON.stringify(r.g6)}`);
   assert(r.g7.state === 'red' && r.g7.detail.startsWith('65 דק׳') && r.g7.detail.includes('מאז הפציעה'), `golden hour: an entered injury time earlier than the incident counts: ${JSON.stringify(r.g7)}`);
   assert(r.g8.state === 'prompt' && r.g8.detail.includes('לפחות 5'), `golden hour: a future incident time is not used; the registration is the lower limit, waiting, never ok: ${JSON.stringify(r.g8)}`);

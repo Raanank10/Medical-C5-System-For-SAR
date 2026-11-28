@@ -371,7 +371,7 @@ Watchdogs run locally and should also be reproducible server-side for Medical Ch
 
 | Watchdog | Trigger | Threshold | Alert |
 |---|---|---:|---|
-| Crush Syndrome | Access = Trapped or Partial | Golden-hour start (earliest of T0, opening, entered T_injury, registration) + 45m | Amber → Red |
+| Crush Syndrome | Access = Trapped, Partial or no access ("אין גישה", owner 2026-11-28) | Golden-hour start (earliest of T0, opening, entered T_injury, registration) + 45m | Amber → Red |
 | Golden Hour | Any registered patient | Golden-hour start (earliest of T0, opening, entered T_injury, registration) + 45m | Amber |
 | Golden Hour | Any registered patient | Golden-hour start + 60m | Red |
 | Tourniquet Warning | Tourniquet per limb | +60m from application | Amber |
