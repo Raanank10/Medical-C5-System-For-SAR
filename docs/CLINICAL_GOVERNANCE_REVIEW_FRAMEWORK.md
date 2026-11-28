@@ -60,7 +60,7 @@ Current rules (exact, from `src/domain/rules.js`):
 
 ## 7. MARCH Completion (WP-31)
 
-`marchStatus(review, avpu)`, `mergeMarchReviews(entries)` and `marchSeenFrom(entries)` in `src/domain/rules.js` (V2.99.92). Criteria set by the owner, a medic platoon commander, on 2026-11-23, with follow-ups on 2026-11-25 and 2026-11-26 after review. That is owner product direction, not a doctrine citation:
+`marchStatus(review, avpu)`, `mergeMarchReviews(entries)` and `marchSeenFrom(entries)` in `src/domain/rules.js` (V2.99.97). Criteria set by the owner, a medic platoon commander, on 2026-11-23, with follow-ups on 2026-11-25 and 2026-11-26 after review. That is owner product direction, not a doctrine citation:
 
 | Rule | Current behaviour |
 |---|---|

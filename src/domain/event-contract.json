@@ -178,6 +178,9 @@
     "Decision-support note or acknowledgment (WP-11): recommendations are computed on each phone from its own view, so declining or acknowledging one is that phone's own state, not a shared fact": [
       "PRIORITY_RECOMMENDATION_DECLINED",
       "RECOMMENDATION_ACKNOWLEDGED"
+    ],
+    "Local demo only: one patient moved between demo platoons. Signed in, the CC moves or reinforces the whole site instead (WP-27, database/096 handover_incident_unit / reinforce_incident_unit); no single patient changes company": [
+      "PATIENT_REASSIGNED_BETWEEN_PLATOONS"
     ]
   },
   "not_events": {
@@ -212,8 +215,7 @@
     ]
   },
   "known_gaps": {
-    "WP-7": [
-      "PATIENT_REASSIGNED_BETWEEN_PLATOONS",
+    "WP-7 (one patient to another medic; not WP-27, which moves whole sites)": [
       "PATIENT_REASSIGNED_WITHIN_PLATOON"
     ]
   }

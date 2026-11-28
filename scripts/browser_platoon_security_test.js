@@ -8,6 +8,11 @@
 // company's medics; create_company / create_platoon / set_profile_unit for company-level command
 // only; set_incident_unit for company-level command and, inside its own company, the rcc. The SQL
 // itself is tested by scripts/rls_test_053_platoons.sql (docs/RLS_AUDIT_v1.md, 053 follow-up).
+// WP-27 (database/096, V2.99.91): the CC hands a site to another company or brings one in to
+// reinforce it from the picker; the leaving PC keeps recording until he taps "הוחלפתי - מסרתי"
+// (or the CC marks him), then is read-only (strip banner, picker badge, no join) until the CC
+// ends its access; the new company's PC is told once. The fake
+// mirrors 096's access rules; the SQL is tested by scripts/rls_test_096_unit_handover.sql.
 //
 // Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_platoon_security_test.js
@@ -69,6 +74,9 @@ function newServer() {
     platoons: [{ id: A1, company_id: CA, name: 'A1', is_active: true }, { id: B1, company_id: CB, name: 'B1', is_active: true }],
     // M2 starts without a unit
     units: { [PC1]: { company_id: CA }, [M1]: { company_id: CA }, [RCC1]: { company_id: CA }, [RPC1]: { platoon_id: A1 }, [PC2]: { company_id: CB } },
+    links: [], // database/096 incident_unit_links
+    noticeAcks: [],
+    unitCalls: [],
   };
 }
 let seq = 0;
@@ -81,20 +89,39 @@ function handle(server, req) {
     && (req.notNull || []).every((c) => row[c] != null);
   const unit = (id) => server.units[id] || {};
   const companyOf = (id) => unit(id).company_id || server.platoons.find((p) => p.id === unit(id).platoon_id)?.company_id || null;
-  const member = (incId, uid = u.id) => server.members.some((m) => m.incident_id === incId && m.profile_id === uid);
+  // database/096: a read-only membership no longer counts as a member; it still reads.
+  const member = (incId, uid = u.id) => server.members.some((m) => m.incident_id === incId && m.profile_id === uid && !m.read_only_since);
   const myCompany = companyOf(u.id);
   const myPlatoon = unit(u.id).platoon_id || null;
-  const canSee = (inc) => SEES_ALL.includes(u.role) || member(inc.id)
+  const full = (inc) => SEES_ALL.includes(u.role) || member(inc.id)
     || (['pc', 'rcc'].includes(u.role) && !!myCompany && inc.company_id === myCompany)
     || (u.role === 'rpc' && !!myPlatoon && inc.platoon_id === myPlatoon);
+  const readOnly = (inc) => server.members.some((m) => m.incident_id === inc.id && m.profile_id === u.id && m.read_only_since && !m.access_ended_at)
+    || (['pc', 'rcc'].includes(u.role) && !!myCompany && server.links.some((l) => l.incident_id === inc.id && l.company_id === myCompany && l.read_only_since && !l.ended_at && (l.link_kind === 'former' || u.role === 'pc')))
+    || (u.role === 'rpc' && !!myPlatoon && server.links.some((l) => l.incident_id === inc.id && l.link_kind === 'former' && l.platoon_id === myPlatoon && !l.ended_at));
+  const canSee = (inc) => full(inc) || readOnly(inc);
+  const UNIT_CHANGERS = ['cc', 'chamal', 'admin'];
+  // 096 relief: the leaving company's medical staff wait for relief (full), its rcc / rpc are
+  // read-only at once, its PCs are kept as members.
+  const startRelief = (incId, company, at) => {
+    Object.values(USERS).filter((x) => x.role === 'pc' && companyOf(x.id) === company && !server.members.some((m) => m.incident_id === incId && m.profile_id === x.id))
+      .forEach((x) => server.members.push({ incident_id: incId, profile_id: x.id, role_at_incident: 'pc', assigned_by: u.id, created_at: at, relief_pending_since: at }));
+    const mine = server.members.filter((m) => m.incident_id === incId && companyOf(m.profile_id) === company && !m.read_only_since);
+    mine.filter((m) => ['pc', 'medic', 'paramedic'].includes(m.role_at_incident) && !m.relief_pending_since).forEach((m) => { m.relief_pending_since = at; });
+    mine.filter((m) => ['rcc', 'rpc'].includes(m.role_at_incident)).forEach((m) => { m.read_only_since = at; });
+    return server.members.filter((m) => m.incident_id === incId && companyOf(m.profile_id) === company && m.relief_pending_since && !m.read_only_since).length;
+  };
+  const restore = (incId, company) => server.members
+    .filter((m) => m.incident_id === incId && companyOf(m.profile_id) === company && !m.access_ended_at && (m.read_only_since || m.relief_pending_since))
+    .map((m) => { m.read_only_since = null; m.relief_pending_since = null; return m; }).length;
   const denied = (msg) => ({ data: null, error: { code: '42501', message: msg } });
   if (req.kind === 'rpc') {
     const p = req.params || {};
     if (req.name === 'list_open_incidents') {
-      return { data: clone(server.incidents.filter((i) => i.status === 'active' && canSee(i)).map((i) => ({ ...i, patient_count: 0, is_member: member(i.id) }))), error: null };
+      return { data: clone(server.incidents.filter((i) => i.status === 'active' && canSee(i)).map((i) => ({ ...i, patient_count: 0, is_member: member(i.id), read_only: !full(i) }))), error: null };
     }
     if (req.name === 'join_incident') {
-      if (['pc', 'rpc', 'rcc', 'medic', 'paramedic'].includes(u.role) && !canSee(server.incidents.find((i) => i.id === p.p_incident_id) || {})) return denied('assignment required');
+      if (['pc', 'rpc', 'rcc', 'medic', 'paramedic'].includes(u.role) && !full(server.incidents.find((i) => i.id === p.p_incident_id) || {})) return denied('assignment required');
       if (!member(p.p_incident_id)) server.members.push({ incident_id: p.p_incident_id, profile_id: u.id, role_at_incident: u.role, assigned_by: u.id, created_at: new Date().toISOString() });
       return { data: { id: p.p_incident_id }, error: null };
     }
@@ -126,6 +153,89 @@ function handle(server, req) {
       inc.company_id = p.p_company_id; inc.platoon_id = p.p_platoon_id;
       return { data: { incident_id: p.p_incident_id }, error: null };
     }
+    if (['handover_incident_unit', 'reinforce_incident_unit', 'release_incident_unit', 'end_incident_unit_access'].includes(req.name)) {
+      server.unitCalls.push({ name: req.name, by: u.id, params: clone(p) });
+      if (!UNIT_CHANGERS.includes(u.role)) return denied('only the medical company commander (cc), chamal or admin');
+      const inc = server.incidents.find((i) => i.id === p.p_incident_id);
+      const at = new Date().toISOString();
+      const openLink = (company) => server.links.find((l) => l.incident_id === inc.id && l.company_id === company && !l.ended_at);
+      if (req.name !== 'end_incident_unit_access' && req.name !== 'release_incident_unit' && !String(p.p_reason || '').trim()) return { data: null, error: { code: '22023', message: 'a reason is required' } };
+      if (req.name === 'handover_incident_unit') {
+        if (inc.company_id === p.p_company_id) return { data: null, error: { code: '22023', message: 'the site already belongs to that company' } };
+        let pending = 0;
+        if (inc.company_id) { server.links.push({ id: 'link-' + (++seq), incident_id: inc.id, link_kind: 'former', company_id: inc.company_id, platoon_id: inc.platoon_id, to_company_id: p.p_company_id, started_at: at, read_only_since: at, reason: p.p_reason }); pending = startRelief(inc.id, inc.company_id, at); }
+        const back = openLink(p.p_company_id); if (back) back.ended_at = at;
+        restore(inc.id, p.p_company_id);
+        inc.company_id = p.p_company_id; inc.platoon_id = null;
+        return { data: { incident_id: inc.id, changed_at: at, relief_pending: pending }, error: null };
+      }
+      if (req.name === 'reinforce_incident_unit') {
+        if (inc.company_id === p.p_company_id) return { data: null, error: { code: '22023', message: 'own company' } };
+        const prev = openLink(p.p_company_id); if (prev) prev.ended_at = at;
+        restore(inc.id, p.p_company_id);
+        const link = { id: 'link-' + (++seq), incident_id: inc.id, link_kind: 'reinforcing', company_id: p.p_company_id, started_at: at, read_only_since: null, reason: p.p_reason };
+        server.links.push(link);
+        const pcs = Object.values(USERS).filter((x) => x.role === 'pc' && companyOf(x.id) === p.p_company_id);
+        pcs.forEach((x) => { const ex = server.members.find((m) => m.incident_id === inc.id && m.profile_id === x.id); if (ex) { ex.read_only_since = null; ex.access_ended_at = null; ex.relief_pending_since = null; } else server.members.push({ incident_id: inc.id, profile_id: x.id, role_at_incident: 'pc', assigned_by: u.id, created_at: at }); });
+        return { data: { incident_id: inc.id, link_id: link.id, pcs_added: pcs.length }, error: null };
+      }
+      if (req.name === 'release_incident_unit') {
+        const l = server.links.find((x) => x.incident_id === inc.id && x.company_id === p.p_company_id && x.link_kind === 'reinforcing' && !x.ended_at && !x.read_only_since);
+        if (!l) return { data: null, error: { code: '22023', message: 'not reinforcing' } };
+        l.read_only_since = at;
+        return { data: { changed_at: at, relief_pending: startRelief(inc.id, p.p_company_id, at) }, error: null };
+      }
+      const l = server.links.find((x) => x.incident_id === inc.id && x.company_id === p.p_company_id && !x.ended_at && x.read_only_since);
+      if (!l) return { data: null, error: { code: '22023', message: 'no read-only access' } };
+      l.ended_at = at;
+      let n = 0;
+      server.members.filter((m) => m.incident_id === inc.id && (m.read_only_since || m.relief_pending_since) && !m.access_ended_at && companyOf(m.profile_id) === p.p_company_id)
+        .forEach((m) => { m.read_only_since = m.read_only_since || at; m.access_ended_at = at; n++; });
+      return { data: { members_ended: n }, error: null };
+    }
+    if (req.name === 'confirm_incident_relief') {
+      server.unitCalls.push({ name: req.name, by: u.id, params: clone(p) });
+      const target = p.p_profile_id || u.id;
+      if (!(target === u.id || UNIT_CHANGERS.includes(u.role) || (u.role === 'pc' && companyOf(target) === myCompany))) return denied('only the person, his PC or the CC');
+      const m = server.members.find((x) => x.incident_id === p.p_incident_id && x.profile_id === target && x.relief_pending_since && !x.read_only_since);
+      if (!m) return { data: null, error: { code: '22023', message: 'no relief is waiting' } };
+      m.read_only_since = new Date().toISOString(); m.relieved_by = u.id;
+      return { data: { profile_id: target, read_only_since: m.read_only_since }, error: null };
+    }
+    if (req.name === 'get_incident_unit_links') {
+      const inc = server.incidents.find((i) => i.id === p.p_incident_id);
+      if (!inc || !canSee(inc)) return denied('access denied');
+      const mine = server.members.find((m) => m.incident_id === inc.id && m.profile_id === u.id && m.read_only_since);
+      const myLink = server.links.find((l) => l.incident_id === inc.id && !l.ended_at && l.read_only_since && l.company_id === myCompany);
+      return { data: { incident_id: inc.id, company_id: inc.company_id, company_name: server.companies.find((c) => c.id === inc.company_id)?.name || null,
+        my_access: !full(inc) ? 'read_only' : (server.members.some((m) => m.incident_id === inc.id && m.profile_id === u.id && m.relief_pending_since && !m.read_only_since) ? 'relief_pending' : 'full'),
+        relief_pending: clone(server.members.filter((m) => m.incident_id === inc.id && m.relief_pending_since && !m.read_only_since
+          && (UNIT_CHANGERS.includes(u.role) || (u.role === 'pc' && companyOf(m.profile_id) === myCompany) || m.profile_id === u.id))
+          .map((m) => ({ profile_id: m.profile_id, display_name: USERS[Object.keys(USERS).find((k) => USERS[k].id === m.profile_id)]?.display_name || m.profile_id, role: m.role_at_incident, since: m.relief_pending_since }))),
+        my_read_only_since: full(inc) ? null : (mine?.read_only_since || myLink?.read_only_since || null),
+        links: clone(server.links.filter((l) => l.incident_id === inc.id).map((l) => ({ id: l.id, kind: l.link_kind, company_id: l.company_id, company_name: server.companies.find((c) => c.id === l.company_id)?.name, started_at: l.started_at, read_only_since: l.read_only_since, ended_at: l.ended_at || null }))) }, error: null };
+    }
+    if (req.name === 'list_incident_unit_notices') {
+      if (!['pc', 'rcc', 'rpc'].includes(u.role) || !myCompany) return { data: [], error: null };
+      const rows = server.links.filter((l) => !server.noticeAcks.some((a) => a.link_id === l.id && a.profile_id === u.id)).filter((l) => {
+        const inc = server.incidents.find((i) => i.id === l.incident_id);
+        return (l.link_kind === 'former' && l.to_company_id === myCompany && inc.company_id === myCompany)
+          || (l.link_kind === 'reinforcing' && l.company_id === myCompany && u.role === 'pc' && !l.ended_at && !l.read_only_since);
+      }).map((l) => { const inc = server.incidents.find((i) => i.id === l.incident_id); return { link_id: l.id, incident_id: inc.id, visual_id: inc.visual_id, location_name: inc.location_name,
+        kind: l.link_kind === 'former' ? 'handover' : 'reinforce', from_company_name: server.companies.find((c) => c.id === l.company_id)?.name,
+        site_company_name: server.companies.find((c) => c.id === inc.company_id)?.name, at: l.started_at, reason: l.reason }; });
+      return { data: rows, error: null };
+    }
+    if (req.name === 'list_pending_reliefs') {
+      if (!['cc', 'chamal', 'admin', 'pc'].includes(u.role)) return { data: [], error: null };
+      const rows = server.members.filter((m) => m.relief_pending_since && !m.read_only_since).filter((m) => {
+        const inc = server.incidents.find((i) => i.id === m.incident_id);
+        return inc && inc.status === 'active' && (UNIT_CHANGERS.includes(u.role) || inc.company_id === myCompany);
+      }).map((m) => { const inc = server.incidents.find((i) => i.id === m.incident_id); return { incident_id: inc.id, visual_id: inc.visual_id, location_name: inc.location_name, profile_id: m.profile_id,
+        display_name: USERS[Object.keys(USERS).find((k) => USERS[k].id === m.profile_id)]?.display_name || m.profile_id, role_at_incident: m.role_at_incident, pending_since: m.relief_pending_since, server_now: new Date().toISOString() }; });
+      return { data: clone(rows), error: null };
+    }
+    if (req.name === 'acknowledge_incident_unit_notice') { server.noticeAcks.push({ link_id: p.p_link_id, profile_id: u.id }); return { data: { acknowledged: true }, error: null }; }
     if (req.name === 'get_incident_command_state') { const inc = server.incidents.find((i) => i.id === p.p_incident_id); return { data: inc ? { incident_id: inc.id, status: inc.status, state_json: {} } : null, error: null }; }
     return { data: null, error: null };
   }
@@ -201,7 +311,8 @@ async function openPhone(context, file) {
   const errors = [];
   const toasts = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  page.on('dialog', (d) => d.accept());
+  const dialogs = [];
+  page.on('dialog', (d) => { dialogs.push(d.message()); d.accept(); });
   await page.route('**/supabase-js@*/**', (r) => r.fulfill({ contentType: 'application/javascript', body: FAKE_SUPABASE }));
   await page.route('**/functions/v1/sync-log**', (r) => r.request().method() === 'POST'
     ? r.fulfill({ contentType: 'application/json', body: JSON.stringify({ accepted: [], duplicates: [], rejected: [] }) })
@@ -215,7 +326,7 @@ async function openPhone(context, file) {
   } else {
     await page.fill('#pin-gate-unlock-input', PIN); await page.click('#pin-gate-unlock-btn');
   }
-  return { page, errors, toasts };
+  return { page, errors, toasts, dialogs };
 }
 async function login(page, email) {
   await page.waitForSelector('#screen-login.active', { timeout: 5000 });
@@ -336,6 +447,143 @@ async function checkFile(browser, file) {
   assert(await pc1.page.locator('#platoon-roster-panel').count() === 0, `${rel}: no roster panel on the PC dashboard`);
   await pc1.page.click('[data-cmd-tab="forces"]'); // V2.99.62: "הפלוגה שלי" is on the כוחות tab
   assert((await bodyRowAfter(pc1.page, 'הפלוגה שלי')).includes('פלוגה א'), `${rel}: the PC dashboard must name its company`);
+
+  // ---- WP-27 (database/096): hand INC2 (company B) to company A; reinforce INC1 with company B.
+  await pc2.page.evaluate(async (id) => { await refreshOpenIncidents(); await enterIncidentFromPicker(id); }, INC2);
+  await pc2.page.waitForTimeout(300);
+  assert(await pc2.page.evaluate((id) => activeIncident?.id === id, INC2), `${rel}: PC2 must be in its own site before the handover`);
+  // Only cc / chamal / admin are offered the action.
+  await pc1.page.evaluate(() => openIncidentPicker());
+  await pc1.page.waitForTimeout(300);
+  assert(await pc1.page.locator('button', { hasText: 'העברה / תגבור פלוגה' }).count() === 0, `${rel}: a PC must not be offered handover / reinforce`);
+  // A company change in the CC roster no longer moves a site silently: it opens the panel.
+  await cc.page.evaluate(() => startRoleDashboard('cc'));
+  await cc.page.click('[data-cmd-tab="forces"]');
+  await cc.page.waitForSelector(`[data-incident-unit="${INC1}"]`, { timeout: 5000 });
+  await cc.page.selectOption(`[data-incident-unit="${INC1}"]`, `c:${CB}`);
+  await cc.page.waitForSelector(`[data-unit-panel="${INC1}"]`, { timeout: 5000 });
+  assert(SERVER.incidents.find((i) => i.id === INC1).company_id === CA, `${rel}: the roster must not move a site to another company directly`);
+  // Handover from the picker: reason required, then the site is company A's with no platoon.
+  await cc.page.evaluate((id) => { _unitPanelFor = null; return toggleIncidentUnitPanel(id); }, INC2);
+  await cc.page.waitForSelector(`[data-unit-panel="${INC2}"] select`, { timeout: 5000 });
+  await cc.page.selectOption(`#unit-company-${INC2}`, CA);
+  await cc.page.evaluate((id) => submitIncidentUnitChange(id), INC2);
+  assert(await cc.page.locator(`#unit-error-${INC2}`).innerText() === 'חובה לציין סיבה', `${rel}: a handover without a reason must be refused on the phone`);
+  assert(!SERVER.unitCalls.some((c) => c.name === 'handover_incident_unit'), `${rel}: nothing is sent without a reason`);
+  await cc.page.fill(`#unit-reason-${INC2}`, 'פלוגה ב יוצאת למנוחה');
+  await cc.page.evaluate((id) => submitIncidentUnitChange(id), INC2);
+  await cc.page.waitForTimeout(300);
+  const inc2 = SERVER.incidents.find((i) => i.id === INC2);
+  assert(inc2.company_id === CA && inc2.platoon_id === null, `${rel}: the handover must give the site to company A with no platoon (got ${JSON.stringify(inc2)})`);
+  const pc2m = SERVER.members.find((m) => m.incident_id === INC2 && m.profile_id === PC2);
+  assert(pc2m.relief_pending_since && !pc2m.read_only_since, `${rel}: PC2 must keep recording until relieved (got ${JSON.stringify(pc2m)})`);
+  assert(cc.toasts.some((t) => t.includes('האתר הועבר לפלוגה א') && t.includes('ממתינים להחלפה')), `${rel}: the CC must be told the site moved and who waits (got ${JSON.stringify(cc.toasts)})`);
+  // Not yet 30 minutes: no alert. At 31 minutes the site's PC (now PC1) and the CC are alerted.
+  await pc1.page.evaluate(() => pollIncidentOpenAlerts());
+  assert(!(await pc1.page.locator('#incident-relief-overdue-banner').isVisible()), `${rel}: no relief alert before 30 minutes`);
+  pc2m.relief_pending_since = new Date(Date.now() - 31 * 60000).toISOString();
+  await pc1.page.evaluate(() => pollIncidentOpenAlerts());
+  await pc1.page.waitForSelector(`#incident-relief-overdue-banner [data-relief-overdue="${INC2}"]`, { timeout: 5000 });
+  const overduePc = await pc1.page.locator('#incident-relief-overdue-banner').innerText();
+  assert(overduePc.includes('לא אישרו החלפה') && overduePc.includes('31 דק'), `${rel}: the site's PC must see who has not confirmed relief for 30+ minutes (got "${overduePc}")`);
+  await cc.page.evaluate(() => pollIncidentOpenAlerts());
+  await cc.page.waitForSelector(`#incident-relief-overdue-banner [data-relief-overdue="${INC2}"] button`, { timeout: 5000 });
+  await rpc1.page.evaluate(() => pollIncidentOpenAlerts());
+  assert(!(await rpc1.page.locator('#incident-relief-overdue-banner').isVisible()), `${rel}: the rescue chain gets no relief alert`);
+  // The leaving PC: told to keep recording, then "הוחלפתי - מסרתי" makes him read-only.
+  await pc2.page.evaluate(() => refreshIncidentContext());
+  await pc2.page.waitForSelector('#incident-readonly-banner [data-relief-self]', { timeout: 5000 });
+  assert(pc2.toasts.some((t) => t.includes('המשך לתעד')), `${rel}: PC2 must be told to keep recording until relieved (got ${JSON.stringify(pc2.toasts)})`);
+  await pc2.page.evaluate(() => openIncidentPicker());
+  await pc2.page.waitForTimeout(300);
+  assert(await pc2.page.locator('[data-readonly-badge]').count() === 0, `${rel}: no read-only badge before the relief`);
+  await pc2.page.evaluate((id) => enterIncidentFromPicker(id), INC2);
+  await pc2.page.waitForTimeout(300);
+  // An unsent record on PC2's phone: the relief tries to send it first and warns while it is not sent.
+  await pc2.page.evaluate((id) => {
+    const ob = getOutbox();
+    ob.push({ type: 'NOTE_ADDED', incident_id: id, synced: false, local_event_id: 'relief-unsent-1', device_id: getDeviceId(), local_timestamp: new Date().toISOString(), payload_json: {} });
+    persistOutbox(ob);
+    window.__origSyncPush = syncPush; syncPush = async () => {}; // offline: nothing goes out
+  }, INC2);
+  pc2.dialogs.length = 0;
+  await pc2.page.click('#incident-readonly-banner [data-relief-self]');
+  await pc2.page.waitForTimeout(300);
+  assert(pc2.dialogs.some((d) => d.includes('רישומים שעוד לא נשלחו')), `${rel}: relieving himself with unsent records must warn first (got ${JSON.stringify(pc2.dialogs)})`);
+  assert(pc2.toasts.some((t) => t.includes('שולח 1 רישומים לפני ההחלפה')), `${rel}: the phone must try to send its records before the relief`);
+  await pc2.page.evaluate(() => { syncPush = window.__origSyncPush; const ob = getOutbox(); const i = ob.findIndex((e) => e.local_event_id === 'relief-unsent-1'); if (i >= 0) ob.splice(i, 1); persistOutbox(); });
+  assert(pc2m.read_only_since && pc2m.relieved_by === PC2, `${rel}: "הוחלפתי - מסרתי" must relieve PC2 himself`);
+  await pc1.page.evaluate(() => pollIncidentOpenAlerts());
+  assert(!(await pc1.page.locator('#incident-relief-overdue-banner').isVisible()), `${rel}: the relief alert must go once he is relieved`);
+  // A record refused after the relief says why and offers no retry that cannot work.
+  await pc2.page.evaluate(() => refreshIncidentContext());
+  await pc2.page.waitForTimeout(200);
+  const relRej = await pc2.page.evaluate(() => {
+    const ob = getOutbox();
+    ob.push({ type: 'VITALS_RECORDED', patient_id: 'p-relief-x', syncRejected: true, syncRejectReason: 'FORBIDDEN_ACTOR_ROLE', syncRejectMessage: 'new row violates row-level security policy' });
+    const html = patientSyncRejectionBanner({ id: 'p-relief-x' });
+    ob.pop();
+    return { readOnly: isActiveIncidentReadOnly(), explains: html.includes('data-relief-rejection'), retry: html.includes('retryPatientSync') };
+  });
+  assert(relRej.readOnly && relRej.explains && !relRej.retry, `${rel}: after relief a refused record must say why, with no retry (got ${JSON.stringify(relRej)})`);
+  // Signed in, the demo title above the dashboard is hidden (the sync pill stays).
+  await pc2.page.evaluate(() => startRoleDashboard('pc'));
+  assert(await pc2.page.locator('#role-context-line').evaluate((el) => el.closest('.demo-strip').classList.contains('signed-in-compact') && getComputedStyle(el.parentElement).display === 'none'),
+    `${rel}: the demo title must be hidden on the signed-in dashboard`);
+  const roBanner = await pc2.page.locator('#incident-readonly-banner').innerText();
+  assert(roBanner.includes('צפייה בלבד') && roBanner.includes('פלוגה א'), `${rel}: PC2 must see a read-only banner naming the new company (got "${roBanner}")`);
+  assert(pc2.toasts.some((t) => t.includes('צפייה בלבד')), `${rel}: PC2 must be told once that it is read-only`);
+  await pc2.page.evaluate(() => openIncidentPicker());
+  await pc2.page.waitForTimeout(300);
+  assert(await pc2.page.locator('[data-readonly-badge]').count() === 1, `${rel}: the picker must mark the read-only site`);
+  // The new PC: told once, then the notice is gone.
+  await pc1.page.evaluate(() => pollIncidentOpenAlerts());
+  await pc1.page.waitForSelector('#incident-unit-notice-banner [data-unit-notice]', { timeout: 5000 });
+  assert((await pc1.page.locator('#incident-unit-notice-banner').innerText()).includes('אתר הועבר לפלוגה שלך'), `${rel}: PC1 must be told the site was handed to its company`);
+  await pc1.page.click('#incident-unit-notice-banner [data-unit-notice] button:has-text("ראיתי")');
+  await pc1.page.waitForTimeout(200);
+  assert(!(await pc1.page.locator('#incident-unit-notice-banner').isVisible()), `${rel}: the notice must go after "ראיתי"`);
+  await pc1.page.evaluate(() => pollIncidentOpenAlerts());
+  assert(!(await pc1.page.locator('#incident-unit-notice-banner').isVisible()), `${rel}: an acknowledged notice must not come back`);
+  // Reinforce INC1 with company B, then release it.
+  await cc.page.evaluate((id) => { _unitPanelFor = null; return toggleIncidentUnitPanel(id); }, INC1);
+  await cc.page.waitForSelector(`[data-unit-panel="${INC1}"]`, { timeout: 5000 });
+  await cc.page.evaluate(() => setIncidentUnitPanelMode('reinforce'));
+  await cc.page.selectOption(`#unit-company-${INC1}`, CB);
+  await cc.page.fill(`#unit-reason-${INC1}`, 'עומס פצועים');
+  await cc.page.evaluate((id) => submitIncidentUnitChange(id), INC1);
+  await cc.page.waitForTimeout(300);
+  assert(SERVER.incidents.find((i) => i.id === INC1).company_id === CA, `${rel}: reinforcement must leave the site with company A`);
+  assert(SERVER.links.some((l) => l.incident_id === INC1 && l.link_kind === 'reinforcing' && l.company_id === CB), `${rel}: reinforcement must be recorded`);
+  await pc2.page.evaluate(() => pollIncidentOpenAlerts());
+  await pc2.page.waitForSelector('#incident-unit-notice-banner [data-unit-notice]', { timeout: 5000 });
+  assert((await pc2.page.locator('#incident-unit-notice-banner').innerText()).includes('הפלוגה שלך נשלחה לתגבר'), `${rel}: PC2 must be told its company reinforces a site`);
+  await cc.page.waitForSelector(`[data-unit-panel="${INC1}"] button:has-text("שחרור תגבור")`, { timeout: 5000 });
+  await cc.page.click(`[data-unit-panel="${INC1}"] button:has-text("שחרור תגבור")`);
+  await cc.page.waitForTimeout(300);
+  const pc2r = SERVER.members.find((m) => m.incident_id === INC1 && m.profile_id === PC2);
+  assert(pc2r.relief_pending_since && !pc2r.read_only_since, `${rel}: after release company B's PC must keep recording until relieved`);
+  // The CC marks him relieved (his phone is gone) from the panel's waiting list.
+  await cc.page.waitForSelector(`[data-unit-panel="${INC1}"] [data-relief-row="${PC2}"] button`, { timeout: 5000 });
+  await cc.page.click(`[data-unit-panel="${INC1}"] [data-relief-row="${PC2}"] button`);
+  await cc.page.waitForTimeout(300);
+  assert(pc2r.read_only_since && pc2r.relieved_by === CC, `${rel}: the CC's "סמן כהוחלף" must relieve PC2`);
+  await pc2.page.evaluate(() => pollIncidentOpenAlerts());
+  assert(!(await pc2.page.locator('#incident-unit-notice-banner').isVisible()), `${rel}: a released reinforcement's notice must go`);
+  // End company B's read-only access to INC2: the old PC is told its access ended.
+  await cc.page.evaluate((id) => { _unitPanelFor = null; return toggleIncidentUnitPanel(id); }, INC2);
+  await cc.page.waitForSelector(`[data-unit-panel="${INC2}"] button:has-text("סיום גישה")`, { timeout: 5000 });
+  await cc.page.click(`[data-unit-panel="${INC2}"] button:has-text("סיום גישה")`);
+  await cc.page.waitForTimeout(300);
+  assert(SERVER.members.find((m) => m.incident_id === INC2 && m.profile_id === PC2).access_ended_at, `${rel}: ending access must end PC2's membership`);
+  await pc2.page.evaluate(async (id) => { if (activeIncident?.id !== id) { activeIncident = { ...activeIncident, id }; } await refreshIncidentContext(); }, INC2);
+  await pc2.page.waitForTimeout(200);
+  assert((await pc2.page.locator('#incident-readonly-banner').innerText()).includes('הגישה שלך לאתר הסתיימה'), `${rel}: PC2 must be told its access ended`);
+  // Signed in, the CC quick action opens the panel instead of moving a demo patient.
+  await cc.page.evaluate((id) => enterIncidentFromPicker(id), INC1);
+  await cc.page.waitForTimeout(300);
+  await cc.page.evaluate(() => { _unitPanelFor = null; return demoReassignBetweenPlatoons(); });
+  await cc.page.waitForSelector(`[data-unit-panel="${INC1}"]`, { timeout: 5000 });
 
   const errors = [...pc2.errors, ...rpc1.errors, ...rcc1.errors, ...cc.errors, ...pc1.errors];
   assert(errors.length === 0, `${rel}: page errors: ${errors.join(' | ')}`);

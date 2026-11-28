@@ -42,8 +42,14 @@ async function checkFile(browser, file) {
   await page.click('#pin-gate-setup-btn');
   await page.waitForFunction(() => document.querySelector('.screen.active')?.id === 'screen-login', { timeout: 5000 });
 
-  // 1. New Patient flow with a tourniquet on two limbs at 10:15.
+  // 1. New Patient flow with a tourniquet on two limbs, put on 30 minutes ago (today). A fixed time
+  // such as 10:15 failed every day for about an hour on CI (UTC): from 09:15 it is later than the
+  // phone's clock, and the app rightly asks "type again / yesterday" (parseTourniquetTimeCode).
   const flow = await page.evaluate(() => {
+    const ago = new Date(Date.now() - 30 * 60000);
+    const tqCode = ago.getDate() === new Date().getDate()
+      ? String(ago.getHours()).padStart(2, '0') + String(ago.getMinutes()).padStart(2, '0')
+      : '0000'; // just after midnight: earlier today, within the tolerance
     patients = [];
     state = freshState();
     state.flowMode = 'quick';
@@ -52,7 +58,7 @@ async function checkFile(browser, file) {
     state.trapStatus = 'not_trapped';
     state.injury = 'דימום';
     quickTqData.applied = true;
-    quickTqData.time = '1015';
+    quickTqData.time = tqCode;
     quickTqData.limbs = new Set(['yl', 'rr']);
     projectPatientStatus('stabilizing', 'TOURNIQUET_APPLIED', { source: 'quick_patient_flow' });
     saveLocalEvent({ type: 'QUICK_PATIENT_CREATED', detail: 'in-flow', payload_json: { needs_full_assessment: true } });
@@ -69,7 +75,7 @@ async function checkFile(browser, file) {
       tq: added.filter((e) => e.type === 'TOURNIQUET_APPLIED').map((e) => ({ pid: e.patient_id, synced: e.synced, limb: e.payload_json.limb, at: e.payload_json.application_time })),
       patientId: p.id,
       localCount: activeTourniquets(p).length,
-      expectedAt: new Date(C5Rules.timeCodeToTodayMs('1015')).toISOString(),
+      expectedAt: new Date(C5Rules.timeCodeToTodayMs(tqCode)).toISOString(),
     };
   });
   assert(flow.inFlow.length === 1 && flow.inFlow[0].synced === true && flow.inFlow[0].localOnly, `${rel}: the in-flow tourniquet event without a patient must stay local`);
