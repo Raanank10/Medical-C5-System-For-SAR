@@ -1,6 +1,6 @@
 # Synthetic Scenarios (scenario injector)
 
-Option B for field experiments: `scripts/inject_scenario.js` signs in as **virtual medics** and pushes a scripted, synthetic MCI timeline into a real incident through the real `/sync/log` Edge Function, the same path a phone uses. PC/CC/Chamal screens see the incident unfold live. Option A (real people playing medics) works at the same time in the same incident.
+Option B for field experiments: `scripts/inject_scenario.js` signs in as **virtual medics** and pushes a scripted, synthetic MCI timeline into a real incident through the real `/sync/log` Edge Function, the same path a phone uses. PC/CC/Medical Chamal screens see the incident unfold live. Option A (real people playing medics) works at the same time in the same incident.
 
 **Synthetic data only** (`docs/OPERATIONS_SAFETY.md`). Every scenario must declare `"synthetic": true`. The clinical values here are plausible but synthetic and are not doctrine; review them per `docs/CLINICAL_GOVERNANCE_REVIEW_FRAMEWORK.md` before an exercise.
 

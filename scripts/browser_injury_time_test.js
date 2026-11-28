@@ -292,7 +292,7 @@ async function checkFile(browser, file) {
   const id = await m1.page.evaluate(() => { siteData.currentZone = 'קומה 2'; createImmediateInterventionPatient('airway'); return patients[0].id; });
   const t0Hhmm = await m1.page.evaluate((t) => tourniquetHhmm(Date.parse(t)), T0);
   let row = await rowText(m1.page, id);
-  assert(row.includes('שעת פציעה (משוערת)') && row.includes(t0Hhmm) && row.includes('משוערת · שעת ההתראה'),
+  assert(row.includes('שעת פציעה (משוערת)') && row.includes(t0Hhmm) && row.includes('משוערת · תחילת האירוע'),
     `${rel}: before an entry the patient screen shows the alert time as an estimate (got "${row}")`);
   await syncAll(m1.page); await syncAll(m1.page);
   let sp = SERVER.patients.find((p) => p.id === id);
@@ -318,10 +318,17 @@ async function checkFile(browser, file) {
   assert(sp.t_injury_source === 'entered' && Date.parse(sp.t_injury) === entered50 && sp.t_injury_set_by_role === 'medic',
     `${rel}: the server marks the time entered by the medic`);
 
-  // Golden Hour on the command watchdog counts from the injury time: 50 min = amber.
-  const golden = await m1.page.evaluate((pid) => computeWatchdogRows(patients).find((r) => r.patient === pid && r.name === 'Golden Hour'), id);
-  assert(golden && golden.state === 'amber' && golden.detail.startsWith('50 דק׳') && golden.detail.includes('מאז הפציעה') && !golden.detail.includes('משוערת'),
-    `${rel}: Golden Hour counts from the entered injury time (got ${JSON.stringify(golden)})`);
+  // Golden Hour on the command watchdog counts from the earliest of the incident's alert, its opening
+  // and the entered injury time (owner 2026-11-27: "the earlier beats everything else"). Here the
+  // entered 50 minutes is earlier than the incident, so it counts. The entered time also drives MIST.
+  const golden = await m1.page.evaluate((pid) => {
+    const p = patients.find((x) => x.id === pid);
+    const startMs = incidentAlertTimeMs(p);
+    const earliest = Math.min(...[startMs, p.tInjury].filter((t) => Number.isFinite(t)));
+    return { row: computeWatchdogRows(patients).find((r) => r.patient === pid && r.name === 'Golden Hour'), expected: Math.floor((Date.now() - earliest) / 60000), enteredFirst: earliest === p.tInjury };
+  }, id);
+  assert(golden.row && golden.row.detail.startsWith(`${golden.expected} דק׳`) && golden.row.detail.includes(golden.enteredFirst ? 'מאז הפציעה' : 'מאז תחילת האירוע'),
+    `${rel}: Golden Hour counts from the earliest of incident start and entered injury time (got ${JSON.stringify(golden)})`);
 
   // MIST: the injury time is said; mechanism and injuries are no longer the same text.
   const mist = await m1.page.evaluate((pid) => mistTextForPatient(patients.find((p) => p.id === pid)), id);

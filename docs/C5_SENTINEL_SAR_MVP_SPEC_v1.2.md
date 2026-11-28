@@ -11,7 +11,7 @@ Build a mission-critical Medical Command & Control (C5) system for Search and Re
 The system consists of:
 
 - **Mobile App** — Medics and Platoon Commanders / Supervisors
-- **Web Dashboard** — Chamal, Company Commander, Platoon Commander, Logistics Officer
+- **Web Dashboard** — Medical Chamal, Company Commander, Platoon Commander, Logistics Officer
 - **Backend / Database** — PostgreSQL / Supabase-compatible event-sourced backend
 - **Realtime Layer** — Realtime Outbox + backend worker / Supabase Realtime / WebSocket
 
@@ -44,7 +44,7 @@ Medic Levi — Medic
 חוג״ד Demo — Medical Platoon Commander
 Log-O Demo — Logistics Officer
 מ״פ רפואה Demo — Medical Company Commander
-Chamal Demo — Chamal
+Medical Chamal Demo — Medical Chamal
 ```
 
 ## Demo Patients
@@ -122,7 +122,7 @@ Medic
 חוג״ד / Medical Platoon Commander
 Logistics Officer (Log-O)
 מ״פ רפואה / Medical Company Commander
-Chamal
+Medical Chamal
 ```
 
 `pc` remains the schema/auth role key. In product language this is shown as `חוג״ד / חפ״ק רפואי`.
@@ -134,15 +134,15 @@ Official incidents and official `T₀` can be created/set only by:
 
 ```text
 Company Commander
-Chamal
+Medical Chamal
 Platoon Commander, if authorized
 ```
 
-**No draft incidents (decision D10, `docs/GAP_CLOSURE_PLAN.md`, `database/064`, V2.99.48).** A Medic or Paramedic opens an **official** incident directly, in their own company (and platoon, when the roster gives them one). Before opening, the phone lists the open incidents of the medic's company from the last 12 hours and offers to join one instead. Once opened, the company's חוג״ד and מ״פ חילוץ, every מ״מ of the company (only the chosen platoon's מ״מ once the platoon is set), and מ״פ רפואה / Chamal / Admin see a pulsing banner until each of them acknowledges it (per person, stored on the server). A medic's incident has no platoon unless the roster sets one, so the חוג״ד or מ״פ חילוץ chooses it from the banner, which then informs that platoon's מ״מ. The opener may cancel the incident as a false alarm while it has no patients; after that, closing follows the close guard (`040`). Duplicates that still happen are merged into one incident by מ״פ רפואה / Chamal / Admin (D8, `database/067`, V2.99.50): from the incident list ("מיזוג כפילות"), with a required reason; everything recorded in the duplicate moves to the chosen incident, temporary patient ids that clash are renamed (`P001` -> `P001-BBBB`) and reported, events keep a record of the incident they were first recorded in, and phones still in the duplicate move to the chosen incident automatically; whatever they record offline in the duplicate is stored in the chosen incident. The earlier draft path (`incidents.status = 'draft'`, `confirm_draft` / `reject_draft` / `acknowledge_draft`) is no longer used by the client; the server functions remain for history.
+**No draft incidents (decision D10, `docs/GAP_CLOSURE_PLAN.md`, `database/064`, V2.99.48).** A Medic or Paramedic opens an **official** incident directly, in their own company (and platoon, when the roster gives them one). Before opening, the phone lists the open incidents of the medic's company from the last 12 hours and offers to join one instead. Once opened, the company's חוג״ד and מ״פ חילוץ, every מ״מ of the company (only the chosen platoon's מ״מ once the platoon is set), and מ״פ רפואה / Medical Chamal / Admin see a pulsing banner until each of them acknowledges it (per person, stored on the server). A medic's incident has no platoon unless the roster sets one, so the חוג״ד or מ״פ חילוץ chooses it from the banner, which then informs that platoon's מ״מ. The opener may cancel the incident as a false alarm while it has no patients; after that, closing follows the close guard (`040`). Duplicates that still happen are merged into one incident by מ״פ רפואה / Medical Chamal / Admin (D8, `database/067`, V2.99.50): from the incident list ("מיזוג כפילות"), with a required reason; everything recorded in the duplicate moves to the chosen incident, temporary patient ids that clash are renamed (`P001` -> `P001-BBBB`) and reported, events keep a record of the incident they were first recorded in, and phones still in the duplicate move to the chosen incident automatically; whatever they record offline in the duplicate is stored in the chosen incident. The earlier draft path (`incidents.status = 'draft'`, `confirm_draft` / `reject_draft` / `acknowledge_draft`) is no longer used by the client; the server functions remain for history.
 
 ## Authorization Matrix
 
-| Action | Medic | חוג״ד | Log-O | מ״פ רפואה | Chamal |
+| Action | Medic | חוג״ד | Log-O | מ״פ רפואה | Medical Chamal |
 |---|---:|---:|---:|---:|---:|
 | Open official incident (D10) | ✓ | ✓ | ✗ | ✓ | ✓ |
 | Set T₀ (site authority) | ✗ | ✓ | ✗ | ✓ | ✓ |
@@ -173,7 +173,7 @@ This action is recorded as:
 MEDIC_SITE_CLOSE_REQUESTED
 ```
 
-A חוג״ד / מ״פ רפואה / Chamal may reopen or reject the close request.
+A חוג״ד / מ״פ רפואה / Medical Chamal may reopen or reject the close request.
 
 ---
 
@@ -201,7 +201,9 @@ patient when the injury time is known to differ. Any override is logged as PATIE
 Until someone enters it, T_injury is shown as an estimate ("משוערת").
 ```
 
-The command watchdog's Golden Hour and Crush Syndrome rows, the MIST handover and the stored after-action report count from `T_injury`. On the server the newest entry by phone time wins, so an older entry pushed late by an offline phone does not overwrite a newer correction.
+Golden Hour (owner 2026-11-27, V2.99.96): the golden hour starts at the earliest of the incident's alert time (T0), when anyone opened the incident, an injury time entered for the casualty, and the casualty's registration (owner 2026-11-27: "the earlier beats everything else"; registration added on clinical review the same day, since the casualty was certainly injured by then, and shown as a lower limit "לפחות" when it is the earliest; `goldenHourStartMs` / `incidentClockStartMs` in `src/domain/rules.js`, `injuryTimerClock` in `index.html`). The earliest, so the clock never runs short: an entered time earlier than the alert counts, a later one never shortens it. A time in the future (wrong clock) is not used; if it is the only one, the row shows "בדוק שעון" and waits, never "ok". Owner 2026-11-28: "Crush syndrome or any other injury timer starts when the alert comes in or open by someone, the earlier beats all": the Crush row uses the same clock. The injury time itself as recorded (patient row, MIST text and payload) stays what was entered. Until an injury time is entered, the phone's `T_injury` itself is also when the casualty's own incident began. With neither known (and for a row stored as `event_time`, which is only the registration time) registration can only come after the injury, so the minutes since registration are a lower limit: they are shown as "לפחות N דק׳", a row is red or amber on that limit (a red from it is always true) and "ממתין לתגובה" while it is under 45, never "ok" (clinical review 2026-11-27): the Golden Hour and Crush rows and the חמ״ל רפואי site card use it, and the MIST text says the injury time is unknown. The server's own default stays `t_injury_default` (= T₀).
+
+The MIST handover text and the stored after-action report keep `T_injury`; the Golden Hour and Crush Syndrome rows and the חמ״ל רפואי site card count from the golden-hour start above. The stored report's golden-hour figure is still computed on the server from `t_injury`; owner 2026-11-28: to be aligned with this rule in a separate PR (server change, SQL first). On the server the newest entry by phone time wins, so an older entry pushed late by an offline phone does not overwrite a newer correction.
 
 ### Site Guard and Patient Creation
 
@@ -343,7 +345,7 @@ Conflict resolution affects read-model projections only, never the immutable eve
 
 ---
 
-## 2.4 Realtime Chamal Updates
+## 2.4 Realtime Medical Chamal Updates
 
 Realtime updates must use the **Transactional Outbox Pattern**.
 
@@ -356,7 +358,7 @@ PostgreSQL trigger writes to realtime_outbox
 ↓
 Backend worker / Supabase Realtime reads outbox
 ↓
-WebSocket / Realtime channel pushes update to Chamal dashboard
+WebSocket / Realtime channel pushes update to Medical Chamal dashboard
 ```
 
 The database must not call the web app directly.
@@ -365,13 +367,13 @@ The database must not call the web app directly.
 
 ## 2.5 Watchdog Stack
 
-Watchdogs run locally and should also be reproducible server-side for Chamal/AAR validation.
+Watchdogs run locally and should also be reproducible server-side for Medical Chamal/AAR validation.
 
 | Watchdog | Trigger | Threshold | Alert |
 |---|---|---:|---|
-| Crush Syndrome | Access = Trapped or Partial | T_injury + 45m | Amber → Red |
-| Golden Hour | Any registered patient | T_injury + 45m | Amber |
-| Golden Hour | Any registered patient | T_injury + 60m | Red |
+| Crush Syndrome | Access = Trapped, Partial or no access ("אין גישה", owner 2026-11-28) | Golden-hour start (earliest of T0, opening, entered T_injury, registration) + 45m | Amber → Red |
+| Golden Hour | Any registered patient | Golden-hour start (earliest of T0, opening, entered T_injury, registration) + 45m | Amber |
+| Golden Hour | Any registered patient | Golden-hour start + 60m | Red |
 | Tourniquet Warning | Tourniquet per limb | +60m from application | Amber |
 | Tourniquet Decision | Tourniquet per limb | +100m from application | Amber (20 min before the medic's 120-minute release window closes) |
 | Tourniquet Critical | Tourniquet per limb | +120m from application | Red (conversion to direct pressure: medic up to 120m, paramedic up to 4h, physician up to 6h) |
@@ -538,7 +540,7 @@ Override consequences:
 - Sync status: 🟢 Live / 🔴 Offline / 🟡 Syncing
 - False-alarm badge, if the opener cancelled the incident
 
-### Incident Opened Banner — חוג״ד / מ״פ חילוץ / מ״מ / מ״פ רפואה / Chamal (D10)
+### Incident Opened Banner — חוג״ד / מ״פ חילוץ / מ״מ / מ״פ רפואה / Medical Chamal (D10)
 
 When a medic or paramedic opens an incident, the screens of the people who must know show a pulsing banner (`list_incident_open_alerts`, polled every 20 seconds, vibrate once per new incident):
 
@@ -546,11 +548,11 @@ When a medic or paramedic opens an incident, the screens of the people who must 
 🚨 New incident opened in the field: INC-... · [location] · [address]
 Opened [time] by [role] [name] · [count] patients
 [platoon not set: the מ״מ was not informed]   (חוג״ד / מ״פ חילוץ: [choose platoon] [set platoon])
-[no company: the medic has no unit (setup error)]   (מ״פ רפואה / Chamal / Admin only)
+[no company: the medic has no unit (setup error)]   (מ״פ רפואה / Medical Chamal / Admin only)
 [ראיתי] [enter]
 ```
 
-Who sees it: the company's חוג״ד and מ״פ חילוץ; every מ״מ of the company until the platoon is chosen, then only the מ״מ of the chosen platoon (`064d`, owner 2026-10-22; a מ״מ gets no entry button until then, since it reaches an incident only through its platoon); מ״פ רפואה, Chamal and Admin for every incident. It stays until that person presses "ראיתי" (one acknowledgment per person; others still see it). A false-alarm cancel shows as "✖ incident cancelled (false alarm)" with the reason, until acknowledged. Alerts cover incidents opened in the last 24 hours.
+Who sees it: the company's חוג״ד and מ״פ חילוץ; every מ״מ of the company until the platoon is chosen, then only the מ״מ of the chosen platoon (`064d`, owner 2026-10-22; a מ״מ gets no entry button until then, since it reaches an incident only through its platoon); מ״פ רפואה, Medical Chamal and Admin for every incident. It stays until that person presses "ראיתי" (one acknowledgment per person; others still see it). A false-alarm cancel shows as "✖ incident cancelled (false alarm)" with the reason, until acknowledged. Alerts cover incidents opened in the last 24 hours.
 
 ### Stat Row
 
@@ -856,7 +858,7 @@ Patient Card / Patient Detail
 → Append treatment event
 → Deduct inventory through inventory_ledger
 → Write realtime_outbox update
-→ Chamal / PC dashboard updates live
+→ Medical Chamal / PC dashboard updates live
 ```
 
 ## MVP Treatment Types
@@ -1035,7 +1037,7 @@ Saving a treatment must create:
    - `INTERVENTION_RECORDED`, `MEDICATION_ADMINISTERED`, or `TOURNIQUET_APPLIED`
 2. One or more `inventory_ledger` rows with negative `quantity_change`
 3. Optional `conflict_log` entry if a safety warning is overridden
-4. `realtime_outbox` row for Chamal/PC updates
+4. `realtime_outbox` row for Medical Chamal/PC updates
 
 There is no mutable `treatments` table in the MVP. The event log is the source of truth.
 
@@ -1060,7 +1062,7 @@ Clicking a stage filters the patient list.
 | Active | Red | Any RED patient not handed over |
 | Caution | Amber | Any YELLOW patient not handed over |
 | Monitoring | Blue | GREEN-only patients not handed over |
-| Clear | Green | All patients handed over and PC/CC/Chamal confirms Site Clear |
+| Clear | Green | All patients handed over and PC/CC/Medical Chamal confirms Site Clear |
 | Unstable | Red border + ⚠ | Building status = Unstable |
 
 `Site Clear` is a two-tap action.
@@ -1174,7 +1176,7 @@ vw_active_watchdog_alerts_by_severity
 - `events` is immutable and append-only.
 - `inventory_ledger` is append-only and replaces absolute inventory quantity.
 - `patients` is a projection/read model.
-- `realtime_outbox` feeds Chamal/dashboard updates.
+- `realtime_outbox` feeds Medical Chamal/dashboard updates.
 - `device_id + local_event_id` prevents duplicate sync.
 - JSON payloads use `jsonb`.
 - JSONB GIN/expression indexes support fast dashboard queries.
@@ -1311,7 +1313,7 @@ AAR is locked until:
 1. All patients across all sectors are marked `Handed Over`
 2. All active sectors/buildings have confirmed `Site Clear`
 
-חוג״ד / מ״פ רפואה / Chamal can unlock the AAR.
+חוג״ד / מ״פ רפואה / Medical Chamal can unlock the AAR.
 
 The report is read-only and exportable as PDF.
 
@@ -1394,7 +1396,7 @@ The system should measure KPIs across four domains: Clinical, Operational, Logis
 
 ## 10.5 MVP KPI Dashboard — First 10 Metrics
 
-The first Chamal/Command dashboard should focus on these metrics:
+The first Medical Chamal/Command dashboard should focus on these metrics:
 
 ```text
 1. Active RED patients
@@ -1438,7 +1440,7 @@ Web Offline Cache: IndexedDB / LocalStorage, limited use
 7. Quick Patient mode
 8. Crush/Tourniquet/Golden Hour watchdogs
 9. Dead Man’s Switch
-10. Realtime Outbox + Chamal dashboard updates
+10. Realtime Outbox + Medical Chamal dashboard updates
 11. Tactical Funnel + Final Sweep Heatmap
 12. MIST handover + secure QR token
 13. Logistics inventory ledger automation
@@ -1542,7 +1544,7 @@ If two devices record conflicting observations, both immutable events are preser
 
 `inventory_ledger` records `location_at_time` for every supply movement or consumption event.
 
-This allows Command / Chamal to answer:
+This allows Command / Medical Chamal to answer:
 - where supplies were consumed
 - which building/floor has high burn rate
 - which medic bag or sector is at risk of stock-out
@@ -1607,11 +1609,11 @@ Patient Treatment Event
 Purpose:
 - allow the Platoon Commander to resupply assigned medics quickly
 - aggregate medic requests before escalating to Log-O
-- give Command and Chamal visibility into stock depletion by platoon, building, floor, and sector
+- give Command and Medical Chamal visibility into stock depletion by platoon, building, floor, and sector
 
 ## Permissions
 
-| Action | Medic | Platoon Commander | Log-O | CC | Chamal |
+| Action | Medic | Platoon Commander | Log-O | CC | Medical Chamal |
 |---|---:|---:|---:|---:|---:|
 | View Platoon Stock | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Manually initialize Platoon Stock during staging | ✗ | ✓ | ✗ | ✗ | ✗ |
@@ -1665,7 +1667,7 @@ Emergency direct path is allowed only as an override:
 Log-O → Medic
 ```
 
-This must be logged as `DIRECT_LOGO_TO_MEDIC` with a required reason. It appears in the Command/Chamal logistics audit trail.
+This must be logged as `DIRECT_LOGO_TO_MEDIC` with a required reason. It appears in the Command/Medical Chamal logistics audit trail.
 
 ## Initial manual fill
 
@@ -1742,7 +1744,7 @@ Correct behavior:
 1. Save the clinical event.
 2. Flag it as HIGH_RISK_CLINICAL_VIOLATION.
 3. Create a critical Watchdog alert.
-4. Show it immediately to Medic / PC / Chamal.
+4. Show it immediately to Medic / PC / Medical Chamal.
 5. Include it in the AAR.
 ```
 
@@ -1794,7 +1796,7 @@ severity = critical
 escalate_to_role = PC
 ```
 
-The alert remains active until acknowledged/resolved by חוג״ד / מ״פ רפואה / Chamal.
+The alert remains active until acknowledged/resolved by חוג״ד / מ״פ רפואה / Medical Chamal.
 
 ## 6. Row Level Security
 
@@ -1806,7 +1808,7 @@ Baseline policies:
 
 - Medics and PCs can create patients and clinical events only for incidents they are assigned to in `incident_memberships`.
 - Log-O can manage logistics events, not clinical patient events.
-- חוג״ד / מ״פ רפואה / Chamal can read command dashboards and conflict logs.
+- חוג״ד / מ״פ רפואה / Medical Chamal can read command dashboards and conflict logs.
 - AAR is command-only.
 - Backend service-role processes realtime outbox internally.
 
@@ -2005,7 +2007,7 @@ This prevents the “ghost dashboard” problem where a medic acts on old local 
 
 ## Command Snapshot Table
 
-The Chamal/command dashboard should not perform large RLS-heavy joins during an MCI.
+The Medical Chamal/command dashboard should not perform large RLS-heavy joins during an MCI.
 
 Use:
 
@@ -2026,7 +2028,7 @@ Rules:
 1. Each alert has a deterministic `dedupe_key`.
 2. Running the watchdog worker twice must not create duplicate active alerts.
 3. If an event in the same sync batch resolves a risk, the alert is suppressed before it reaches the dashboard.
-4. Example: if a batch contains “vitals overdue risk” and then `VITALS_RECORDED`, no active overdue-vitals alert should flash on Chamal.
+4. Example: if a batch contains “vitals overdue risk” and then `VITALS_RECORDED`, no active overdue-vitals alert should flash on Medical Chamal.
 5. Resolution is recorded with `resolved_by_event_id` for auditability.
 
 ## Panic Mode / Tactical High-Contrast UI

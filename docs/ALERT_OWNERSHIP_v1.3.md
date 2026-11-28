@@ -24,11 +24,11 @@ Medic alerts focus on direct action: treat, reassess, complete missing rescue-cr
 
 מ״פ רפואה alerts are aggregated operational risks: multiple red casualties, evacuation bottlenecks, logistics shortages, silent teams, cross-site report mismatch, and unresolved reinforcement requests.
 
-Chamal alerts focus on data integrity and cross-incident picture quality: sync gaps, external report conflicts, duplicate suspicion, and official incident visibility.
+Medical Chamal alerts focus on data integrity and cross-incident picture quality: sync gaps, external report conflicts, duplicate suspicion, and official incident visibility.
 
 ## Commander UI Buckets
 
-The חוג״ד/Chamal board routes alerts into:
+The חוג״ד/Medical Chamal board routes alerts into:
 
 - `טיפול דחוף`
 - `חילוץ / לכודים`
@@ -53,4 +53,4 @@ Required fields:
 | `targetLocation` | Site/building/floor or free location. |
 | `status` | `pending`, `acknowledged`, `assigned`, `en_route`, `arrived`, `denied`, `cancelled`, or `resolved`. |
 
-The חוג״ד creates the request. מ״פ רפואה/Chamal can track, acknowledge, assign, and close it. The event export includes both alert ownership rows and reinforcement request state.
+The חוג״ד creates the request. מ״פ רפואה/Medical Chamal can track, acknowledge, assign, and close it. The event export includes both alert ownership rows and reinforcement request state.

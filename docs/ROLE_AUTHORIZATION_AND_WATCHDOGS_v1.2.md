@@ -10,13 +10,13 @@ This document defines the operating roles, the demo authorization matrix, and th
 | חוג״ד / חפ״ק רפואי | Opens official incidents, is informed of incidents its company's medics open and chooses their platoon, supervises clinical and command state, dispatches supply to Log-O, and unlocks live incident summary / AAR. |
 | Logistics Officer (Log-O) | Manages kit templates, resupply runners, and company equipment status. Does not create or edit clinical casualty records. |
 | מ״פ רפואה | Company medical-resource command authority for official incident confirmation, closure/reopen, site clear, resource allocation, dashboard, conflict log, and AAR. |
-| Chamal | Higher command/operations room. Informed of every incident a medic opens, manages official incident state, sees command dashboards, conflict log, and AAR. |
+| Medical Chamal | Higher command/operations room. Informed of every incident a medic opens, manages official incident state, sees command dashboards, conflict log, and AAR. |
 
-There are no draft incidents (D10, `database/064`, V2.99.48). A medic opens an official incident after the phone offered to join an open incident of the medic's company; חוג״ד, מ״פ חילוץ, the company's מ״מים (only the chosen platoon's once it is set), מ״פ רפואה and Chamal are informed by a banner until each acknowledges it. The opener may cancel it as a false alarm while it has no patients. Earlier drafts were confirmed by חוג״ד, מ״פ רפואה, or Chamal with an auditable event; those server functions remain for history.
+There are no draft incidents (D10, `database/064`, V2.99.48). A medic opens an official incident after the phone offered to join an open incident of the medic's company; חוג״ד, מ״פ חילוץ, the company's מ״מים (only the chosen platoon's once it is set), מ״פ רפואה and Medical Chamal are informed by a banner until each acknowledges it. The opener may cancel it as a false alarm while it has no patients. Earlier drafts were confirmed by חוג״ד, מ״פ רפואה, or Medical Chamal with an auditable event; those server functions remain for history.
 
 ## Authorization Matrix
 
-| Action | Medic | חוג״ד | Log-O | מ״פ רפואה | Chamal |
+| Action | Medic | חוג״ד | Log-O | מ״פ רפואה | Medical Chamal |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Open official incident (D10) | Yes | Yes | No | Yes | Yes |
 | Set T0 (site authority) | No | Yes | No | Yes | Yes |
@@ -39,13 +39,15 @@ There are no draft incidents (D10, `database/064`, V2.99.48). A medic opens an o
 
 ## Watchdog Stack
 
-Watchdogs run locally for field awareness and must also be reproducible server-side for Chamal/AAR validation.
+Watchdogs run locally for field awareness and must also be reproducible server-side for Medical Chamal/AAR validation.
 
 | Watchdog | Trigger | Threshold | Alert |
 | --- | --- | ---: | --- |
-| Crush Syndrome | Access = Trapped | T_injury +45m | Amber, escalating to Red if prolonged |
-| Golden Hour | Any registered patient | T_injury +45m | Amber |
-| Golden Hour | Any registered patient | T_injury +60m | Red |
+| Crush Syndrome | Access = Trapped or no access | Golden-hour start +45m | Amber, escalating to Red if prolonged |
+| Golden Hour | Any registered patient | Golden-hour start +45m | Amber |
+| Golden Hour | Any registered patient | Golden-hour start +60m | Red |
+
+Golden-hour start (owner 2026-11-27/28, V2.99.96): the earliest of the incident's alert time (T0), its opening, an entered injury time and the casualty's registration, never a time in the future; the registration counts as a lower limit ("לפחות"). See [C5_SENTINEL_SAR_MVP_SPEC_v1.2.md](C5_SENTINEL_SAR_MVP_SPEC_v1.2.md) §T_injury.
 | Tourniquet Warning | Tourniquet per limb | +60m from application | Amber |
 | Tourniquet Critical | Tourniquet per limb | +120m from application | Red |
 | Reassessment RED | Triage = RED | Every 10m | Prompt |

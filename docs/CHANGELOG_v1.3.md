@@ -7,20 +7,20 @@ v1.3 upgrades the command layer from “many alerts” into routed operational w
 - Alert ownership model with `owner`, `audience`, `escalatesTo`, `escalateAfterMin`, `actionRequired`, and `scope`.
 - Commander alert categories: urgent care, rescue/trapped, evacuation, data gaps, picture integrity, and forces/devices.
 - Alert cards now show owner, required action, category, and escalation status.
-- Medical reinforcement request workflow for PC/CC/Chamal:
+- Medical reinforcement request workflow for PC/CC/Medical Chamal:
   - resource type,
   - reason codes,
   - urgency,
   - location,
   - status tracking.
-- Reinforcement request command panel in the PC/Chamal dashboard.
+- Reinforcement request command panel in the PC/Medical Chamal dashboard.
 - Exportable `alert_ownership` and `reinforcement_requests` sections in the experiment JSON.
 
 ## Changed
 
 - Demo launcher and experiment strip now identify the app as v1.3.
 - Medic alerts are grouped around field action: `עכשיו לטפל`, `להשלים כשאפשר`, and system/data alerts.
-- PC/Chamal alerts are routed by decision type instead of only critical/routine severity.
+- PC/Medical Chamal alerts are routed by decision type instead of only critical/routine severity.
 - Role authorization matrix now includes medical reinforcement request authority.
 
 ## Release Intent

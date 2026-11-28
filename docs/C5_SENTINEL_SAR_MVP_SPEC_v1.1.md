@@ -9,7 +9,7 @@ Build a mission-critical Medical Command & Control (C5) system for Search and Re
 The system consists of:
 
 - **Mobile App** — Medics and Platoon Commanders / Supervisors
-- **Web Dashboard** — Chamal, Company Commander, Platoon Commander, Logistics Officer
+- **Web Dashboard** — Medical Chamal, Company Commander, Platoon Commander, Logistics Officer
 - **Backend / Database** — PostgreSQL / Supabase-compatible event-sourced backend
 - **Realtime Layer** — Realtime Outbox + backend worker / Supabase Realtime / WebSocket
 
@@ -42,7 +42,7 @@ Medic Levi — Medic
 חוג״ד Demo — Medical Platoon Commander
 Log-O Demo — Logistics Officer
 CC Demo — Company Commander
-Chamal Demo — Chamal
+Medical Chamal Demo — Medical Chamal
 ```
 
 ## Demo Patients
@@ -120,7 +120,7 @@ Medic
 Platoon Commander / Supervisor (PC)
 Logistics Officer (Log-O)
 מ״פ רפואה / Medical Company Commander
-Chamal
+Medical Chamal
 ```
 
 `PC` is the schema/auth role name for Platoon Commander. In the product language this is the field Supervisor role, so `pc` in the auth matrix should be read as "Platoon Commander / Supervisor".
@@ -131,15 +131,15 @@ Official incidents and official `T₀` can be created/set only by:
 
 ```text
 Company Commander
-Chamal
+Medical Chamal
 Platoon Commander, if authorized
 ```
 
-A Medic may create a **local draft incident** only when no official incident is available. A draft incident allows field data capture but must later be confirmed by חוג״ד / מ״פ רפואה / Chamal. The confirmation event is auditable. Draft state has a single source of truth: `incidents.status = 'draft'`; there is no separate `is_draft` flag.
+A Medic may create a **local draft incident** only when no official incident is available. A draft incident allows field data capture but must later be confirmed by חוג״ד / מ״פ רפואה / Medical Chamal. The confirmation event is auditable. Draft state has a single source of truth: `incidents.status = 'draft'`; there is no separate `is_draft` flag.
 
 ## Authorization Matrix
 
-| Action | Medic | חוג״ד | Log-O | מ״פ רפואה | Chamal |
+| Action | Medic | חוג״ד | Log-O | מ״פ רפואה | Medical Chamal |
 |---|---:|---:|---:|---:|---:|
 | Create local draft incident | ✓ | ✓ | ✗ | ✓ | ✓ |
 | Open official incident and set T₀ | ✗ | ✓ | ✗ | ✓ | ✓ |
@@ -169,7 +169,7 @@ This action is recorded as:
 MEDIC_SITE_CLOSE_REQUESTED
 ```
 
-A חוג״ד / מ״פ רפואה / Chamal may reopen or reject the close request.
+A חוג״ד / מ״פ רפואה / Medical Chamal may reopen or reject the close request.
 
 ---
 
@@ -215,7 +215,7 @@ DRAFT INCIDENT — pending confirmation
 Patients may be recorded, but incident approval is required.
 ```
 
-חוג״ד / מ״פ רפואה / Chamal screens must show a high-priority blinking/pulsing approval banner until the draft incident is approved, merged, rejected, or explicitly acknowledged.
+חוג״ד / מ״פ רפואה / Medical Chamal screens must show a high-priority blinking/pulsing approval banner until the draft incident is approved, merged, rejected, or explicitly acknowledged.
 
 ---
 
@@ -348,7 +348,7 @@ Conflict resolution affects read-model projections only, never the immutable eve
 
 ---
 
-## 2.4 Realtime Chamal Updates
+## 2.4 Realtime Medical Chamal Updates
 
 Realtime updates must use the **Transactional Outbox Pattern**.
 
@@ -361,7 +361,7 @@ PostgreSQL trigger writes to realtime_outbox
 ↓
 Backend worker / Supabase Realtime reads outbox
 ↓
-WebSocket / Realtime channel pushes update to Chamal dashboard
+WebSocket / Realtime channel pushes update to Medical Chamal dashboard
 ```
 
 The database must not call the web app directly.
@@ -370,7 +370,7 @@ The database must not call the web app directly.
 
 ## 2.5 Watchdog Stack
 
-Watchdogs run locally and should also be reproducible server-side for Chamal/AAR validation.
+Watchdogs run locally and should also be reproducible server-side for Medical Chamal/AAR validation.
 
 | Watchdog | Trigger | Threshold | Alert |
 |---|---|---:|---|
@@ -539,9 +539,9 @@ Override consequences:
 - Sync status: 🟢 Live / 🔴 Offline / 🟡 Syncing
 - Draft incident badge, if relevant
 
-### Draft Incident Approval Banner — חוג״ד / מ״פ רפואה / Chamal
+### Draft Incident Approval Banner — חוג״ד / מ״פ רפואה / Medical Chamal
 
-When a draft incident exists, חוג״ד / מ״פ רפואה / Chamal screens display a high-priority blinking/pulsing banner:
+When a draft incident exists, חוג״ד / מ״פ רפואה / Medical Chamal screens display a high-priority blinking/pulsing banner:
 
 ```text
 ⚠ Draft Incident Pending Approval
@@ -563,7 +563,7 @@ After acknowledgment: persistent amber banner
 If patients are attached: remains high-priority until resolved
 ```
 
-Medic screens show a non-blocking draft badge, but חוג״ד / מ״פ רפואה / Chamal screens require explicit action.
+Medic screens show a non-blocking draft badge, but חוג״ד / מ״פ רפואה / Medical Chamal screens require explicit action.
 
 ### Stat Row
 
@@ -852,7 +852,7 @@ Patient Card / Patient Detail
 → Append treatment event
 → Deduct inventory through inventory_ledger
 → Write realtime_outbox update
-→ Chamal / PC dashboard updates live
+→ Medical Chamal / PC dashboard updates live
 ```
 
 ## MVP Treatment Types
@@ -1031,7 +1031,7 @@ Saving a treatment must create:
    - `INTERVENTION_RECORDED`, `MEDICATION_ADMINISTERED`, or `TOURNIQUET_APPLIED`
 2. One or more `inventory_ledger` rows with negative `quantity_change`
 3. Optional `conflict_log` entry if a safety warning is overridden
-4. `realtime_outbox` row for Chamal/PC updates
+4. `realtime_outbox` row for Medical Chamal/PC updates
 
 There is no mutable `treatments` table in the MVP. The event log is the source of truth.
 
@@ -1056,7 +1056,7 @@ Clicking a stage filters the patient list.
 | Active | Red | Any RED patient not handed over |
 | Caution | Amber | Any YELLOW patient not handed over |
 | Monitoring | Blue | GREEN-only patients not handed over |
-| Clear | Green | All patients handed over and PC/CC/Chamal confirms Site Clear |
+| Clear | Green | All patients handed over and PC/CC/Medical Chamal confirms Site Clear |
 | Unstable | Red border + ⚠ | Building status = Unstable |
 
 `Site Clear` is a two-tap action.
@@ -1170,7 +1170,7 @@ vw_active_watchdog_alerts_by_severity
 - `events` is immutable and append-only.
 - `inventory_ledger` is append-only and replaces absolute inventory quantity.
 - `patients` is a projection/read model.
-- `realtime_outbox` feeds Chamal/dashboard updates.
+- `realtime_outbox` feeds Medical Chamal/dashboard updates.
 - `device_id + local_event_id` prevents duplicate sync.
 - JSON payloads use `jsonb`.
 - JSONB GIN/expression indexes support fast dashboard queries.
@@ -1307,7 +1307,7 @@ AAR is locked until:
 1. All patients across all sectors are marked `Handed Over`
 2. All active sectors/buildings have confirmed `Site Clear`
 
-חוג״ד / מ״פ רפואה / Chamal can unlock the AAR.
+חוג״ד / מ״פ רפואה / Medical Chamal can unlock the AAR.
 
 The report is read-only and exportable as PDF.
 
@@ -1390,7 +1390,7 @@ The system should measure KPIs across four domains: Clinical, Operational, Logis
 
 ## 10.5 MVP KPI Dashboard — First 10 Metrics
 
-The first Chamal/Command dashboard should focus on these metrics:
+The first Medical Chamal/Command dashboard should focus on these metrics:
 
 ```text
 1. Active RED patients
@@ -1434,7 +1434,7 @@ Web Offline Cache: IndexedDB / LocalStorage, limited use
 7. Quick Patient mode
 8. Crush/Tourniquet/Golden Hour watchdogs
 9. Dead Man’s Switch
-10. Realtime Outbox + Chamal dashboard updates
+10. Realtime Outbox + Medical Chamal dashboard updates
 11. Tactical Funnel + Final Sweep Heatmap
 12. MIST handover + secure QR token
 13. Logistics inventory ledger automation
@@ -1538,7 +1538,7 @@ If two devices record conflicting observations, both immutable events are preser
 
 `inventory_ledger` records `location_at_time` for every supply movement or consumption event.
 
-This allows Command / Chamal to answer:
+This allows Command / Medical Chamal to answer:
 - where supplies were consumed
 - which building/floor has high burn rate
 - which medic bag or sector is at risk of stock-out
@@ -1603,11 +1603,11 @@ Patient Treatment Event
 Purpose:
 - allow the Platoon Commander to resupply assigned medics quickly
 - aggregate medic requests before escalating to Log-O
-- give Command and Chamal visibility into stock depletion by platoon, building, floor, and sector
+- give Command and Medical Chamal visibility into stock depletion by platoon, building, floor, and sector
 
 ## Permissions
 
-| Action | Medic | Platoon Commander | Log-O | CC | Chamal |
+| Action | Medic | Platoon Commander | Log-O | CC | Medical Chamal |
 |---|---:|---:|---:|---:|---:|
 | View Platoon Stock | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Manually initialize Platoon Stock during staging | ✗ | ✓ | ✗ | ✗ | ✗ |
@@ -1661,7 +1661,7 @@ Emergency direct path is allowed only as an override:
 Log-O → Medic
 ```
 
-This must be logged as `DIRECT_LOGO_TO_MEDIC` with a required reason. It appears in the Command/Chamal logistics audit trail.
+This must be logged as `DIRECT_LOGO_TO_MEDIC` with a required reason. It appears in the Command/Medical Chamal logistics audit trail.
 
 ## Initial manual fill
 
@@ -1700,7 +1700,7 @@ This keeps inventory auditable, offline-safe, and compatible with after-action l
 
 ## Draft Incident Patient Creation
 
-`+ New Patient` is allowed under a draft incident. Patients created under a draft incident are marked `Pending Incident Approval` and remain syncable. חוג״ד / מ״פ רפואה / Chamal screens show a blinking/pulsing approval banner until the draft incident is approved, merged, rejected, or acknowledged.
+`+ New Patient` is allowed under a draft incident. Patients created under a draft incident are marked `Pending Incident Approval` and remain syncable. חוג״ד / מ״פ רפואה / Medical Chamal screens show a blinking/pulsing approval banner until the draft incident is approved, merged, rejected, or acknowledged.
 
 ## Event-Driven Sync
 
@@ -1738,7 +1738,7 @@ Correct behavior:
 1. Save the clinical event.
 2. Flag it as HIGH_RISK_CLINICAL_VIOLATION.
 3. Create a critical Watchdog alert.
-4. Show it immediately to Medic / PC / Chamal.
+4. Show it immediately to Medic / PC / Medical Chamal.
 5. Include it in the AAR.
 ```
 
@@ -1790,7 +1790,7 @@ severity = critical
 escalate_to_role = PC
 ```
 
-The alert remains active until acknowledged/resolved by חוג״ד / מ״פ רפואה / Chamal.
+The alert remains active until acknowledged/resolved by חוג״ד / מ״פ רפואה / Medical Chamal.
 
 ## 6. Row Level Security
 
@@ -1802,7 +1802,7 @@ Baseline policies:
 
 - Medics and PCs can create patients and clinical events only for incidents they are assigned to in `incident_memberships`.
 - Log-O can manage logistics events, not clinical patient events.
-- חוג״ד / מ״פ רפואה / Chamal can read command dashboards and conflict logs.
+- חוג״ד / מ״פ רפואה / Medical Chamal can read command dashboards and conflict logs.
 - AAR is command-only.
 - Backend service-role processes realtime outbox internally.
 
@@ -2001,7 +2001,7 @@ This prevents the “ghost dashboard” problem where a medic acts on old local 
 
 ## Command Snapshot Table
 
-The Chamal/command dashboard should not perform large RLS-heavy joins during an MCI.
+The Medical Chamal/command dashboard should not perform large RLS-heavy joins during an MCI.
 
 Use:
 
@@ -2022,7 +2022,7 @@ Rules:
 1. Each alert has a deterministic `dedupe_key`.
 2. Running the watchdog worker twice must not create duplicate active alerts.
 3. If an event in the same sync batch resolves a risk, the alert is suppressed before it reaches the dashboard.
-4. Example: if a batch contains “vitals overdue risk” and then `VITALS_RECORDED`, no active overdue-vitals alert should flash on Chamal.
+4. Example: if a batch contains “vitals overdue risk” and then `VITALS_RECORDED`, no active overdue-vitals alert should flash on Medical Chamal.
 5. Resolution is recorded with `resolved_by_event_id` for auditability.
 
 ## Panic Mode / Tactical High-Contrast UI

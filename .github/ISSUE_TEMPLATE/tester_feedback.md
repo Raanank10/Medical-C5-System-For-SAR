@@ -22,7 +22,7 @@ assignees: ""
 - [ ] Platoon Commander (חוג"ד)
 - [ ] Company Medical / CC (מ"פ רפואה)
 - [ ] Logistics
-- [ ] Chamal / Command
+- [ ] Medical Chamal / Command
 - [ ] Login / setting a password
 - [ ] Not sure
 

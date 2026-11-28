@@ -541,6 +541,32 @@ assert.deepEqual(rules.RESCUE_PRIORITIES, ["urgent", "pending", "not_urgent"]);
   assert.equal(rules.RELIEF_OVERDUE_MS, 30 * 60000);
 }
 
+// Incident clock (owner 2026-11-27): earlier of T0 and the opening time; never a guess.
+{
+  const t0 = Date.parse("2026-11-27T10:00:00Z"), opened = Date.parse("2026-11-27T10:07:00Z");
+  assert.equal(rules.incidentClockStartMs(t0, opened), t0);          // alert first
+  assert.equal(rules.incidentClockStartMs(opened, t0), t0);          // order does not matter
+  assert.equal(rules.incidentClockStartMs(NaN, opened), opened);     // no T0: when it was opened
+  assert.equal(rules.incidentClockStartMs(t0, undefined), t0);
+  assert.ok(Number.isNaN(rules.incidentClockStartMs(NaN, NaN)));     // neither: unknown, not "now"
+  assert.ok(Number.isNaN(rules.incidentClockStartMs(0, null)));
+}
+
+// Golden-hour start (owner 2026-11-27): the earliest known time wins, never a future one.
+{
+  const now = Date.parse("2026-11-27T09:45:00Z");
+  const at = (hhmm) => Date.parse(`2026-11-27T${hhmm}:00Z`);
+  assert.equal(rules.goldenHourStartMs([at("09:05"), at("09:07"), at("08:40")], now), at("08:40")); // entered earlier than the alert: entered
+  assert.equal(rules.goldenHourStartMs([at("09:05"), at("09:07"), at("09:30")], now), at("09:05")); // entered later: the alert, never shorter
+  assert.equal(rules.goldenHourStartMs([NaN, at("09:07"), undefined], now), at("09:07"));
+  assert.equal(rules.goldenHourStartMs([at("10:30"), at("09:20")], now), at("09:20"));             // a T0 in the future is not used
+  assert.ok(Number.isNaN(rules.goldenHourStartMs([at("10:30")], now)));                             // only a future time: unknown
+  assert.ok(Number.isNaN(rules.goldenHourStartMs([], now)));
+  assert.equal(rules.goldenHourStartMs([now + 60000], now), now + 60000);   // the 1-minute tolerance edge: kept
+  assert.ok(Number.isNaN(rules.goldenHourStartMs([now + 60001], now)));     // past it: a wrong clock
+  assert.ok(Number.isNaN(rules.goldenHourStartMs([0, -5, "x", null], now)));
+}
+
 // WP-40 (owner 2026-11-19): waiting for a vehicle after leaving for the נאפ״ל, from when the patient was sent.
 {
   const now = Date.parse("2026-11-19T12:00:00Z");

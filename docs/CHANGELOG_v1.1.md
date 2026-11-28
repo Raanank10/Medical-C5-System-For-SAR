@@ -21,7 +21,7 @@ Changes applied from the reviewed draft spec:
 
 1. Renamed the document from `FINAL SPECIFICATION v2.0` to `MVP Product & Technical Specification v1.1`.
 2. Fixed the contradiction around incident creation and T₀:
-   - Official incidents and T₀ can be set by CC, Chamal, and authorized PC.
+   - Official incidents and T₀ can be set by CC, Medical Chamal, and authorized PC.
    - Medic can create only a local draft incident.
 3. Added draft incident workflow and confirmation rule.
 4. Replaced absolute inventory quantity model with append-only `inventory_ledger`.

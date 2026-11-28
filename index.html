@@ -655,6 +655,19 @@ input[type=range]{width:100%;accent-color:var(--orange);}
 .role-metric{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 8px;text-align:center;}
 .role-metric-num{font-family:var(--mono);font-size:22px;font-weight:900;}
 .role-metric-label{font-size:10px;color:var(--muted);margin-top:3px;line-height:1.25;}
+.chamal-sites{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:10px;margin-bottom:10px;}
+.chamal-site{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;}
+.chamal-site-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+.chamal-site-name{font-weight:900;font-size:16px;}
+.chamal-site-line{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4;}
+.chamal-site-total{font-family:var(--mono);font-size:24px;font-weight:900;text-align:center;line-height:1;}
+.chamal-site-total span{display:block;font-family:inherit;font-size:11px;font-weight:600;color:var(--muted);margin-top:2px;}
+.chamal-site-open{width:100%;margin-top:10px;min-height:48px;}
+.chamal-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:0 10px;}
+.chamal-grid>div,.chamal-sites>div{min-width:0;}
+.chamal-grid .role-list{grid-template-columns:minmax(0,1fr);min-width:0;}
+.chamal-grid .cmd-strip-alert{min-width:0;}
+@media (min-width:1024px){ .chamal-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);} }
 .role-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;}
 .role-section-title{font-size:13px;font-weight:900;margin-bottom:8px;color:var(--text);}
 .role-list{display:grid;gap:7px;}
@@ -1050,13 +1063,13 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9995</div>
+      <div class="demo-kicker">Demo V2.9996</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
       </div>
       <div class="demo-strip-sub" style="margin-top:12px">
-        הערה לדמו: בדמו ניתן לבחור תפקיד כדי להציג את יכולות המערכת. בניסוי שטח, כל משתמש ייכנס אוטומטית לתפקיד שהוגדר לו: חובש, חוג"ד, מ״פ רפואה, רופא/פראמדיק או חמ״ל.
+        הערה לדמו: בדמו ניתן לבחור תפקיד כדי להציג את יכולות המערכת. בניסוי שטח, כל משתמש ייכנס אוטומטית לתפקיד שהוגדר לו: חובש, חוג"ד, מ״פ רפואה, רופא/פראמדיק או חמ״ל רפואי.
       </div>
       <div class="field-experiment-notice" style="background:rgba(255,107,53,0.12);border:1px solid var(--orange);padding:12px;margin-top:15px;border-radius:6px;text-align:right">
         <div style="font-weight:800;color:var(--orange);margin-bottom:4px;font-size:14px">הערה מבצעית לניסוי השטח:</div>
@@ -1102,7 +1115,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
         </button>
         <button class="demo-card" onclick="startRoleDashboard('chamal')">
           <div class="demo-icon">📡</div>
-          <div><strong>חמ״ל</strong><span>תמונת מצב, אמינות נתונים, כפילויות, Sync וסיכום אירוע חי.</span></div>
+          <div><strong>חמ״ל רפואי</strong><span>תמונת מצב, אמינות נתונים, כפילויות, Sync וסיכום אירוע חי.</span></div>
         </button>
       </div>
     </div>
@@ -1147,7 +1160,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9995</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9996</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1157,7 +1170,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9995</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9996</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2105,7 +2118,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div class="modal-overlay panic-modal hidden" id="trap-status-modal" onclick="closeTrapStatusModal(event)">
   <div class="modal-sheet panic-sheet" style="border-color:var(--yellow);box-shadow:0 22px 90px rgba(244,162,97,.2)">
     <div class="panic-title" style="color:var(--yellow)">סטטוס חילוץ אחרון</div>
-    <div class="panic-message">בחר מצב בינארי לפני סגירה: לכוד או לא לכוד. אם אין זמן, ניתן לשמור כחסר נתון והחמ״ל יראה שיש לקחת מדדים.</div>
+    <div class="panic-message">בחר מצב בינארי לפני סגירה: לכוד או לא לכוד. אם אין זמן, ניתן לשמור כחסר נתון והחמ״ל הרפואי יראה שיש לקחת מדדים.</div>
     <div class="tap-grid tap-grid-2">
       <button class="tap-btn" onclick="confirmTrapStatus('trapped')"><span class="icon">⛓️</span><div style="font-weight:800">לכוד</div></button>
       <button class="tap-btn" onclick="confirmTrapStatus('not_trapped')"><span class="icon">🚶</span><div style="font-weight:800">לא לכוד</div></button>
@@ -2437,7 +2450,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-commander" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle">COMMANDER // CHAMAL</div>
+      <div class="header-subtitle">COMMANDER // MEDICAL CHAMAL</div>
       <div class="header-title" id="cmd-header-label">כל המוקדים</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -2461,7 +2474,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="alert-slicer" id="command-role-slicer" style="padding-top:10px">
     <button class="alert-slice active" onclick="switchCommandRole('pc',this)">חוג"ד / הכל</button>
-    <button class="alert-slice" onclick="switchCommandRole('chamal',this)">חמ״ל / הכל</button>
+    <button class="alert-slice" onclick="switchCommandRole('chamal',this)">חמ״ל רפואי / הכל</button>
     <button class="alert-slice other" onclick="switchCommandRole('cc',this)">מ״פ רפואה / הפלוגה שלי</button>
   </div>
   <div style="display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto" id="cmd-site-tabs"></div>
@@ -3397,6 +3410,26 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     return { level: ms >= EVAC_POINT_WAIT_CRITICAL_MS ? "critical" : "warning", minutes: Math.floor(ms / 60000) };
   }
 
+  // Incident clock (owner 2026-11-27): the golden hour of a casualty with no injury time entered
+  // starts when the incident began: the alert time (T0) or when anyone opened the incident,
+  // whichever came first. Never the time a phone registered the casualty, which can be late or
+  // the sync time. NaN when neither time is known, so the caller shows "unknown" instead of a clock.
+  function incidentClockStartMs(tZeroMs, openedAtMs) {
+    const times = [Number(tZeroMs), Number(openedAtMs)].filter((t) => Number.isFinite(t) && t > 0);
+    return times.length ? Math.min(...times) : NaN;
+  }
+
+  // Golden-hour start (owner 2026-11-27: "the earlier beats everything else"): the earliest of the
+  // times that say when the casualty could have been injured: the incident's alert time (T0), when
+  // anyone opened it, and an injury time entered in the field. Earliest, so the clock never runs
+  // short; an entered time later than the incident start does not shorten it. A time in the future
+  // (wrong clock) is not used. NaN when none is known; the caller then uses the registration time
+  // only as a lower limit ("לפחות").
+  function goldenHourStartMs(times, nowMs = Date.now()) {
+    const valid = (times || []).map(Number).filter((t) => Number.isFinite(t) && t > 0 && t <= nowMs + 60000);
+    return valid.length ? Math.min(...valid) : NaN;
+  }
+
   // Relief not confirmed (WP-27, owner 2026-11-22/23): after a handover or a release, the leaving
   // company's medical staff keep recording until each confirms "הוחלפתי - מסרתי". Still waiting
   // 30 minutes later: the site's PC and the CC are alerted, so nobody keeps writing on a site he
@@ -3458,6 +3491,8 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     EVAC_POINT_WAIT_CRITICAL_MS,
     EVAC_POINT_WAIT_WARN_MS,
     evacPointWaitAlert,
+    incidentClockStartMs,
+    goldenHourStartMs,
     reliefOverdueMinutes,
     RELIEF_OVERDUE_MS,
     isCriticalAlert,
@@ -3569,7 +3604,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.95';
+const APP_VERSION = '2.99.96';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3808,7 +3843,7 @@ const DEMO_USERS = [
   {userId:'USR-DR', fullName:'ד״ר איתן שלו', role:'physician', callsign:'רופא חברה', platoonId:null, companyId:'COMP-1', active:true},
   {userId:'USR-PARA', fullName:'רס״ר מיה אדרי', role:'paramedic', callsign:'פראמדיקית', platoonId:null, companyId:'COMP-1', active:true},
   {userId:'USR-LOG', fullName:'רס״ם אמיר דגן', role:'logistics', callsign:'Log-O', platoonId:null, companyId:'COMP-1', active:true},
-  {userId:'USR-CHAMAL', fullName:'סמלת תמר גולן', role:'chamal', callsign:'חמ״ל', platoonId:null, companyId:'COMP-1', active:true}
+  {userId:'USR-CHAMAL', fullName:'סמלת תמר גולן', role:'chamal', callsign:'חמ״ל רפואי', platoonId:null, companyId:'COMP-1', active:true}
 ];
 const DEMO_PLATOONS = [
   {platoonId:'PLT-A', name:'מחלקה רפואית א', pcId:'USR-BARAK', companyId:'COMP-1'},
@@ -4012,7 +4047,7 @@ const ROLE_DEFS = [
   {key:'cc', label:'מ״פ רפואה', he:'מפקד פלוגה רפואית', desc:'סמכות פיקודית לפתיחת/אישור אירוע, סגירה, אתר נקי, דשבורד וייצוא.'},
   {key:'physician', label:'Physician', he:'רופא', desc:'סמכות פיקודית כמו מ״פ רפואה (ניהול אירוע, מכשירים, תמונת מצב, ניגודי עדכון) בתוספת סמכות רישום קליני מלאה: מדדים, טיפול, מיון. אינו פותח פצוע חדש. הדרג הגבוה ביותר בהכרעת ניגודי עדכון בין מכשירים. בעל סמכות אישור מוות קליני.'},
   {key:'paramedic', label:'Paramedic', he:'פראמדיק', desc:'אותה סמכות טיפול שדה כמו חובש: פתיחת פצוע, מדדים, תרופות, מיון, מסירת מצב — כולל אישור חריגת סיכון גבוה. ללא הסמכות הפיקודית של רופא/מ״פ רפואה וללא סמכות אישור מוות קליני.'},
-  {key:'chamal', label:'Chamal', he:'חמ״ל', desc:'תמונת מצב מלאה, התראה על אירועים שנפתחו בשטח, ניהול אירוע ברמת חטיבה וסיכום אירוע חי, ללא רישום פצועים.'},
+  {key:'chamal', label:'Medical Chamal', he:'חמ״ל רפואי', desc:'תמונת מצב מלאה, התראה על אירועים שנפתחו בשטח, ניהול אירוע ברמת חטיבה וסיכום אירוע חי, ללא רישום פצועים.'},
   {key:'rpc', label:'מ״מ', he:'מפקד מחלקת חילוץ', desc:'פאנל טקטי למחלקה שלו: תג, עדיפות פינוי (דחוף / לא דחוף), אזור, לכוד/נייד, סטטוס פינוי, חובש אחראי (כינוי קריאה). ללא צבע מיון, חסם, מדדים, טיפול או מנגנון פציעה. סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא אישור רפואי. יכול לדווח פצוע ראשוני (מיקום/לכוד/חסם בלבד).'},
   {key:'rcc', label:'מ״פ חילוץ', he:'מפקד פלוגת חילוץ', desc:'פאנל טקטי מרוכז לפי מחלקות עבור הפלוגה שלו (דחוף / לא דחוף, לכודים, פינוי), כולל בקשות אספקה פתוחות (לוגיסטיקת פלוגת חילוץ). ללא צבע מיון, חסם, מדדים, טיפול או מנגנון פציעה. סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא אישור רפואי. יכול לדווח פצוע ראשוני (מיקום/לכוד/חסם בלבד).'},
   {key:'admin', label:'Admin', he:'מנהל מערכת', desc:'גישה טכנית מלאה: כל הנתונים הגולמיים, טעינת/ניקוי תרחישים, ייצוא ניסוי, בדיקת גרסה וסנכרון. תפקיד טכני להרצת דמו/בדיקות, לא תפקיד פיקודי מבצעי.'}
@@ -4747,7 +4782,7 @@ function renderAuthStatus(){
 // picks the role for each invitation; the invitee never does. Inviting or promoting someone to
 // admin, and deactivating anyone, always asks for confirmation first.
 const ADMIN_USERS_FUNCTION_URL = SUPABASE_URL + '/functions/v1/admin-users';
-const ADMIN_ROLE_NAMES = {medic:'חובש', paramedic:'פראמדיק', physician:'רופא', pc:'חוג"ד', cc:'מ״פ רפואה', chamal:'חמ״ל', logistics_officer:'קצין לוגיסטיקה', rpc:'מ״מ חילוץ', rcc:'מ״פ חילוץ', admin:'מנהל מערכת'};
+const ADMIN_ROLE_NAMES = {medic:'חובש', paramedic:'פראמדיק', physician:'רופא', pc:'חוג"ד', cc:'מ״פ רפואה', chamal:'חמ״ל רפואי', logistics_officer:'קצין לוגיסטיקה', rpc:'מ״מ חילוץ', rcc:'מ״פ חילוץ', admin:'מנהל מערכת'};
 const ADMIN_ERROR_TEXT = {
   invalid_email:'כתובת האימייל אינה תקינה',
   invalid_role:'יש לבחור תפקיד',
@@ -5848,7 +5883,7 @@ async function assignRealMedic(profileId, address, note){
     }catch(_){}
     // A relieved medic: only his PC, the CC, chamal or admin give him access back (database/096).
     if(mem.error.code==='42501' && /access back/.test(mem.error.message||'')){
-      throw new Error('החובש הוחלף באתר הזה. רק החוג"ד שלו, מ״פ רפואה, חמ"ל או מנהל מערכת יכולים להחזיר לו גישה');
+      throw new Error('החובש הוחלף באתר הזה. רק החוג"ד שלו, מ״פ רפואה, חמ״ל רפואי או מנהל מערכת יכולים להחזיר לו גישה');
     }
     throw mem.error;
   }
@@ -6951,7 +6986,7 @@ function roleConfig(role){
     cc:{title:'מ״פ רפואה', actor:'מ״פ רפואה — משתמש מחובר', audience:'cc', legacy:'commander', responsibilities:['פיקוד ישיר על משאבים רפואיים','הקצאה בין מחלקות','אישור / דחייה / ניתוב בקשות תגבור','ניהול תורי רופא / פראמדיק / קביעת מוות','הסרת צווארי בקבוק ברמת פלוגה']},
     physician:{title:'רופא / פראמדיק — תור סקירה רפואית', actor:'רופא / פראמדיק — משתמש מחובר', audience:'physician', legacy:'commander', responsibilities:['סקירת פצועים קשים','מענה לבקשות חוג"ד / מ״פ רפואה','החלטה רפואית בכירה','קביעת מוות / אישור מוות','סגירת בקשת סקירה רפואית']},
     logistics:{title:'קצין לוגיסטיקה / Log-O', actor:'רס״ם אמיר דגן — Log-O', audience:'logistics', legacy:'logistics', responsibilities:['מלאי ציוד רפואי לפי מחלקה / מוקד','מענה לבקשות ציוד','הקצאת אספקה מחדש','מעקב burn rate','הצפת חוסר המשפיע על טיפול']},
-    chamal:{title:'חמ״ל / מפעיל', actor:'חמ״ל — משתמש מחובר', audience:'chamal', legacy:'commander', responsibilities:['תמונת מצב כללית','אמינות נתונים ו-Sync','כפילויות ודיווחים חיצוניים','תמיכה בחוג"ד / מ״פ רפואה','ייצוא סיכום אירוע חי']},
+    chamal:{title:'חמ״ל רפואי / מפעיל', actor:'חמ״ל רפואי — משתמש מחובר', audience:'chamal', legacy:'commander', responsibilities:['תמונת מצב כללית','אמינות נתונים ו-Sync','כפילויות ודיווחים חיצוניים','תמיכה בחוג"ד / מ״פ רפואה','ייצוא סיכום אירוע חי']},
     admin:{title:'מנהל דמו', actor:'מנהל דמו', audience:'chamal', legacy:'roles', responsibilities:['הפעלת תרחיש חתום','ניקוי דמו','ייצוא ניסוי','בדיקת הרשאות','הפרדת דמו מנתוני אמת']},
     rpc:{title:'מ״מ חילוץ', actor:'מ״מ — משתמש מחובר', audience:'rpc', legacy:'role-dashboard', responsibilities:['טבלת האירועים (מוקדים) של המחלקה שלי בלבד — הקשה על אירוע פותחת את הפצועים שלו לפי סדר הפינוי','הודעה (באנר ורטט) כשפצוע מהמחלקה מגיע לנאפ״ל או מפונה לבית חולים','צפייה בתג, עדיפות פינוי (דחוף / לא דחוף), אזור, לכוד/נייד וסטטוס פינוי לפצועי המחלקה שלי בלבד','צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע — לזיהוי פיזי בשטח','ראיית חובש אחראי לכל פצוע (כינוי קריאה בלבד, לא שם)','סדר פינוי מומלץ למחלקה שלי, זהה למה שחוג"ד/מ״פ רפואה רואים','ספירות לכודים (דחוף / לא דחוף / טרם מוין), בנאפ״ל, פונו לבי״ח וסה״כ לכל אירוע','ללא גישה לצבע מיון, חסם, מדדים, טיפול או מנגנון פציעה','לא מגיש בקשות תגבור / אספקה','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סטטוס מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה']},
     rcc:{title:'מ״פ חילוץ', actor:'מ״פ חילוץ — משתמש מחובר', audience:'rcc', legacy:'role-dashboard', responsibilities:['טבלת כל האירועים הפתוחים בפלוגה שלי — הקשה על אירוע פותחת את הפצועים שלו לפי סדר הפינוי','הודעה (באנר ורטט) כשפצוע מגיע לנאפ״ל או מפונה לבית חולים, ורשימת עדכוני הפינוי בפס העליון','צפייה בשם מאומת/מדווח או תיאור זיהוי זמני לכל פצוע — לזיהוי פיזי בשטח','ספירות דחוף, לכודים, באתר, בפינוי ופונו לכל אירוע','סדר פינוי מומלץ לכלל הפלוגה, זהה למה שמ״פ רפואה רואה','צפייה בבקשות אספקה פתוחות (לוגיסטיקת פלוגת חילוץ)','ללא גישה לצבע מיון, חסם, מדדים, טיפול או מנגנון פציעה','לא מגיש בקשות תגבור רפואי','דיווח פצוע ראשוני (מיקום / לכוד / חסם בלבד — ללא מיון קליני)','סמכות אתר כראשון בזירה: פתיחת אירוע רשמי + T0, סוג אירוע, מצב מבנה, אישור אתר נקי — סופי, ללא צורך באישור חוג"ד / מ״פ רפואה','סגירת אירוע אחרי שכל הפצועים נמסרו (לא ניתן לעקוף את חסימת הסגירה)']}
@@ -6989,7 +7024,9 @@ function roleScopedRequests(role){
 }
 function roleAlertRows(role){
   const audience=roleConfig(role).audience;
-  return buildAlertObjects(roleScopedPatients(role)).filter(a=>a.audience.includes(audience) || (role==='physician' && a.type==='MEDICAL_REINFORCEMENT_REQUEST'));
+  const reportSites=COMPANY_COMMAND_ROLES.has(role) ? allSites.map(s=>s.id).filter(id=>id!=='ALL')
+    : role==='pc' ? [pcPlatoonSite()] : null;
+  return buildAlertObjects(roleScopedPatients(role), reportSites).filter(a=>a.audience.includes(audience) || (role==='physician' && a.type==='MEDICAL_REINFORCEMENT_REQUEST'));
 }
 function medicOperationalTopLine(){
   ensureSiteReadiness();
@@ -7986,7 +8023,7 @@ function renderSweepBoardForPc(){
   const completed=sweepSessionsForBoard().map(s=>roleRow(
     `הושלמה · ${s.zone}`,
     `${s.medicName} · ${s.casualtyCountInSweep} פצועים · אדום ${s.counts?.red||0} · צהוב ${s.counts?.yellow||0} · ירוק ${s.counts?.green||0} · שחור ${s.counts?.black||0} · לכודים ${s.trapped} · לא ניידים ${s.immobile||0} · חסמים ${s.tourniquets} · נתיבי אוויר ${s.airwayInterventions||0} · חסר מדדים ${s.missingFullVitals} · זהות לא ידועה ${s.unknownIdentity||0} · ציוד: ${supplyGaps}${s.arrivalToSweepCompletionMinutes!==null&&s.arrivalToSweepCompletionMinutes!==undefined?' · זמן מהגעה '+s.arrivalToSweepCompletionMinutes+' דק׳':''}`,
-    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><button class="demo-mini-btn" onclick="demoReassignWithinPlatoon()">שייך חובש למעקב</button><button class="demo-mini-btn" onclick="openReinforcementRequest()">בקש תגבור רפואי</button><button class="demo-mini-btn" onclick="openReinforcementRequest()">בקש פראמדיק</button><button class="demo-mini-btn" onclick="toast('בקשת פינוי נרשמה לחמ״ל')">בקש פינוי</button><button class="demo-mini-btn" onclick="toast('מעבר לשלב מעקב אושר')">אשר מעבר לשלב מעקב</button><button class="demo-mini-btn" onclick="showRoleDrilldown('patients')">פתח רשימת פצועים באזור</button></div>`
+    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><button class="demo-mini-btn" onclick="demoReassignWithinPlatoon()">שייך חובש למעקב</button><button class="demo-mini-btn" onclick="openReinforcementRequest()">בקש תגבור רפואי</button><button class="demo-mini-btn" onclick="openReinforcementRequest()">בקש פראמדיק</button><button class="demo-mini-btn" onclick="toast('בקשת פינוי נרשמה לחמ״ל הרפואי')">בקש פינוי</button><button class="demo-mini-btn" onclick="toast('מעבר לשלב מעקב אושר')">אשר מעבר לשלב מעקב</button><button class="demo-mini-btn" onclick="showRoleDrilldown('patients')">פתח רשימת פצועים באזור</button></div>`
   )).join('');
   return roleSection('סריקות MSTART פעילות / הושלמו', activeRows + completed || roleRow('אין סריקות MSTART פעילות','כאשר חובש יסיים סריקה, תופיע כאן תמונת הסריקה וחוב ההערכה.'));
 }
@@ -8096,13 +8133,16 @@ function sortedPatientsByEvacPriority(list=patients){
 // syndrome). database/086 applies the same rule on the server.
 // Trapped since the incident started unless recorded otherwise: the official T0, else when the
 // incident was opened, else the casualty's registration.
+// The 60-minute long-entrapment rule runs on the same clock as every injury timer (owner
+// 2026-11-28: "put it on the same rule"): injuryTimerClock, the earliest of the casualty's own
+// incident's T0 and opening, an entered injury time and the registration. Before, it took the
+// first of site T0 / the active incident's T0 / opening / registration, always SITE_A and the active
+// incident signed in, and never an entered time. A clock in the future is unknown (null), so the
+// rule falls back to the priority check. The server (database/086) gets the same rule separately.
 function rescueTrappedMinutes(p){
-  const siteId=currentUser?'SITE_A':(p.siteId||'SITE_A');
-  const t0=Date.parse(ensureSiteStatusFields(siteId).t0||'');
-  const opened=currentUser?Date.parse(activeIncident?.t_zero||activeIncident?.opened_at||''):NaN;
-  const reg=Date.parse(p.createdAt||'');
-  const start=Number.isFinite(t0)?t0:Number.isFinite(opened)?opened:Number.isFinite(reg)?reg:null;
-  return start===null?null:Math.max(0,Math.floor((Date.now()-start)/60000));
+  const clock=injuryTimerClock(p);
+  if(!Number.isFinite(clock.ms) || clock.ms>Date.now()+60000) return null;
+  return Math.max(0,Math.floor((Date.now()-clock.ms)/60000));
 }
 function rescueExtractionRequirementOf(p){ return C5Rules.rescueExtractionRequirement(rescuePriorityOf(p), rescueTrappedMinutes(p)); }
 function rescueExtractionNeedsMedic(p){ return !!rescueExtractionRequirementOf(p); }
@@ -8599,7 +8639,7 @@ function renderCommandStatusStrip(role, pts, alerts){
     </div>
     <div class="cmd-strip-counts">${cell(c.red,'אדום','var(--red)')}${cell(c.yellow,'צהוב','var(--yellow)')}${cell(c.green,'ירוק','var(--green)')}${cell(c.black,'שחור','var(--muted)')}${cell(c.trapped,'לכודים','var(--orange)')}</div>
     ${reviewLines?`<div class="cmd-strip-reviews">${reviewLines}</div>`:''}
-    <div class="cmd-strip-alerts${commandStripExpanded?' expanded':''}">${shown.map(commandAlertLineHtml).join('')}</div>
+    <div class="cmd-strip-alerts${commandStripExpanded?' expanded':''}">${shown.map(g=>commandAlertLineHtml(g)).join('')}</div>
   </div>`;
 }
 function renderCommandTabBar(alerts){
@@ -8630,6 +8670,92 @@ function positionCommandSticky(){
   sticky.style.top=`${headerTop+header.offsetHeight}px`;
 }
 window.addEventListener('resize', positionCommandSticky);
+// ── חמ״ל רפואי panel (V2.99.96) ──
+// The control room's own screen instead of the generic role page (docs/ROLE_COMMAND_MODEL_v2.6.md
+// "Chamal / Operator / Observer": picture quality - sync, duplicates, external report conflicts,
+// pending requests). One page, nothing behind a tab: the shared status strip (server contact,
+// longest tourniquet, blocked events, triage counts), one card per site, then clinical alerts
+// beside picture-quality alerts and devices, then open requests. Client only: it reads the same
+// state the full command screen reads and writes nothing new.
+let chamalResponsibilitiesOpen=false;
+function toggleChamalResponsibilities(){ chamalResponsibilitiesOpen=!chamalResponsibilitiesOpen; renderRoleDashboard('chamal'); }
+function isPictureQualityAlert(a){ return a.category==='integrity' || a.scope==='system'; }
+function openChamalSite(siteId){ cmdActiveSite=siteId; openLegacyForRole('chamal'); }
+function chamalSiteCardHtml(site){
+  const pts=getSitePatients(site.id);
+  const st=ensureSiteStatusFields(site.id);
+  const t0Ms=st.t0?Date.parse(st.t0):NaN;
+  const t0=Number.isFinite(t0Ms)
+    ? `T0 ${new Date(t0Ms).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})} · ${t0Ms>Date.now()?'<span style="color:var(--orange)">בעתיד, בדוק שעון</span>':`לפני ${Math.floor((Date.now()-t0Ms)/60000)} דק׳`}`
+    : `<span style="color:var(--orange)">${st.t0?'T0 לא קריא':'T0 טרם נקבע'}</span>`;
+  const status=st.siteClear?.cleared?'אתר נקי':(INCIDENT_STATUS_LABELS[st.incidentStatus]||st.incidentStatus);
+  // Golden hour (the full screen's 45 / 60 minute watchdog thresholds), for casualties still on the
+  // way out: not evacuated, and not black / deceased. Counted from the earliest of the incident's alert,
+  // its opening, an entered injury time and the registration (injuryTimerClock, owner 2026-11-27).
+  // "Estimated" counts only a non-entered stored time that is not the incident's own start. Always shown beside the count: how many times are estimates
+  // (the incident's start, no time entered), how many have neither (counted on the registration time
+  // as a lower limit and named "לפחות"),
+  // and how many lie in the future (device clock), also left out rather than read as "within the hour".
+  const open=pts.filter(p=>evacuationStage(p)!=='evacuated' && !isDeceasedForEvac(p));
+  const gh={amber:0,red:0,estimated:0,unknown:0,future:0};
+  open.forEach(p=>{
+    const inj=injuryTimerClock(p);
+    // A time in the future is set aside and named; the casualty is still counted on the clock left.
+    if(inj.futureEntered) gh.future++;
+    if(Number.isFinite(inj.ms) && inj.ms>Date.now()+60000){ if(!inj.futureEntered) gh.future++; return; }
+    if(!Number.isFinite(inj.ms)){ gh.unknown++; return; }
+    // No injury or incident time: the registration time is a lower limit, so they are counted on it
+    // (a casualty registered 70 minutes ago is at least 70 minutes from injury) and named.
+    if(inj.source==='event_time') gh.unknown++;
+    else if(inj.estimated) gh.estimated++;
+    const level=watchdogState(Math.floor((Date.now()-inj.ms)/60000),45,60);
+    if(level==='red') gh.red++; else if(level==='amber') gh.amber++;
+  });
+  const ghNotes=[gh.estimated?`${gh.estimated} לפי שעה משוערת`:'', gh.unknown?`${gh.unknown} ללא שעת פציעה ושעת אירוע (נספרו לפחות מהרישום)`:'', gh.future?`${gh.future} שעה בעתיד, בדוק שעון`:''].filter(Boolean).join(' · ');
+  const ghMain=gh.red||gh.amber ? `${gh.red} עברו 60 דק׳ · ${gh.amber} מעל 45 דק׳` : 'אף פצוע לא מעל 45 דק׳';
+  const ghLine=`<div class="chamal-site-line" data-chamal-golden style="${gh.red?'color:var(--red);font-weight:800':gh.amber?'color:var(--orange);font-weight:800':''}">⏱ שעת זהב (לא פונו, ללא שחורים): ${ghMain}${ghNotes?` · <span style="color:var(--orange)">${ghNotes}</span>`:''}</div>`;
+  const stage=k=>pts.filter(p=>evacuationStage(p)===k).length;
+  const wait=longestEvacPointWait(pts.filter(p=>evacuationStage(p)==='evac_point'));
+  const reports=siteExternalReports(site.id);
+  const gaps=externalConflictCount(pts, reports);
+  const ext=reports.length
+    ? `<div class="chamal-site-line" data-chamal-external style="${gaps?'color:var(--orange);font-weight:800':''}">דיווח חיצוני: ${reports.length} דיווחים · ${gaps?`${gaps} פערים מול ספירת השדה`:'תואם לספירת השדה'}</div>`
+    : `<div class="chamal-site-line" data-chamal-external>דיווח חיצוני: אין</div>`;
+  return `<div class="chamal-site" data-chamal-site="${escAttr(site.id)}">
+    <div class="chamal-site-head"><div><div class="chamal-site-name">${escAttr(site.name)}</div><div class="chamal-site-line">${escAttr(incidentTypeLabel(site.id))} · ${escAttr(status)} · ${t0}</div></div><div class="chamal-site-total">${pts.length}<span>פצועים</span></div></div>
+    ${siteTriageGridHtml(pts)}
+    ${(()=>{ const pending=pts.filter(p=>['pending','unknown'].includes(triageKey(p.triage)) && !isDeceasedForEvac(p)).length; return pending?`<div class="chamal-site-line" data-chamal-pending style="color:var(--orange);font-weight:800">ממתינים למיון: ${pending}</div>`:''; })()}
+    <div class="chamal-site-line" data-chamal-evac>בזירה ${stage('on_scene')} · בדרך לנאפ״ל ${stage('to_evac_point')} · בנאפ״ל ${stage('evac_point')}${wait!==null?` (עד ${wait} דק׳)`:''} · פונו ${stage('evacuated')}</div>
+    ${ghLine}
+    ${ext}
+    <button class="demo-mini-btn chamal-site-open" onclick="openChamalSite('${escAttr(site.id)}')">פתח מוקד במסך המלא</button>
+  </div>`;
+}
+function chamalDevicesHtml(pts){
+  const rows=commandDeviceRows(pts).map(d=>({...d, silent:C5Rules.isDeviceSilent(d.last)}))
+    .sort((a,b)=>(b.silent-a.silent) || (b.unsynced-a.unsynced) || (a.last-b.last));
+  const silent=rows.filter(d=>d.silent).length;
+  const list=rows.map(d=>`<div class="device-row ${d.silent?'offline':''}" data-chamal-device="${escAttr(d.id)}"><div><div class="device-name">${escAttr(d.id)}</div><div class="device-meta">${d.patients} פצועים · ${d.unsynced} ממתינים לשליחה</div></div><div class="sync-pill ${d.silent?'offline':''}">${d.silent?'שקט':(d.last?timeAgoLabel(d.last):'אין נתון')}</div></div>`).join('');
+  return roleSection(`מכשירים · ${silent} שקטים מתוך ${rows.length}`, list);
+}
+function renderChamalPanel(ctx){
+  const sites=allSites.filter(s=>s.id!=='ALL');
+  const clinical=commandAlertGroups(ctx.alerts.filter(a=>!isPictureQualityAlert(a)));
+  const quality=commandAlertGroups(ctx.alerts.filter(isPictureQualityAlert));
+  const lines=(groups,empty)=>groups.length?groups.map(g=>commandAlertLineHtml(g)).join(''):`<div class="role-row-sub" style="padding:6px 2px">${empty}</div>`;
+  const chip=`<button class="cmd-strip-chip" data-chamal-responsibilities onclick="toggleChamalResponsibilities()">${chamalResponsibilitiesOpen?'סגור אחריות ✕':'ⓘ האחריות שלי'}</button>`;
+  return `<div id="command-sticky" class="cmd-sticky">${renderCommandStatusStrip('chamal', ctx.pts, [])}</div>
+    ${dashboardFocusBanner()}
+    <div style="display:flex;justify-content:flex-start;margin:0 0 10px">${chip}</div>
+    ${chamalResponsibilitiesOpen?roleSection('האחריות שלי', ctx.responsibilities):''}
+    <div class="chamal-sites" data-chamal-sites>${sites.map(chamalSiteCardHtml).join('')||roleRow('אין מוקדים פתוחים','')}</div>
+    <div class="chamal-grid">
+      <div data-chamal-clinical>${roleSection(`התראות לטיפול · ${clinical.length}`, lines(clinical,'אין התראות קליניות פתוחות'))}</div>
+      <div data-chamal-quality>${roleSection(`אמינות תמונת מצב · ${quality.length}`, lines(quality,'אין חשד לכפילות ואין פער דיווח חיצוני'))}${chamalDevicesHtml(ctx.pts)}</div>
+    </div>
+    ${roleSection('בקשות / הקצאות פתוחות', ctx.reqHtml)}
+    <div class="demo-actions" style="margin:0;grid-template-columns:1fr 1fr">${ctx.actions}<button class="demo-mini-btn" onclick="goTo('aar')">סיכום אירוע חי</button></div>`;
+}
 function renderCommandPanel(role, ctx){
   if(commandPanelRole!==role){ commandPanelRole=role; resetCommandPanel(); }
   if(role==='cc' && isCcOverviewMode()) return renderCcOverviewPanel();
@@ -9238,6 +9364,10 @@ function renderRoleDashboard(role=activeRoleDashboard){
   }else if(isCommandPanelRole(role)){
     body.innerHTML=renderCommandPanel(role,{pts,alerts,responsibilities,objects,reqHtml,actions});
     positionCommandSticky();
+  }else if(role==='chamal'){
+    body.innerHTML=renderChamalPanel({pts,alerts,responsibilities,reqHtml,actions})
+      +(canManagePlatoonRoster()?roleSection('פלוגות ומחלקות — שיבוץ', '<div id="platoon-roster-panel" style="font-size:13px;color:var(--muted)">טוען…</div>'):'');
+    positionCommandSticky();
   }else{
     body.innerHTML=`
     ${dashboardFocusBanner()}
@@ -9257,7 +9387,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
 // physician in a company); and sets which unit works the active site. Every change is written to
 // unit_audit on the server.
 function canManagePlatoonRoster(){ return !!currentUser && COMPANY_COMMAND_ROLES.has(currentUser.role); }
-// Dashboards that show the roster panel (owner, 2026-10-23: מ״פ רפואה, חמ״ל and admin place medical
+// Dashboards that show the roster panel (owner, 2026-10-23: מ״פ רפואה, חמ״ל רפואי and admin place medical
 // staff in the company's platoons). The server already allows them (app.is_unit_manager()).
 const ROSTER_PANEL_ROLES=new Set(['cc','chamal','admin']);
 const UNIT_MEMBER_ROLE_LABELS={pc:'חוג״ד', rpc:'מ״מ', rcc:'מ״פ חילוץ', medic:'חובש', paramedic:'פראמדיק', physician:'רופא'};
@@ -9410,7 +9540,7 @@ function updateExperimentLine(){
   const mins=Math.max(0, Math.round((Date.now()-started.getTime())/60000));
   const notes=observerNotes().length;
   const conflicts=conflictLog().length;
-  const line=`תרחיש: ${siteData.name||'ללא מוקד'} · תפקידים: חובש/חוג"ד/לוגיסטיקה/מ״פ רפואה/חמ״ל · מכשיר: ${getDeviceId()} · התחלה: ${started.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})} · שלב: ${experimentPhase} · ${notes} הערות · ${conflicts} התנגשויות · ${mins} דק׳`;
+  const line=`תרחיש: ${siteData.name||'ללא מוקד'} · תפקידים: חובש/חוג"ד/לוגיסטיקה/מ״פ רפואה/חמ״ל רפואי · מכשיר: ${getDeviceId()} · התחלה: ${started.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})} · שלב: ${experimentPhase} · ${notes} הערות · ${conflicts} התנגשויות · ${mins} דק׳`;
   ['experiment-line-dashboard','experiment-line-command'].forEach(id=>{const el=document.getElementById(id); if(el) el.textContent=line;});
 }
 function showObserverNote(){
@@ -11164,13 +11294,12 @@ function patientAlertObjects(pts){
   });
   return alerts;
 }
-function buildAlertObjects(pts=patients){
+function buildAlertObjects(pts=patients, reportSites=null){
   const alerts=patientAlertObjects(pts);
   serverWatchdogAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
   tourniquetSnoozeAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
   pcReviewAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
-  duplicateCandidates(pts).forEach(([a,b],idx)=>pushAlert(alerts,{id:`dup-${a.id}-${b.id}`,type:'DUPLICATE_SUSPECTED',severity:'medium',owner:'pc',audience:['pc','chamal'],escalatesTo:null,actionRequired:'merge_duplicate',scope:'site',category:'integrity',siteId:a.siteId||b.siteId||'SITE_A',patientId:a.id,title:`חשד לכפילות ${a.id} ↔ ${b.id}`,detail:'בדיקה ידנית בלבד; אין מיזוג הרסני של אירועים'}));
-  const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id)):siteExternalReports(cmdActiveSite);
+  duplicateCandidates(pts).forEach(([a,b],idx)=>pushAlert(alerts,{id:`dup-${a.id}-${b.id}`,type:'DUPLICATE_SUSPECTED',severity:'medium',owner:'pc',audience:['pc','chamal'],escalatesTo:null,actionRequired:'merge_duplicate',scope:'site',category:'integrity',siteId:a.siteId||b.siteId||'SITE_A',patientId:a.id,title:`חשד לכפילות ${a.visualId||a.id} ↔ ${b.visualId||b.id}`,detail:'בדיקה ידנית בלבד; אין מיזוג הרסני של אירועים'}));
   if(currentUser){
     openIncidentTypeReports().forEach(x=>pushAlert(alerts,{id:`incident-type-report-${x.id}`,type:'INCIDENT_TYPE_MISMATCH',severity:'medium',owner:'pc',audience:['pc','cc'],escalatesTo:null,actionRequired:'acknowledge',scope:'site',category:'integrity',siteId:'SITE_A',
       title:'בקשה להסיר סוג אירוע',
@@ -11181,8 +11310,13 @@ function buildAlertObjects(pts=patients){
     const auth=ensureSiteStatusFields(typeReport.siteId);
     if(auth.incidentType && auth.incidentType!==typeReport.type) pushAlert(alerts,{id:`incident-type-mismatch-${typeReport.siteId}`,type:'INCIDENT_TYPE_MISMATCH',severity:'medium',owner:'pc',audience:['pc','cc'],escalatesTo:null,actionRequired:'acknowledge',scope:'site',category:'integrity',siteId:typeReport.siteId,title:'פער בסוג אירוע: חובש מול חילוץ',detail:`חילוץ: ${INCIDENT_TYPE_LABELS[auth.incidentType]} · חובש: ${INCIDENT_TYPE_LABELS[typeReport.type]} · סוג החילוץ נשאר בתוקף`});
   }
-  const conflicts=externalConflictCount(pts,reports);
-  if(conflicts>0) pushAlert(alerts,{id:`external-conflict-${cmdActiveSite}`,type:'EXTERNAL_REPORT_CONFLICT',severity:conflicts>2?'high':'medium',owner:'chamal',audience:['pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'verify_report',scope:'site',category:'integrity',siteId:cmdActiveSite,title:'פער דיווח חיצוני מול שדה',detail:`${conflicts} פערים בין דיווח חיצוני לספירה מאושרת`});
+  // Per site, and only against a report that exists (V2.99.96; externalGapsBySite). Before, the
+  // field count of every patient passed in (all sites for CC and chamal, one platoon for PC) was
+  // compared with the reports of cmdActiveSite alone, and with no report every field casualty
+  // counted as a "gap".
+  externalGapsBySite(pts, reportSites).forEach(({siteId,gaps})=>{
+    if(gaps>0) pushAlert(alerts,{id:`external-conflict-${siteId}`,type:'EXTERNAL_REPORT_CONFLICT',severity:gaps>2?'high':'medium',owner:'chamal',audience:['pc','cc','chamal'],escalatesTo:'cc',escalateAfterMin:10,actionRequired:'verify_report',scope:'site',category:'integrity',siteId,title:`פער דיווח חיצוני מול שדה · ${siteNameById(siteId)}`,detail:`${gaps} פערים בין דיווח חיצוני לספירה מאושרת`});
+  });
   const unsynced=pts.reduce((sum,p)=>sum+(p.unsyncedEvents||0),0)+localOutboxCount();
   if(unsynced>0) pushAlert(alerts,{id:`sync-backlog-${cmdActiveSite}`,type:'UNSYNCED_EVENT_BACKLOG',severity:unsynced>5?'high':'low',owner:'chamal',audience:unsynced>5?['pc','cc','chamal']:['medic','pc'],escalatesTo:unsynced>5?'cc':null,escalateAfterMin:unsynced>5?5:null,actionRequired:'review_sync',scope:'system',category:'integrity',siteId:cmdActiveSite,title:'אירועים מקומיים לא מסונכרנים',detail:`${unsynced} אירועים ממתינים בתור המקומי`});
   requestAlertObjects(reinforcementRequests.filter(isRequestOpen)).forEach(a=>alerts.push(a));
@@ -12137,7 +12271,7 @@ function findExternalReportByKey(key, siteId){
     || allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id)).find(r=>externalReportLinkKey(r)===key) || null;
 }
 function openReportLinkSheet(key, siteId){
-  if(!canUpdateEvacuationTracking()){ toast('שיוך דיווח לפצוע — חוג״ד, מ״פ רפואה, חמ״ל או רופא'); return; }
+  if(!canUpdateEvacuationTracking()){ toast('שיוך דיווח לפצוע — חוג״ד, מ״פ רפואה, חמ״ל רפואי או רופא'); return; }
   const r=findExternalReportByKey(key, siteId); if(!r){ toast('הדיווח לא נמצא'); return; }
   reportLinkState={key, siteId, patientId:null, mda:null};
   let modal=document.getElementById('report-link-modal');
@@ -12533,7 +12667,7 @@ let evacSheetState={patientId:null, mode:'update', mda:null};
 function openEvacuationSheet(id, mode='update'){
   const p=patients.find(x=>x.id===id); if(!p) return;
   if(mode==='handover' && !C5Rules.canChangePatientStatus(p)){ toast('כבר נרשמה מסירה — לא ניתן לשלוח שוב'); return; }
-  if(mode==='update' && !canUpdateEvacuationTracking()){ toast('עדכון יעד / סיווג מד״א — חוג״ד, מ״פ רפואה, חמ״ל או רופא'); return; }
+  if(mode==='update' && !canUpdateEvacuationTracking()){ toast('עדכון יעד / סיווג מד״א — חוג״ד, מ״פ רפואה, חמ״ל רפואי או רופא'); return; }
   ensureEvacDestinationDatalist();
   evacSheetState={patientId:id, mode, mda:p.mdaClassification||null};
   let modal=document.getElementById('evac-sheet-modal');
@@ -12573,7 +12707,7 @@ function confirmEvacuationSheet(){
 }
 function updatePatientEvacuation(id, {destination='', mdaClassification=null, silent=false}={}){
   const p=patients.find(x=>x.id===id); if(!p) return;
-  if(!canUpdateEvacuationTracking()){ if(!silent) toast('עדכון יעד / סיווג מד״א — חוג״ד, מ״פ רפואה, חמ״ל או רופא'); return; }
+  if(!canUpdateEvacuationTracking()){ if(!silent) toast('עדכון יעד / סיווג מד״א — חוג״ד, מ״פ רפואה, חמ״ל רפואי או רופא'); return; }
   const payload=evacuationPayload(destination, mdaClassification);
   if(!payload.destination_facility && !payload.mda_classification){ if(!silent) toast('לא הוזן יעד או סיווג מד״א'); return; }
   applyEvacuationPayloadLocally(p, payload);
@@ -12711,6 +12845,8 @@ function mistInjuriesText(p){
 function mistInjuryTimeText(p){
   const it=patientInjuryTime(p);
   const minutes=Math.max(0, Math.floor((Date.now()-it.ms)/60000));
+  // No injury or incident time: say so, with the registration as a lower limit (owner 2026-11-27).
+  if(it.source==='event_time') return `לא ידועה (נרשם ${tourniquetHhmm(it.ms)}, לפני לפחות ${tourniquetAgoText(minutes)})`;
   return `${tourniquetHhmm(it.ms)}${it.estimated?' משוערת':''}, לפני ${tourniquetAgoText(minutes)}`;
 }
 function mistSummaryPayload(p){
@@ -14468,7 +14604,7 @@ let cmdPanelOpen={priority:true,locations:true,reinforcement:true,heatmap:false,
 function companyLabelForSite(siteId){
   return siteId==='SITE_B' ? 'פלוגה ב / BRAVO' : siteId==='SITE_A' ? 'פלוגה א / ALFA' : 'כל הפלוגות';
 }
-// The PC's command screen shows its own platoon's site only; מ״פ רפואה, חמ״ל and every other
+// The PC's command screen shows its own platoon's site only; מ״פ רפואה, חמ״ל רפואי and every other
 // command role see every site, including the "all sites" tab.
 function pcPlatoonSite(){
   const site=PLATOON_SITE[pcPlatoonId]||'SITE_A';
@@ -14601,7 +14737,7 @@ function renderCmdTabs(){
 }
 function switchCmdSite(id){
   if(!canSeeCommandSite(id)){
-    toast('חוג״ד רואה רק את מוקד המחלקה שלו · מ״פ רפואה וחמ״ל רואים את כל המוקדים');
+    toast('חוג״ד רואה רק את מוקד המחלקה שלו · מ״פ רפואה וחמ״ל רפואי רואים את כל המוקדים');
     return;
   }
   cmdActiveSite=id; cmdFilter='all';
@@ -14659,20 +14795,68 @@ function sectorFromLocation(location=''){
   const floor=(location.match(/קומה\s*([^,]+)/)||[])[1] || 'קרקע/לא ידוע';
   return {building:building.trim(), floor:floor.trim()};
 }
+// External report against the field, per site (V2.99.96). The sites looked at: every site that has a
+// casualty in pts, plus every site in view that has a report (a report with no field casualty yet is
+// the whole gap). Each site's report is compared with that site's whole field count
+// (getSitePatients), never with a platoon's share of it or with another site's casualties. Sites with
+// no report are left out: no report is not a gap.
+// scopeSites: the sites the viewer covers. The role dashboards pass it (company command: every site);
+// the full command screen leaves it out and uses its own site picker.
+function externalGapsBySite(pts, scopeSites=null){
+  const scope=scopeSites || (cmdActiveSite==='ALL' ? commandVisibleSites() : [cmdActiveSite]);
+  const ids=new Set(pts.map(p=>p.siteId||'SITE_A'));
+  scope.forEach(id=>{ if(siteExternalReports(id).length) ids.add(id); });
+  return [...ids].filter(id=>id!=='ALL').map(siteId=>{
+    const reports=siteExternalReports(siteId);
+    return {siteId, reports:reports.length, gaps:reports.length?externalConflictCount(getSitePatients(siteId), reports):0};
+  }).filter(x=>x.reports>0);
+}
 function externalConflictCount(pts, reports){
   const field={red:0,yellow:0,green:0};
   pts.forEach(p=>{if(field[p.triage]!==undefined) field[p.triage]++;});
   const reported=(reports||[]).reduce((a,r)=>({red:a.red+(r.red||0),yellow:a.yellow+(r.yellow||0),green:a.green+(r.green||0)}),{red:0,yellow:0,green:0});
   return Math.abs(field.red-reported.red)+Math.abs(field.yellow-reported.yellow)+Math.abs(field.green-reported.green);
 }
+// Two casualties are a suspected duplicate only on the same site, in the same recorded zone, with an
+// overlapping injury or both trapped / without access (V2.99.96). The field flows keep the site
+// address in location and the zone in locDetail (zoneLabel(), sometimes followed by " · " and a
+// description), so the zone is read from there; location was the site address and never told two
+// places apart. Before, sites were not compared, an unparsed location counted as one sector and two
+// casualties who were both "not trapped" matched, so almost every pair on every site was flagged.
+const DUPLICATE_UNKNOWN_ZONES=new Set(['','לא צוין','אזור לא צוין']);
+function duplicateZoneOf(p){ return String(p.zone||String(p.locDetail||'').split(' · ')[0]||'').trim(); }
+// Words that say nothing about the casualty: the template texts the flows write when no injury was
+// entered (MSTART sweep, life-saving action, rescue-chain report), the site's likely mechanisms (a
+// site setting) and generic words. Without this, every casualty registered without an injury
+// "overlapped" with every other one (V2.99.96). siteData.lastMechanism is deliberately not ignored:
+// it is the last injury typed on this phone, a real injury, and ignoring it would hide a true pair.
+const DUPLICATE_PLACEHOLDER_INJURIES=['לא תועד','הערכת MSTART בלבד','פעולה מצילת חיים בשטח','פעולה מצילת חיים','דיווח שדה ראשוני — לא הוערך קלינית','פגיעת קריסה / לכידה','חסם עורקים הונח (דיווח שדה ראשוני)','דימום מסיבי מדווח'];
+const DUPLICATE_GENERIC_WORDS=['פגיעת','פגיעה','פציעה','פציעת','חשד','מדווח','בשטח','ראשוני'];
+const DUPLICATE_TOKEN_SPLIT=/[\s+,/·—\-.():;"'״׳!?]+/;
+// One leading Hebrew prefix letter (ב ה ו ל מ ש כ) is dropped from words of 4+ letters, so "בראש"
+// matches "ראש". Different forms of a word ("שבר" / "שבורה") still do not match.
+function duplicateTokenStem(t){ return t.length>=4 && /^[בהולמשכ]/.test(t) ? t.slice(1) : t; }
+function duplicateInjuryTokens(p, ignore){
+  return String(p.injury||'').split(DUPLICATE_TOKEN_SPLIT).filter(t=>t.length>2 && !ignore.has(t) && !ignore.has(duplicateTokenStem(t))).map(duplicateTokenStem);
+}
+function duplicateIgnoredTokens(){
+  const words=[...DUPLICATE_PLACEHOLDER_INJURIES, ...(siteData?.likelyMechanisms||[])].join(' ');
+  return new Set([...words.split(DUPLICATE_TOKEN_SPLIT), ...DUPLICATE_GENERIC_WORDS].filter(Boolean).flatMap(t=>[t, duplicateTokenStem(t)]));
+}
+function isTrappedForDuplicate(p){ return ['trapped','access_blocked'].includes(normalizeTrapStatus(p)); }
 function duplicateCandidates(pts){
   const pairs=[];
+  const ignore=duplicateIgnoredTokens();
   for(let i=0;i<pts.length;i++){
     for(let j=i+1;j<pts.length;j++){
       const a=pts[i], b=pts[j];
-      const sameSector=sectorFromLocation(a.location).building===sectorFromLocation(b.location).building && sectorFromLocation(a.location).floor===sectorFromLocation(b.location).floor;
-      const injuryOverlap=(a.injury||'').split(/[ +,]/).some(token=>token.length>2 && (b.injury||'').includes(token));
-      if(sameSector && (injuryOverlap || normalizeTrapStatus(a)===normalizeTrapStatus(b))) pairs.push([a,b]);
+      if((a.siteId||'SITE_A')!==(b.siteId||'SITE_A')) continue;
+      const za=duplicateZoneOf(a), zb=duplicateZoneOf(b);
+      const sameSector=!DUPLICATE_UNKNOWN_ZONES.has(za) && za===zb;
+      const tb=new Set(duplicateInjuryTokens(b, ignore));
+      const injuryOverlap=duplicateInjuryTokens(a, ignore).some(token=>tb.has(token));
+      const bothTrapped=isTrappedForDuplicate(a) && isTrappedForDuplicate(b);
+      if(sameSector && (injuryOverlap || bothTrapped)) pairs.push([a,b]);
     }
   }
   return pairs.slice(0,4);
@@ -14936,17 +15120,42 @@ function computeWatchdogRows(pts){
   const now=Date.now();
   const rows=[];
   pts.forEach(p=>{
-    // Golden Hour and Crush count from the injury time (WP-23): entered in the field, else the
-    // incident's alert time, marked "משוערת". Before WP-23 they counted from this phone's
-    // registration of the patient while the label already said T_injury.
-    const injury=patientInjuryTime(p);
-    const ageMin=Math.max(0, Math.floor((now-injury.ms)/60000));
-    const injuryNote=`מאז הפציעה ${tourniquetHhmm(injury.ms)}${injury.estimated?' (משוערת)':''}`;
-    const golden=watchdogState(ageMin,45,60);
-    rows.push({patient:p.id, name:'Golden Hour', trigger:'Any registered patient', threshold:'T_injury +45m / +60m', state:golden, detail:`${ageMin} דק׳ ${injuryNote}`});
-    if(normalizeTrapStatus(p)==='trapped'){
-      const crush=watchdogState(ageMin,45,60);
-      rows.push({patient:p.id, name:'Crush Syndrome', trigger:'Access = Trapped', threshold:'T_injury +45m', state:crush, detail:`לכוד · ${ageMin} דק׳ ${injuryNote}`});
+    // Golden Hour and Crush count from the injury time (WP-23): entered in the field, else when the
+    // casualty's incident began (the earlier of alert and opening), marked "משוערת". Before WP-23
+    // they counted from this phone's registration of the patient while the label said T_injury.
+    // With no injury time entered they count from when the incident began (owner 2026-11-27: the
+    // earlier of alert and opening, incidentAlertTimeMs). With neither, the injury time is unknown,
+    // but registration can only come after the injury, so the minutes since registration are a
+    // lower limit: "לפחות N דק׳". The row alarms on that limit (a red from it is always a true red)
+    // and is "prompt" only while the limit is under 45, never "ok" (clinical review 2026-11-27).
+    // The Golden Hour row counts every registered casualty, evacuated and black ones included (the
+    // spec's "Any registered patient", for after-action); the חמ״ל רפואי site card counts only the
+    // ones still in the field, so the row says so to keep the two numbers apart.
+    const label=p.visualId||p.id;
+    const lowerBound=(level)=>level==='ok'?'prompt':level;
+    const clockRow=(clock)=>{
+      const noClock=clock.source==='event_time';
+      // A start in the future is a wrong clock: shown and waiting, never "ok" (clinical review).
+      if(clock.ms>now+60000) return {state:'prompt', detail:`שעת התחלה בעתיד (${tourniquetHhmm(clock.ms)}) · בדוק שעון`};
+      const ageMin=Math.max(0, Math.floor((now-clock.ms)/60000));
+      const est=clock.estimated?' (משוערת)':'';
+      const note=clock.source==='entered' ? `מאז הפציעה ${tourniquetHhmm(clock.ms)}`
+        : clock.source==='incident_open' ? `מאז תחילת האירוע ${tourniquetHhmm(clock.ms)}${est}`
+        : `מאז הפציעה ${tourniquetHhmm(clock.ms)}${est}`;
+      return {state:noClock?lowerBound(watchdogState(ageMin,45,60)):watchdogState(ageMin,45,60),
+        detail:noClock?`לפחות ${ageMin} דק׳ (מהרישום) · אין שעת פציעה ואין שעת התראה או פתיחה לאירוע`:`${ageMin} דק׳ ${note}`};
+    };
+    const ghClock=injuryTimerClock(p);
+    const golden=clockRow(ghClock);
+    const futureNote=ghClock.futureEntered?' · שעת הפציעה שהוזנה בעתיד, בדוק שעון':'';
+    rows.push({patient:p.id, label, name:'Golden Hour', title:'Golden Hour · כל הפצועים (כולל שפונו ושחורים)', trigger:'Any registered patient', threshold:'Earliest of T0 / opening / injury / registration +45m / +60m', state:golden.state, detail:golden.detail+futureNote});
+    // "אין גישה" counts as trapped (owner 2026-11-19, and for Crush 2026-11-28): nobody knows
+    // whether a limb is pinned.
+    const trapState=normalizeTrapStatus(p);
+    if(trapState==='trapped' || trapState==='access_blocked'){
+      const crush=clockRow(ghClock);
+      const trapWord=trapState==='trapped'?'לכוד':'אין גישה';
+      rows.push({patient:p.id, label, name:'Crush Syndrome', trigger:'Access = Trapped / no access', threshold:'Earliest of T0 / opening / injury / registration +45m', state:crush.state, detail:`${trapWord} · ${crush.detail}${futureNote}`});
     }
     if(p.tourniquet?.appliedAt){
       const tqMin=Math.floor((now-p.tourniquet.appliedAt)/60000);
@@ -14983,12 +15192,14 @@ function renderWatchdogPanel(pts){
   setCmdPanelMeta('watchdogs', `${red} אדום · ${amber} ענבר · ${prompt} ממתין לתגובה`);
   const body=document.getElementById('cmd-watchdogs');
   if(!body) return;
-  const visible=(active.length?active:rows.slice(0,6)).slice(0,12);
+  // Red first, then amber, then prompt, so the no-clock prompts never push a red row out of the 12.
+  const rank={red:0,amber:1,prompt:2};
+  const visible=(active.length?[...active].sort((a,b)=>(rank[a.state]??3)-(rank[b.state]??3)):rows.slice(0,6)).slice(0,12);
   body.innerHTML=visible.map(r=>{
     const tag=r.state==='ok'?'ok':r.state;
     return `<div class="cmd-matrix-row watchdog-row ${tag}">
       <div>
-        <div class="cmd-matrix-title">${r.name} · ${r.patient}</div>
+        <div class="cmd-matrix-title">${escAttr(r.title||r.name)} · ${escAttr(r.label||patients.find(x=>x.id===r.patient)?.visualId||r.patient)}</div>
         <div class="cmd-matrix-sub">${r.trigger} · ${r.threshold} · ${r.detail}</div>
       </div>
       <div class="watchdog-tag ${tag}">${r.state.toUpperCase()}</div>
@@ -15707,7 +15918,7 @@ function renderReinforcementPanel(){
   setCmdPanelMeta('reinforcement', `${open.length} פתוחות מתוך ${visible.length}`);
   const createButton=`<div style="padding:8px 16px 0"><button class="btn-primary" onclick="openReinforcementRequest()" style="background:var(--accent)">+ בקשת תגבור רפואי</button></div>`;
   if(!visible.length){
-    body.innerHTML=createButton+`<div class="alert-banner muted" style="margin-top:8px"><span>✓</span><div><div class="alert-banner-title" style="color:var(--muted)">אין בקשות תגבור פתוחות</div><div class="alert-banner-sub">חוג"ד יוצר בקשה, מ״פ רפואה/חמ״ל מאשרים ומשייכים משאב.</div></div></div>`;
+    body.innerHTML=createButton+`<div class="alert-banner muted" style="margin-top:8px"><span>✓</span><div><div class="alert-banner-title" style="color:var(--muted)">אין בקשות תגבור פתוחות</div><div class="alert-banner-sub">חוג"ד יוצר בקשה, מ״פ רפואה/חמ״ל רפואי מאשרים ומשייכים משאב.</div></div></div>`;
     return;
   }
   body.innerHTML=createButton+visible.map(r=>{
@@ -15739,7 +15950,7 @@ function renderCommandOperationalPanels(pts, site){
   const evacBlocked=pts.filter(p=>p.triage==='red' && !['evacuating','evacuated','handed_over'].includes(p.patientStatus));
   const unsynced=pts.reduce((sum,p)=>sum+(p.unsyncedEvents||0),0)+localOutboxCount();
   const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id)):siteExternalReports(cmdActiveSite);
-  const conflicts=externalConflictCount(pts,reports);
+  const conflicts=externalGapsBySite(pts).reduce((sum,x)=>sum+x.gaps,0);
   setCmdPanelMeta('priority', `${pts.filter(p=>p.triage==='red').length} אדומים · ${stale.length} מידע ישן · ${unsynced} לא סונכרן`);
   const commandMacro = commandRole==='pc'
     ? renderExtractedCounterBoard()
@@ -15791,28 +16002,10 @@ function renderCommandOperationalPanels(pts, site){
   // Real device_presence rows when logged in and available; local-demo mode (no login, so
   // _remoteDevicePresence never populates) falls back to inferring devices from locally-known
   // patients' lastTouchedBy — the previous behavior, unchanged for the offline demo story.
-  const deviceMap=new Map();
-  if(currentUser && _remoteDevicePresence.length){
-    _remoteDevicePresence.forEach(d=>{
-      if(!deviceMap.has(d.device_id)) deviceMap.set(d.device_id,{id:d.device_id,last:Date.parse(d.last_heartbeat_at)||0,patients:0,unsynced:0,syncStatus:d.sync_status});
-    });
-    pts.forEach(p=>{
-      const id=p.lastTouchedBy||p.medic;
-      if(id && deviceMap.has(id)) deviceMap.get(id).patients++;
-    });
-    if(!deviceMap.has(getDeviceId())) deviceMap.set(getDeviceId(),{id:getDeviceId(),last:Date.now(),patients:0,unsynced:localOutboxCount()});
-    else deviceMap.get(getDeviceId()).unsynced=localOutboxCount();
-  } else {
-    pts.forEach(p=>{
-      const id=p.lastTouchedBy||p.medic||'UNKNOWN';
-      if(!deviceMap.has(id)) deviceMap.set(id,{id,last:0,patients:0,unsynced:0});
-      const d=deviceMap.get(id); d.patients++; d.unsynced+=(p.unsyncedEvents||0); d.last=Math.max(d.last,p.lastVitalsAt||0,Date.parse(p.lastModifiedAt||'')||0);
-    });
-    if(!deviceMap.has(getDeviceId())) deviceMap.set(getDeviceId(),{id:getDeviceId(),last:Date.now(),patients:0,unsynced:localOutboxCount()});
-  }
+  const deviceMap=new Map(commandDeviceRows(pts).map(d=>[d.id,d]));
   document.getElementById('cmd-device-panel').innerHTML=[...deviceMap.values()].map(d=>{
     const silent=C5Rules.isDeviceSilent(d.last);
-    return `<div class="device-row ${silent?'offline':''}"><div><div class="device-name">${d.id}</div><div class="device-meta">${d.patients} פצועים · ${d.unsynced} unsynced</div></div><div class="sync-pill ${silent?'offline':''}">${silent?'SILENT':timeAgoLabel(d.last)}</div></div>`;
+    return `<div class="device-row ${silent?'offline':''}"><div><div class="device-name">${escAttr(d.id)}</div><div class="device-meta">${d.patients} פצועים · ${d.unsynced} unsynced</div></div><div class="sync-pill ${silent?'offline':''}">${silent?'SILENT':timeAgoLabel(d.last)}</div></div>`;
   }).join('');
   setCmdPanelMeta('devices', `${[...deviceMap.values()].filter(d=>C5Rules.isDeviceSilent(d.last)).length} שקטים מתוך ${deviceMap.size} מכשירים`);
 
@@ -15874,12 +16067,36 @@ function renderCommandOperationalPanels(pts, site){
 
   const dupes=duplicateCandidates(pts);
   document.getElementById('cmd-duplicates').innerHTML=dupes.length?dupes.map(([a,b])=>`<div class="cmd-matrix-row critical">
-    <div><div class="cmd-matrix-title">${a.id} ↔ ${b.id}</div><div class="cmd-matrix-sub">${sectorFromLocation(a.location).building} קומה ${sectorFromLocation(a.location).floor} · מיזוג לא הורס אירועים</div></div>
+    <div><div class="cmd-matrix-title">${escAttr(a.visualId||a.id)} ↔ ${escAttr(b.visualId||b.id)}</div><div class="cmd-matrix-sub">${escAttr(duplicateZoneOf(a))} · מיזוג לא הורס אירועים</div></div>
     <div class="cmd-matrix-counts"><span style="color:var(--orange)">חשד לכפילות</span></div>
   </div>`).join(''):`<div class="cmd-matrix-row"><div class="cmd-matrix-sub">${conflicts?`${conflicts} פערי דיווח חיצוני מול שדה`:'אין כפילויות חשודות כרגע'}</div></div>`;
   setCmdPanelMeta('duplicates', `${dupes.length} חשודים`);
   const roleAudience=commandRole==='cc'?'cc':commandRole==='chamal'?'chamal':'pc';
   setCmdPanelMeta('alerts', `${buildAlertObjects(pts).filter(a=>a.audience.includes(roleAudience)).length} מנותבות`);
+}
+// One row per field device: real device_presence signed in, inferred from patients in the local demo.
+// Shared by the full command screen's device panel and the חמ״ל רפואי panel (V2.99.96).
+function commandDeviceRows(pts){
+  const deviceMap=new Map();
+  if(currentUser && _remoteDevicePresence.length){
+    _remoteDevicePresence.forEach(d=>{
+      if(!deviceMap.has(d.device_id)) deviceMap.set(d.device_id,{id:d.device_id,last:Date.parse(d.last_heartbeat_at)||0,patients:0,unsynced:0,syncStatus:d.sync_status});
+    });
+    pts.forEach(p=>{
+      const id=p.lastTouchedBy||p.medic;
+      if(id && deviceMap.has(id)) deviceMap.get(id).patients++;
+    });
+    if(!deviceMap.has(getDeviceId())) deviceMap.set(getDeviceId(),{id:getDeviceId(),last:Date.now(),patients:0,unsynced:localOutboxCount()});
+    else deviceMap.get(getDeviceId()).unsynced=localOutboxCount();
+  } else {
+    pts.forEach(p=>{
+      const id=p.lastTouchedBy||p.medic||'UNKNOWN';
+      if(!deviceMap.has(id)) deviceMap.set(id,{id,last:0,patients:0,unsynced:0});
+      const d=deviceMap.get(id); d.patients++; d.unsynced+=(p.unsyncedEvents||0); d.last=Math.max(d.last,p.lastVitalsAt||0,Date.parse(p.lastModifiedAt||'')||0);
+    });
+    if(!deviceMap.has(getDeviceId())) deviceMap.set(getDeviceId(),{id:getDeviceId(),last:Date.now(),patients:0,unsynced:localOutboxCount()});
+  }
+  return [...deviceMap.values()];
 }
 function renderCmdContent(){
   ensureSiteReadiness();
@@ -15892,7 +16109,7 @@ function renderCmdContent(){
     ? `${site.name} — חוג״ד (${platoonName(pcPlatoonId)})`
     : commandRole==='cc'
       ? (cmdActiveSite==='ALL'?'כל המוקדים בפלוגה — מ״פ רפואה':`${site.name} — מ״פ רפואה`)
-      : (cmdActiveSite==='ALL'?'כל המוקדים מכל הפלוגות — חמ״ל':site.name);
+      : (cmdActiveSite==='ALL'?'כל המוקדים מכל הפלוגות — חמ״ל רפואי':site.name);
   const c={red:0,yellow:0,green:0,black:0};
   pts.forEach(p=>{if(c[p.triage]!==undefined)c[p.triage]++;});
   if(cmdActiveSite==='ALL' || cmdActiveSite==='SITE_A'){
@@ -16287,7 +16504,7 @@ function renderCmdPatients(){
         <div style="margin-top:3px">${triageBand(p.triage,p)}</div>
         <div style="font-size:12px;color:var(--muted)">${injuryLabel(p)} · ${patientStatusLabel(p)}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">נגע אחרון: ${p.lastTouchedBy||p.medic||'—'} · ${p.confirmedClinical===false?'מדווח':'מאושר שדה'}</div>
-        ${assessmentDebtForPatient(p).length?`<div style="font-size:11px;color:var(--orange);font-weight:700;margin-top:2px">יש לקחת מדדים: ${assessmentDebtForPatient(p).join(', ')}</div>`:''}
+        ${assessmentDebtForPatient(p).length?`<div style="font-size:11px;color:var(--orange);font-weight:700;margin-top:2px">יש לקחת מדדים: ${assessmentDebtForPatient(p).map(debtLabel).join(' · ')}</div>`:''}
         ${tourniquetTimerLabel(p)?`<div style="margin-top:4px"><span class="tq-timer ${tourniquetTimerLabel(p).cls}">${tourniquetTimerLabel(p).label}</span></div>`:''}
         ${p.deterioration&&p.deterioration.length?`<div style="font-size:11px;color:var(--red);font-weight:700;margin-top:2px">⚠ ${p.deterioration.join(' · ')}</div>`:''}
         ${!(p.deterioration&&p.deterioration.length)&&isVitalsOverdue(p)?`<div style="font-size:11px;color:var(--orange);margin-top:2px">⏱ מדדים נדרשים</div><button class="demo-mini-btn" onclick="event.stopPropagation();remindMedicVitals('${p.id}')" style="margin-top:6px">תזכר לחובש</button>`:''}
@@ -17065,7 +17282,8 @@ async function activateIncident(inc){
   const prev=activeIncident?.id===inc.id ? activeIncident : null;
   activeIncident={id:inc.id, visual_id:inc.visual_id, status:inc.status, location_name:inc.location_name, address:inc.address||'', incident_type:inc.incident_type||null, incident_types:incidentTypesFromRow(inc), draft_resolution:inc.draft_resolution||null,
     opened_by:inc.opened_by!==undefined?inc.opened_by:(prev?prev.opened_by:undefined), false_alarm:!!(inc.false_alarm||prev?.false_alarm),
-    t_zero:inc.t_zero||prev?.t_zero||null}; // the alert time, injury time's default (WP-23)
+    t_zero:inc.t_zero||prev?.t_zero||null, // the alert time, injury time's default (WP-23)
+    opened_at:inc.opened_at||prev?.opened_at||null}; // with t_zero, when the incident began (owner 2026-11-27)
   // WP-27: keep this phone's relief / read-only state across a re-entry, and ask the server now.
   if(prev?.access_mode){ activeIncident.access_mode=prev.access_mode; activeIncident.read_only_since=prev.read_only_since||null; activeIncident.site_company_name=prev.site_company_name||null; }
   else if(inc.read_only) activeIncident.access_mode='read_only';
@@ -17326,7 +17544,7 @@ async function submitIncidentMerge(sourceId){
   const keptEnded=Array.isArray(r.data.memberships_kept_ended)?r.data.memberships_kept_ended:[];
   if(keptEnded.length){
     const label=x=>`${x.display_name||'ללא שם'} (${x.access_ended_at?'ללא גישה':'צפייה בלבד'})`;
-    alert(`שים/י לב: ${keptEnded.map(label).join(', ')} - ב-${r.data.target_visual_id||tgt?.visual_id||''} הגישה שלהם הוגבלה עוד לפני המיזוג, והמיזוג לא החזיר אותה. אם צריך לעבוד שם, יש לשייך מחדש (החוג"ד של האדם, מ״פ רפואה, חמ"ל או מנהל מערכת).`);
+    alert(`שים/י לב: ${keptEnded.map(label).join(', ')} - ב-${r.data.target_visual_id||tgt?.visual_id||''} הגישה שלהם הוגבלה עוד לפני המיזוג, והמיזוג לא החזיר אותה. אם צריך לעבוד שם, יש לשייך מחדש (החוג"ד של האדם, מ״פ רפואה, חמ״ל רפואי או מנהל מערכת).`);
   }
   if(activeIncident?.id===sourceId){ await switchToMergedIncident(targetId, r.data.target_visual_id||null); return; }
   await refreshIncidentContext();
@@ -17842,7 +18060,7 @@ function showIncidentCloseModal(ctx){
   if(title) title.textContent='לא ניתן לסגור את האירוע';
   const sub=document.getElementById('incident-close-sub');
   if(sub) sub.textContent=`${n} פצועים באירוע טרם נמסרו (לא הועברו, לא פונו עצמאית ולא נקבע מוות). יש להשלים מסירה לפני סגירה.`
-    +(ctx.canOverride?' פיקוד רפואה רשאי לסגור בעקיפה עם סיבה מתועדת.':' רק חוג״ד / מ״פ רפואה / חמ״ל / רופא רשאים לסגור בעקיפה.');
+    +(ctx.canOverride?' פיקוד רפואה רשאי לסגור בעקיפה עם סיבה מתועדת.':' רק חוג״ד / מ״פ רפואה / חמ״ל רפואי / רופא רשאים לסגור בעקיפה.');
   const list=document.getElementById('incident-close-list');
   if(list) list.innerHTML=ctx.openPatients.map(p=>`<div class="close-guard-row"><strong>${escAttr(p.visual_id||p.id||'')}</strong><span>${escAttr(TRIAGE_LABELS[p.triage]||p.triage||'')} · ${escAttr(STATUS_LABELS[p.status]||p.status||'')}</span></div>`).join('');
   const override=document.getElementById('incident-close-override');
@@ -18144,7 +18362,7 @@ setInterval(()=>{ if(currentUser) syncPullAll(); }, 45000);
 // so this stays a thin read + merge, not a second projector.
 // A patient with any unsynced local outbox entry is left untouched this round: the medic's own
 // in-flight edit wins locally until it's actually pushed, rather than being clobbered mid-edit.
-const PROJECTED_PATIENT_COLUMNS = 'id,incident_id,visual_id,current_triage,current_status,status_recorded_at,access_status,needs_full_assessment,is_pediatric,pediatric_age_years,last_vitals_at,version,optional_name,identifying_description,physician_death_confirmed_at,physician_death_confirmed_by';
+const PROJECTED_PATIENT_COLUMNS = 'id,incident_id,created_at,visual_id,current_triage,current_status,status_recorded_at,access_status,needs_full_assessment,is_pediatric,pediatric_age_years,last_vitals_at,version,optional_name,identifying_description,physician_death_confirmed_at,physician_death_confirmed_by';
 const VALID_LOCAL_TRIAGE = new Set(['red','yellow','green','black','pending']);
 const VALID_LOCAL_STATUS = new Set(['identified','stabilizing','observing','evacuating','handed_over','closed','self_evacuated','deceased']);
 
@@ -18304,6 +18522,9 @@ function remotePatientRecord(row){
     patientAgeGroup:row.is_pediatric?'pediatric':'adult', patientAge:row.pediatric_age_years||null,
     fullName:row.optional_name||'לא מזוהה', identityStatus:row.optional_name?'reported':'unknown', temporaryDescription:row.identifying_description||'',
     assignedMedicId:null, assignedPlatoonId:null, tempPatientId:null,
+    // The server's registration time (V2.99.96): the golden hour's lower limit for a casualty with
+    // no incident or injury time; lastModifiedAt is the pull time and moves on every update.
+    createdAt:row.created_at||undefined,
     stockSnapshot:{}, lastTouchedBy:'(remote)', lastModifiedAt:new Date().toISOString(),
     confirmedClinical:true, unsyncedEvents:0, locationHistory:[], possibleDuplicate:false,
     time:nowT(), vitals:{...VITALS_NOT_ON_DEVICE}, vitalsCapture:null, txHistory:[],
@@ -19049,31 +19270,75 @@ function applyEvacPointArrivals(rows){
 // server the newest entry by phone time wins, so an older entry pushed late does not overwrite a
 // newer correction. Other phones read patients.t_injury with its own query (pullInjuryTimes).
 const INJURY_TIME_EDIT_ROLES=new Set(['medic','paramedic','physician','pc','admin']);
-const INJURY_TIME_SOURCE_LABELS={entered:'הוזנה בשטח', incident_open:'משוערת · שעת ההתראה', event_time:'משוערת · שעת הרישום'};
+const INJURY_TIME_SOURCE_LABELS={entered:'הוזנה בשטח', incident_open:'משוערת · תחילת האירוע', event_time:'משוערת · שעת הרישום'};
 function injuryTimeRole(){ return currentUser?.role || activeRoleDashboard; }
 function canEditInjuryTime(){ return INJURY_TIME_EDIT_ROLES.has(injuryTimeRole()); }
 // Signed in, the account's own name (currentMedicName() is the local demo medic).
 function injuryTimeActorName(){ return currentUser ? (_myDisplayName || EVAC_POINT_ROLE_NAMES[currentUser.role] || currentUser.role) : currentMedicName(); }
 // The incident's alert time: signed in, the active incident's T0 (open_incident() stores it as
 // t_injury_default); in local demo mode, the site's T0 once the incident is official.
+// When the casualty's incident began (owner 2026-11-27, C5Rules.incidentClockStartMs): the earlier of
+// its alert time (T0) and its opening time. Signed in, the casualty's own incident: the active one,
+// or the incident list (_openIncidents) for a casualty of another incident (CC / חמ״ל רפואי see
+// several). Before this, only the active incident's T0 was known and every other casualty fell back
+// to the registration time.
+// The local demo has no opening time, only the site's T0.
 function incidentAlertTimeMs(p){
   if(currentUser){
-    if(p?.incidentId && activeIncident && p.incidentId!==activeIncident.id) return NaN;
-    return Date.parse(activeIncident?.t_zero||'');
+    const inc=(!p?.incidentId || p.incidentId===activeIncident?.id) ? activeIncident
+      : (_openIncidents||[]).find(i=>i.id===p.incidentId);
+    if(!inc) return NaN;
+    return C5Rules.incidentClockStartMs(Date.parse(inc.t_zero||''), Date.parse(inc.opened_at||''));
   }
   const s=siteAuthority?.[p?.siteId||'SITE_A'];
-  return Date.parse(s?.t0||'');
+  return C5Rules.incidentClockStartMs(Date.parse(s?.t0||''), NaN);
 }
-// {ms, source, estimated}: an entered or server time first, then the alert time, then (no T0
-// known) the registration time, which is what the server held before 088.
+// {ms, source, estimated}: an entered or server time first, then when the casualty's incident began
+// (incidentAlertTimeMs), then the registration time as source 'event_time', which the watchdog and
+// the חמ״ל רפואי card treat as "no clock". A stored 'event_time' (rows from before 088) is itself
+// only the registration time, so the incident's start is tried before it (owner 2026-11-27).
 function patientInjuryTime(p){
   const own=Number(p?.tInjury);
-  if(Number.isFinite(own) && own>0 && INJURY_TIME_SOURCE_LABELS[p.tInjurySource]) return {ms:own, source:p.tInjurySource, estimated:p.tInjurySource!=='entered'};
+  if(Number.isFinite(own) && own>0 && p.tInjurySource!=='event_time' && INJURY_TIME_SOURCE_LABELS[p.tInjurySource]) return {ms:own, source:p.tInjurySource, estimated:p.tInjurySource!=='entered'};
+  // The estimate is the incident's start, but never later than the registration (owner OK
+  // 2026-11-28): a T0 set after the casualty was registered, or in the future, cannot be when the
+  // injury happened; then the registration is the estimate, as a lower limit.
   const alertMs=incidentAlertTimeMs(p);
+  const registered=Date.parse(p?.createdAt||'');
+  const alertOk=Number.isFinite(alertMs) && alertMs>0 && alertMs<=Date.now()+60000;
+  if(alertOk && !(Number.isFinite(registered) && registered<alertMs)) return {ms:alertMs, source:'incident_open', estimated:true};
+  if(Number.isFinite(registered) && registered>0) return {ms:registered, source:'event_time', estimated:true};
   if(Number.isFinite(alertMs) && alertMs>0) return {ms:alertMs, source:'incident_open', estimated:true};
   return {ms:patientClockStart(p), source:'event_time', estimated:true};
 }
 function injuryClockStart(p){ return patientInjuryTime(p).ms; }
+// Clock of every injury timer, the Golden Hour and Crush rows and the חמ״ל רפואי golden-hour line
+// (owner 2026-11-27: "the earlier beats everything else"; 2026-11-28: "Crush syndrome or any other
+// injury timer starts when the alert comes in or open by someone, the earlier beats all"): the earliest of the
+// incident's alert time, its opening time and an injury time stored for the casualty
+// (C5Rules.goldenHourStartMs; future times are not used). So an entered time earlier than the alert
+// counts, and a later one never shortens the clock. With none known, the casualty's injury time as
+// patientInjuryTime gives it: the registration as a lower limit (source 'event_time') or a time in
+// the future, which the callers show as such. The injury time itself as recorded (patient row, MIST
+// text and payload) stays patientInjuryTime: it is what was entered, not an alarm.
+// Registration is the fourth input (clinical review 2026-11-27): the casualty was certainly injured
+// by then, so when it is the earliest (a site made official after its casualties were registered, a
+// future T0) the clock runs from it as a lower limit ("לפחות", source 'event_time') instead of
+// dropping to 0 or to "waiting". A tie goes to the incident start, which is not an estimate, also
+// when the server stored that same time as the casualty's 'incident_open' default.
+function injuryTimerClock(p){
+  const now=Date.now();
+  const incidentMs=incidentAlertTimeMs(p);
+  const own=Number(p?.tInjury);
+  const ownKnown=Number.isFinite(own) && own>0 && p.tInjurySource!=='event_time' && !!INJURY_TIME_SOURCE_LABELS[p.tInjurySource];
+  const registered=Date.parse(p?.createdAt||'');
+  const start=C5Rules.goldenHourStartMs([incidentMs, ownKnown?own:NaN, registered], now);
+  const futureEntered=ownKnown && p.tInjurySource==='entered' && own>now+60000;
+  if(!Number.isFinite(start)) return {...patientInjuryTime(p), futureEntered};
+  if(Number.isFinite(incidentMs) && start===incidentMs) return {ms:start, source:'incident_open', estimated:false, futureEntered};
+  if(ownKnown && start===own) return {ms:own, source:p.tInjurySource, estimated:p.tInjurySource!=='entered' && p.tInjurySource!=='incident_open', futureEntered};
+  return {ms:start, source:'event_time', estimated:true, futureEntered};
+}
 function injuryTimeHhmm(p){ return tourniquetHhmm(injuryClockStart(p)); }
 function injuryTimeShortLabel(p){
   const it=patientInjuryTime(p);

@@ -23,7 +23,7 @@ Demo V2.4 reshapes the product around the tactical timeline of a collapsed-build
 
 ## Command Picture
 
-- En-route site data is treated as command-visible context for חוג"ד, חמ"ל, and מ״פ רפואה.
+- En-route site data is treated as command-visible context for חוג"ד, חמ"ל רפואי, and מ״פ רפואה.
 - Initial evacuated counts remain editable later.
 - Added חוג"ד board section for active/completed MSTART sweeps, severity counts, trapped count, tourniquets, airway interventions, and missing full vitals.
 - Added a truck-first logistics model: medic supply use creates `SUPPLY_CONSUMED` events, חוג"ד sees whether the request is available in the truck, and shortages escalate to מ״פ רפואה / logistics.

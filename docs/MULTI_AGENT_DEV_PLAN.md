@@ -47,4 +47,4 @@ Things the first version recorded that are still true and still referenced:
 
 - **The `rules.js` / inlined-copy drift** (the SABCDE airway check present in one copy and not the other) was the reason for "single source of truth for domain rules". `scripts/check_repo.py` now fails if the two copies differ.
 - **Cloud sync over mesh networking** was decided because cellular networks hold up in real operations. Peer-to-peer mesh stays deferred, and this section is where the decision is recorded, so a proposal to add it has to argue against it. (The first version planned a line in ARCHITECTURE.md as well; it was never added.)
-- **"CHAMAL" is the command system role and dashboard**, not a network protocol.
+- **"MEDICAL CHAMAL" is the command system role and dashboard**, not a network protocol.
