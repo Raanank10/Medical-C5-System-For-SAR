@@ -125,10 +125,10 @@ async function checkFile(browser, file) {
     return {
       summary: text.includes('בזירה 3 · בנאפ״ל 1 (עד 7 דק׳) · פונו 1'),
       evacPoint: cut('בנאפ״ל (נקודת איסוף פלוגתית) — ממתינים לפינוי מד״א', 'פונו — לפי יעד'),
-      evacuated: cut('פונו — לפי יעד', 'משפך פינוי מחלקתי'),
-      funnel: text.includes('משפך פינוי מחלקתי') && text.includes('תעדוף פינוי מחלקתי'),
+      evacuated: cut('פונו — לפי יעד', 'משפך פינוי פלוגתי'),
+      funnel: text.includes('משפך פינוי פלוגתי') && text.includes('תעדוף פינוי פלוגתי'),
       truck: cut('בנאפ״ל (נקודת איסוף פלוגתית) — ממתינים לפינוי מד״א', 'פונו — לפי יעד').includes('רכב חוג״ד בנאפ״ל'),
-      priority: cut('תעדוף פינוי מחלקתי', 'פונו לפני הגעת כוח רפואי'),
+      priority: cut('תעדוף פינוי פלוגתי', 'פונו לפני הגעת כוח רפואי'),
     };
   });
   assert(board.summary, `${rel}: the site card must count on scene / at the evacuation point / evacuated separately`);

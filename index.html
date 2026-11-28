@@ -1050,7 +1050,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9995</div>
+      <div class="demo-kicker">Demo V2.9996</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1147,7 +1147,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9995</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9996</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1157,7 +1157,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9995</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9996</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -3569,7 +3569,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.95';
+const APP_VERSION = '2.99.96';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3814,12 +3814,17 @@ const DEMO_PLATOONS = [
   {platoonId:'PLT-A', name:'מחלקה רפואית א', pcId:'USR-BARAK', companyId:'COMP-1'},
   {platoonId:'PLT-B', name:'מחלקה רפואית ב', pcId:'USR-BARAK', companyId:'COMP-1'}
 ];
-// Command hierarchy (docs/ROLE_COMMAND_MODEL_v2.7.md): חוג״ד commands one platoon, מ״פ רפואה the
-// whole company. Each demo platoon works one site (same mapping the demo loader uses for
-// assignedPlatoonId); the PC's platoon is PLT-A, as in roleScopedPatients('pc'). Signed in, only
-// the active incident exists as SITE_A, so the PC's scope is that incident.
+// Command hierarchy (docs/ROLE_COMMAND_MODEL_v2.8.md "Companies and platoons", owner 2026-11-28):
+// the חוג״ד is the medical commander of its rescue company and sees every site of that company,
+// like the מ״פ חילוץ; מ״פ רפואה sees every site. Each demo platoon works one site (same mapping the
+// demo loader uses for assignedPlatoonId); the demo PC's company is its own companyId in
+// DEMO_USERS, and both demo platoons belong to it. Signed in, only the active incident exists as
+// SITE_A and the server decides access (app.can_access_incident: pc reaches its company's sites).
 const PLATOON_SITE = Object.freeze({'PLT-A':'SITE_A', 'PLT-B':'SITE_B'});
-let pcPlatoonId='PLT-A';
+let pcPlatoonId='PLT-A';   // the demo PC's home platoon (its own site, the truck site)
+function pcCompanyId(){ return DEMO_USERS.find(u=>u.role==='pc')?.companyId || 'COMP-1'; }
+function pcCompanyPlatoonIds(){ return DEMO_PLATOONS.filter(pl=>pl.companyId===pcCompanyId()).map(pl=>pl.platoonId); }
+function pcCompanyMedics(){ return DEMO_USERS.filter(u=>u.role==='medic' && u.companyId===pcCompanyId()); }
 // ── Real units (database/053, V2.99.42) ──
 // Signed in, the command views use the server's units instead of DEMO_PLATOONS: rescue companies
 // (each with its מ״פ חילוץ, its חוג״ד and medics, and platoons led by a מ״מ) and an ambulance team.
@@ -5736,7 +5741,7 @@ async function openMedicAssignModal(medicId){
     await loadRealMedicProfiles();
     document.getElementById('medic-assign-real-medic').innerHTML=_realMedicProfiles.length
       ? _realMedicProfiles.map(p=>`<option value="${escAttr(p.id)}">${escAttr(p.display_name||'חובש ללא שם')}${p.role==='paramedic'?' (פראמדיק)':p.role==='pc'?' (חוג״ד)':''}</option>`).join('')
-      : `<option value="">${currentUser?.role==='pc'?'אין חובשים במחלקה שלך · מ״פ רפואה משייך חובשים למחלקה':'לא נמצאו חשבונות חובש'}</option>`;
+      : `<option value="">${currentUser?.role==='pc'?'אין חובשים בפלוגה שלך · מ״פ רפואה משבץ חובשים בפלוגה':'לא נמצאו חשבונות חובש'}</option>`;
   }
   document.getElementById('medic-assign-title').textContent=real?`${COMPANY_COMMAND_ROLES.has(currentUser?.role)?'שיוך חובש / חוג״ד':'שיוך חובש'} לאירוע ${incidentDisplayName(activeIncident)}`:`שיוך ${displayUser(medicId)} לאירוע`;
   document.getElementById('medic-assign-address').value=real?(activeIncident.address||''):(current?.address||siteAddressFromName(pendingMedicAssign.siteId));
@@ -6969,7 +6974,10 @@ function openLegacyForRole(role){
 }
 function roleScopedPatients(role){
   if(role==='medic') return sortedPatients(patients.filter(p=>(p.assignedMedicId||userIdFromMedic(p.medic||p.lastTouchedBy))==='USR-COHEN'));
-  if(role==='pc') return sortedPatients(patients.filter(p=>(p.assignedPlatoonId||'PLT-A')===pcPlatoonId));
+  if(role==='pc'){
+    const myPlatoonIds=pcCompanyPlatoonIds();
+    return sortedPatients(patients.filter(p=>myPlatoonIds.includes(p.assignedPlatoonId||'PLT-A')));
+  }
   if(role==='rpc') return sortedPatients(patients.filter(p=>(p.assignedPlatoonId||'PLT-A')==='PLT-A'));
   if(role==='rcc'){
     const myPlatoonIds=commandPlatoons().filter(pl=>pl.companyId==='COMP-1').map(pl=>pl.platoonId);
@@ -7603,7 +7611,7 @@ const DecisionSupportEngine=(()=>{
     ]);
   }
   function forPc(){
-    // חוג״ד's recommendations cover its own platoon only, like its dashboard and command screen.
+    // חוג״ד's recommendations cover its own company only, like its dashboard and command screen.
     const ctx={...defaultContext(),patients:roleScopedPatients('pc')};
     const recommendations=evaluate(ctx).filter(r=>['PC','Medic','Logistics'].includes(r.responsibleRole));
     return {recommendations,sectorRisk:SectorRiskScore(ctx),operationalPressure:OperationalPressureIndex(ctx)};
@@ -7820,7 +7828,7 @@ function renderPcMedicPanel(m){
   </div>`;
 }
 function renderPcMedicLoadBoard(myPts){
-  const medics=focusFilteredList(DEMO_USERS.filter(u=>u.role==='medic' && u.platoonId==='PLT-A'), focusMatchesMedic);
+  const medics=focusFilteredList(pcCompanyMedics(), focusMatchesMedic);
   const panels=medics.map(u=>{
     const pts=myPts.filter(p=>(p.assignedMedicId||userIdFromMedic(p.medic||p.lastTouchedBy))===u.userId);
     const red=pts.filter(p=>p.triage==='red').length;
@@ -7839,7 +7847,7 @@ function renderPcMedicLoadBoard(myPts){
   return renderCollapsibleSection('pc-medic-load','עומס חובשים',grid || renderOperationalEmptyState('אין פצועים במיקוד הנוכחי'), medics.length, {emptyMessage:'אין פצועים במיקוד הנוכחי'});
 }
 function renderPcResponsibilityBoard(){
-  const medics=focusFilteredList(DEMO_USERS.filter(u=>u.role==='medic' && u.platoonId==='PLT-A'), focusMatchesMedic);
+  const medics=focusFilteredList(pcCompanyMedics(), focusMatchesMedic);
   const myPts=focusFilteredList(roleScopedPatients('pc'), focusMatchesPatient);
   const buttons=[
     ['medics',`חובשים בקריסה`,`${medics.length} חובשים · עומס לפי פצועים ועדכון אחרון`],
@@ -7857,8 +7865,8 @@ function renderPcResponsibilityBoard(){
       ${renderCommandIncidentTypeSection()}
       ${renderIncidentTypeReportsSection()}
       ${roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds('pc'), {truckSiteId:pcPlatoonSite()}))}
-      ${renderCommandEvacuationFunnel(myPts,'משפך פינוי מחלקתי')}
-      ${renderCollapsibleSection('pc-evac-priority','תעדוף פינוי מחלקתי', companyEvacuationPriorityRows(myPts), myPts.length, {criticalCount:myPts.filter(p=>p.triage==='red'&&!['evacuated','handed_over','deceased'].includes(p.patientStatus)).length, emptyMessage:waiting?'אין פצועים במיקוד הנוכחי':'אין פצועים הממתינים לפינוי'})}
+      ${renderCommandEvacuationFunnel(myPts,'משפך פינוי פלוגתי')}
+      ${renderCollapsibleSection('pc-evac-priority','תעדוף פינוי פלוגתי', companyEvacuationPriorityRows(myPts), myPts.length, {criticalCount:myPts.filter(p=>p.triage==='red'&&!['evacuated','handed_over','deceased'].includes(p.patientStatus)).length, emptyMessage:waiting?'אין פצועים במיקוד הנוכחי':'אין פצועים הממתינים לפינוי'})}
       ${renderExtractedCounterBoard()}
       ${board.patientBoard}`,
     action:`${renderPcNowTaskBoard(myPts)}${board.alerts}${board.tq}${board.handsOn}${renderSweepBoardForPc()}${renderPcAssessmentDebtBoard()}${board.rhythm}`,
@@ -7893,7 +7901,7 @@ function renderDedicatedPcCommandBoard(myPts){
   return {
     alerts:renderCollapsibleSection('pc-active-alerts','התראות פעילות',alertStrip,activeAlerts.length,{criticalCount:activeAlerts.length,emptyMessage:'אין התראות פתוחות'}),
     tq:renderCollapsibleSection('pc-tq-watch','⏱ חסמי עורקים פעילים',tqRows,tqPts.length,{criticalCount:tqPts.filter(isCriticalPatientForFocus).length,emptyMessage:'אין פצועים במיקוד הנוכחי'}),
-    patientBoard:renderCollapsibleSection('pc-patient-board','לוח פצועים מחלקתי',cards,myPts.length,{criticalCount:myPts.filter(isCriticalPatientForFocus).length,emptyMessage:'אין פצועים במיקוד הנוכחי'}),
+    patientBoard:renderCollapsibleSection('pc-patient-board','לוח פצועים פלוגתי',cards,myPts.length,{criticalCount:myPts.filter(isCriticalPatientForFocus).length,emptyMessage:'אין פצועים במיקוד הנוכחי'}),
     handsOn:`<div class="role-row" style="margin:0 16px 14px">
       <div class="role-row-title">טיפול ישיר — go hands-on</div>
       <div class="role-row-sub">חוג"ד יכול לפתוח ולטפל בפצוע בעצמו, בדיוק כמו חובש, כשצריך.</div>
@@ -7993,7 +8001,7 @@ function renderSweepBoardForPc(){
 function pcDrilldownHtml(key){
   const myPts=roleScopedPatients('pc');
   if(key==='medics'){
-    const rows=DEMO_USERS.filter(u=>u.role==='medic' && u.platoonId==='PLT-A').map(u=>{
+    const rows=pcCompanyMedics().map(u=>{
       const pts=myPts.filter(p=>(p.assignedMedicId||userIdFromMedic(p.medic||p.lastTouchedBy))===u.userId);
       const red=pts.filter(p=>p.triage==='red').length;
       const stale=pts.filter(p=>isVitalsOverdue(p)).length;
@@ -9146,7 +9154,7 @@ function renderRoleDashboard(role=activeRoleDashboard){
   // Signed in, the demo title and text are noise above the fold in an operation; only the sync pill stays.
   ctx?.closest('.demo-strip')?.classList.toggle('signed-in-compact', !!currentUser);
   const metrics=[
-    roleMetric(pts.length, role==='medic'?'הפצועים שלי':role==='pc'?'פצועי המחלקה':role==='rpc'?'פצועי המחלקה (טקטי)':role==='rcc'?'פצועי הפלוגה (טקטי)':'פצועים גלויים'),
+    roleMetric(pts.length, role==='medic'?'הפצועים שלי':role==='pc'?'פצועי הפלוגה':role==='rpc'?'פצועי המחלקה (טקטי)':role==='rcc'?'פצועי הפלוגה (טקטי)':'פצועים גלויים'),
     roleMetric(alerts.length, 'התראות לפעולה'),
     roleMetric(requests.filter(isRequestOpen).length, 'בקשות פתוחות'),
     roleMetric(['cc','rcc'].includes(role)?commandPlatoons().length:allSites.filter(s=>s.id!=='ALL').length, ['cc','rcc'].includes(role)?unitPluralLabel():'מוקדים')
@@ -9157,9 +9165,9 @@ function renderRoleDashboard(role=activeRoleDashboard){
   if(role==='pc'){
     const myPts=roleScopedPatients('pc');
     const medicCount=usingRealPlatoons() ? platoonMembers(_myCompanyId,['medic','paramedic']).length
-      : DEMO_USERS.filter(u=>u.role==='medic' && u.platoonId==='PLT-A').length;
+      : pcCompanyMedics().length;
     objects=[
-      roleRow('חובשים בקריסה',`${medicCount} חובשים זמינים / פעילים במחלקה`),
+      roleRow('חובשים בקריסה',`${medicCount} חובשים זמינים / פעילים בפלוגה`),
       roleRow('הפצועים שלי',`${myPts.length} פצועים תחת אחריות חוג"ד · ${myPts.filter(p=>['red','yellow'].includes(p.triage)).length} אדום/צהוב`),
       roleRow('תמונת מצב מוקד',`${siteData.name||'אין מוקד'} · צפי לכודים ${siteData.expectedCasualties?.trapped||0} · נעדרים ${siteData.expectedCasualties?.missing||0}`),
       ...sitesSummaryRows()
@@ -14468,14 +14476,20 @@ let cmdPanelOpen={priority:true,locations:true,reinforcement:true,heatmap:false,
 function companyLabelForSite(siteId){
   return siteId==='SITE_B' ? 'פלוגה ב / BRAVO' : siteId==='SITE_A' ? 'פלוגה א / ALFA' : 'כל הפלוגות';
 }
-// The PC's command screen shows its own platoon's site only; מ״פ רפואה, חמ״ל and every other
-// command role see every site, including the "all sites" tab.
+// The PC's command screen shows every site of its company (no "all sites" tab, so another
+// company's site can never be summed in); מ״פ רפואה, חמ״ל and every other command role see every
+// site, including the "all sites" tab.
 function pcPlatoonSite(){
   const site=PLATOON_SITE[pcPlatoonId]||'SITE_A';
   return allSites.some(s=>s.id===site) ? site : 'SITE_A';
 }
+function pcCompanySites(){
+  const sites=pcCompanyPlatoonIds().map(id=>PLATOON_SITE[id]).filter(id=>id && allSites.some(s=>s.id===id));
+  const home=pcPlatoonSite();
+  return [home, ...sites.filter(id=>id!==home)].filter((id,i,a)=>a.indexOf(id)===i);
+}
 function commandVisibleSites(){
-  if(commandRole==='pc') return [pcPlatoonSite()];
+  if(commandRole==='pc') return pcCompanySites();
   return allSites.map(s=>s.id);
 }
 function canSeeCommandSite(siteId){
@@ -14601,7 +14615,7 @@ function renderCmdTabs(){
 }
 function switchCmdSite(id){
   if(!canSeeCommandSite(id)){
-    toast('חוג״ד רואה רק את מוקד המחלקה שלו · מ״פ רפואה וחמ״ל רואים את כל המוקדים');
+    toast('חוג״ד רואה רק את מוקדי הפלוגה שלו · מ״פ רפואה וחמ״ל רואים את כל המוקדים');
     return;
   }
   cmdActiveSite=id; cmdFilter='all';
@@ -15702,7 +15716,7 @@ function pcReviewAarStats(){
 }
 function renderReinforcementPanel(){
   const body=document.getElementById('cmd-reinforcement-requests'); if(!body) return;
-  const visible=reinforcementRequests.filter(r=>commandRole!=='pc' || (r.siteId||'SITE_A')===pcPlatoonSite());
+  const visible=reinforcementRequests.filter(r=>commandRole!=='pc' || pcCompanySites().includes(r.siteId||'SITE_A'));
   const open=visible.filter(isRequestOpen);
   setCmdPanelMeta('reinforcement', `${open.length} פתוחות מתוך ${visible.length}`);
   const createButton=`<div style="padding:8px 16px 0"><button class="btn-primary" onclick="openReinforcementRequest()" style="background:var(--accent)">+ בקשת תגבור רפואי</button></div>`;
@@ -15889,7 +15903,7 @@ function renderCmdContent(){
   const site=allSites.find(s=>s.id===cmdActiveSite)||allSites[0];
   const hdr=document.getElementById('cmd-header-label');
   if(hdr) hdr.textContent=commandRole==='pc'
-    ? `${site.name} — חוג״ד (${platoonName(pcPlatoonId)})`
+    ? `${site.name} — חוג״ד (${platoonName(Object.keys(PLATOON_SITE).find(id=>PLATOON_SITE[id]===site.id)||pcPlatoonId)})`
     : commandRole==='cc'
       ? (cmdActiveSite==='ALL'?'כל המוקדים בפלוגה — מ״פ רפואה':`${site.name} — מ״פ רפואה`)
       : (cmdActiveSite==='ALL'?'כל המוקדים מכל הפלוגות — חמ״ל':site.name);
@@ -16244,10 +16258,10 @@ function renderCasualtyLocationBoard(siteIds, options={}){
   }).join('');
   return blocks || '<div style="color:var(--muted);font-size:13px;padding:8px 0">אין מוקדים להצגה</div>';
 }
-// מ״פ רפואה (company) sees every site; חוג״ד (platoon) only its own platoon's site
-// (docs/ROLE_COMMAND_MODEL_v2.7.md), the same scope as the command screen.
+// מ״פ רפואה sees every site; חוג״ד every site of its own company (docs/ROLE_COMMAND_MODEL_v2.8.md
+// "Companies and platoons"), the same scope as the command screen.
 function casualtyBoardSiteIds(role){
-  return role==='pc' ? [pcPlatoonSite()] : allSites.filter(s=>s.id!=='ALL').map(s=>s.id);
+  return role==='pc' ? pcCompanySites() : allSites.filter(s=>s.id!=='ALL').map(s=>s.id);
 }
 // External reports = this device's own (persisted locally) + the synced ones from the server
 // (database/044), deduplicated by the local report id the server keeps as external_reference.

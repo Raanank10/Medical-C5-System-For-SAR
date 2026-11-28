@@ -9,7 +9,7 @@ node scripts/browser_incident_lifecycle_test.js   # logged-in incident picker/op
 node scripts/browser_collapse_brief_test.js       # Movement screen: building collapse with any incident type
 node scripts/browser_medic_assignment_test.js     # cross-device PC -> medic assignment: PC, medic and rescue tabs sharing one stubbed backend; a refused re-assign of a relieved medic (WP-27) takes its note and address back and says why in Hebrew
 node scripts/browser_evacuation_tracking_test.js  # cross-device evacuation destination/MDA classification, location board, UH report: PC, CC and medic tabs
-node scripts/browser_command_scope_test.js        # command hierarchy: CC (company) sees every site, PC (platoon) only its own
+node scripts/browser_command_scope_test.js        # command hierarchy: CC sees every site; PC every site of its own company (V2.99.96), never another company's
 node scripts/browser_platoon_security_test.js     # database/045+053 client side: real companies/platoons, no self-join, unit roster, PC/RCC see their company, RPC its platoon; WP-27 (database/096): CC hands a site to another company or reinforces it from the picker (reason required), the leaving PC keeps recording until "הוחלפתי - מסרתי" (or the CC's "סמן כהוחלף"), then sees "צפייה בלבד" until the CC ends its access, the new PC gets a one-time notice, a relief unconfirmed for 30 min alerts the site's PC and the CC, the demo title is hidden when signed in, the roster no longer moves a site silently
 node scripts/browser_admin_users_test.js          # admin user management + invite-link handling, stubbed Supabase client
 node scripts/browser_sync_rejection_test.js       # a server-rejected patient is loud on the phone (tile badge, card banner, red sync pill, resend)

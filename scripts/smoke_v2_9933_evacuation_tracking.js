@@ -39,14 +39,14 @@ for (const rel of files) {
   assert(html.includes("roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds('pc'), {truckSiteId:pcPlatoonSite()}))")
     && html.includes("roleSection('לוח נפגעים לפי מיקום — מוקד ואזור', renderCasualtyLocationBoard(casualtyBoardSiteIds('cc')))"), `${rel}: PC and CC role dashboards must show the location board`);
   assert(html.includes('id="cmd-location-board"') && html.includes('locations:true'), `${rel}: command screen must have the location board panel`);
-  assert(html.includes("return role==='pc' ? [pcPlatoonSite()] : allSites.filter(s=>s.id!=='ALL').map(s=>s.id);"), `${rel}: board: CC (company) every site, PC (platoon) its own site`);
+  assert(html.includes("return role==='pc' ? pcCompanySites() : allSites.filter(s=>s.id!=='ALL').map(s=>s.id);"), `${rel}: board: CC every site, PC every site of its own company (V2.99.96)`);
   assert(html.includes("renderCasualtyLocationBoard(cmdActiveSite==='ALL'?commandVisibleSites().filter(id=>id!=='ALL'):[cmdActiveSite])"), `${rel}: command screen board follows the command scope`);
 
-  // Command hierarchy: PC (platoon) scoped to its platoon's site, CC (company) sees every site.
-  assert(html.includes("function commandVisibleSites(){\n  if(commandRole==='pc') return [pcPlatoonSite()];\n  return allSites.map(s=>s.id);"), `${rel}: only the PC is narrowed on the command screen`);
+  // Command hierarchy: PC scoped to its own company's sites (V2.99.96, owner 2026-11-28), CC sees every site.
+  assert(html.includes("function commandVisibleSites(){\n  if(commandRole==='pc') return pcCompanySites();\n  return allSites.map(s=>s.id);"), `${rel}: only the PC is narrowed on the command screen, to its company`);
   assert(!html.includes('ccCompanySite'), `${rel}: the CC must no longer be pinned to one site`);
-  assert(html.includes("const visible=reinforcementRequests.filter(r=>commandRole!=='pc' || (r.siteId||'SITE_A')===pcPlatoonSite());"), `${rel}: PC sees its own platoon's reinforcement requests, CC all`);
-  assert(html.includes("const ctx={...defaultContext(),patients:roleScopedPatients('pc')};"), `${rel}: PC recommendations cover its own platoon only`);
+  assert(html.includes("const visible=reinforcementRequests.filter(r=>commandRole!=='pc' || pcCompanySites().includes(r.siteId||'SITE_A'));"), `${rel}: PC sees its own company's reinforcement requests, CC all`);
+  assert(html.includes("const ctx={...defaultContext(),patients:roleScopedPatients('pc')};"), `${rel}: PC recommendations cover its own company only`);
   assert(html.includes("const border=color?`2px solid ${color}`:'2px dashed var(--muted)';"), `${rel}: pending triage must never get a triage colour on the board`);
 
   // Location now syncs, and new pulls never break the main patient pull.

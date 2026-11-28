@@ -1,7 +1,10 @@
 // Real-browser test of the command hierarchy on the command screen and role dashboards (V2.99.33):
-// מ״פ רפואה (cc, company) sees every site; חוג״ד (pc, platoon) only its own platoon's site
-// (docs/ROLE_COMMAND_MODEL_v2.7.md). Local demo mode, which has two sites (SITE_A = PLT-A,
-// SITE_B = PLT-B); signed in there is only the active incident, so nothing narrows further there.
+// מ״פ רפואה (cc) sees every site; חוג״ד (pc), the medical commander of a rescue company, sees every
+// site of its own company and no other (docs/ROLE_COMMAND_MODEL_v2.8.md "Companies and platoons",
+// owner 2026-11-28; the server has the same rule in app.can_access_incident since database/053).
+// Local demo mode, which has two sites (SITE_A = PLT-A, SITE_B = PLT-B), both platoons of the
+// PC's company COMP-1; the test then moves PLT-B to another company and checks the PC loses it.
+// Signed in there is only the active incident, so nothing narrows further there.
 //
 // Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_command_scope_test.js
@@ -47,8 +50,10 @@ async function checkFile(browser, file) {
     const board = document.getElementById('cmd-location-board').textContent;
     const reinf = document.getElementById('cmd-panel-reinforcement-meta').textContent;
     const header = document.getElementById('cmd-header-label').textContent;
+    const active = cmdActiveSite;
     const triedB = (switchCmdSite('SITE_B'), cmdActiveSite);
-    return { tabs, board, reinf, header, active: cmdActiveSite, triedB };
+    const boardAfterB = document.getElementById('cmd-location-board').textContent;
+    return { tabs, board, reinf, header, active, triedB, boardAfterB };
   }, role);
 
   // CC: every site, including "all sites", starting on all sites.
@@ -59,13 +64,13 @@ async function checkFile(browser, file) {
   assert(cc.header.includes('מ״פ רפואה'), `${rel}: CC header must name the role (got ${cc.header})`);
   assert(cc.triedB === 'SITE_B', `${rel}: CC may switch to any site`);
 
-  // PC: its own platoon's site only; switching to the other site is refused.
+  // PC: every site of its company (both demo platoons are COMP-1), no "all sites" tab.
   const pc = await view('pc');
-  assert(pc.tabs.length === 1 && !pc.tabs[0].includes('הכל'), `${rel}: PC must see only its platoon's site tab (got ${JSON.stringify(pc.tabs)})`);
-  assert(pc.active === 'SITE_A' && pc.triedB === 'SITE_A', `${rel}: PC must stay on its platoon's site (active ${pc.active}, after switch ${pc.triedB})`);
-  assert(pc.board.includes('PA1') && !pc.board.includes('PB1'), `${rel}: PC board must show only its platoon's site`);
-  assert(pc.reinf.includes('מתוך 1'), `${rel}: PC must see only its platoon's reinforcement requests (got ${pc.reinf})`);
-  assert(pc.header.includes('חוג״ד') && pc.header.includes('מחלקה רפואית א'), `${rel}: PC header must name its platoon (got ${pc.header})`);
+  assert(pc.tabs.length === 2 && !pc.tabs.some((t) => t.includes('הכל')), `${rel}: PC must see both company sites and no all-sites tab (got ${JSON.stringify(pc.tabs)})`);
+  assert(pc.active === 'SITE_A' && pc.triedB === 'SITE_B', `${rel}: PC starts on its home site and may switch to the company's other site (active ${pc.active}, after switch ${pc.triedB})`);
+  assert(pc.board.includes('PA1') && !pc.board.includes('PB1') && pc.boardAfterB.includes('PB1'), `${rel}: PC command board shows the active company site, and the other one after switching`);
+  assert(pc.reinf.includes('מתוך 2'), `${rel}: PC must see the company's reinforcement requests (got ${pc.reinf})`);
+  assert(pc.header.includes('חוג״ד') && pc.header.includes('מחלקה רפואית א'), `${rel}: PC header must name the site's platoon (got ${pc.header})`);
 
   // Role dashboards follow the same hierarchy.
   const dash = async (role) => page.evaluate((r) => { startRoleDashboard(r); return document.getElementById('role-dashboard-body').textContent; }, role);
@@ -73,15 +78,26 @@ async function checkFile(browser, file) {
   const pcDash = await dash('pc');
   assert(ccDash.includes('PA1') && ccDash.includes('PB1'), `${rel}: CC dashboard board must show both sites`);
   const pcBoard = pcDash.slice(pcDash.indexOf('לוח נפגעים לפי מיקום'));
-  assert(pcBoard.includes('PA1') && !pcBoard.includes('PB1'), `${rel}: PC dashboard board must show only its platoon's site`);
-
-  // PC recommendations never point at the other platoon's patients.
+  assert(pcBoard.includes('PA1') && pcBoard.includes('PB1'), `${rel}: PC dashboard board must show both company sites`);
   const pcRecs = await page.evaluate(() => JSON.stringify(DecisionSupportEngine.forPc().recommendations));
-  assert(!pcRecs.includes('scope-b') && !pcRecs.includes('PB1'), `${rel}: PC recommendations must stay inside its platoon`);
+  assert(pcRecs.includes('scope-a') || pcRecs.includes('PA1'), `${rel}: PC recommendations must cover its company's red patient`);
+
+  // Move PLT-B (and so SITE_B) to another company: the PC loses it, the CC keeps it.
+  await page.evaluate(() => { DEMO_PLATOONS.find((pl) => pl.platoonId === 'PLT-B').companyId = 'COMP-2'; });
+  const pcOther = await view('pc');
+  assert(pcOther.tabs.length === 1 && pcOther.active === 'SITE_A' && pcOther.triedB === 'SITE_A', `${rel}: PC must not reach another company's site (tabs ${JSON.stringify(pcOther.tabs)}, after switch ${pcOther.triedB})`);
+  assert(pcOther.board.includes('PA1') && !pcOther.boardAfterB.includes('PB1'), `${rel}: PC board must not show another company's site`);
+  assert(pcOther.reinf.includes('מתוך 1'), `${rel}: PC must not see another company's reinforcement requests (got ${pcOther.reinf})`);
+  const pcOtherDash = await dash('pc');
+  assert(!pcOtherDash.slice(pcOtherDash.indexOf('לוח נפגעים לפי מיקום')).includes('PB1'), `${rel}: PC dashboard must not show another company's site`);
+  const pcOtherRecs = await page.evaluate(() => JSON.stringify(DecisionSupportEngine.forPc().recommendations));
+  assert(!pcOtherRecs.includes('scope-b') && !pcOtherRecs.includes('PB1'), `${rel}: PC recommendations must stay inside its company`);
+  const ccOther = await view('cc');
+  assert(ccOther.board.includes('PB1') && ccOther.triedB === 'SITE_B', `${rel}: CC still sees every site`);
 
   assert(errors.length === 0, `${rel}: page errors: ${errors.join(' | ')}`);
   await context.close();
-  console.log(`${rel}: command scope (CC every site, PC own platoon) browser test passed`);
+  console.log(`${rel}: command scope (CC every site, PC own company) browser test passed`);
 }
 
 (async () => {
