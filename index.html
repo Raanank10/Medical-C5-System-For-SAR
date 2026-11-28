@@ -8688,7 +8688,7 @@ function chamalSiteCardHtml(site){
   const status=st.siteClear?.cleared?'אתר נקי':(INCIDENT_STATUS_LABELS[st.incidentStatus]||st.incidentStatus);
   // Golden hour (the full screen's 45 / 60 minute watchdog thresholds), for casualties still on the
   // way out: not evacuated, and not black / deceased. Counted from the earliest of the incident's alert,
-  // its opening, an entered injury time and the registration (goldenHourClock, owner 2026-11-27).
+  // its opening, an entered injury time and the registration (injuryTimerClock, owner 2026-11-27).
   // "Estimated" counts only a non-entered stored time that is not the incident's own start. Always shown beside the count: how many times are estimates
   // (the incident's start, no time entered), how many have neither (counted on the registration time
   // as a lower limit and named "לפחות"),
@@ -8696,7 +8696,7 @@ function chamalSiteCardHtml(site){
   const open=pts.filter(p=>evacuationStage(p)!=='evacuated' && !isDeceasedForEvac(p));
   const gh={amber:0,red:0,estimated:0,unknown:0,future:0};
   open.forEach(p=>{
-    const inj=goldenHourClock(p);
+    const inj=injuryTimerClock(p);
     // A time in the future is set aside and named; the casualty is still counted on the clock left.
     if(inj.futureEntered) gh.future++;
     if(Number.isFinite(inj.ms) && inj.ms>Date.now()+60000){ if(!inj.futureEntered) gh.future++; return; }
@@ -11297,7 +11297,6 @@ function buildAlertObjects(pts=patients, reportSites=null){
   tourniquetSnoozeAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
   pcReviewAlertObjects(pts).forEach(a=>pushAlert(alerts,a));
   duplicateCandidates(pts).forEach(([a,b],idx)=>pushAlert(alerts,{id:`dup-${a.id}-${b.id}`,type:'DUPLICATE_SUSPECTED',severity:'medium',owner:'pc',audience:['pc','chamal'],escalatesTo:null,actionRequired:'merge_duplicate',scope:'site',category:'integrity',siteId:a.siteId||b.siteId||'SITE_A',patientId:a.id,title:`חשד לכפילות ${a.visualId||a.id} ↔ ${b.visualId||b.id}`,detail:'בדיקה ידנית בלבד; אין מיזוג הרסני של אירועים'}));
-  const reports=cmdActiveSite==='ALL'?allSites.filter(s=>s.id!=='ALL').flatMap(s=>siteExternalReports(s.id)):siteExternalReports(cmdActiveSite);
   if(currentUser){
     openIncidentTypeReports().forEach(x=>pushAlert(alerts,{id:`incident-type-report-${x.id}`,type:'INCIDENT_TYPE_MISMATCH',severity:'medium',owner:'pc',audience:['pc','cc'],escalatesTo:null,actionRequired:'acknowledge',scope:'site',category:'integrity',siteId:'SITE_A',
       title:'בקשה להסיר סוג אירוע',
@@ -11308,7 +11307,6 @@ function buildAlertObjects(pts=patients, reportSites=null){
     const auth=ensureSiteStatusFields(typeReport.siteId);
     if(auth.incidentType && auth.incidentType!==typeReport.type) pushAlert(alerts,{id:`incident-type-mismatch-${typeReport.siteId}`,type:'INCIDENT_TYPE_MISMATCH',severity:'medium',owner:'pc',audience:['pc','cc'],escalatesTo:null,actionRequired:'acknowledge',scope:'site',category:'integrity',siteId:typeReport.siteId,title:'פער בסוג אירוע: חובש מול חילוץ',detail:`חילוץ: ${INCIDENT_TYPE_LABELS[auth.incidentType]} · חובש: ${INCIDENT_TYPE_LABELS[typeReport.type]} · סוג החילוץ נשאר בתוקף`});
   }
-  const conflicts=externalConflictCount(pts,reports);
   // Per site, and only against a report that exists (V2.99.96; externalGapsBySite). Before, the
   // field count of every patient passed in (all sites for CC and chamal, one platoon for PC) was
   // compared with the reports of cmdActiveSite alone, and with no report every field casualty
@@ -15144,13 +15142,13 @@ function computeWatchdogRows(pts){
       return {state:noClock?lowerBound(watchdogState(ageMin,45,60)):watchdogState(ageMin,45,60),
         detail:noClock?`לפחות ${ageMin} דק׳ (מהרישום) · אין שעת פציעה ואין שעת התראה או פתיחה לאירוע`:`${ageMin} דק׳ ${note}`};
     };
-    const ghClock=goldenHourClock(p);
+    const ghClock=injuryTimerClock(p);
     const golden=clockRow(ghClock);
     const futureNote=ghClock.futureEntered?' · שעת הפציעה שהוזנה בעתיד, בדוק שעון':'';
     rows.push({patient:p.id, label, name:'Golden Hour', title:'Golden Hour · כל הפצועים (כולל שפונו ושחורים)', trigger:'Any registered patient', threshold:'Earliest of T0 / opening / injury / registration +45m / +60m', state:golden.state, detail:golden.detail+futureNote});
     if(normalizeTrapStatus(p)==='trapped'){
-      const crush=clockRow(patientInjuryTime(p));
-      rows.push({patient:p.id, label, name:'Crush Syndrome', trigger:'Access = Trapped', threshold:'T_injury +45m', state:crush.state, detail:`לכוד · ${crush.detail}`});
+      const crush=clockRow(ghClock);
+      rows.push({patient:p.id, label, name:'Crush Syndrome', trigger:'Access = Trapped', threshold:'Earliest of T0 / opening / injury / registration +45m', state:crush.state, detail:`לכוד · ${crush.detail}${futureNote}`});
     }
     if(p.tourniquet?.appliedAt){
       const tqMin=Math.floor((now-p.tourniquet.appliedAt)/60000);
@@ -17531,8 +17529,16 @@ async function submitIncidentMerge(sourceId){
   _mergePanelFor=null;
   const renames=Array.isArray(r.data.renamed_patients)?r.data.renamed_patients:[];
   const moved=r.data.moved||{};
-  toast(`אוחד לתוך ${r.data.target_visual_id||tgt?.visual_id||''} · ${moved.patients??0} פצועים הועברו`+(renames.length?` · ${renames.length} מזהים שונו: `+renames.slice(0,3).map(x=>`${x.from}→${x.to}`).join(', '):'')
+  if(r.data.changed===false) toast(`האירוע כבר אוחד לתוך ${r.data.target_visual_id||tgt?.visual_id||''} קודם לכן`);
+  else toast(`אוחד לתוך ${r.data.target_visual_id||tgt?.visual_id||''} · ${moved.patients??0} פצועים הועברו`+(renames.length?` · ${renames.length} מזהים שונו: `+renames.slice(0,3).map(x=>`${x.from}→${x.to}`).join(', '):'')
     +(r.data.pre_evacuation_kept_on_source?' · דיווח פינוי מוקדם נשאר באירוע המקורי, יש לבדוק':''));
+  // database/098: someone the target site itself ended stays ended; the CC must know who, because
+  // the merge did not give him access back (owner 2026-11-26). Blocking, like the confirm above.
+  const keptEnded=Array.isArray(r.data.memberships_kept_ended)?r.data.memberships_kept_ended:[];
+  if(keptEnded.length){
+    const label=x=>`${x.display_name||'ללא שם'} (${x.access_ended_at?'ללא גישה':'צפייה בלבד'})`;
+    alert(`שים/י לב: ${keptEnded.map(label).join(', ')} - ב-${r.data.target_visual_id||tgt?.visual_id||''} הגישה שלהם הוגבלה עוד לפני המיזוג, והמיזוג לא החזיר אותה. אם צריך לעבוד שם, יש לשייך מחדש (החוג"ד של האדם, מ״פ רפואה, חמ״ל רפואי או מנהל מערכת).`);
+  }
   if(activeIncident?.id===sourceId){ await switchToMergedIncident(targetId, r.data.target_visual_id||null); return; }
   await refreshIncidentContext();
   if(document.getElementById('screen-incident-picker')?.classList.contains('active')) renderIncidentPicker();
@@ -19292,19 +19298,21 @@ function patientInjuryTime(p){
   return {ms:patientClockStart(p), source:'event_time', estimated:true};
 }
 function injuryClockStart(p){ return patientInjuryTime(p).ms; }
-// Golden-hour clock (owner 2026-11-27: "the earlier beats everything else"): the earliest of the
+// Clock of every injury timer, the Golden Hour and Crush rows and the חמ״ל רפואי golden-hour line
+// (owner 2026-11-27: "the earlier beats everything else"; 2026-11-28: "Crush syndrome or any other
+// injury timer starts when the alert comes in or open by someone, the earlier beats all"): the earliest of the
 // incident's alert time, its opening time and an injury time stored for the casualty
 // (C5Rules.goldenHourStartMs; future times are not used). So an entered time earlier than the alert
 // counts, and a later one never shortens the clock. With none known, the casualty's injury time as
 // patientInjuryTime gives it: the registration as a lower limit (source 'event_time') or a time in
-// the future, which the callers show as such. Crush, MIST and the stored report keep the casualty's
-// own injury time (patientInjuryTime).
+// the future, which the callers show as such. The injury time itself as recorded (patient row, MIST
+// text and payload) stays patientInjuryTime: it is what was entered, not an alarm.
 // Registration is the fourth input (clinical review 2026-11-27): the casualty was certainly injured
 // by then, so when it is the earliest (a site made official after its casualties were registered, a
 // future T0) the clock runs from it as a lower limit ("לפחות", source 'event_time') instead of
 // dropping to 0 or to "waiting". A tie goes to the incident start, which is not an estimate, also
 // when the server stored that same time as the casualty's 'incident_open' default.
-function goldenHourClock(p){
+function injuryTimerClock(p){
   const now=Date.now();
   const incidentMs=incidentAlertTimeMs(p);
   const own=Number(p?.tInjury);
