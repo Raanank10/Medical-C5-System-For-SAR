@@ -29,8 +29,9 @@ You review server-side and sync changes for C5 Sentinel-SAR: a Postgres event lo
    - **Own company's sites and incidents only:** `rcc` (מ״פ חילוץ, rescue company commander) and `pc`.
    - **Own platoon's sites and incidents only:** `rpc`.
    - **Anyone else** (medics, logistics) reaches only the incidents they are an active member of (`incident_memberships`, not read-only). A member's own incidents are reachable for every role.
+   - **Read-only reach** (`app.has_read_only_incident_access()`, `app.can_view_incident()` in `database/096`): after the CC hands a site to another company, the company that left (its PC/RCC, its former RPC) and read-only members keep a read-only view until the CC ends it. That is by design, not a leak; a change that lets a read-only caller write, or never ends the access, is a finding.
    - Do not confuse the two company commanders: the medical CC sees everything, the rescue RCC only its own company.
-   - The rescue chain (RPC/RCC) also never reads clinical data: no triage colour, tourniquet, vitals, treatment or mechanism (`database/053`, `database/074`).
+   - The rescue chain (RPC/RCC) also never reads clinical data (`database/053`, `database/074`): no triage colour (only urgent / not urgent / not yet sorted), tourniquet, pulse, breathing, injury zones, MDA classification, vitals or treatments. They keep identity, location, trapped / access, evacuation status and the evacuation order.
    - A change that widens any role's reach, or gives RCC/RPC clinical data, is a blocker unless the diff records the owner's decision.
 
    Check the server enforces what the client hides. A spoofed `actor_role` in an event payload must not grant authority.

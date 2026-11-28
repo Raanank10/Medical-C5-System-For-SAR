@@ -5807,7 +5807,7 @@ async function loadRealMedicProfiles(){
   if(!client || !currentUser) return;
   try{
     // database/045: company-level command may also assign a PC to a site; a PC's list is limited
-    // by RLS to its own platoon's medics/paramedics.
+    // by RLS to its own company's medics/paramedics (database/053, 065).
     const roles=COMPANY_COMMAND_ROLES.has(currentUser.role) ? ['medic','paramedic','pc'] : ['medic','paramedic'];
     const res=await client.from('profiles').select('id,display_name,role').in('role',roles).eq('is_active',true).order('display_name');
     if(!res.error) _realMedicProfiles=res.data||[];
@@ -6952,7 +6952,7 @@ function startRoleDashboard(role){
 function roleConfig(role){
   return {
     medic:{title:'חובש — מפעיל פצועים', actor:'חובש — משתמש מחובר', audience:'medic', legacy:'dashboard', responsibilities:['פתיחת פצועים ועדכון מדדים','תיעוד טיפול ומיון','סימון לכוד / לא לכוד / לא ידוע','טיוטת מוקד ראשונית','סימון חשד לנפטר / לא בר הצלה ופתיחת בקשת רופא אוטומטית']},
-    pc:{title:'חוג"ד / חפ״ק רפואי', actor:'חוג"ד — משתמש מחובר', audience:'pc', legacy:'commander', responsibilities:['ניהול כל החובשים במחלקה','התראה על אירוע שחובש פתח ושיבוץ המחלקה שלו','הקצאה מחדש בתוך המחלקה','בקשת חובשים / פראמדיק / רופא','ניהול פינוי ותעדוף מקומי','יכול לפתוח ולטפל בפצוע ישירות כמו חובש, כולל סריקת MSTART, כשנדרש']},
+    pc:{title:'חוג"ד / חפ״ק רפואי', actor:'חוג"ד — משתמש מחובר', audience:'pc', legacy:'commander', responsibilities:['ניהול כל החובשים בפלוגה','התראה על אירוע שחובש פתח ושיבוץ המחלקה שלו','הקצאה מחדש בתוך הפלוגה','בקשת חובשים / פראמדיק / רופא','ניהול פינוי ותעדוף מקומי','יכול לפתוח ולטפל בפצוע ישירות כמו חובש, כולל סריקת MSTART, כשנדרש']},
     cc:{title:'מ״פ רפואה', actor:'מ״פ רפואה — משתמש מחובר', audience:'cc', legacy:'commander', responsibilities:['פיקוד ישיר על משאבים רפואיים','הקצאה בין מחלקות','אישור / דחייה / ניתוב בקשות תגבור','ניהול תורי רופא / פראמדיק / קביעת מוות','הסרת צווארי בקבוק ברמת פלוגה']},
     physician:{title:'רופא / פראמדיק — תור סקירה רפואית', actor:'רופא / פראמדיק — משתמש מחובר', audience:'physician', legacy:'commander', responsibilities:['סקירת פצועים קשים','מענה לבקשות חוג"ד / מ״פ רפואה','החלטה רפואית בכירה','קביעת מוות / אישור מוות','סגירת בקשת סקירה רפואית']},
     logistics:{title:'קצין לוגיסטיקה / Log-O', actor:'רס״ם אמיר דגן — Log-O', audience:'logistics', legacy:'logistics', responsibilities:['מלאי ציוד רפואי לפי מחלקה / מוקד','מענה לבקשות ציוד','הקצאת אספקה מחדש','מעקב burn rate','הצפת חוסר המשפיע על טיפול']},
