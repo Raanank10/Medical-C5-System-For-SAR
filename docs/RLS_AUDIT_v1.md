@@ -194,6 +194,8 @@ To do once applied live: the same matrix against the real project inside a rolle
 
 ## Follow-up: platoon command scope (`database/045`)
 
+*Superseded for the PC by `database/053` (see "Follow-up: companies, platoons and rescue-chain scope" below): a PC reaches every site of its own company, not only its platoon's. Kept as the record of the 045 decision and audit.*
+
 Decided with the repo owner 2026-10-18: מ״פ רפואה (cc, company) sees every site; חוג״ד (pc, platoon) only its own platoon's site, enforced on the server and not only in the UI. A site is an incident, one incident per platoon. A medic's draft goes to the PC of that medic's platoon. Medics and paramedics follow the same no-self-join rule.
 
 The cc side was already true (`app.can_access_incident` gives cc/chamal/admin/physician/rpc/rcc every incident). The pc was not actually confined, because membership was self-service. Gaps found live:

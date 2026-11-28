@@ -125,16 +125,16 @@ async function checkFile(browser, file) {
     return {
       summary: text.includes('בזירה 3 · בנאפ״ל 1 (עד 7 דק׳) · פונו 1'),
       evacPoint: cut('בנאפ״ל (נקודת איסוף פלוגתית) — ממתינים לפינוי מד״א', 'פונו — לפי יעד'),
-      evacuated: cut('פונו — לפי יעד', 'משפך פינוי מחלקתי'),
-      funnel: text.includes('משפך פינוי מחלקתי') && text.includes('תעדוף פינוי מחלקתי'),
+      evacuated: cut('פונו — לפי יעד', 'משפך פינוי פלוגתי'),
+      funnel: text.includes('משפך פינוי פלוגתי') && text.includes('תעדוף פינוי פלוגתי'),
       truck: cut('בנאפ״ל (נקודת איסוף פלוגתית) — ממתינים לפינוי מד״א', 'פונו — לפי יעד').includes('רכב חוג״ד בנאפ״ל'),
-      priority: cut('תעדוף פינוי מחלקתי', 'פונו לפני הגעת כוח רפואי'),
+      priority: cut('תעדוף פינוי פלוגתי', 'פונו לפני הגעת כוח רפואי'),
     };
   });
   assert(board.summary, `${rel}: the site card must count on scene / at the evacuation point / evacuated separately`);
   assert(board.evacPoint.includes('P004') && !board.evacuated.includes('P004'), `${rel}: a patient at the evacuation point must not be counted as evacuated`);
   assert(board.evacuated.includes('P006') && board.evacuated.includes('שיבא'), `${rel}: a handed-over patient is listed as evacuated with its destination`);
-  assert(board.funnel && board.truck, `${rel}: PC overview must show the platoon funnel, evacuation priority and the truck at the evacuation point`);
+  assert(board.funnel && board.truck, `${rel}: PC overview must show the company funnel, evacuation priority and the truck at the evacuation point`);
   // Owner 2026-10-23: patients at the evacuation point still wait for MDA, so they stay on the
   // evacuation-to-hospital list (green P004 too), marked as at the evacuation point; a handed-over
   // patient is not on it.
