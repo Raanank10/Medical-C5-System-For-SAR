@@ -43,9 +43,11 @@ Watchdogs run locally for field awareness and must also be reproducible server-s
 
 | Watchdog | Trigger | Threshold | Alert |
 | --- | --- | ---: | --- |
-| Crush Syndrome | Access = Trapped | T_injury +45m | Amber, escalating to Red if prolonged |
-| Golden Hour | Any registered patient | T_injury +45m | Amber |
-| Golden Hour | Any registered patient | T_injury +60m | Red |
+| Crush Syndrome | Access = Trapped | Golden-hour start +45m | Amber, escalating to Red if prolonged |
+| Golden Hour | Any registered patient | Golden-hour start +45m | Amber |
+| Golden Hour | Any registered patient | Golden-hour start +60m | Red |
+
+Golden-hour start (owner 2026-11-27/28, V2.99.96): the earliest of the incident's alert time (T0), its opening, an entered injury time and the casualty's registration, never a time in the future; the registration counts as a lower limit ("לפחות"). See [C5_SENTINEL_SAR_MVP_SPEC_v1.2.md](C5_SENTINEL_SAR_MVP_SPEC_v1.2.md) §T_injury.
 | Tourniquet Warning | Tourniquet per limb | +60m from application | Amber |
 | Tourniquet Critical | Tourniquet per limb | +120m from application | Red |
 | Reassessment RED | Triage = RED | Every 10m | Prompt |
