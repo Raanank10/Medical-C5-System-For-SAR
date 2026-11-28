@@ -303,6 +303,13 @@ body.field-mode .patient-card{padding:16px 15px;margin-top:8px;margin-bottom:8px
 .march-hint{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;}
 .march-clear{margin-top:10px;width:100%;min-height:56px;background:transparent;border:2px dashed var(--border);border-radius:12px;color:var(--muted);font-size:14px;font-weight:700;cursor:pointer;touch-action:manipulation;}
 .march-clear.selected{border-style:solid;border-color:var(--green);color:var(--green);background:rgba(52,199,89,.12);}
+/* WP-31: treated, not yet reassessed (or H without AVPU) is not complete. */
+.march-reassess{margin-top:10px;width:100%;min-height:56px;background:rgba(255,149,0,.12);border:2px solid var(--orange);border-radius:12px;color:var(--text);font-size:14px;font-weight:800;cursor:pointer;touch-action:manipulation;}
+.march-reassess.selected{border-color:var(--green);color:var(--green);background:rgba(52,199,89,.12);}
+.march-section.pending{border-color:var(--orange);}
+.march-state.pending{color:var(--orange);}
+.march-avpu{font-size:12px;font-weight:700;color:var(--green);margin-top:6px;}
+.march-avpu.missing{color:var(--orange);}
 .chip.restricted{opacity:.45;border-style:dashed;}
 .chip-scope{font-size:11px;font-weight:600;color:var(--muted);}
 /* Letter strip (V2.99.69, owner 2026-10-26): one letter's treatments on screen at a time, every
@@ -316,6 +323,7 @@ body.field-mode .patient-card{padding:16px 15px;margin-top:8px;margin-bottom:8px
 .march-tile.none small{color:var(--orange);}
 .march-tile.treated{background:var(--accent);border-color:var(--accent);color:#fff;}
 .march-tile.clear{border-color:var(--green);color:var(--green);background:rgba(52,199,89,.12);}
+.march-tile.pending{border-color:var(--orange);color:var(--orange);background:rgba(255,149,0,.12);}
 .march-tile.current{outline:3px solid var(--text);outline-offset:2px;}
 #screen-step7 .march-section.march-hidden{display:none;}
 #screen-step7 .march-section .chip-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
@@ -1050,7 +1058,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9995</div>
+      <div class="demo-kicker">Demo V2.9997</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1147,7 +1155,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9995</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9997</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1157,7 +1165,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9995</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9997</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -1963,6 +1971,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
         <button class="limb-btn" onclick="toggleLimb(this,'rr')">רגל ימין</button>
       </div>
     </div>
+      <button class="march-reassess" id="march-reassess-m" style="display:none" onclick="toggleMarchReassess('m')">בדיקה חוזרת: הטיפול יעיל</button>
       <button class="march-clear" id="march-clear-m" onclick="toggleMarchClear(this,'m')">נבדק - לא נדרש טיפול</button>
     </div>
     <div class="march-section" id="march-sec-a">
@@ -1973,6 +1982,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
         <button class="chip" data-tx="recovery_position" onclick="toggleChip(this,'recovery_position')"><span class="chip-icon">🛌</span>תנוחת התאוששות</button>
         <button class="chip" data-tx="cric" onclick="toggleChip(this,'cric')"><span class="chip-icon">🔪</span>קוניוטומיה <span class="chip-scope">פרמדיק / רופא</span></button>
       </div>
+      <button class="march-reassess" id="march-reassess-a" style="display:none" onclick="toggleMarchReassess('a')">בדיקה חוזרת: הטיפול יעיל</button>
       <button class="march-clear" id="march-clear-a" onclick="toggleMarchClear(this,'a')">נבדק - לא נדרש טיפול</button>
     </div>
     <div class="march-section" id="march-sec-r">
@@ -1982,6 +1992,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
         <button class="chip" data-tx="needle_decompression" onclick="toggleChip(this,'needle_decompression')"><span class="chip-icon">💉</span>ניקור חזה <span class="chip-scope">פרמדיק / רופא</span></button>
         <button class="chip" data-tx="oxygen" onclick="toggleChip(this,'oxygen')"><span class="chip-icon">🫧</span>חמצן</button>
       </div>
+      <button class="march-reassess" id="march-reassess-r" style="display:none" onclick="toggleMarchReassess('r')">בדיקה חוזרת: הטיפול יעיל</button>
       <button class="march-clear" id="march-clear-r" onclick="toggleMarchClear(this,'r')">נבדק - לא נדרש טיפול</button>
     </div>
     <div class="march-section" id="march-sec-c">
@@ -2002,6 +2013,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
         <button class="vital-btn" style="border-radius:0 10px 10px 0" onclick="changeDose('fluids',50)">+</button>
       </div>
     </div>
+      <button class="march-reassess" id="march-reassess-c" style="display:none" onclick="toggleMarchReassess('c')">בדיקה חוזרת: הטיפול יעיל</button>
       <button class="march-clear" id="march-clear-c" onclick="toggleMarchClear(this,'c')">נבדק - לא נדרש טיפול</button>
     </div>
     <div class="march-section" id="march-sec-h">
@@ -2010,6 +2022,8 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
         <button class="chip" data-tx="blanket" onclick="toggleChip(this,'blanket')"><span class="chip-icon">🧣</span>מניעת היפותרמיה (שמיכה)</button>
       </div>
       <div class="march-hint">פגיעת ראש: רמת הכרה (AVPU) מתועדת בשלב המדדים.</div>
+      <div class="march-avpu" id="march-avpu-h"></div>
+      <button class="march-reassess" id="march-reassess-h" style="display:none" onclick="toggleMarchReassess('h')">בדיקה חוזרת: הטיפול יעיל</button>
       <button class="march-clear" id="march-clear-h" onclick="toggleMarchClear(this,'h')">נבדק - לא נדרש טיפול</button>
     </div>
     <div class="march-section paws" id="march-sec-p">
@@ -3429,6 +3443,110 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     return null;
   }
 
+  // MARCH completion (WP-31, owner 2026-11-23). Each MARCH letter is documented as "treated" (a
+  // treatment in that letter), "effective" (treated, then a reassessment tap confirmed it worked)
+  // or "clear" (checked, nothing needed). Treated alone is not complete: a tourniquet on is not
+  // bleeding controlled until someone looks again. Clear is complete with no vitals needed (R and
+  // C included: the medic's check stands). H (hypothermia / head injury) also needs an AVPU on
+  // record, so the head-injury half is covered. PAWS letters are not judged here: they stay
+  // documented / not documented. Documentation only: nothing here blocks a save or a handover.
+  const MARCH_LETTERS = ["m", "a", "r", "c", "h"];
+  const MARCH_REVIEW_VALUES = ["treated", "effective", "clear"];
+  function marchLetterStatus(letter, value, avpu) {
+    if (!MARCH_REVIEW_VALUES.includes(value)) return "not_documented";
+    if (value === "treated") return "needs_reassessment";
+    if (letter === "h" && !["A", "V", "P", "U"].includes(avpu)) return "needs_avpu";
+    return "complete";
+  }
+  function marchStatus(review, avpu) {
+    const letters = {};
+    MARCH_LETTERS.forEach((id) => {
+      letters[id] = marchLetterStatus(id, review && typeof review === "object" ? review[id] : null, avpu);
+    });
+    const missing = MARCH_LETTERS.filter((id) => letters[id] !== "complete");
+    return { letters, complete: missing.length === 0, missing };
+  }
+  // A casualty's review is built from every MARCH-PAWS save on every phone (the New Patient form's
+  // march_review, then each later "טיפולים MARCH-PAWS" save, which carries only the letters touched
+  // then), plus M treatments the phone knows from elsewhere (an active tourniquet, recorded continued
+  // bleeding). For PAWS letters the newest documented value wins; MARCH letters follow the rule below.
+  // For MARCH letters (owner 2026-11-25, "treated wins across phones"): a treatment is closed only by
+  // a reassessment from the same source stamped after it (one clock), or by one whose `seen` says it
+  // knew that treatment. Phone clocks are never compared across sources, so a phone with a fast clock or
+  // one that was offline and never saw the treatment cannot hide it.
+  // Entries: {at: ms, review, source?, seen?, aliases?}. `source` names whose clock `at` is (a phone
+  // id, or a stable key for a tourniquet / bleeding record); `seen` is {letter: {source: latest
+  // treated at}}. PAWS letters keep plain newest-wins.
+  // A treatment may also carry `aliases`: other names the same treatment had on some phone (a
+  // tourniquet's limb + minute before its event key was known), so a reassessment that saw it under
+  // that name still covers it.
+  function marchEntryCovers(closer, treated, letter) {
+    const seen = closer.seen && closer.seen[letter];
+    return [treated.source, ...treated.aliases].some((source) => {
+      if (closer.source === source && closer.at >= treated.at) return true;
+      const t = seen && typeof seen === "object" && Object.prototype.hasOwnProperty.call(seen, source) ? Number(seen[source]) : NaN;
+      return Number.isFinite(t) && t >= treated.at;
+    });
+  }
+  function normalizeMarchEntries(entries) {
+    const list = [];
+    (Array.isArray(entries) ? entries : []).forEach((entry) => {
+      const at = Number(entry && entry.at);
+      const review = entry && entry.review;
+      if (!Number.isFinite(at) || !review || typeof review !== "object") return;
+      const source = entry.source === undefined || entry.source === null ? "" : String(entry.source);
+      const seen = entry.seen && typeof entry.seen === "object" ? entry.seen : null;
+      const aliases = Array.isArray(entry.aliases) ? entry.aliases.filter((a) => typeof a === "string" && a && a !== source) : [];
+      list.push({ at, review, source, seen, aliases });
+    });
+    return list;
+  }
+  function mergeMarchReviews(entries) {
+    const list = normalizeMarchEntries(entries);
+    const out = {};
+    const at = {};
+    list.forEach((entry) => {
+      Object.keys(entry.review).forEach((id) => {
+        const value = entry.review[id];
+        if (!MARCH_REVIEW_VALUES.includes(value)) return;
+        if (at[id] === undefined || entry.at >= at[id]) {
+          out[id] = value;
+          at[id] = entry.at;
+        }
+      });
+    });
+    // MARCH letters: a treatment is closed only by a reassessment ("effective") that covers it; a
+    // later "nothing needed" never closes or hides one (owner 2026-11-23 criterion 1). So the letter
+    // is "treated" while any treatment is uncovered, "effective" once every one is, and otherwise
+    // "clear" if anyone checked it. Clocks are never compared across sources here.
+    MARCH_LETTERS.forEach((id) => {
+      const treated = list.filter((e) => e.review[id] === "treated");
+      const reassessed = list.filter((e) => e.review[id] === "effective");
+      if (treated.some((t) => !reassessed.some((c) => marchEntryCovers(c, t, id)))) out[id] = "treated";
+      else if (treated.length || reassessed.length) out[id] = "effective";
+      else if (list.some((e) => e.review[id] === "clear")) out[id] = "clear";
+      else delete out[id];
+    });
+    return out;
+  }
+  // What a closing save records as seen: per MARCH letter, the latest treated stamp per source among
+  // the entries this phone knows now. Sent with the review (march_seen) so other phones can tell a
+  // reassessment of their treatment from one that never saw it.
+  function marchSeenFrom(entries) {
+    const seen = {};
+    normalizeMarchEntries(entries).forEach((entry) => {
+      MARCH_LETTERS.forEach((id) => {
+        if (entry.review[id] !== "treated") return;
+        const bySource = seen[id] || (seen[id] = {});
+        // Only the name the phone knows it by: an alias (limb + minute) is shared by two tourniquets on
+        // one limb in one minute, so seeing one must not cover the other. A phone that knew only the
+        // alias has it as the source, and the alias then covers the event-keyed entry later.
+        if (bySource[entry.source] === undefined || entry.at > bySource[entry.source]) bySource[entry.source] = entry.at;
+      });
+    });
+    return seen;
+  }
+
   return {
     AVPU_RANK,
     DEVICE_SILENCE_MS,
@@ -3487,6 +3605,10 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
     RESCUE_PRIORITIES,
     rescueEvacPriority,
     LONG_ENTRAPMENT_MINUTES,
+    MARCH_LETTERS,
+    marchStatus,
+    mergeMarchReviews,
+    marchSeenFrom,
     rescueExtractionRequirement,
     suggestedSweepColor,
     suggestMstartTriage,
@@ -3569,7 +3691,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.95';
+const APP_VERSION = '2.99.97';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -3994,7 +4116,11 @@ const MARCH_PAWS_SECTIONS = [
   {id:'w', letter:'W', label:'פצעים', phase:'paws', keys:['wound_care','eye_shield']},
   {id:'s', letter:'S', label:'קיבוע', phase:'paws', keys:['splint']}
 ];
-const MARCH_REVIEW_LABELS = {treated:'טופל', clear:'נבדק - ללא טיפול'};
+const MARCH_REVIEW_LABELS = {treated:'טופל', effective:'טופל - בדיקה חוזרת: יעיל', clear:'נבדק - ללא טיפול'};
+// WP-31 (owner 2026-11-23): a treated MARCH letter is not complete until a reassessment tap says
+// the treatment worked; H also needs an AVPU. PAWS letters keep 'טופל'. C5Rules.marchStatus decides.
+const MARCH_PENDING_LABEL='טופל - חסרה בדיקה חוזרת';
+const MARCH_NEEDS_AVPU_LABEL='חסר AVPU';
 // Owner 2026-10-23: only a paramedic or a physician performs these on scene. The server enforces
 // the same rule (sync-log and events_insert_by_role, database/075).
 const ADVANCED_PROCEDURE_KEYS = new Set(['cric','needle_decompression']);
@@ -5161,7 +5287,7 @@ function freshState(){
     flowMode:'extended', patientAgeGroup:'adult', patientAgeBand:'adult', patientAge:null,
     injury:null, injuryZones:new Set(), patientStatus:'identified',
     rapidWalking:null, rapidMajorBleeding:null, rapidAutoFilled:false,
-    interventions:new Set(), marchClear:new Set(), triage:null,
+    interventions:new Set(), marchClear:new Set(), marchReassessed:new Set(), marchPrior:null, marchSeenBase:null, triage:null,
     needsFullAssessment:true, localEvents:[], supplyMovements:{}, pediatricOverrides:{}, pendingMedicationOverride:null,
     vitalsMedicName:'', txMedicName:''
   };
@@ -5251,6 +5377,7 @@ function serializeActiveDraft(screen=null){
       ...state,
       interventions:[...(state.interventions||[])],
       marchClear:[...(state.marchClear||[])],
+      marchReassessed:[...(state.marchReassessed||[])],
       injuryZones:[...(state.injuryZones||[])],
       pendingMedicationOverride:null
     },
@@ -5275,6 +5402,7 @@ function hydrateActiveDraft(snapshot){
   state={...freshState(), ...snapshot.state};
   state.interventions=new Set(snapshot.state.interventions||[]);
   state.marchClear=new Set(snapshot.state.marchClear||[]);
+  state.marchReassessed=new Set(snapshot.state.marchReassessed||[]);
   state.injuryZones=new Set(snapshot.state.injuryZones||[]);
   delete state.localStockCache; // the bag is medicBag(), not part of a patient draft (WP-19)
   state.supplyMovements=snapshot.state.supplyMovements||{};
@@ -7933,6 +8061,7 @@ function renderPcAssessmentDebtBoard(){
     ['סטטוס לכוד לא ידוע', pts.filter(p=>normalizeTrapStatus(p)==='unknown' || !normalizeTrapStatus(p))],
     ['אין סטטוס פינוי', pts.filter(p=>!['evacuating','evacuated','handed_over','deceased'].includes(p.patientStatus))],
     ['גפה של חסם לא הושלמה', pts.filter(p=>p.assessmentDebt?.includes('tourniquet_limb_missing'))],
+    ['MARCH לא הושלם', pts.filter(marchDebtApplies)], // WP-31: red / yellow at the site
     ['אין הערכה חוזרת אחרי 10 דק׳', pts.filter(p=>['red','yellow'].includes(p.triage) && needsVitals(p) && vitalsAgeMs(p)>=10*60*1000)],
     ['שימוש בציוד לא אושר', pts.filter(p=>(p.events||[]).some(e=>e.type==='SUPPLY_CONSUMED' && !e.confirmed))],
     ['סריקה הסתיימה, אין שיוך מעקב', pts.filter(p=>p.phase==='mstart_sweep' && assessmentDebtList(p).includes('missing_vitals'))]
@@ -9801,7 +9930,8 @@ function queueTourniquetAppliedEvent(p, tq, extra={}){
   // written on the body, 'unknown' = already on the patient with no time (application_time is then
   // only the registration time, a lower bound).
   const timeSource=tourniquetTimeUnknown(tq) ? 'unknown' : tq.timeSource==='entered' ? 'entered' : 'phone';
-  saveLocalEvent({type:'TOURNIQUET_APPLIED',detail:`${p.visualId||p.id} · ${tq.id} · ${tq.limbLabel||tourniquetLimbMeta(limb).label}`,warn:true,patient_id:p.id,
+  marchTqIdentity(tq); // WP-31: the event's id is the tourniquet's key on every phone
+  saveLocalEvent({type:'TOURNIQUET_APPLIED',local_event_id:tq.appliedLocalEventId,detail:`${p.visualId||p.id} · ${tq.id} · ${tq.limbLabel||tourniquetLimbMeta(limb).label}`,warn:true,patient_id:p.id,
     payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb,application_time:new Date(tq.appliedAt||Date.now()).toISOString(),clinical_context:'unknown',
       time_source:timeSource, ...(timeSource==='entered'?{time_code:tq.timeCode||null, time_entered_at:new Date(tq.timeEnteredAt||Date.now()).toISOString()}:{}), ...extra}});
 }
@@ -10762,8 +10892,12 @@ function markSweepTourniquetEffectiveness(tourniquetId, effectiveness){
 // minutes (D1: the server rule is authoritative); the same 30 is sent here so a check does not
 // stretch the server's cadence to its 60-minute default.
 function queueTourniquetReassessment(p, tq, effectiveness){
+  // WP-31: each "bleeding continues" is its own M treatment, keyed by this check's event so every
+  // phone names it the same way (the server row's last_reassessed_event_id) and a new one reopens M.
+  const leid=`local-${Date.now()}-${uid()}`;
+  if(tq) tq.bleedEventKey=effectiveness==='bleeding_continues' ? `${getDeviceId()}:${leid}` : null;
   if(!tq?.serverLimb) return;
-  saveLocalEvent({type:'TOURNIQUET_REASSESSMENT',detail:`${p.visualId||p.id} · ${tq.id} · ${effectiveness==='bleeding_continues'?'דימום ממשיך':'דימום נשלט'}`,
+  saveLocalEvent({type:'TOURNIQUET_REASSESSMENT',local_event_id:leid,detail:`${p.visualId||p.id} · ${tq.id} · ${effectiveness==='bleeding_continues'?'דימום ממשיך':'דימום נשלט'}`,
     warn:effectiveness==='bleeding_continues',patient_id:p.id,
     payload_json:{patient_id:p.id,tourniquet_id:tq.id,limb:tq.serverLimb,tourniquet_status:effectiveness==='bleeding_continues'?'bleeding_continues':'effective',
       effectiveness,clinical_context:'unknown',next_reassessment_interval_minutes:30}});
@@ -12347,6 +12481,7 @@ function openPatient(id){
       <div class="summary-row"><span class="summary-key">חילוץ</span><span class="summary-val">${TRAP_LABELS[normalizeTrapStatus(p)]||'לא תועד'}</span></div>
       <div class="summary-row"><span class="summary-key">פציעה</span><span class="summary-val">${injuryLabel(p)}</span></div>
       ${patientInjuryTimeRowHtml(p)}
+      ${patientMarchStatusHtml(p)}
     </div>
     ${p.txHistory&&p.txHistory.length?`
     <div style="margin-bottom:4px"><div class="section-label" style="padding:0 0 8px">היסטוריית טיפולים (${p.txHistory.length})</div>
@@ -12981,7 +13116,7 @@ function startNewPatient(mode='extended'){
   quickTqData = {applied:false, time:null, timeTyped:false, limbs:new Set()};
 
   // Reset all UI
-  document.querySelectorAll('.tap-btn,.avpu-btn,.chip,.bp-btn,.limb-btn,.body-hotspot,.march-clear').forEach(b=>b.classList.remove('selected','ok','issue','managed'));
+  document.querySelectorAll('.tap-btn,.avpu-btn,.chip,.bp-btn,.limb-btn,.body-hotspot,.march-clear,.march-reassess').forEach(b=>b.classList.remove('selected','ok','issue','managed'));
   const modeBtn=document.querySelector(`#flow-mode-grid .tap-btn[onclick*="'${mode}'"]`) || document.querySelector('#flow-mode-grid .tap-btn:nth-child(2)');
   if(modeBtn) modeBtn.classList.add('selected');
   const adultBtn=document.querySelector('#age-grid .tap-btn');
@@ -13392,6 +13527,7 @@ function toggleChip(btn, key){
     reconcileSupplyForIntervention(key);
     const sec=marchSectionForKey(key);
     if(sec) state.marchClear?.delete(sec.id);
+    if(sec) state.marchReassessed?.delete(sec.id); // a new treatment needs its own reassessment (WP-31)
   }
   if(key==='tourniquet' && state.interventions.has(key)) haptic([120,60,120]);
   document.getElementById('tourniquet-wrap').style.display=state.interventions.has('tourniquet')?'block':'none';
@@ -13416,20 +13552,69 @@ function marchSectionForKey(key){
 }
 // 'treated' (a treatment in this letter, or the step 3 immediate tourniquet for M), 'clear' (the
 // medic checked it and nothing was needed) or null (not documented: shown as such, never hidden).
+// The value this save records for the letter (sent in march_review): 'treated', 'effective'
+// (treated, then reassessed as working, MARCH only), 'clear' or null (nothing new this time).
 function marchSectionStatus(sec){
-  if(sec.keys.some(k=>state.interventions.has(k)) || (sec.id==='m' && quickTqData.applied)) return 'treated';
+  const reassessed=sec.phase==='march' && state.marchReassessed?.has(sec.id);
+  if(sec.keys.some(k=>state.interventions.has(k)) || (sec.id==='m' && quickTqData.applied)) return reassessed ? 'effective' : 'treated';
   if(state.marchClear?.has(sec.id)) return 'clear';
+  // Treated in an earlier save (this phone or another), reassessed now.
+  if(reassessed && state.marchPrior?.[sec.id]==='treated') return 'effective';
   return null;
 }
+// What the screen shows for the letter: this save's value, else the casualty's recorded one
+// (only when updating a casualty already on the board, WP-31).
+function marchShownStatus(sec){
+  return marchSectionStatus(sec) || state.marchPrior?.[sec.id] || null;
+}
+// AVPU the H letter reads: the casualty's when updating one, the form's vitals step otherwise.
+function marchCurrentAvpu(){
+  const p=marchUpdatePatient();
+  return p ? marchAvpuOf(p) : (flowVitals?.avpu||null);
+}
+function marchShownReview(){
+  return Object.fromEntries(MARCH_PAWS_SECTIONS.map(sec=>[sec.id, marchShownStatus(sec)]));
+}
+function marchStateLabel(sec, status, letterStatus){
+  if(sec.phase==='march' && status==='treated') return MARCH_PENDING_LABEL;
+  if(letterStatus==='needs_avpu') return `${MARCH_REVIEW_LABELS[status]} · ${MARCH_NEEDS_AVPU_LABEL}`;
+  return MARCH_REVIEW_LABELS[status]||'לא תועד';
+}
+// "בדיקה חוזרת: הטיפול יעיל" (MARCH letters only): offered while the letter is treated and not yet
+// reassessed; tapping again takes it back.
+function toggleMarchReassess(id){
+  const sec=MARCH_PAWS_SECTIONS.find(s=>s.id===id);
+  if(!sec || sec.phase!=='march') return;
+  if(!state.marchReassessed) state.marchReassessed=new Set();
+  if(state.marchReassessed.has(id)) state.marchReassessed.delete(id);
+  else {
+    if(marchShownStatus(sec)!=='treated'){ toast('אין טיפול שממתין לבדיקה חוזרת בסעיף זה'); return; }
+    state.marchReassessed.add(id);
+  }
+  renderMarchProgress();
+  saveActiveRecoveryState('step7');
+}
 function marchReviewFromState(){
-  return Object.fromEntries(MARCH_PAWS_SECTIONS.map(sec=>[sec.id, marchSectionStatus(sec)]));
+  return Object.fromEntries(MARCH_PAWS_SECTIONS.map(sec=>{
+    const status=marchSectionStatus(sec);
+    // WP-31: a tourniquet is its own M treatment (marchSyntheticEntries), so its "דימום נשלט" check can
+    // close it. An M treated only by tourniquets is not also recorded here as "treated", or that copy
+    // would stay open after the check. Reassessed, it is recorded ("effective" with march_seen).
+    if(sec.id==='m' && status==='treated' && !sec.keys.some(k=>k!=='tourniquet' && state.interventions.has(k))) return [sec.id, null];
+    return [sec.id, status];
+  }));
 }
 function toggleMarchClear(btn, id){
   const sec=MARCH_PAWS_SECTIONS.find(s=>s.id===id);
   if(!sec) return;
   if(!state.marchClear) state.marchClear=new Set();
-  if(marchSectionStatus(sec)==='treated'){
+  if(['treated','effective'].includes(marchSectionStatus(sec))){
     toast('כבר נבחר טיפול בסעיף זה');
+    return;
+  }
+  // A treatment from an earlier save still waits for its reassessment: "nothing needed" would hide it.
+  if(!state.marchClear.has(id) && sec.phase==='march' && marchShownStatus(sec)==='treated'){
+    toast('הטיפול בסעיף זה ממתין לבדיקה חוזרת');
     return;
   }
   if(state.marchClear.has(id)) state.marchClear.delete(id); else state.marchClear.add(id);
@@ -13446,13 +13631,13 @@ function nextUndocumentedMarchLetter(fromId){
   const start=Math.max(0, MARCH_PAWS_SECTIONS.findIndex(sec=>sec.id===fromId));
   for(let i=1;i<=MARCH_PAWS_SECTIONS.length;i++){
     const sec=MARCH_PAWS_SECTIONS[(start+i)%MARCH_PAWS_SECTIONS.length];
-    if(!marchSectionStatus(sec)) return sec.id;
+    if(!marchShownStatus(sec)) return sec.id;
   }
   return null;
 }
 // Entering step 7 opens the first letter not yet documented, M when every letter is.
 function resetMarchOpenLetter(){
-  marchOpenLetter=MARCH_PAWS_SECTIONS.find(sec=>!marchSectionStatus(sec))?.id || 'm';
+  marchOpenLetter=MARCH_PAWS_SECTIONS.find(sec=>!marchShownStatus(sec))?.id || 'm';
 }
 function openMarchLetter(id){
   if(!MARCH_PAWS_SECTIONS.some(sec=>sec.id===id)) return;
@@ -13467,11 +13652,15 @@ function scrollMarchStripIntoView(){
 function renderMarchStrip(){
   const el=document.getElementById('march-strip');
   if(!el) return;
+  const march=C5Rules.marchStatus(marchShownReview(), marchCurrentAvpu());
   const tile=sec=>{
-    const status=marchSectionStatus(sec);
-    const short=status==='treated'?'טופל':status==='clear'?'✓ נבדק':'לא תועד';
+    const status=marchShownStatus(sec);
+    const letter=sec.phase==='march' ? march.letters[sec.id] : null;
+    const pending=sec.phase==='march' && status==='treated';
+    const short=pending?'בדיקה חוזרת':letter==='needs_avpu'?'חסר AVPU':status==='effective'?'✓ יעיל':status==='treated'?'טופל':status==='clear'?'✓ נבדק':'לא תועד';
+    const cls=pending||letter==='needs_avpu'?'pending':status==='effective'?'clear':(status||'none');
     const current=sec.id===marchOpenLetter;
-    return `<button class="march-tile ${status||'none'}${current?' current':''}" id="march-tile-${sec.id}" role="tab" aria-selected="${current}" aria-label="${sec.letter} ${sec.label}: ${MARCH_REVIEW_LABELS[status]||'לא תועד'}" onclick="openMarchLetter('${sec.id}')">${sec.letter}<small>${short}</small></button>`;
+    return `<button class="march-tile ${cls}${current?' current':''}" id="march-tile-${sec.id}" role="tab" aria-selected="${current}" aria-label="${sec.letter} ${sec.label}: ${marchStateLabel(sec, status, letter)}" onclick="openMarchLetter('${sec.id}')">${sec.letter}<small>${short}</small></button>`;
   };
   const phase=ph=>MARCH_PAWS_SECTIONS.filter(sec=>sec.phase===ph).map(tile).join('');
   el.innerHTML=`<div class="march-strip-label">MARCH - ייצוב</div><div class="march-strip march">${phase('march')}</div>`
@@ -13487,27 +13676,182 @@ function renderMarchProgress(){
     chip.classList.toggle('restricted', !advanced);
     chip.setAttribute('aria-disabled', advanced ? 'false' : 'true');
   });
-  const counts={march:[0,0], paws:[0,0]};
+  const avpu=marchCurrentAvpu();
+  const march=C5Rules.marchStatus(marchShownReview(), avpu);
+  const pawsCount=[0,0];
   MARCH_PAWS_SECTIONS.forEach(sec=>{
-    const status=marchSectionStatus(sec);
-    counts[sec.phase][1]++;
-    if(status) counts[sec.phase][0]++;
+    const status=marchShownStatus(sec);
+    const letter=sec.phase==='march' ? march.letters[sec.id] : null;
+    if(sec.phase==='paws'){ pawsCount[1]++; if(status) pawsCount[0]++; }
+    const done=sec.phase==='march' ? letter==='complete' : !!status;
+    const pending=sec.phase==='march' && !!status && !done;
     const label=document.getElementById('march-state-'+sec.id);
-    if(label){ label.textContent=MARCH_REVIEW_LABELS[status]||'לא תועד'; label.className='march-state '+(status||'none'); }
-    document.getElementById('march-sec-'+sec.id)?.classList.toggle('done', !!status);
+    if(label){ label.textContent=marchStateLabel(sec, status, letter); label.className='march-state '+(pending?'pending':(status||'none')); }
+    document.getElementById('march-sec-'+sec.id)?.classList.toggle('done', done);
+    document.getElementById('march-sec-'+sec.id)?.classList.toggle('pending', pending);
     document.getElementById('march-sec-'+sec.id)?.classList.toggle('march-hidden', sec.id!==marchOpenLetter);
     document.getElementById('march-clear-'+sec.id)?.classList.toggle('selected', status==='clear');
+    const re=document.getElementById('march-reassess-'+sec.id);
+    if(re){
+      const offered=status==='treated' || state.marchReassessed?.has(sec.id);
+      re.style.display=offered ? '' : 'none';
+      re.classList.toggle('selected', !!state.marchReassessed?.has(sec.id) && status==='effective');
+    }
   });
+  const avpuLine=document.getElementById('march-avpu-h');
+  if(avpuLine){
+    avpuLine.textContent=avpu ? `רמת הכרה (AVPU) מתועדת - ${avpu}` : 'חסרה רמת הכרה (AVPU) - הסעיף לא יושלם בלי זה. מתעדים בשלב המדדים או בעדכון מדדים.';
+    avpuLine.classList.toggle('missing', !avpu);
+  }
   const progress=document.getElementById('march-progress');
-  if(progress) progress.textContent=`תועדו: MARCH ${counts.march[0]}/${counts.march[1]} · PAWS ${counts.paws[0]}/${counts.paws[1]}`;
+  if(progress) progress.textContent=`MARCH הושלמו ${5-march.missing.length}/5 · PAWS תועדו ${pawsCount[0]}/${pawsCount[1]}`;
   renderMarchStrip();
 }
 function marchReviewSummaryHtml(review){
+  // Same reading as the strip (WP-31): treated MARCH and H without AVPU orange, complete green.
+  const march=C5Rules.marchStatus(review, marchCurrentAvpu());
   return MARCH_PAWS_SECTIONS.map(sec=>{
     const status=review?.[sec.id]||null;
-    const color=status==='treated'?'var(--accent)':status==='clear'?'var(--green)':'var(--muted)';
-    return `<span style="color:${color};white-space:nowrap">${sec.letter} ${sec.label}: ${MARCH_REVIEW_LABELS[status]||'לא תועד'}</span>`;
+    const letter=sec.phase==='march' ? march.letters[sec.id] : null;
+    const color=!status?'var(--muted)':(letter==='needs_reassessment'||letter==='needs_avpu')?'var(--orange)':status==='treated'?'var(--accent)':'var(--green)';
+    return `<span style="color:${color};white-space:nowrap">${sec.letter} ${sec.label}: ${marchStateLabel(sec, status, letter)}</span>`;
   }).join('<br>');
+}
+// ── MARCH completion for a casualty (WP-31, owner 2026-11-23) ──
+// A casualty's review is every MARCH-PAWS save: the New Patient form's, each later
+// "טיפולים MARCH-PAWS" save on this phone (p.marchReviews) and the ones from other phones
+// (p.remoteMarchReviews, from their PATIENT_CREATED / NOTE_ADDED march_review), plus M treatments from
+// tourniquets and recorded bleeding. C5Rules.mergeMarchReviews combines them: a MARCH treatment stays
+// open until a reassessment that saw it (march_seen), never by comparing phone clocks.
+function localMarchReviews(p){
+  const me=getDeviceId();
+  if(Array.isArray(p?.marchReviews)) return p.marchReviews.map(e=>({...e, source:e.source||me}));
+  // Saved before WP-31: one review, from the create (or the last update, which replaced it).
+  if(p?.marchReview && typeof p.marchReview==='object') return [{at:Date.parse(p.createdAt||'')||0, review:p.marchReview, source:me}];
+  return [];
+}
+// M treatments this phone knows outside any MARCH-PAWS save (owner 2026-11-25 / 2026-11-26).
+// A tourniquet is keyed by its TOURNIQUET_APPLIED event (`tq:<device>:<local_event_id>`): the same on
+// every phone (the server row's applied_event_id leads back to it) and unchanged when its time or limb
+// is corrected, so a correction does not reopen M. Its own check counts as the reassessment:
+// "דימום נשלט" (effective, synced as tourniquet_status) closes it on every phone; "bleeding
+// continues" (each check its own key) keeps it open until it is checked again or M is reassessed after it. Recorded active
+// bleeding with no tourniquet behind it is this phone's own record (other phones do not see it).
+// A tourniquet whose event cannot be traced yet falls back to limb + applied minute (safe: M stays
+// open until a reassessment that saw that key).
+const MARCH_TQ_EVENT_KEYS=new Map(); // events.id -> '<device>:<local_event_id>' (pullRemoteMarchReviews)
+function marchTqMinute(ms){ return Math.round((Number(ms)||0)/60000); }
+function marchTqIdentity(tq){
+  if(!tq) return null;
+  if(!tq.appliedLocalEventId && tq.source!=='server') tq.appliedLocalEventId=`local-${Date.now()}-${uid()}`;
+  if(!tq.appliedDeviceId && tq.source!=='server') tq.appliedDeviceId=getDeviceId();
+  return tq;
+}
+function marchTqFallbackKey(t){ return `tq:${t.limb||'?'}:${marchTqMinute(t.appliedAt)}`; }
+function marchTqKey(t){
+  if(t.source==='server'){
+    const k=t.appliedEventId && MARCH_TQ_EVENT_KEYS.get(t.appliedEventId);
+    if(k) return `tq:${k}`;
+  } else if(t.appliedLocalEventId){
+    return `tq:${t.appliedDeviceId||getDeviceId()}:${t.appliedLocalEventId}`;
+  }
+  return marchTqFallbackKey(t);
+}
+// The newest "bleeding continues" check on a tourniquet, by its event.
+function marchBleedKey(t){
+  if(t.bleedEventKey) return `bleed:${t.bleedEventKey}`; // this phone's own check, before the server has it
+  if(t.source==='server'){
+    const k=t.lastCheckEventId && MARCH_TQ_EVENT_KEYS.get(t.lastCheckEventId);
+    if(k) return `bleed:${k}`;
+  }
+  return `bleed:${marchTqKey(t)}`;
+}
+// Stamped 0: the key alone names the treatment, so a later time correction (owner 2026-11-26) cannot
+// move it past what a reassessment saw. The limb + minute name is an alias, so a reassessment saved
+// before this phone knew the event key (offline cold start) still covers it.
+function marchSyntheticEntries(p){
+  const out=[];
+  let tqBleeding=false;
+  activeTourniquets(p||{}).forEach(t=>{
+    const bleeding=t.status==='ineffective' || t.effectiveness==='bleeding_continues';
+    const key=marchTqKey(t);
+    // "דימום נשלט" (owner 2026-11-26) is this tourniquet's reassessment: M documented as effective for
+    // it. It covers nothing else (no seen), so a dressing still waiting for its reassessment stays open.
+    if(t.effectiveness==='effective' && !bleeding){ out.push({at:0, source:`tqcheck:${key}`, seen:{m:{[key]:0}}, review:{m:'effective'}}); return; }
+    const fallback=marchTqFallbackKey(t);
+    out.push({at:0, source:key, aliases:fallback!==key?[fallback]:[], review:{m:'treated'}});
+    if(bleeding){
+      tqBleeding=true;
+      out.push({at:0, source:marchBleedKey(t), review:{m:'treated'}});
+    }
+  });
+  // A tourniquet converted to direct pressure, replaced or removed is still a treatment M has not
+  // reassessed (owner 2026-11-23 criterion 1). This phone keeps it; on other phones a tourniquet that
+  // was recorded in a MARCH-PAWS save stays through that save's march_tq (marchEntriesFromReviews).
+  ensureTourniquetArray(p||{}).filter(t=>['converted','replaced','removed'].includes(t.status)).forEach(t=>{
+    out.push({at:0, source:marchTqKey(t), aliases:[marchTqFallbackKey(t)].filter(a=>a!==marchTqKey(t)), review:{m:'treated'}});
+  });
+  if(p && !tqBleeding && (p.hemorrhageControl?.status==='bleeding_continues' || p.activeBleeding)){
+    const at=Number(p.hemorrhageControl?.lastCheckedAt)||0;
+    out.push({at, source:`bleed:${getDeviceId()}:${marchTqMinute(at)}`, review:{m:'treated'}});
+  }
+  return out;
+}
+// A save lists the tourniquets it recorded (march_tq): each stays an M treatment by its key, on every
+// phone, after the tourniquet is converted or removed, until a reassessment that saw it.
+function marchEntriesFromReviews(entries){
+  const out=[];
+  entries.forEach(e=>(Array.isArray(e.tq)?e.tq:[]).forEach(k=>{ if(typeof k==='string' && k) out.push({at:0, source:k, review:{m:'treated'}}); }));
+  return out;
+}
+function patientMarchEntries(p){
+  const saves=[...localMarchReviews(p), ...(p?.remoteMarchReviews||[])];
+  return [...saves, ...marchEntriesFromReviews(saves), ...marchSyntheticEntries(p)];
+}
+function patientMarchReview(p){
+  return C5Rules.mergeMarchReviews(patientMarchEntries(p));
+}
+// A seen map ({letter: {source: at}}) as entries, joined with more entries (marchSeenFrom input).
+function marchSeenEntries(seenMap, more=[]){
+  const out=[];
+  Object.keys(seenMap||{}).forEach(id=>Object.keys(seenMap[id]||{}).forEach(src=>out.push({at:seenMap[id][src], source:src, review:{[id]:'treated'}})));
+  return [...out, ...more];
+}
+// What a save that closes letters records as seen (march_seen), only for the letters it closes.
+function marchSeenForReview(review, entries){
+  const all=C5Rules.marchSeenFrom(entries);
+  const seen={};
+  Object.keys(all).forEach(id=>{ if(['effective','clear'].includes(review?.[id])) seen[id]=all[id]; });
+  return seen;
+}
+// AVPU "on record" for H: the newest one measured, even if a later reading (here or on another
+// phone) did not include it.
+function marchAvpuOf(p){
+  const ok=v=>['A','V','P','U'].includes(v);
+  if(ok(p?.vitals?.avpu)) return p.vitals.avpu;
+  const hit=(p?.vitalsHistory||[]).filter(h=>ok(h?.avpu)).sort((a,b)=>(b.t||0)-(a.t||0))[0];
+  return hit ? hit.avpu : null;
+}
+function patientMarchStatus(p){
+  return C5Rules.marchStatus(patientMarchReview(p), marchAvpuOf(p));
+}
+const MARCH_LETTER_BY_ID=Object.fromEntries(MARCH_PAWS_SECTIONS.filter(sec=>sec.phase==='march').map(sec=>[sec.id, sec.letter]));
+const MARCH_MISSING_SHORT={not_documented:'לא תועד', needs_reassessment:'בדיקה חוזרת', needs_avpu:'AVPU'};
+function marchMissingText(status){
+  return status.missing.map(id=>`${MARCH_LETTER_BY_ID[id]} (${MARCH_MISSING_SHORT[status.letters[id]]})`).join(' · ');
+}
+// PC "חוב הערכה" row: a red or yellow casualty still at the site whose MARCH is not complete.
+// Shown, never blocking (owner: strip + debt row, no handover block).
+function marchDebtApplies(p){
+  if(!p || !['red','yellow'].includes(p.triage)) return false;
+  if(['evacuated','handed_over','deceased'].includes(p.patientStatus)) return false;
+  return !patientMarchStatus(p).complete;
+}
+function patientMarchStatusHtml(p){
+  if(!p || p.triage==='black') return '';
+  const s=patientMarchStatus(p);
+  const val=s.complete ? '<span style="color:var(--green)">הושלם</span>' : `<span style="color:var(--orange)">חסר: ${marchMissingText(s)}</span>`;
+  return `<div class="summary-row" data-march-status="${s.complete?'complete':'incomplete'}"><span class="summary-key">MARCH</span><span class="summary-val">${val}</span></div>`;
 }
 // ── MARCH-PAWS for a casualty already on the board (V2.99.85, owner 2026-11-21) ──
 // The same step 7 screen, opened from the patient card (and so reachable by medics, paramedics and
@@ -13531,6 +13875,10 @@ function openMarchForPatient(pid){
   if(!canRecordTreatments()){ toast('תיעוד טיפולים - לגורם רפואי בלבד'); return; }
   startNewPatient('extended');
   state.marchUpdatePid=pid;
+  state.marchPrior=patientMarchReview(p); // WP-31: earlier saves, this phone and others
+  // What this screen shows is what a save from it has seen (march_seen): a treatment that arrives
+  // from another phone while the screen is open is not closed by it (owner 2026-11-25).
+  state.marchSeenBase=C5Rules.marchSeenFrom(patientMarchEntries(p));
   state.needsFullAssessment=false;
   // The casualty's age group drives the pediatric dose guard and suggested doses here too.
   state.patientAgeGroup=p.patientAgeGroup==='pediatric'?'pediatric':'adult';
@@ -13586,10 +13934,16 @@ function saveMarchUpdate(){
   queueIntakeClinicalEventsAtSave(p.id, 'march_update');
   sendFormSupply(p.id);
   const done=MARCH_PAWS_SECTIONS.filter(sec=>review[sec.id]).map(sec=>`${sec.letter} ${MARCH_REVIEW_LABELS[review[sec.id]]}`).join(' · ');
-  saveLocalEvent({type:'NOTE_ADDED', detail:`MARCH-PAWS · ${p.visualId||p.id} · ${done}`, warn:false, patient_id:p.id,
-    payload_json:{kind:'march_review', march_review:review, source:'march_update'}});
+  // Seen = what the screen showed when it opened, plus the tourniquets this save adds.
+  const seen=marchSeenForReview(review, marchSeenEntries(state.marchSeenBase, marchSyntheticEntries({tourniquets:tqEntries})));
+  const stamp=new Date();
+  const marchTq=tqEntries.map(t=>marchTqKey(t));
+  saveLocalEvent({type:'NOTE_ADDED', local_timestamp:stamp.toISOString(), detail:`MARCH-PAWS · ${p.visualId||p.id} · ${done}`, warn:false, patient_id:p.id,
+    payload_json:{kind:'march_review', march_review:review, ...(Object.keys(seen).length?{march_seen:seen}:{}), ...(marchTq.length?{march_tq:marchTq}:{}), source:'march_update'}});
   if(text){ p.txHistory=p.txHistory||[]; p.txHistory.unshift({time:nowT(), text, medic:medicName}); }
-  p.marchReview=review;
+  p.marchReviews=localMarchReviews(p);
+  p.marchReviews.push({at:stamp.getTime(), review, source:getDeviceId(), seen, tq:marchTq}); // the event's own stamp
+  p.marchReview=patientMarchReview(p);
   p.events=p.events||[];
   p.events.unshift({type:'MARCH_PAWS_RECORDED', time:nowT(), detail:`MARCH-PAWS: ${done}${text?` · ${text}`:''}`, warn:false});
   p.lastModifiedAt=new Date().toISOString();
@@ -14013,7 +14367,7 @@ function renderSummary(){
     <div class="summary-row"><span class="summary-key">פציעה</span><span class="summary-val">${state.injury||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">מצב</span><span class="summary-val">${STATUS_LABELS[state.patientStatus]||'—'}</span></div>
     <div class="summary-row"><span class="summary-key">טיפולים שניתנו</span><span class="summary-val">${intStr||'ללא'}</span></div>
-    ${state.flowMode!=='quick' && state.triage!=='black'?`<div class="summary-row" style="align-items:flex-start"><span class="summary-key">MARCH-PAWS</span><span class="summary-val" style="font-size:12px;line-height:1.7">${marchReviewSummaryHtml(marchReviewFromState())}</span></div>`:''}
+    ${state.flowMode!=='quick' && state.triage!=='black'?`<div class="summary-row" style="align-items:flex-start"><span class="summary-key">MARCH-PAWS</span><span class="summary-val" style="font-size:12px;line-height:1.7">${marchReviewSummaryHtml(marchShownReview())}</span></div>`:''}
     <div class="summary-row"><span class="summary-key">מלאי אישי</span><span class="summary-val"><button class="demo-mini-btn" style="padding:7px 10px;margin:0" onclick="showOwnInventory()">הצג מלאי שלי</button> <button class="demo-mini-btn" style="padding:7px 10px;margin:0" onclick="restockMedicBag()">התיק חודש</button></span></div>
     <div class="summary-row" style="align-items:flex-start"><span class="summary-key">העברה לא מקוונת</span><span class="summary-val"><textarea id="offline-transport-payload" readonly style="height:68px;direction:ltr;font-family:var(--mono);font-size:10px;margin-bottom:8px">${lastTacticalPayload}</textarea><button class="demo-mini-btn" style="padding:7px 10px;margin:0" onclick="copyTacticalDataString()">העתק payload</button></span></div>
     <div class="summary-row"><span class="summary-key">חתימת טיפול</span><span class="summary-val device-id">${deviceId}</span></div>
@@ -14030,6 +14384,11 @@ function savePatient(){
   const deviceId=getDeviceId();
   const tqRecord=tourniquetRecordFromState();
   const tqEntries=tourniquetEntriesFromState();
+  // WP-31: an M reassessed in this form saw this form's own tourniquets (march_seen).
+  tqEntries.forEach(marchTqIdentity); // keys fixed now, used again when the events are queued
+  const createMarchSeen=marchSeenForReview(marchReviewFromState(), marchSyntheticEntries({tourniquets:tqEntries.map(t=>({...t}))}));
+  const createMarchTq=tqEntries.map(t=>marchTqKey(t));
+  const createStamp=new Date();
   const t=nowT();
   const vitalsCapture=vitalsCapturePayload('flow');
   queueMedicationEventsBeforeSave();
@@ -14094,6 +14453,7 @@ function savePatient(){
     tourniquet:tqRecord,
     tourniquets:tqEntries,
     marchReview:marchReviewFromState(),
+    marchReviews:[{at:createStamp.getTime(), review:marchReviewFromState(), source:getDeviceId(), seen:createMarchSeen, tq:createMarchTq}],
     medic:deviceId,
     siteId:'SITE_A',
     events:[
@@ -14110,7 +14470,7 @@ function savePatient(){
   // needs_full_assessment=true only for that type, and PATIENT_CREATED leaves the column's
   // default (false), which the 45s pull would then copy back over the medic's own flag.
   const quickCapture=state.needsFullAssessment && state.triage!=='black';
-  saveLocalEvent({type:quickCapture?'QUICK_PATIENT_CREATED':'PATIENT_CREATED',detail:`${newId} נפתח — ${quickCapture?'מסלול מהיר, יש לקחת מדדים':'הערכה מלאה'}`,warn:false,patient_id:patientUuid,
+  saveLocalEvent({type:quickCapture?'QUICK_PATIENT_CREATED':'PATIENT_CREATED',local_timestamp:createStamp.toISOString(),detail:`${newId} נפתח — ${quickCapture?'מסלול מהיר, יש לקחת מדדים':'הערכה מלאה'}`,warn:false,patient_id:patientUuid,
     payload_json:{visual_id:newId,triage:state.triage,needs_full_assessment:quickCapture,capture_mode:state.flowMode,
       // Injury zones are projected into patients.injury_zones from the create event (WP-3).
       injury_zones:[...(state.injuryZones||[])], injury_mechanism:effectiveInjury,
@@ -14119,7 +14479,7 @@ function savePatient(){
       patient_age_group:state.patientAgeGroup||'adult', patient_age_band:state.patientAgeBand||'adult',
       patient_age:Number.isFinite(Number(state.patientAge)) && state.patientAge!==null && state.patientAge!=='' ? Number(state.patientAge) : null,
       // Kept in the event log for audit/AAR; the server projects no column from it (V2.99.62).
-      ...(state.flowMode!=='quick' && state.triage!=='black' ? {march_review:marchReviewFromState()} : {})}});
+      ...(state.flowMode!=='quick' && state.triage!=='black' ? {march_review:marchReviewFromState(), ...(Object.keys(createMarchSeen).length?{march_seen:createMarchSeen}:{}), ...(createMarchTq.length?{march_tq:createMarchTq}:{})} : {})}});
   // Vitals taken in the full flow: the server sets last_vitals_at (and clears
   // needs_full_assessment) from this event, so other devices do not show the patient as
   // vitals overdue. Never sent for a quick capture, which must stay flagged for assessment.
@@ -18488,7 +18848,9 @@ function applyRescuePatientBoard(rows, incidentId){
 const SERVER_TOURNIQUET_COLUMNS='id,patient_id,limb,applied_at,is_active,tourniquet_status';
 // How the start time was set (database/081): 'phone', 'entered' (from the body, with when it was
 // entered) or 'unknown' (already on the patient, no time yet).
-const SERVER_TOURNIQUET_TIME_COLUMNS='id,time_source,time_entered_at';
+// WP-31: the events behind a row (application, newest check) give its MARCH key on every phone. Read
+// here, not in the main select, so a problem with them never stops the tourniquets themselves.
+const SERVER_TOURNIQUET_TIME_COLUMNS='id,time_source,time_entered_at,applied_event_id,last_reassessed_event_id';
 // One patient's active tourniquets from server rows (SERVER_TOURNIQUET_COLUMNS).
 function serverTourniquetRecords(rows, patientId, timeMeta=null){
   const metaById=new Map((timeMeta||[]).map(m=>[m.id, m]));
@@ -18499,6 +18861,7 @@ function serverTourniquetRecords(rows, patientId, timeMeta=null){
     const tq={id:`SRV-${r.id}`, appliedAt:Date.parse(r.applied_at)||null, limb:meta.key, limbLabel:meta.label, side:meta.side, bodyPart:meta.bodyPart,
       appliedBy:'(מכשיר אחר)', source:'server', status:effectiveness==='bleeding_continues'?'ineffective':'active', effectiveness, reasonForAdditional:null, note:''};
     const time=metaById.get(r.id);
+    if(time){ tq.appliedEventId=time.applied_event_id||null; tq.lastCheckEventId=time.last_reassessed_event_id||null; }
     if(time && ['phone','entered','unknown'].includes(time.time_source)){
       tq.timeSource=time.time_source;
       tq.timeUnknown=time.time_source==='unknown';
@@ -18517,7 +18880,7 @@ function applyServerTourniquets(rows, incidentId, timeMeta=null){
     if(!p.sourcedFromRemote || pending.has(p.id)) continue; // local edit wins until pushed
     if(site && p.siteId && p.siteId!==site) continue;
     const next=serverTourniquetRecords(rows, p.id, timeMeta);
-    const key=list=>JSON.stringify((list||[]).filter(t=>t.source==='server').map(t=>[t.id,t.limb,t.appliedAt,t.effectiveness,t.timeSource||null]));
+    const key=list=>JSON.stringify((list||[]).filter(t=>t.source==='server').map(t=>[t.id,t.limb,t.appliedAt,t.effectiveness,t.timeSource||null,t.appliedEventId||null,t.lastCheckEventId||null]));
     if(key(p.tourniquets)===key(next) && (p.tourniquets||[]).every(t=>t.source==='server')) continue;
     // Clear the legacy p.tourniquet alias first: ensureTourniquetArray() rebuilds an empty
     // list from it, which would bring back a tourniquet the server has released.
@@ -18539,7 +18902,7 @@ function applyServerTourniquets(rows, incidentId, timeMeta=null){
   if(changed){ saveDemoState(); refreshActiveScreenData(); }
 }
 function pullProjectedPatientStateAll(){
-  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullEvacPointArrivals(id); pullExternalReports(id); pullInjuryTimes(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); pullPcReviews(id); pullAlertAcknowledgments(id); pullRemoteTreatments(id); pullRemoteVitals(id); pullServerWatchdogAlerts(id); pullTourniquetSnoozes(id); });
+  Object.values(SITE_TO_INCIDENT_ID).forEach(id=>{ pullProjectedPatientState(id); pullPatientLocations(id); pullEvacuationTracking(id); pullEvacPointArrivals(id); pullExternalReports(id); pullInjuryTimes(id); pullPreEvacuation(id); pullMedicalResourceRequests(id); pullPcReviews(id); pullAlertAcknowledgments(id); pullRemoteTreatments(id); pullRemoteMarchReviews(id); pullRemoteVitals(id); pullServerWatchdogAlerts(id); pullTourniquetSnoozes(id); });
 }
 // ── Pre-evacuation report pull (V2.99.36, database/050) ──
 // incident_pre_evacuations is the server's verdict on who owns the report (first medical
@@ -18643,6 +19006,103 @@ function applyRemoteTreatments(rows){
     const next=byPatient[p.id]||[];
     if(JSON.stringify((p.remoteTreatments||[]).map(t=>t.id))===JSON.stringify(next.map(t=>t.id))) return;
     p.remoteTreatments=next;
+    changed=true;
+  });
+  if(changed){ saveDemoState(); refreshActiveScreenData(); }
+}
+// ── MARCH reviews from other devices (WP-31) ──
+// The New Patient form sends its march_review on the create event and each later MARCH-PAWS save
+// sends one as NOTE_ADDED (kind march_review). Read them from events (RLS decides who sees what),
+// so the PC's debt row and the patient card show the letters another phone documented. Values
+// other than treated / effective / clear are dropped by C5Rules.mergeMarchReviews.
+// From the payload only the review, march_seen, march_tq and the note's kind leave the server (PostgREST JSON
+// paths), not the rest of the create payload or a note's text.
+// actor_role is bound to the writer's profile role (database/075), so only reviews written by a
+// role that records treatments count (NOTE_ADDED is also open to cc, chamal, logistics and the
+// rescue chain). march_seen says which treatments a closing save had seen (owner 2026-11-25).
+const REMOTE_MARCH_COLUMNS='id,patient_id,device_id,actor_role,type,local_timestamp,march_review:payload_json->march_review,march_seen:payload_json->march_seen,march_tq:payload_json->march_tq,kind:payload_json->>kind';
+const REMOTE_MARCH_LIMIT=1000;
+// Pages of REMOTE_MARCH_LIMIT until a short page; up to REMOTE_MARCH_MAX_PAGES, then whatever was
+// read is added to (never replaces) what this phone knows.
+const REMOTE_MARCH_MAX_PAGES=10;
+async function pullEventPages(build){
+  const rows=[];
+  for(let page=0; page<REMOTE_MARCH_MAX_PAGES; page++){
+    let r;
+    try{ r=await build().range(page*REMOTE_MARCH_LIMIT, (page+1)*REMOTE_MARCH_LIMIT-1); }
+    catch(e){ return null; }
+    if(r.error || !Array.isArray(r.data)) return null;
+    rows.push(...r.data);
+    if(r.data.length<REMOTE_MARCH_LIMIT) return {rows, complete:true};
+  }
+  return {rows, complete:false};
+}
+async function pullRemoteMarchReviews(incidentId){
+  if(!currentUser) return;
+  const client=getSupabaseClient();
+  if(!client) return;
+  // Each tourniquet's key on every phone is its TOURNIQUET_APPLIED event (device + local id), and its
+  // newest "bleeding continues" its TOURNIQUET_REASSESSMENT; the server row's applied_event_id /
+  // last_reassessed_event_id point at those events' ids.
+  const tq=await pullEventPages(()=>client.from('events').select('id,device_id,local_event_id').eq('incident_id', incidentId).in('type',['TOURNIQUET_APPLIED','TOURNIQUET_REASSESSMENT']).order('id'));
+  let newKeys=false;
+  (tq?.rows||[]).forEach(row=>{
+    if(!row?.id || !row.device_id || !row.local_event_id) return;
+    const k=`${String(row.device_id).slice(0,120)}:${String(row.local_event_id).slice(0,120)}`;
+    if(MARCH_TQ_EVENT_KEYS.get(row.id)!==k){ MARCH_TQ_EVENT_KEYS.set(row.id, k); newKeys=true; }
+  });
+  const res=await pullEventPages(()=>client.from('events').select(REMOTE_MARCH_COLUMNS).eq('incident_id', incidentId).in('type',['PATIENT_CREATED','NOTE_ADDED']).not('payload_json->march_review','is',null).order('local_timestamp',{ascending:false}).order('id'));
+  if(!res){ if(newKeys) refreshActiveScreenData(); return; }
+  applyRemoteMarchReviews(res.rows, {partial:!res.complete, incidentId, newKeys});
+}
+const MARCH_SEEN_MAX_SOURCES=50;
+function sanitizeMarchSeen(raw){
+  const seen={};
+  if(!raw || typeof raw!=='object' || Array.isArray(raw)) return seen;
+  C5Rules.MARCH_LETTERS.forEach(id=>{
+    const bySource=Object.prototype.hasOwnProperty.call(raw, id) ? raw[id] : null;
+    if(!bySource || typeof bySource!=='object' || Array.isArray(bySource)) return;
+    const out={};
+    Object.keys(bySource).slice(0, MARCH_SEEN_MAX_SOURCES).forEach(src=>{
+      if(['__proto__','constructor','prototype'].includes(src)) return;
+      const t=Number(bySource[src]);
+      if(Number.isFinite(t)) out[String(src).slice(0,260)]=t;
+    });
+    seen[id]=out;
+  });
+  return seen;
+}
+function applyRemoteMarchReviews(rows, opts={}){
+  const byPatient={};
+  // This phone's own rows are read back too: after an incident re-entry the local history is gone,
+  // and the per-letter merge gives the same answer when it sees a review twice.
+  rows.forEach(row=>{
+    if(!row || !row.patient_id) return;
+    if(!TREATMENT_RECORDING_ROLES.has(SERVER_ROLE_TO_CLIENT_ROLE[row.actor_role]||row.actor_role)) return;
+    const mr=row.march_review;
+    if(!mr || typeof mr!=='object' || Array.isArray(mr)) return;
+    if(row.type==='NOTE_ADDED' && row.kind!=='march_review') return;
+    const at=Date.parse(row.local_timestamp);
+    if(!Number.isFinite(at)) return;
+    const review={};
+    MARCH_PAWS_SECTIONS.forEach(sec=>{ if(Object.prototype.hasOwnProperty.call(mr, sec.id) && ['treated','effective','clear'].includes(mr[sec.id])) review[sec.id]=mr[sec.id]; });
+    const tq=Array.isArray(row.march_tq) ? row.march_tq.filter(k=>typeof k==='string' && k && k.length<=260).slice(0,20) : [];
+    (byPatient[row.patient_id]||(byPatient[row.patient_id]=[])).push({at, review, source:String(row.device_id||''), seen:sanitizeMarchSeen(row.march_seen), tq, id:String(row.id||'')});
+  });
+  // Only this incident's casualties (as applyServerTourniquets).
+  const site=opts.incidentId ? INCIDENT_ID_TO_SITE[opts.incidentId] : null;
+  let changed=!!opts.newKeys;
+  patients.forEach(p=>{
+    if(site && p.siteId && p.siteId!==site) return;
+    let next=(byPatient[p.id]||[]);
+    if(opts.partial){
+      const ids=new Set(next.map(e=>e.id));
+      next=[...(p.remoteMarchReviews||[]).filter(e=>e.source && !ids.has(e.id)), ...next];
+    }
+    const once=new Set(); next=next.filter(e=>!e.id || (once.has(e.id) ? false : once.add(e.id))); // a page boundary can repeat a row
+    next=next.sort((a,b)=>a.at-b.at);
+    if(JSON.stringify(p.remoteMarchReviews||[])===JSON.stringify(next)) return;
+    p.remoteMarchReviews=next;
     changed=true;
   });
   if(changed){ saveDemoState(); refreshActiveScreenData(); }

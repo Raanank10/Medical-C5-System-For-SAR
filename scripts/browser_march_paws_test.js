@@ -13,6 +13,10 @@
 // - a restored draft shows its selected treatments and letter states again;
 // - V2.99.69 letter strip: one letter's treatments at a time, every letter's state in the strip,
 //   the strip on the first screen, "no treatment needed" moves on to the next undocumented letter.
+// - WP-31 (owner 2026-11-23): a treated MARCH letter reads "טופל - חסרה בדיקה חוזרת" until
+//   "בדיקה חוזרת: הטיפול יעיל" is tapped (sent as "effective"); a new treatment in the letter needs
+//   a new reassessment; H needs an AVPU from the vitals step; the progress line counts completed
+//   MARCH letters; PAWS stays documented / not documented.
 //
 // Runs in CI through scripts/run_tests.js (WP-13); also runs on its own.
 // Run: npm install && node scripts/browser_march_paws_test.js
@@ -71,7 +75,7 @@ async function main() {
     assert(layout.wide.length === 0, `nothing on the MARCH screen may go past a 375px viewport: ${layout.wide.join(', ')}`);
     assert(layout.scrollWidth <= 375, `no horizontal page scroll at 375px, scrollWidth ${layout.scrollWidth}`);
     assert(layout.states.every((s) => s === 'לא תועד'), `every letter starts as not documented, got ${layout.states}`);
-    assert(layout.progress === 'תועדו: MARCH 0/5 · PAWS 0/4', `progress line, got "${layout.progress}"`);
+    assert(layout.progress === 'MARCH הושלמו 0/5 · PAWS תועדו 0/4', `progress line, got "${layout.progress}"`);
 
     // 2. Real taps: treatments, "no treatment needed", and their interaction.
     await page.click('#march-sec-m .chip[data-tx="hemostatic"]');
@@ -103,9 +107,9 @@ async function main() {
     assert(JSON.stringify(taps.review) === JSON.stringify({ m: 'treated', a: 'treated', r: 'treated', c: 'treated', h: 'clear', p: null, ab: null, w: null, s: 'treated' }),
       `letter review after taps, got ${JSON.stringify(taps.review)}`);
     assert(taps.clear === 'h', `only H stays "no treatment needed" (C withdrawn by TXA, M refused), got ${taps.clear}`);
-    assert(taps.mState === 'טופל' && taps.hState === 'נבדק - ללא טיפול', `letter labels, got M "${taps.mState}" H "${taps.hState}"`);
+    assert(taps.mState === 'טופל - חסרה בדיקה חוזרת' && taps.hState === 'נבדק - ללא טיפול · חסר AVPU', `letter labels, got M "${taps.mState}" H "${taps.hState}"`);
     assert(!taps.cClearSelected, 'C\'s "no treatment needed" button must clear once a C treatment is chosen');
-    assert(taps.progress === 'תועדו: MARCH 5/5 · PAWS 1/4', `progress line after taps, got "${taps.progress}"`);
+    assert(taps.progress === 'MARCH הושלמו 0/5 · PAWS תועדו 1/4', `progress line after taps, got "${taps.progress}"`);
     assert(taps.gauze === 1, `hemostatic gauze must come out of the medic's stock (2 -> 1), got ${taps.gauze}`);
 
     // 3. Restored draft: chips and letter states come back.
@@ -164,7 +168,7 @@ async function main() {
       const create = getOutbox().slice(before).find((e) => /PATIENT_CREATED$/.test(e.type));
       return { m, quickHasReview: 'march_review' in (create?.payload_json || {}) };
     });
-    assert(quickTq.m === 'טופל', `immediate tourniquet from step 3 must mark M as treated, got ${quickTq.m}`);
+    assert(quickTq.m === 'טופל - חסרה בדיקה חוזרת', `immediate tourniquet from step 3 must mark M as treated, got ${quickTq.m}`);
     assert(!quickTq.quickHasReview, 'a quick-flow patient never saw step 7 and must not send march_review');
 
     // 7. Cric and needle decompression: paramedic or physician only (owner 2026-10-23).
@@ -220,7 +224,7 @@ async function main() {
     // Tourniquet-only patient: M treated, then one tap per remaining letter.
     await page.click('#march-sec-m .chip[data-tx="tourniquet"]');
     v = await view();
-    assert(v.open === 'm' && v.tiles.m === 'טופל', `choosing a treatment keeps its letter open (limb / time), got ${JSON.stringify(v)}`);
+    assert(v.open === 'm' && v.tiles.m === 'בדיקה חוזרת', `choosing a treatment keeps its letter open (limb / time), got ${JSON.stringify(v)}`);
     await page.click('#march-tile-a');
     for (const id of ['a', 'r', 'c', 'h', 'p', 'ab', 'w']) {
       v = await view();
@@ -232,7 +236,7 @@ async function main() {
     await page.click('#march-clear-s');
     v = await view();
     assert(v.open === 's', `with every letter documented the last one stays open, got ${v.open}`);
-    assert(v.tiles.m === 'טופל' && ['a', 'r', 'c', 'h', 'p', 'ab', 'w', 's'].every((id) => v.tiles[id] === '✓ נבדק'), `tiles after the sweep, got ${JSON.stringify(v.tiles)}`);
+    assert(v.tiles.m === 'בדיקה חוזרת' && v.tiles.h === 'חסר AVPU' && ['a', 'r', 'c', 'p', 'ab', 'w', 's'].every((id) => v.tiles[id] === '✓ נבדק'), `tiles after the sweep, got ${JSON.stringify(v.tiles)}`);
     // Wrap round: an undocumented letter before the current one is reached too.
     await page.click('#march-tile-a');
     await page.click('#march-clear-a'); // un-check A
@@ -274,6 +278,70 @@ async function main() {
     const order = ['step3', 'step4', 'step5', 'step6', 'step7', 'step2', 'step8'].map((sid) => look.bars[sid]);
     assert(look.bars.step7[0] === 'שלב 6 / 8' && look.bars.step2[0] === 'שלב 7 / 8', `step labels, got ${JSON.stringify(look.bars)}`);
     assert(order.every(([, w], i) => i === 0 || w > order[i - 1][1]) && order[order.length - 1][1] === 100, `the progress bar must only grow through the full flow, got ${JSON.stringify(look.bars)}`);
+
+    // 10. WP-31: reassessment, AVPU for H, completion count.
+    await page.evaluate(() => { startNewPatient('extended'); state.triage = 'red'; goTo('step7'); });
+    const re = () => page.evaluate(() => ({
+      btn: getComputedStyle(document.getElementById('march-reassess-m')).display !== 'none',
+      btnSel: document.getElementById('march-reassess-m').classList.contains('selected'),
+      mState: document.getElementById('march-state-m').textContent,
+      tile: document.querySelector('#march-tile-m small').textContent,
+      review: marchReviewFromState(),
+      progress: document.getElementById('march-progress').textContent,
+      avpuLine: document.getElementById('march-avpu-h').textContent,
+    }));
+    let r = await re();
+    assert(!r.btn, 'no reassessment button before any treatment');
+    await page.evaluate(() => toggleMarchReassess('m'));
+    r = await re();
+    assert(r.review.m === null, `reassessing an untreated letter must do nothing, got ${r.review.m}`);
+    await page.click('#march-sec-m .chip[data-tx="bandage"]');
+    r = await re();
+    assert(r.btn && !r.btnSel && r.review.m === 'treated' && r.tile === 'בדיקה חוזרת', `treated M offers the reassessment, got ${JSON.stringify(r)}`);
+    await page.click('#march-reassess-m');
+    r = await re();
+    assert(r.review.m === 'effective' && r.btnSel && r.tile === '✓ יעיל' && r.mState === 'טופל - בדיקה חוזרת: יעיל', `reassessed M is effective, got ${JSON.stringify(r)}`);
+    assert(r.progress === 'MARCH הושלמו 1/5 · PAWS תועדו 0/4', `M counts as complete, got ${r.progress}`);
+    await page.click('#march-sec-m .chip[data-tx="hemostatic"]');
+    r = await re();
+    assert(r.review.m === 'treated' && !r.btnSel, `a new M treatment needs a new reassessment, got ${JSON.stringify(r)}`);
+    await page.click('#march-reassess-m');
+    await page.click('#march-reassess-m'); // second tap takes it back
+    r = await re();
+    assert(r.review.m === 'treated', `the reassessment can be taken back, got ${r.review.m}`);
+    await page.click('#march-reassess-m');
+    for (const id of ['a', 'r', 'c', 'h']) { await page.click(`#march-tile-${id}`); await page.click(`#march-clear-${id}`); }
+    r = await re();
+    assert(r.progress === 'MARCH הושלמו 4/5 · PAWS תועדו 0/4' && r.avpuLine.startsWith('חסרה רמת הכרה (AVPU)'), `H waits for AVPU, got ${r.progress} / ${r.avpuLine}`);
+    await page.evaluate(() => { flowVitals.avpu = 'V'; renderMarchProgress(); });
+    r = await re();
+    assert(r.progress === 'MARCH הושלמו 5/5 · PAWS תועדו 0/4' && r.avpuLine === 'רמת הכרה (AVPU) מתועדת - V', `with AVPU MARCH is complete, got ${r.progress} / ${r.avpuLine}`);
+    const effSaved = await page.evaluate(() => {
+      const before = getOutbox().length;
+      savePatient();
+      const create = getOutbox().slice(before).find((e) => /PATIENT_CREATED$/.test(e.type));
+      const p = patients[patients.length - 1];
+      return { sent: create?.payload_json?.march_review?.m, complete: patientMarchStatus(p).complete, reviews: (p.marchReviews || []).length };
+    });
+    assert(effSaved.sent === 'effective' && effSaved.complete && effSaved.reviews === 1, `the create sends "effective" and the casualty is complete, got ${JSON.stringify(effSaved)}`);
+
+    // 11. A step-3 tourniquet reassessed in the form stays closed after save; the create says what it saw.
+    const formTq = await page.evaluate(() => {
+      startNewPatient('extended'); state.triage = 'red'; quickTqData.applied = true; flowVitals.avpu = 'A';
+      goTo('step7');
+      toggleMarchReassess('m');
+      const before = getOutbox().length;
+      savePatient();
+      const p = patients[patients.length - 1];
+      const added = getOutbox().slice(before);
+      const create = added.find((e) => /PATIENT_CREATED$/.test(e.type));
+      const tqEv = added.find((e) => e.type === 'TOURNIQUET_APPLIED');
+      const seenKeys = Object.keys(create?.payload_json?.march_seen?.m || {});
+      return { sent: create?.payload_json?.march_review?.m, m: patientMarchReview(p).m, tqs: (p.tourniquets || []).length,
+        keyMatch: !!tqEv && seenKeys.includes(`tq:${getDeviceId()}:${tqEv.local_event_id}`), stampEq: Date.parse(create.local_timestamp) === p.marchReviews[0].at };
+    });
+    assert(formTq.sent === 'effective' && formTq.m === 'effective' && formTq.tqs >= 1 && formTq.keyMatch && formTq.stampEq,
+      `a reassessed step-3 tourniquet stays closed after save, got ${JSON.stringify(formTq)}`);
 
     assert(pageErrors.length === 0, `uncaught page error(s): ${pageErrors.join(' | ')}`);
     await page.close();

@@ -606,6 +606,110 @@
     return null;
   }
 
+  // MARCH completion (WP-31, owner 2026-11-23). Each MARCH letter is documented as "treated" (a
+  // treatment in that letter), "effective" (treated, then a reassessment tap confirmed it worked)
+  // or "clear" (checked, nothing needed). Treated alone is not complete: a tourniquet on is not
+  // bleeding controlled until someone looks again. Clear is complete with no vitals needed (R and
+  // C included: the medic's check stands). H (hypothermia / head injury) also needs an AVPU on
+  // record, so the head-injury half is covered. PAWS letters are not judged here: they stay
+  // documented / not documented. Documentation only: nothing here blocks a save or a handover.
+  const MARCH_LETTERS = ["m", "a", "r", "c", "h"];
+  const MARCH_REVIEW_VALUES = ["treated", "effective", "clear"];
+  function marchLetterStatus(letter, value, avpu) {
+    if (!MARCH_REVIEW_VALUES.includes(value)) return "not_documented";
+    if (value === "treated") return "needs_reassessment";
+    if (letter === "h" && !["A", "V", "P", "U"].includes(avpu)) return "needs_avpu";
+    return "complete";
+  }
+  function marchStatus(review, avpu) {
+    const letters = {};
+    MARCH_LETTERS.forEach((id) => {
+      letters[id] = marchLetterStatus(id, review && typeof review === "object" ? review[id] : null, avpu);
+    });
+    const missing = MARCH_LETTERS.filter((id) => letters[id] !== "complete");
+    return { letters, complete: missing.length === 0, missing };
+  }
+  // A casualty's review is built from every MARCH-PAWS save on every phone (the New Patient form's
+  // march_review, then each later "טיפולים MARCH-PAWS" save, which carries only the letters touched
+  // then), plus M treatments the phone knows from elsewhere (an active tourniquet, recorded continued
+  // bleeding). For PAWS letters the newest documented value wins; MARCH letters follow the rule below.
+  // For MARCH letters (owner 2026-11-25, "treated wins across phones"): a treatment is closed only by
+  // a reassessment from the same source stamped after it (one clock), or by one whose `seen` says it
+  // knew that treatment. Phone clocks are never compared across sources, so a phone with a fast clock or
+  // one that was offline and never saw the treatment cannot hide it.
+  // Entries: {at: ms, review, source?, seen?, aliases?}. `source` names whose clock `at` is (a phone
+  // id, or a stable key for a tourniquet / bleeding record); `seen` is {letter: {source: latest
+  // treated at}}. PAWS letters keep plain newest-wins.
+  // A treatment may also carry `aliases`: other names the same treatment had on some phone (a
+  // tourniquet's limb + minute before its event key was known), so a reassessment that saw it under
+  // that name still covers it.
+  function marchEntryCovers(closer, treated, letter) {
+    const seen = closer.seen && closer.seen[letter];
+    return [treated.source, ...treated.aliases].some((source) => {
+      if (closer.source === source && closer.at >= treated.at) return true;
+      const t = seen && typeof seen === "object" && Object.prototype.hasOwnProperty.call(seen, source) ? Number(seen[source]) : NaN;
+      return Number.isFinite(t) && t >= treated.at;
+    });
+  }
+  function normalizeMarchEntries(entries) {
+    const list = [];
+    (Array.isArray(entries) ? entries : []).forEach((entry) => {
+      const at = Number(entry && entry.at);
+      const review = entry && entry.review;
+      if (!Number.isFinite(at) || !review || typeof review !== "object") return;
+      const source = entry.source === undefined || entry.source === null ? "" : String(entry.source);
+      const seen = entry.seen && typeof entry.seen === "object" ? entry.seen : null;
+      const aliases = Array.isArray(entry.aliases) ? entry.aliases.filter((a) => typeof a === "string" && a && a !== source) : [];
+      list.push({ at, review, source, seen, aliases });
+    });
+    return list;
+  }
+  function mergeMarchReviews(entries) {
+    const list = normalizeMarchEntries(entries);
+    const out = {};
+    const at = {};
+    list.forEach((entry) => {
+      Object.keys(entry.review).forEach((id) => {
+        const value = entry.review[id];
+        if (!MARCH_REVIEW_VALUES.includes(value)) return;
+        if (at[id] === undefined || entry.at >= at[id]) {
+          out[id] = value;
+          at[id] = entry.at;
+        }
+      });
+    });
+    // MARCH letters: a treatment is closed only by a reassessment ("effective") that covers it; a
+    // later "nothing needed" never closes or hides one (owner 2026-11-23 criterion 1). So the letter
+    // is "treated" while any treatment is uncovered, "effective" once every one is, and otherwise
+    // "clear" if anyone checked it. Clocks are never compared across sources here.
+    MARCH_LETTERS.forEach((id) => {
+      const treated = list.filter((e) => e.review[id] === "treated");
+      const reassessed = list.filter((e) => e.review[id] === "effective");
+      if (treated.some((t) => !reassessed.some((c) => marchEntryCovers(c, t, id)))) out[id] = "treated";
+      else if (treated.length || reassessed.length) out[id] = "effective";
+      else if (list.some((e) => e.review[id] === "clear")) out[id] = "clear";
+      else delete out[id];
+    });
+    return out;
+  }
+  // What a closing save records as seen: per MARCH letter, the latest treated stamp per source among
+  // the entries this phone knows now. Sent with the review (march_seen) so other phones can tell a
+  // reassessment of their treatment from one that never saw it.
+  function marchSeenFrom(entries) {
+    const seen = {};
+    normalizeMarchEntries(entries).forEach((entry) => {
+      MARCH_LETTERS.forEach((id) => {
+        if (entry.review[id] !== "treated") return;
+        const bySource = seen[id] || (seen[id] = {});
+        // Only the name the phone knows it by: an alias (limb + minute) is shared by two tourniquets on
+        // one limb in one minute, so seeing one must not cover the other. A phone that knew only the
+        // alias has it as the source, and the alias then covers the event-keyed entry later.
+        if (bySource[entry.source] === undefined || entry.at > bySource[entry.source]) bySource[entry.source] = entry.at;
+      });
+    });
+    return seen;
+  }
+
   return {
     AVPU_RANK,
     DEVICE_SILENCE_MS,
@@ -664,6 +768,10 @@
     RESCUE_PRIORITIES,
     rescueEvacPriority,
     LONG_ENTRAPMENT_MINUTES,
+    MARCH_LETTERS,
+    marchStatus,
+    mergeMarchReviews,
+    marchSeenFrom,
     rescueExtractionRequirement,
     suggestedSweepColor,
     suggestMstartTriage,
