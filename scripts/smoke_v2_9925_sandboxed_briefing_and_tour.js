@@ -31,7 +31,8 @@ for (const rel of files) {
   // or a tap on it would write supply events about a demo patient into the real outbox.
   assert(/_demoSandbox=null;\s*closeAllOpenModals\(\);\s*restoreSandboxState\(snapshot\);/.test(html), `${rel}: ending the demo must close every open modal before restoring`);
 
-  // Guided tour: read-only walkthrough of the real PC/CC dashboards.
+  // Guided tour: read-only walkthrough of the real PC/CC dashboards. Presence checks only; what the
+  // tour actually shows is tested in scripts/browser_guided_tour_test.js (WP-43).
   assert(html.includes('onclick="startGuidedTour()"'), `${rel}: guided tour button must exist`);
   assert(html.includes('const GUIDED_TOUR_STEPS = ['), `${rel}: guided tour steps must exist`);
   assert(html.includes('id="guided-tour-card"'), `${rel}: guided tour card must exist`);

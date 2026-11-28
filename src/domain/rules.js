@@ -575,6 +575,18 @@
     return { level: ms >= EVAC_POINT_WAIT_CRITICAL_MS ? "critical" : "warning", minutes: Math.floor(ms / 60000) };
   }
 
+  // Relief not confirmed (WP-27, owner 2026-11-22/23): after a handover or a release, the leaving
+  // company's medical staff keep recording until each confirms "הוחלפתי - מסרתי". Still waiting
+  // 30 minutes later: the site's PC and the CC are alerted, so nobody keeps writing on a site he
+  // has left without anyone noticing. Counted from when that person started waiting.
+  const RELIEF_OVERDUE_MS = 30 * 60 * 1000;
+  function reliefOverdueMinutes(pendingSinceMs, nowMs = Date.now()) {
+    const since = Number(pendingSinceMs);
+    if (!Number.isFinite(since) || since <= 0) return null;
+    const ms = nowMs - since;
+    return ms >= RELIEF_OVERDUE_MS ? Math.floor(ms / 60000) : null;
+  }
+
   function rescueEvacPriority(triage, tourniquetActive) {
     if (triage === "red" || tourniquetActive === true) return "urgent";
     if (triage === "yellow" || triage === "green" || triage === "black") return "not_urgent";
@@ -624,6 +636,8 @@
     EVAC_POINT_WAIT_CRITICAL_MS,
     EVAC_POINT_WAIT_WARN_MS,
     evacPointWaitAlert,
+    reliefOverdueMinutes,
+    RELIEF_OVERDUE_MS,
     isCriticalAlert,
     isDeviceSilent,
     isFinalPatientStatus,
