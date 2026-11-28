@@ -40,6 +40,10 @@ Current rules (exact, from `src/domain/rules.js`):
 
 **Questions for the reviewer**: these specific numbers were set explicitly by product direction earlier in this project's history (not derived from a cited doctrine source in the code itself) — does a real tourniquet-timing doctrine source exist that should be cited here, and do these numbers match it? A prior version of this code had 40-minute/60-minute thresholds that were corrected — worth double-checking there isn't a *third* number that's actually correct.
 
+### Converting a tourniquet to direct pressure
+
+`TOURNIQUET_CONVERSION_LIMIT_MS` / `tourniquetConversionAllowed`: medic and PC up to 120 minutes after application, paramedic and physician (and admin, the test profile) up to 6 hours; other roles never; an unknown application time blocks every role. Owner product direction (2026-10-26 / 27, 2026-11-08; the paramedic raised from 4 to 6 hours on 2026-11-26), checked on the phone only, not by `sync-log`. **Question for the reviewer**: are these windows right for each role's training and authorization, and should the server enforce them?
+
 ## 4. Pediatric Detection and High-Risk Medication Dosing
 
 `PEDIATRIC_AGE_CUTOFF = 8` (under 8, or explicitly flagged as pediatric age group, triggers pediatric handling). `PEDIATRIC_HIGH_RISK_DOSE_LIMITS`: morphine 4mg max, fentanyl 50mcg max, compared against a weight estimate derived from age (`Math.max(4, age*2+8)` kg when age is known, else a conservative 4kg floor when age is unknown).

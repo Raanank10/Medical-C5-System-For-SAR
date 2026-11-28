@@ -1050,7 +1050,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-demo" class="screen">
   <div class="demo-hero">
     <div>
-      <div class="demo-kicker">Demo V2.9995</div>
+      <div class="demo-kicker">Demo V2.9998</div>
       <div class="demo-title">דמו פיתוח — תמונת מצב רפואית באירוע חילוץ</div>
       <div class="demo-sub">
         החובש מזין מוקד ואזור בדרך לאירוע. בהגעה לשטח הוא מסמן פצועים בסריקת MSTART בלי שם, בלי זיהוי ובלי מדדים מלאים. אחרי הסריקה הוא חוזר לפצועים שלו למדדים מלאים ומעקב הידרדרות. תרחיש הדגמה חתום נטען רק בלחיצה יזומה וניתן לניקוי מיד לאחר מכן. כל השמות בדמו פיקטיביים.
@@ -1147,7 +1147,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
 <div id="screen-role-dashboard" class="screen">
   <div class="header">
     <div class="header-left">
-      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9995</div>
+      <div class="header-subtitle" id="role-header-subtitle">ROLE // V2.9998</div>
       <div class="header-title" id="role-header-title">תפקיד</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1157,7 +1157,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   </div>
   <div class="demo-strip">
     <div>
-      <div class="demo-strip-title">Role-Based Medical Command System V2.9995</div>
+      <div class="demo-strip-title">Role-Based Medical Command System V2.9998</div>
       <div class="demo-strip-sub" id="role-context-line">כל השמות בדמו פיקטיביים. כל תפקיד רואה אחריות, התראות, אובייקטים ופעולות משלו.</div>
     </div>
     <div class="sync-pill" id="sync-pill-role">SYNC</div>
@@ -2846,7 +2846,7 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   const TOURNIQUET_NOTICE_MS = 45 * 60 * 1000;
   const TOURNIQUET_WARN_MS = 60 * 60 * 1000;
   // Repo owner, 2026-10-26 / 27: a medic may convert a tourniquet to direct pressure only up to 120
-  // minutes after it went on; a paramedic up to 4 hours, a physician up to 6 (see
+  // minutes after it went on; a paramedic or a physician up to 6 hours (paramedic 4 until 2026-11-26; see
   // TOURNIQUET_CONVERSION_LIMIT_MS). The 100-minute
   // alert gives the medic 20 minutes to decide (convert / evacuate) before that window closes.
   const TOURNIQUET_DECISION_MS = 100 * 60 * 1000;
@@ -2857,12 +2857,13 @@ body .screen:has(> .bottom-bar), body.field-mode .screen:has(> .bottom-bar){padd
   const TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS = 6 * 60 * 60 * 1000;
   // Converting a tourniquet to direct pressure (repo owner, 2026-10-26 / 27 / 11-08): how long after
   // application each role may do it. A medic (and a PC, the platoon's medical commander) up to 120
-  // minutes, a paramedic up to 4 hours, a physician up to 6 hours; past that the phone blocks them.
+  // minutes, a paramedic or a physician up to 6 hours (owner 2026-11-26; the paramedic's was 4);
+  // past that the phone blocks them.
   // Any other role may not convert (no admin exception, as with cric / needle decompression).
   const TOURNIQUET_CONVERSION_LIMIT_MS = {
     medic: TOURNIQUET_CRITICAL_MS,
     pc: TOURNIQUET_CRITICAL_MS,
-    paramedic: 4 * 60 * 60 * 1000,
+    paramedic: TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS, // owner 2026-11-26: 6 h, as a physician (was 4 h)
     physician: TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS,
     // The owner's test / monitoring profile (2026-11-08): every option open, with the physician's
     // limits so the blocked states can be seen too.
@@ -3569,7 +3570,7 @@ function captureAuthLinkSignal(){
 // ═══════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════
-const APP_VERSION = '2.99.95';
+const APP_VERSION = '2.99.98';
 const DEMO_STORAGE_KEY = 'c5-sentinel-sar-demo-v1';
 const RECOMMENDATION_ACK_KEY = 'c5_sentinel_recommendation_ack_v1';
 const OBSERVER_NOTES_KEY = 'c5-sentinel-sar-observer-notes-v1';
@@ -10498,14 +10499,14 @@ function patientTourniquetFixHtml(p){
   }).join('');
   return `<div class="summary-card"><div class="summary-key" style="margin-bottom:8px">חסמים פעילים</div>${rows}</div>`;
 }
-// Converting a tourniquet to direct pressure (repo owner, 2026-10-26 / 27 / 11-08): a medic or PC
-// may do it up to 120 minutes after application, a paramedic up to 4 hours, a physician up to 6
-// hours; the phone blocks the rest (C5Rules.tourniquetConversionAllowed). Before
+// Converting a tourniquet to direct pressure (repo owner, 2026-10-26 / 27 / 11-08 / 11-26): a medic or
+// PC may do it up to 120 minutes after application, a paramedic or a physician up to 6 hours; the
+// phone blocks the rest (C5Rules.tourniquetConversionAllowed). Before
 // this the app had no way to record a release at all, only "cancel an entry recorded by mistake".
 // The conversion stops that tourniquet's alerts and is sent as TOURNIQUET_RELEASED with reason
 // 'converted_direct_pressure', which closes the server row (project_tourniquet_events) and resolves
 // its watchdog alerts (silence_resolved_watchdogs_for_event).
-const TQ_CONVERSION_ROLE_LIMIT_LABELS={medic:'120 דק׳', pc:'120 דק׳', paramedic:'4 שעות', physician:'6 שעות', admin:'6 שעות'};
+const TQ_CONVERSION_ROLE_LIMIT_LABELS={medic:'120 דק׳', pc:'120 דק׳', paramedic:'6 שעות', physician:'6 שעות', admin:'6 שעות'};
 function tourniquetConversionRole(){ return currentUser?.role || activeRoleDashboard; }
 // A tourniquet's time is unknown when it was already on the patient and no time has been entered:
 // the sweep's "היה על הפצוע" with no time, a New Patient flow tourniquet saved with an empty time
@@ -10530,8 +10531,9 @@ function tourniquetConversionBlockedText(check){
   if(check.reason==='role') return 'חובש / פראמדיק / רופא בלבד';
   if(check.reason==='time_unknown') return 'שעת הנחה לא ידועה · לא ניתן להמיר';
   const role=tourniquetConversionRole();
-  if(role==='physician' || role==='admin') return 'עברו 6 שעות · חלון ההמרה נסגר';
-  return role==='paramedic' ? 'עברו 4 שעות · רופא בלבד' : `עברו ${TQ_CONVERSION_ROLE_LIMIT_LABELS[role]||'120 דק׳'} · פראמדיק / רופא בלבד`;
+  // Owner 2026-11-26: paramedic and physician share the 6-hour limit, so past it nobody converts.
+  if(role==='physician' || role==='admin' || role==='paramedic') return 'עברו 6 שעות · חלון ההמרה נסגר';
+  return `עברו ${TQ_CONVERSION_ROLE_LIMIT_LABELS[role]||'120 דק׳'} · פראמדיק / רופא בלבד`;
 }
 function tourniquetConversionButtonHtml(p, tq){
   const check=tourniquetConversionCheck(tq);
@@ -10704,7 +10706,7 @@ function applyTourniquetEnteredTime(p, tq, value, appliedAtMs, minutesAgo){
   renderTourniquetTimeAlert();
   rerenderAfterTourniquetFix(p);
   const pastCritical=tqAlertRank(tq.timeAlertedLevel)>=tqAlertRank('critical');
-  toast(pastCritical ? `שעת הנחה נשמרה · עברו ${minutes} דק׳ · המרה: ${tourniquetConversionCheck(tq).allowed?'מותרת לך':'פראמדיק / רופא בלבד'}` : `שעת הנחה נשמרה · +${minutes} דק׳`);
+  toast(pastCritical ? `שעת הנחה נשמרה · עברו ${minutes} דק׳ · המרה: ${tourniquetConversionCheck(tq).allowed?'מותרת לך':tourniquetConversionBlockedText(tourniquetConversionCheck(tq))}` : `שעת הנחה נשמרה · +${minutes} דק׳`);
 }
 // Sweep (owner, 2026-11-08): a tourniquet recorded in the sweep is either placed now by this medic
 // (the phone's time, as before) or was already on the patient (time from the body, or unknown; no
@@ -11283,13 +11285,12 @@ function tqAlertTitle(level){
   const hours=tqAlertHours(level);
   return hours ? `חסם עורקים: עברו ${hours} שעות` : TQ_ALERT_TITLES[level];
 }
-// Who may still convert the tourniquet to direct pressure (owner, 2026-10-26 / 27): past 120
-// minutes a paramedic up to 4 hours and a physician up to 6 (C5Rules.TOURNIQUET_CONVERSION_LIMIT_MS).
+// Who may still convert the tourniquet to direct pressure (owner, 2026-10-26 / 27 / 11-26): past 120
+// minutes a paramedic or a physician, up to 6 hours (C5Rules.TOURNIQUET_CONVERSION_LIMIT_MS).
 function tqAlertNote(level){
   const hours=tqAlertHours(level);
-  if(hours && hours>=C5Rules.TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS/3600000) return 'עבר חלון השחרור של רופא (6 שעות)';
-  if(hours && hours>=C5Rules.TOURNIQUET_CONVERSION_LIMIT_MS.paramedic/3600000) return 'המרה ללחץ ישיר: רופא בלבד (עד 6 שעות)';
-  return level==='critical' || hours ? 'המרה ללחץ ישיר אחרי 120 דק׳: פראמדיק עד 4 שעות, רופא עד 6 שעות' : '';
+  if(hours && hours>=C5Rules.TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS/3600000) return 'עבר חלון ההמרה (פראמדיק / רופא, 6 שעות)';
+  return level==='critical' || hours ? 'המרה ללחץ ישיר אחרי 120 דק׳: פראמדיק / רופא עד 6 שעות' : '';
 }
 const TQ_ALERT_HAPTICS={notice:150, warn:[250,100,250], decision:[300,100,300,100,300], critical:[400,150,400,150,400]};
 const TQ_ALERT_COLORS={notice:'var(--yellow)', warn:'var(--orange)', decision:'var(--orange)', critical:'var(--red)'};

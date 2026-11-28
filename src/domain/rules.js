@@ -23,7 +23,7 @@
   const TOURNIQUET_NOTICE_MS = 45 * 60 * 1000;
   const TOURNIQUET_WARN_MS = 60 * 60 * 1000;
   // Repo owner, 2026-10-26 / 27: a medic may convert a tourniquet to direct pressure only up to 120
-  // minutes after it went on; a paramedic up to 4 hours, a physician up to 6 (see
+  // minutes after it went on; a paramedic or a physician up to 6 hours (paramedic 4 until 2026-11-26; see
   // TOURNIQUET_CONVERSION_LIMIT_MS). The 100-minute
   // alert gives the medic 20 minutes to decide (convert / evacuate) before that window closes.
   const TOURNIQUET_DECISION_MS = 100 * 60 * 1000;
@@ -34,12 +34,13 @@
   const TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS = 6 * 60 * 60 * 1000;
   // Converting a tourniquet to direct pressure (repo owner, 2026-10-26 / 27 / 11-08): how long after
   // application each role may do it. A medic (and a PC, the platoon's medical commander) up to 120
-  // minutes, a paramedic up to 4 hours, a physician up to 6 hours; past that the phone blocks them.
+  // minutes, a paramedic or a physician up to 6 hours (owner 2026-11-26; the paramedic's was 4);
+  // past that the phone blocks them.
   // Any other role may not convert (no admin exception, as with cric / needle decompression).
   const TOURNIQUET_CONVERSION_LIMIT_MS = {
     medic: TOURNIQUET_CRITICAL_MS,
     pc: TOURNIQUET_CRITICAL_MS,
-    paramedic: 4 * 60 * 60 * 1000,
+    paramedic: TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS, // owner 2026-11-26: 6 h, as a physician (was 4 h)
     physician: TOURNIQUET_PHYSICIAN_RELEASE_MAX_MS,
     // The owner's test / monitoring profile (2026-11-08): every option open, with the physician's
     // limits so the blocked states can be seen too.

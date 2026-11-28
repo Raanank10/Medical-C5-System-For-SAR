@@ -347,8 +347,8 @@ assert.equal(rules.tourniquetAlertToRaise("hours_4", "hours_3"), "hours_4");
 assert.equal(rules.tourniquetAlertToRaise("hours_5", "warn"), "hours_5");
 assert.equal(rules.tourniquetAlertToRaise("critical", "hours_4"), null);
 
-// Converting a tourniquet to direct pressure (owner, 2026-10-26 / 27 / 11-08): medic and PC up to
-// 120 min, paramedic up to 4 h, physician up to 6 h, other roles never.
+// Converting a tourniquet to direct pressure (owner, 2026-10-26 / 27 / 11-08 / 11-26): medic and PC up
+// to 120 min, paramedic and physician up to 6 h, other roles never.
 {
   const M = 60 * 1000;
   const ok = (role, min) => rules.tourniquetConversionAllowed(role, min * M);
@@ -357,8 +357,9 @@ assert.equal(rules.tourniquetAlertToRaise("critical", "hours_4"), null);
   assert.equal(ok("pc", 119).allowed, true);
   assert.equal(ok("pc", 121).reason, "time");
   assert.equal(ok("paramedic", 121).allowed, true);
-  assert.equal(ok("paramedic", 240).allowed, true);
-  assert.deepEqual(ok("paramedic", 241), { allowed: false, limitMs: 240 * M, reason: "time" });
+  assert.equal(ok("paramedic", 241).allowed, true); // was the 4 h limit until 2026-11-26
+  assert.deepEqual(ok("paramedic", 360), { allowed: true, limitMs: 360 * M, reason: null });
+  assert.deepEqual(ok("paramedic", 361), { allowed: false, limitMs: 360 * M, reason: "time" });
   assert.deepEqual(ok("physician", 300), { allowed: true, limitMs: 360 * M, reason: null });
   assert.deepEqual(ok("physician", 360), { allowed: true, limitMs: 360 * M, reason: null });
   assert.deepEqual(ok("physician", 361), { allowed: false, limitMs: 360 * M, reason: "time" });
